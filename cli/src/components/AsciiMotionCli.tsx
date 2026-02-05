@@ -34,7 +34,7 @@ type AsciiMotionCliProps = {
   autoPlay?: boolean;
   loop?: boolean;
   onReady?: (api: PlaybackAPI) => void;
-  onScroll?: () => void; // Called when user scrolls (scroll wheel)
+  onInteraction?: () => void; // Called when user scrolls, clicks, or drags
 };
 
 const FRAMES: FrameData[] = [
@@ -333364,7 +333364,7 @@ const FRAME_BOTTOM_RIGHT = 128;
 
 export const AsciiMotionCli: React.FC<AsciiMotionCliProps> = ({
   hasDarkBackground = true,
-  onScroll,
+  onInteraction,
 }) => {
   const [frameIndex, setFrameIndex] = useState(0);
   const [targetFrame, setTargetFrame] = useState(0);
@@ -333390,13 +333390,13 @@ export const AsciiMotionCli: React.FC<AsciiMotionCliProps> = ({
   // Stop animation on terminal resize to prevent visual glitches
   useEffect(() => {
     const handleResize = () => {
-      onScroll?.();
+      onInteraction?.();
     };
     process.stdout.on("resize", handleResize);
     return () => {
       process.stdout.off("resize", handleResize);
     };
-  }, [onScroll]);
+  }, [onInteraction]);
 
   // Mouse tracking - gracefully handle environments without tty support
   useEffect(() => {
@@ -333417,13 +333417,19 @@ export const AsciiMotionCli: React.FC<AsciiMotionCliProps> = ({
     const handleData = (data: Buffer) => {
       const str = data.toString();
 
-      // Parse mouse events: \x1b[<button;x;yM
+      // Parse mouse events: \x1b[<button;x;yM (M=press, m=release)
       const mouseMatch = str.match(/\x1b\[<(\d+);(\d+);(\d+)([Mm])/);
       if (mouseMatch) {
         const button = parseInt(mouseMatch[1], 10);
-        // Button 64 = scroll up, 65 = scroll down
-        if (button === 64 || button === 65) {
-          onScroll?.();
+        const isPress = mouseMatch[4] === "M";
+        // Button 64/65 = scroll up/down
+        // Button 0-2 = left/middle/right click (on press)
+        // Button 32-34 = drag with left/middle/right button held
+        const isScroll = button === 64 || button === 65;
+        const isClick = isPress && button >= 0 && button <= 2;
+        const isDrag = button >= 32 && button <= 34;
+        if (isScroll || isClick || isDrag) {
+          onInteraction?.();
         }
         // Throttle cursor updates to ~20fps to reduce re-renders
         const now = Date.now();
