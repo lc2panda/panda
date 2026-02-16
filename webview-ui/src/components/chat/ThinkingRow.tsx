@@ -11,6 +11,7 @@ interface ThinkingRowProps {
 	onToggle?: () => void
 	title?: string
 	isStreaming?: boolean
+	showChevron?: boolean
 }
 
 export const ThinkingRow = memo(
@@ -22,6 +23,7 @@ export const ThinkingRow = memo(
 		onToggle,
 		title = "Thinking",
 		isStreaming = false,
+		showChevron = true,
 	}: ThinkingRowProps) => {
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const [canScrollUp, setCanScrollUp] = useState(false)
@@ -56,14 +58,14 @@ export const ThinkingRow = memo(
 	return (
 		<div className="ml-1 pl-0 mb-0 -mt-[2px]">
 			{showTitle ? (
-					<Button
-						className={cn(
+				<Button
+					className={cn(
 						"inline-flex justify-baseline gap-0.5 text-left select-none px-0 py-0 my-0 h-auto min-h-0 w-full text-description overflow-visible",
 						{
 							"cursor-pointer": !!onToggle,
+							"cursor-default": !onToggle,
 						},
 					)}
-					disabled={!onToggle}
 					onClick={onToggle}
 					size="icon"
 					variant="icon">
@@ -71,14 +73,16 @@ export const ThinkingRow = memo(
 						className={cn("text-[13px] leading-[1.2]", {
 							"animate-shimmer bg-linear-90 from-foreground to-description bg-[length:200%_100%] bg-clip-text text-transparent":
 								isStreaming,
+							"select-none": isStreaming,
 						})}>
 						{title}
 					</span>
-					{isExpanded ? (
-						<ChevronDownIcon className="!size-1 text-description" />
-					) : (
-						<ChevronRightIcon className="!size-1 text-description" />
-					)}
+					{showChevron &&
+						(isExpanded ? (
+							<ChevronDownIcon className="!size-1 text-description" />
+						) : (
+							<ChevronRightIcon className="!size-1 text-description" />
+						))}
 				</Button>
 			) : null}
 
