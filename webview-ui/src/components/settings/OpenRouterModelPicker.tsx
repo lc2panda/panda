@@ -54,14 +54,14 @@ export interface OpenRouterModelPickerProps {
 // Featured models for Cline provider organized by tabs
 export const recommendedModels = [
 	{
-		id: "anthropic/claude-sonnet-4.6",
+		id: "anthropic/claude-sonnet-4.5",
 		description: "Best balance of speed, cost, and quality",
 		label: "BEST",
 	},
 	{
-		id: "minimax/minimax-m2.5",
-		description: "Great coding capability and subagent use",
-		label: "HOT",
+		id: "anthropic/claude-sonnet-4.6",
+		description: "Latest Sonnet release with strong coding and agent performance",
+		label: "NEW",
 	},
 	{
 		id: "anthropic/claude-opus-4.6",
