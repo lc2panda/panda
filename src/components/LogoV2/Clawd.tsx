@@ -1,6 +1,9 @@
 import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
 import { Box, Text } from '../../ink.js';
+import { join } from 'path';
+import { readFileSync, existsSync } from 'fs';
+
 export type ClawdPose = 'default' | 'arms-up'
 | 'look-left'
 | 'look-right';
@@ -8,6 +11,23 @@ export type ClawdPose = 'default' | 'arms-up'
 type Props = {
   pose?: ClawdPose;
 };
+
+function getLogoBase64(): string | null {
+  const candidates = [
+    join(process.cwd(), 'pandalogo.jpeg'),
+    join(import.meta.dir ?? '', '..', '..', '..', 'pandalogo.jpeg'),
+  ];
+  for (const p of candidates) {
+    try {
+      if (existsSync(p)) {
+        return readFileSync(p).toString('base64');
+      }
+    } catch {}
+  }
+  return null;
+}
+
+let cachedImage: string | null | undefined;
 
 export function Clawd(t0) {
   const $ = _c(4);
@@ -25,17 +45,18 @@ export function Clawd(t0) {
   const pose = t2 === undefined ? "default" : t2;
   let t3;
   if ($[2] !== pose) {
-    t3 = <Box flexDirection="column" alignItems="center">
-      <Text>{'  ██   ██'}</Text>
-      <Text>{' ████ ████'}</Text>
-      <Text>{'  █████████'}</Text>
-      <Text>{' ██ █████ ██'}</Text>
-      <Text>{' █ '}<Text color="#44dddd">{'◉'}</Text>{' ███ '}<Text color="#44dddd">{'◉'}</Text>{' █'}</Text>
-      <Text>{' ██ █████ ██'}</Text>
-      <Text>{'  █  ▼▼  █'}</Text>
-      <Text>{'  █ ╰──╯ █'}</Text>
-      <Text>{'   ██████'}</Text>
-    </Box>;
+    if (cachedImage === undefined) {
+      cachedImage = getLogoBase64();
+    }
+
+    if (cachedImage && (process.env.TERM_PROGRAM === 'iTerm.app' || process.env.TERM_PROGRAM === 'WezTerm' || process.env.TERM === 'xterm-kitty')) {
+      const osc = `\x1b]1337;File=inline=1;width=8;height=4;preserveAspectRatio=1:${cachedImage}\x07`;
+      t3 = <Box><Text>{osc}</Text></Box>;
+    } else {
+      t3 = <Box flexDirection="column" alignItems="center">
+        <Text>{'🐼'}</Text>
+      </Box>;
+    }
     $[2] = pose;
     $[3] = t3;
   } else {
