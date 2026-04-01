@@ -1,239 +1,29 @@
-import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
 import { Box, Text } from '../../ink.js';
-import { env } from '../../utils/env.js';
-export type ClawdPose = 'default' | 'arms-up' // both arms raised (used during jump)
-| 'look-left' // both pupils shifted left
-| 'look-right'; // both pupils shifted right
+
+export type ClawdPose = 'default' | 'arms-up' | 'look-left' | 'look-right';
 
 type Props = {
   pose?: ClawdPose;
 };
 
-// Standard-terminal pose fragments. Each row is split into segments so we can
-// vary only the parts that change (eyes, arms) while keeping the body/bg spans
-// stable. All poses end up 9 cols wide.
-//
-// arms-up: the row-2 arm shapes (▝▜ / ▛▘) move to row 1 as their
-// bottom-heavy mirrors (▗▟ / ▙▖) — same silhouette, one row higher.
-//
-// look-* use top-quadrant eye chars (▙/▟) so both eyes change from the
-// default (▛/▜, bottom pupils) — otherwise only one eye would appear to move.
-type Segments = {
-  /** row 1 left (no bg): optional raised arm + side */
-  r1L: string;
-  /** row 1 eyes (with bg): left-eye, forehead, right-eye */
-  r1E: string;
-  /** row 1 right (no bg): side + optional raised arm */
-  r1R: string;
-  /** row 2 left (no bg): arm + body curve */
-  r2L: string;
-  /** row 2 right (no bg): body curve + arm */
-  r2R: string;
-};
-const POSES: Record<ClawdPose, Segments> = {
-  default: {
-    r1L: '◖',
-    r1E: '◉ ‿ ◉',
-    r1R: '◗',
-    r2L: ' (',
-    r2R: ') '
-  },
-  'look-left': {
-    r1L: '◖',
-    r1E: '◉ ‿ ◉',
-    r1R: '◗',
-    r2L: ' (',
-    r2R: ') '
-  },
-  'look-right': {
-    r1L: '◖',
-    r1E: '◉ ‿ ◉',
-    r1R: '◗',
-    r2L: ' (',
-    r2R: ') '
-  },
-  'arms-up': {
-    r1L: '◖',
-    r1E: '◉ ◡ ◉',
-    r1R: '◗',
-    r2L: '\\(',
-    r2R: ')/'
-  }
-};
-
-// Apple Terminal uses a bg-fill trick (see below), so only eye poses make
-// sense. Arm poses fall back to default.
-const APPLE_EYES: Record<ClawdPose, string> = {
-  default: '◉ ‿ ◉',
-  'look-left': '◉ ‿ ◉',
-  'look-right': '◉ ‿ ◉',
-  'arms-up': '◉ ◡ ◉'
-};
-export function Clawd(t0) {
-  const $ = _c(26);
-  let t1;
-  if ($[0] !== t0) {
-    t1 = t0 === undefined ? {} : t0;
-    $[0] = t0;
-    $[1] = t1;
-  } else {
-    t1 = $[1];
-  }
-  const {
-    pose: t2
-  } = t1;
-  const pose = t2 === undefined ? "default" : t2;
-  if (env.terminal === "Apple_Terminal") {
-    let t3;
-    if ($[2] !== pose) {
-      t3 = <AppleTerminalClawd pose={pose} />;
-      $[2] = pose;
-      $[3] = t3;
-    } else {
-      t3 = $[3];
-    }
-    return t3;
-  }
-  const p = POSES[pose];
-  let t3;
-  if ($[4] !== p.r1L) {
-    t3 = <Text color="clawd_body">{p.r1L}</Text>;
-    $[4] = p.r1L;
-    $[5] = t3;
-  } else {
-    t3 = $[5];
-  }
-  let t4;
-  if ($[6] !== p.r1E) {
-    t4 = <Text color="clawd_body" backgroundColor="clawd_background">{p.r1E}</Text>;
-    $[6] = p.r1E;
-    $[7] = t4;
-  } else {
-    t4 = $[7];
-  }
-  let t5;
-  if ($[8] !== p.r1R) {
-    t5 = <Text color="clawd_body">{p.r1R}</Text>;
-    $[8] = p.r1R;
-    $[9] = t5;
-  } else {
-    t5 = $[9];
-  }
-  let t6;
-  if ($[10] !== t3 || $[11] !== t4 || $[12] !== t5) {
-    t6 = <Text>{t3}{t4}{t5}</Text>;
-    $[10] = t3;
-    $[11] = t4;
-    $[12] = t5;
-    $[13] = t6;
-  } else {
-    t6 = $[13];
-  }
-  let t7;
-  if ($[14] !== p.r2L) {
-    t7 = <Text color="clawd_body">{p.r2L}</Text>;
-    $[14] = p.r2L;
-    $[15] = t7;
-  } else {
-    t7 = $[15];
-  }
-  let t8;
-  if ($[16] === Symbol.for("react.memo_cache_sentinel")) {
-    t8 = <Text color="clawd_body" backgroundColor="clawd_background">█████</Text>;
-    $[16] = t8;
-  } else {
-    t8 = $[16];
-  }
-  let t9;
-  if ($[17] !== p.r2R) {
-    t9 = <Text color="clawd_body">{p.r2R}</Text>;
-    $[17] = p.r2R;
-    $[18] = t9;
-  } else {
-    t9 = $[18];
-  }
-  let t10;
-  if ($[19] !== t7 || $[20] !== t9) {
-    t10 = <Text>{t7}{t8}{t9}</Text>;
-    $[19] = t7;
-    $[20] = t9;
-    $[21] = t10;
-  } else {
-    t10 = $[21];
-  }
-  let t11;
-  if ($[22] === Symbol.for("react.memo_cache_sentinel")) {
-    t11 = <Text color="clawd_body">{"  "}🎋{"     "}</Text>;
-    $[22] = t11;
-  } else {
-    t11 = $[22];
-  }
-  let t12;
-  if ($[23] !== t10 || $[24] !== t6) {
-    t12 = <Box flexDirection="column">{t6}{t10}{t11}</Box>;
-    $[23] = t10;
-    $[24] = t6;
-    $[25] = t12;
-  } else {
-    t12 = $[25];
-  }
-  return t12;
+function P({ c, b }: { c: string; b: string }) {
+  return <Text color={c} backgroundColor={b}>▀</Text>;
 }
-function AppleTerminalClawd(t0) {
-  const $ = _c(10);
-  const {
-    pose
-  } = t0;
-  let t1;
-  if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-    t1 = <Text color="clawd_body">▗</Text>;
-    $[0] = t1;
-  } else {
-    t1 = $[0];
-  }
-  const t2 = APPLE_EYES[pose];
-  let t3;
-  if ($[1] !== t2) {
-    t3 = <Text color="clawd_background" backgroundColor="clawd_body">{t2}</Text>;
-    $[1] = t2;
-    $[2] = t3;
-  } else {
-    t3 = $[2];
-  }
-  let t4;
-  if ($[3] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = <Text color="clawd_body">▖</Text>;
-    $[3] = t4;
-  } else {
-    t4 = $[3];
-  }
-  let t5;
-  if ($[4] !== t3) {
-    t5 = <Text>{t1}{t3}{t4}</Text>;
-    $[4] = t3;
-    $[5] = t5;
-  } else {
-    t5 = $[5];
-  }
-  let t6;
-  let t7;
-  if ($[6] === Symbol.for("react.memo_cache_sentinel")) {
-    t6 = <Text backgroundColor="clawd_body">{" ".repeat(7)}</Text>;
-    t7 = <Text color="clawd_body">▘▘ ▝▝</Text>;
-    $[6] = t6;
-    $[7] = t7;
-  } else {
-    t6 = $[6];
-    t7 = $[7];
-  }
-  let t8;
-  if ($[8] !== t5) {
-    t8 = <Box flexDirection="column" alignItems="center">{t5}{t6}{t7}</Box>;
-    $[8] = t5;
-    $[9] = t8;
-  } else {
-    t8 = $[9];
-  }
-  return t8;
+
+export function Clawd({ pose: _pose = 'default' }: Props) {
+  return (
+    <Box flexDirection="column">
+      <Text><P c="rgb(0,0,0)" b="rgb(0,0,0)"/><P c="rgb(0,0,0)" b="rgb(0,1,1)"/><P c="rgb(0,1,1)" b="rgb(0,1,1)"/><P c="rgb(0,1,2)" b="rgb(0,0,0)"/><P c="rgb(0,0,0)" b="rgb(4,34,34)"/><P c="rgb(0,0,0)" b="rgb(12,71,84)"/><P c="rgb(0,1,0)" b="rgb(17,86,110)"/><P c="rgb(0,7,4)" b="rgb(21,80,113)"/><P c="rgb(0,8,5)" b="rgb(20,78,112)"/><P c="rgb(0,2,1)" b="rgb(18,85,111)"/><P c="rgb(0,0,0)" b="rgb(13,74,90)"/><P c="rgb(0,0,0)" b="rgb(5,43,44)"/><P c="rgb(0,1,1)" b="rgb(0,4,2)"/><P c="rgb(0,1,2)" b="rgb(0,0,0)"/><P c="rgb(0,0,0)" b="rgb(0,2,2)"/><P c="rgb(0,0,0)" b="rgb(0,0,0)"/></Text>
+      <Text><P c="rgb(0,2,2)" b="rgb(0,0,0)"/><P c="rgb(0,0,0)" b="rgb(2,33,33)"/><P c="rgb(1,22,22)" b="rgb(22,128,143)"/><P c="rgb(11,90,109)" b="rgb(46,96,127)"/><P c="rgb(29,86,133)" b="rgb(32,62,105)"/><P c="rgb(40,58,116)" b="rgb(31,52,95)"/><P c="rgb(36,39,104)" b="rgb(25,62,109)"/><P c="rgb(35,34,102)" b="rgb(32,78,122)"/><P c="rgb(44,36,107)" b="rgb(35,79,125)"/><P c="rgb(34,37,102)" b="rgb(25,65,111)"/><P c="rgb(37,52,115)" b="rgb(17,38,93)"/><P c="rgb(31,78,128)" b="rgb(29,51,104)"/><P c="rgb(15,95,118)" b="rgb(45,90,122)"/><P c="rgb(1,35,36)" b="rgb(30,123,141)"/><P c="rgb(0,0,0)" b="rgb(4,51,52)"/><P c="rgb(0,2,2)" b="rgb(0,0,0)"/></Text>
+      <Text><P c="rgb(4,27,25)" b="rgb(21,100,120)"/><P c="rgb(29,131,146)" b="rgb(48,76,107)"/><P c="rgb(63,59,83)" b="rgb(24,7,34)"/><P c="rgb(29,8,34)" b="rgb(56,61,86)"/><P c="rgb(53,60,80)" b="rgb(229,228,231)"/><P c="rgb(133,170,184)" b="rgb(255,255,255)"/><P c="rgb(195,217,221)" b="rgb(253,254,254)"/><P c="rgb(219,229,229)" b="rgb(255,255,255)"/><P c="rgb(218,229,230)" b="rgb(255,255,255)"/><P c="rgb(197,217,220)" b="rgb(253,253,253)"/><P c="rgb(137,178,190)" b="rgb(255,255,255)"/><P c="rgb(47,76,100)" b="rgb(209,206,208)"/><P c="rgb(26,12,36)" b="rgb(43,45,70)"/><P c="rgb(60,38,62)" b="rgb(9,0,32)"/><P c="rgb(45,115,132)" b="rgb(58,58,83)"/><P c="rgb(1,48,51)" b="rgb(19,114,135)"/></Text>
+      <Text><P c="rgb(35,99,135)" b="rgb(48,117,131)"/><P c="rgb(22,62,100)" b="rgb(24,103,128)"/><P c="rgb(45,74,95)" b="rgb(172,210,213)"/><P c="rgb(233,229,231)" b="rgb(255,255,255)"/><P c="rgb(255,255,255)" b="rgb(212,212,216)"/><P c="rgb(251,252,252)" b="rgb(242,242,242)"/><P c="rgb(252,253,253)" b="rgb(255,255,255)"/><P c="rgb(253,253,254)" b="rgb(255,255,255)"/><P c="rgb(255,255,255)" b="rgb(228,227,230)"/><P c="rgb(254,254,254)" b="rgb(226,225,228)"/><P c="rgb(249,250,250)" b="rgb(255,255,255)"/><P c="rgb(255,255,255)" b="rgb(250,250,251)"/><P c="rgb(223,221,222)" b="rgb(255,255,255)"/><P c="rgb(48,51,74)" b="rgb(199,210,211)"/><P c="rgb(20,57,85)" b="rgb(30,115,146)"/><P c="rgb(42,90,136)" b="rgb(49,115,130)"/></Text>
+      <Text><P c="rgb(44,137,164)" b="rgb(23,136,199)"/><P c="rgb(30,130,162)" b="rgb(121,183,198)"/><P c="rgb(231,239,240)" b="rgb(213,205,208)"/><P c="rgb(192,187,194)" b="rgb(78,72,90)"/><P c="rgb(39,27,52)" b="rgb(50,48,70)"/><P c="rgb(160,155,165)" b="rgb(125,122,136)"/><P c="rgb(255,255,255)" b="rgb(251,251,250)"/><P c="rgb(255,255,255)" b="rgb(241,240,241)"/><P c="rgb(94,85,103)" b="rgb(89,84,102)"/><P c="rgb(50,39,63)" b="rgb(36,33,60)"/><P c="rgb(206,204,209)" b="rgb(77,68,89)"/><P c="rgb(255,255,255)" b="rgb(225,223,226)"/><P c="rgb(250,252,253)" b="rgb(255,255,255)"/><P c="rgb(255,252,250)" b="rgb(255,255,255)"/><P c="rgb(91,153,170)" b="rgb(160,186,192)"/><P c="rgb(41,160,176)" b="rgb(25,136,196)"/></Text>
+      <Text><P c="rgb(32,111,190)" b="rgb(51,102,171)"/><P c="rgb(216,234,231)" b="rgb(232,229,223)"/><P c="rgb(126,115,132)" b="rgb(204,159,166)"/><P c="rgb(27,19,47)" b="rgb(58,43,65)"/><P c="rgb(34,35,59)" b="rgb(108,110,125)"/><P c="rgb(212,212,216)" b="rgb(136,134,143)"/><P c="rgb(255,255,255)" b="rgb(69,63,83)"/><P c="rgb(255,255,255)" b="rgb(186,186,192)"/><P c="rgb(124,123,135)" b="rgb(255,255,255)"/><P c="rgb(40,35,60)" b="rgb(86,82,101)"/><P c="rgb(42,33,58)" b="rgb(76,52,74)"/><P c="rgb(136,131,145)" b="rgb(206,165,170)"/><P c="rgb(255,255,255)" b="rgb(255,253,253)"/><P c="rgb(255,255,255)" b="rgb(255,255,255)"/><P c="rgb(173,184,186)" b="rgb(157,164,164)"/><P c="rgb(28,96,179)" b="rgb(41,69,150)"/></Text>
+      <Text><P c="rgb(71,86,173)" b="rgb(118,86,205)"/><P c="rgb(188,206,201)" b="rgb(101,127,161)"/><P c="rgb(255,247,244)" b="rgb(240,240,234)"/><P c="rgb(244,239,237)" b="rgb(255,255,255)"/><P c="rgb(202,202,204)" b="rgb(223,225,228)"/><P c="rgb(129,129,141)" b="rgb(116,102,118)"/><P c="rgb(85,87,106)" b="rgb(147,101,111)"/><P c="rgb(237,237,239)" b="rgb(136,131,143)"/><P c="rgb(230,229,231)" b="rgb(172,172,178)"/><P c="rgb(227,229,231)" b="rgb(246,245,246)"/><P c="rgb(235,220,222)" b="rgb(255,255,255)"/><P c="rgb(255,223,223)" b="rgb(253,254,254)"/><P c="rgb(253,250,250)" b="rgb(248,250,249)"/><P c="rgb(252,248,247)" b="rgb(209,202,201)"/><P c="rgb(126,142,153)" b="rgb(54,71,96)"/><P c="rgb(60,87,173)" b="rgb(51,181,209)"/></Text>
+      <Text><P c="rgb(84,128,180)" b="rgb(13,79,67)"/><P c="rgb(53,130,187)" b="rgb(65,182,158)"/><P c="rgb(66,101,121)" b="rgb(26,27,57)"/><P c="rgb(199,192,194)" b="rgb(19,17,47)"/><P c="rgb(252,253,251)" b="rgb(80,80,100)"/><P c="rgb(223,219,220)" b="rgb(156,156,164)"/><P c="rgb(197,182,185)" b="rgb(203,205,207)"/><P c="rgb(200,197,201)" b="rgb(208,207,208)"/><P c="rgb(253,253,252)" b="rgb(183,181,184)"/><P c="rgb(249,248,247)" b="rgb(159,158,165)"/><P c="rgb(240,239,238)" b="rgb(127,125,137)"/><P c="rgb(230,229,227)" b="rgb(72,71,91)"/><P c="rgb(167,164,171)" b="rgb(9,13,46)"/><P c="rgb(46,46,72)" b="rgb(25,10,40)"/><P c="rgb(26,23,51)" b="rgb(60,72,96)"/><P c="rgb(58,154,164)" b="rgb(14,82,91)"/></Text>
+      <Text><P c="rgb(0,0,0)" b="rgb(0,1,1)"/><P c="rgb(10,78,87)" b="rgb(0,1,1)"/><P c="rgb(59,83,106)" b="rgb(12,66,73)"/><P c="rgb(48,27,54)" b="rgb(48,96,116)"/><P c="rgb(6,1,35)" b="rgb(61,62,85)"/><P c="rgb(0,0,31)" b="rgb(43,30,57)"/><P c="rgb(14,15,46)" b="rgb(19,10,40)"/><P c="rgb(22,23,53)" b="rgb(8,1,35)"/><P c="rgb(21,23,52)" b="rgb(8,1,36)"/><P c="rgb(2,2,36)" b="rgb(22,13,43)"/><P c="rgb(0,0,32)" b="rgb(40,28,55)"/><P c="rgb(3,1,32)" b="rgb(59,54,79)"/><P c="rgb(42,23,52)" b="rgb(51,92,113)"/><P c="rgb(63,73,97)" b="rgb(17,79,89)"/><P c="rgb(24,91,102)" b="rgb(0,8,8)"/><P c="rgb(0,7,6)" b="rgb(0,0,0)"/></Text>
+      <Text><P c="rgb(0,0,0)" b="rgb(0,0,0)"/><P c="rgb(0,2,2)" b="rgb(0,0,0)"/><P c="rgb(0,0,0)" b="rgb(0,2,2)"/><P c="rgb(2,31,32)" b="rgb(0,0,0)"/><P c="rgb(19,83,92)" b="rgb(0,0,0)"/><P c="rgb(40,96,113)" b="rgb(0,16,16)"/><P c="rgb(48,84,104)" b="rgb(3,42,45)"/><P c="rgb(49,71,96)" b="rgb(9,53,59)"/><P c="rgb(49,70,94)" b="rgb(9,52,59)"/><P c="rgb(49,82,103)" b="rgb(4,46,49)"/><P c="rgb(43,95,112)" b="rgb(0,21,20)"/><P c="rgb(23,87,99)" b="rgb(0,1,0)"/><P c="rgb(4,41,45)" b="rgb(0,0,0)"/><P c="rgb(0,0,0)" b="rgb(0,1,1)"/><P c="rgb(0,1,1)" b="rgb(0,0,0)"/><P c="rgb(0,1,1)" b="rgb(0,0,0)"/></Text>
+    </Box>
+  );
 }
