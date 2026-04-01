@@ -6,55 +6,17 @@ type Props = { pose?: ClawdPose };
 
 export function Clawd({ pose = 'default' }: Props) {
   const happy = pose === 'arms-up';
-  const mouth = happy ? '╰──◡──╯' : '╰─────╯';
+  const mouth = happy ? '  ╰ ◡ ╯  ' : '  ╰───╯  ';
 
   return (
     <Box flexDirection="column" alignItems="center">
-      <Text>
-        <Text color="#00ccdd">{'   '}</Text>
-        <Text color="#222233" bold>{'▄██▄'}</Text>
-        <Text color="#00ccdd">{'     '}</Text>
-        <Text color="#222233" bold>{'▄██▄'}</Text>
-      </Text>
-      <Text>
-        <Text color="#00ccdd">{'  ╭'}</Text>
-        <Text color="#222233" bold>{'████'}</Text>
-        <Text color="#ffffff" bold>{'▀▀▀▀▀'}</Text>
-        <Text color="#222233" bold>{'████'}</Text>
-        <Text color="#00ccdd">{'╮'}</Text>
-      </Text>
-      <Text>
-        <Text color="#00ccdd">{'  │'}</Text>
-        <Text color="#ffffff" bold>{' '}</Text>
-        <Text color="#222233" bold>{'▓██'}</Text>
-        <Text color="#ffffff" bold>{'  ▼  '}</Text>
-        <Text color="#222233" bold>{'██▓'}</Text>
-        <Text color="#ffffff" bold>{' '}</Text>
-        <Text color="#00ccdd">{'│'}</Text>
-      </Text>
-      <Text>
-        <Text color="#00ccdd">{'  │'}</Text>
-        <Text color="#ff99aa">{' ◦'}</Text>
-        <Text color="#222233" bold>{'▓'}</Text>
-        <Text color="#66eeff">{'◉'}</Text>
-        <Text color="#222233" bold>{'▓'}</Text>
-        <Text color="#ffffff" bold>{'     '}</Text>
-        <Text color="#222233" bold>{'▓'}</Text>
-        <Text color="#66eeff">{'◉'}</Text>
-        <Text color="#222233" bold>{'▓'}</Text>
-        <Text color="#ff99aa">{'◦ '}</Text>
-        <Text color="#00ccdd">{'│'}</Text>
-      </Text>
-      <Text>
-        <Text color="#00ccdd">{'  │'}</Text>
-        <Text color="#ffffff" bold>{'    '}</Text>
-        <Text color="#555566">{mouth}</Text>
-        <Text color="#ffffff" bold>{'    '}</Text>
-        <Text color="#00ccdd">{'│'}</Text>
-      </Text>
-      <Text>
-        <Text color="#00ccdd">{'  ╰─────────────────╯'}</Text>
-      </Text>
+      <Text>{'   ▄███▄     ▄███▄'}</Text>
+      <Text>{'  ██████▀▀▀▀▀██████'}</Text>
+      <Text>{'  █ '}<Text color="blackBright">{'▄███▄'}</Text>{'   '}<Text color="blackBright">{'▄███▄'}</Text>{' █'}</Text>
+      <Text>{'  █ '}<Text color="blackBright">{'█'}</Text><Text color="#00ccdd" bold>{'◉'}</Text><Text color="blackBright">{'██'}</Text>{'   '}<Text color="blackBright">{'██'}</Text><Text color="#00ccdd" bold>{'◉'}</Text><Text color="blackBright">{'█'}</Text>{' █'}</Text>
+      <Text>{'  █ '}<Text color="blackBright">{'▀███▀'}</Text>{' ▼ '}<Text color="blackBright">{'▀███▀'}</Text>{' █'}</Text>
+      <Text>{'  █  '}<Text color="#ff8899">{'◦'}</Text>{mouth}<Text color="#ff8899">{'◦'}</Text>{'  █'}</Text>
+      <Text>{'  ▀█▄▄▄▄▄▄▄▄▄▄▄█▀'}</Text>
     </Box>
   );
 }
