@@ -4,7 +4,7 @@ import type { Command } from '../../commands.js'
 const peers = {
   type: 'local-jsx',
   name: 'peers',
-  description: 'List and manage connected peer Claude sessions',
+  description: 'List and manage connected peer Claude sessions · 列出和管理已连接的对等会话',
   isEnabled: () => { if (feature('UDS_INBOX')) { return true } return false },
   get isHidden() {
     if (feature('UDS_INBOX')) { return false }

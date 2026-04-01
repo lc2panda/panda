@@ -6,7 +6,7 @@ const web = {
   type: 'local-jsx',
   name: 'web-setup',
   description:
-    'Setup Panda Code on the web (requires connecting your GitHub account)',
+    'Setup Panda Code on the web (requires connecting your GitHub account) · 设置 Web 端（需连接 GitHub）',
   availability: ['claude-ai'],
   isEnabled: () =>
     getFeatureValue_CACHED_MAY_BE_STALE('tengu_cobalt_lantern', false) &&

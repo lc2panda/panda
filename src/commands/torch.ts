@@ -8,7 +8,7 @@ import {
 const torch = {
   type: 'local-jsx',
   name: 'torch',
-  description: 'Toggle Torch mode for enhanced visibility into model reasoning',
+  description: 'Toggle Torch mode for enhanced visibility into model reasoning · 切换 Torch 模式查看模型推理过程',
   isEnabled: () => { if (feature('TORCH')) { return true } return false },
   immediate: true,
   load: () =>
