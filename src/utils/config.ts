@@ -598,6 +598,8 @@ export type GlobalConfig = {
     cleanupTime?: string
     briefingTime?: string
   }
+
+  privacyEnhanced?: boolean
 }
 
 /**
