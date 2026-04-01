@@ -36,7 +36,7 @@
   ],
   "scripts": {
     "build": "bun run build.ts",
-    "dev": "bash scripts/dev.sh",
+    "dev": "bun run build.ts && bun dist/cli.js",
     "prepublishOnly": "bun run build",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --fix src/",
