@@ -14,6 +14,7 @@ import {
 } from '../../utils/mcpOutputStorage.js'
 import { getSettings_DEPRECATED } from '../../utils/settings/settings.js'
 import { asSystemPrompt } from '../../utils/systemPromptType.js'
+import { isThirdPartyProvider } from '../../utils/model/providers.js'
 import { isPreapprovedHost } from './preapproved.js'
 import { makeSecondaryModelPrompt } from './prompt.js'
 
@@ -176,6 +177,13 @@ type DomainCheckResult =
 export async function checkDomainBlocklist(
   domain: string,
 ): Promise<DomainCheckResult> {
+  // Third-party providers: skip domain_info check which is an Anthropic-only
+  // endpoint (api.anthropic.com/api/web/domain_info). The check would always
+  // fail or return irrelevant results. Allow all fetches directly.
+  if (isThirdPartyProvider()) {
+    return { status: 'allowed' }
+  }
+
   if (DOMAIN_CHECK_CACHE.has(domain)) {
     return { status: 'allowed' }
   }

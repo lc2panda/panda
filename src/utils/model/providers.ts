@@ -18,6 +18,16 @@ export function getAPIProviderForStatsig(): AnalyticsMetadata_I_VERIFIED_THIS_IS
 }
 
 /**
+ * Check if ANTHROPIC_BASE_URL points to a third-party (non-Anthropic) API provider.
+ * Returns true when a custom base URL is set that does NOT point to anthropic.com.
+ * Used to skip Anthropic-specific behaviors (beta headers, telemetry, domain checks)
+ * when routing through DeepSeek/Kimi/Qwen/MiniMax/GLM/火山引擎 etc.
+ */
+export function isThirdPartyProvider(): boolean {
+  return !isFirstPartyAnthropicBaseUrl()
+}
+
+/**
  * Check if ANTHROPIC_BASE_URL is a first-party Anthropic API URL.
  * Returns true if not set (default API) or points to api.anthropic.com
  * (or api-staging.anthropic.com for ant users).
