@@ -3,7 +3,11 @@ import type { Command } from '../../commands.js'
 import { isBridgeEnabled } from '../../bridge/bridgeEnabled.js'
 
 function isEnabled(): boolean {
-  if (!feature('DAEMON') || !feature('BRIDGE_MODE')) {
+  let daemonEnabled = false
+  if (feature('DAEMON')) { daemonEnabled = true }
+  let bridgeModeEnabled = false
+  if (feature('BRIDGE_MODE')) { bridgeModeEnabled = true }
+  if (!daemonEnabled || !bridgeModeEnabled) {
     return false
   }
   return isBridgeEnabled()

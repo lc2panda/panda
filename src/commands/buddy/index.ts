@@ -6,9 +6,10 @@ const buddy = {
   type: 'local-jsx',
   name: 'buddy',
   description: 'Toggle your coding companion buddy',
-  isEnabled: () => feature('BUDDY'),
+  isEnabled: () => { if (feature('BUDDY')) { return true } return false },
   get isHidden() {
-    return !feature('BUDDY')
+    if (feature('BUDDY')) { return false }
+    return true
   },
   argumentHint: '[show|hide|mute|unmute|info]',
   immediate: true,

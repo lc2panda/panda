@@ -5,9 +5,10 @@ const workflows = {
   type: 'local-jsx',
   name: 'workflows',
   description: 'List and manage workflow scripts',
-  isEnabled: () => feature('WORKFLOW_SCRIPTS'),
+  isEnabled: () => { if (feature('WORKFLOW_SCRIPTS')) { return true } return false },
   get isHidden() {
-    return !feature('WORKFLOW_SCRIPTS')
+    if (feature('WORKFLOW_SCRIPTS')) { return false }
+    return true
   },
   load: () =>
     Promise.resolve({

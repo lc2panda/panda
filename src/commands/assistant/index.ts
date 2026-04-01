@@ -9,7 +9,7 @@ const assistant = {
   type: 'local-jsx',
   name: 'assistant',
   description: 'Toggle assistant mode (Kairos)',
-  isEnabled: () => feature('KAIROS'),
+  isEnabled: () => { if (feature('KAIROS')) { return true } return false },
   immediate: true,
   load: () =>
     Promise.resolve({
