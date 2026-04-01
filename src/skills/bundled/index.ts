@@ -1,6 +1,7 @@
 import { feature } from 'bun:bundle'
 import { shouldAutoEnableClaudeInChrome } from 'src/utils/claudeInChrome/setup.js'
 import { registerBatchSkill } from './batch.js'
+import { registerCleanupSkill } from './cleanup.js'
 import { registerClaudeInChromeSkill } from './claudeInChrome.js'
 import { registerDebugSkill } from './debug.js'
 import { registerHealthCheckSkill } from './healthCheck.js'
@@ -38,6 +39,7 @@ export function initBundledSkills(): void {
   registerStuckSkill()
   registerMorningSkill()
   registerOrganizeSkill()
+  registerCleanupSkill()
   registerHealthCheckSkill()
   registerRemindSkill()
   if (feature('KAIROS') || feature('KAIROS_DREAM')) {

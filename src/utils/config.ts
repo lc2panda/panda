@@ -584,6 +584,8 @@ export type GlobalConfig = {
     model: string
   }
 
+  language?: string
+
   persona?: {
     active: string
     custom?: Record<string, { name: string; style: string; systemPrompt?: string }>
