@@ -19,3 +19,4 @@ export const pauseProactive: () => void = () => {};
 export const resumeProactive: () => void = () => {};
 export const setContextBlocked: (blocked: boolean) => void = () => {};
 export const subscribeToProactiveChanges: (cb: () => void) => (() => void) = (_cb) => () => {};
+export const getNextTickAt: () => number | null = () => null;
