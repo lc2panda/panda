@@ -575,6 +575,14 @@ export type GlobalConfig = {
   // CURRENT_MIGRATION_VERSION, runMigrations() skips all sync migrations
   // (avoiding 11× saveGlobalConfig lock+re-read on every startup).
   migrationVersion?: number
+
+  // Third-party API provider configuration (set via `panda auth login --provider`)
+  thirdPartyProvider?: {
+    name: string
+    baseURL: string
+    apiKey: string
+    model: string
+  }
 }
 
 /**
