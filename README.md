@@ -438,64 +438,75 @@ panda-code/
 
 ## 快速开始
 
-### 环境要求
-
-一定要最新版本的 bun，不然一堆奇奇怪怪的 BUG！`bun upgrade`！
-
-- [Bun](https://bun.sh/) >= 1.3.11
-- 常规的配置 CC 的方式，各大提供商都有自己的配置方式
-
-### 安装
+### 新设备完整安装
 
 ```bash
+# 1. 安装 Bun（必须最新版，旧版有兼容问题）
+curl -fsSL https://bun.sh/install | bash
+bun upgrade
+
+# 2. 克隆代码
+git clone <仓库地址> cc-panda
+cd cc-panda
+
+# 3. 安装依赖
 bun install
-```
 
-### 运行
-
-```bash
-# 开发模式（自动构建 + 运行，看到版本号 888 说明就是对了）
-bun run dev
-
-# 仅构建
+# 4. 构建（内联 91 个 feature flags，输出 ~527 个 JS 文件到 dist/）
 bun run build
 
-# 直接运行构建产物
-bun dist/cli.js
-```
-
-`bun run dev` = 先构建（内联 91 个 feature flags）再运行 `dist/cli.js`。构建采用 code splitting 多文件打包（`build.ts`），产物输出到 `dist/` 目录（入口 `dist/cli.js` + 约 527 个 chunk 文件）。构建出的版本 bun 和 node 都可以启动，你 publish 到私有源可以直接启动。
-
-### 打包安装
-
-构建完成后，可以将 `dist/` 目录打包为可分发的 npm 包：
-
-```bash
-# 1. 构建产物
-bun run build
-
-# 2. 验证构建产物
-bun dist/cli.js --version    # 应输出: 2.1.888 (Panda Code)
-node dist/cli.js --version   # Node.js 同样可运行
-
-# 3. 全局安装（本地开发）
+# 5. 注册全局命令
 bun link
 
-# 4. 或发布到私有 npm registry
-npm publish --registry https://your-registry.example.com
+# 6. 任意目录使用
+panda
 ```
 
-全局安装后，`claude-js` 命令可直接使用（bin 名称定义在 `package.json` 的 `bin` 字段）。
+首次使用需要配置 API 访问（和原版 claude 一样）：
+
+```bash
+panda auth login
+```
+
+### 后续更新
+
+```bash
+cd cc-panda && git pull && bun install && bun run build && bun link
+```
+
+### 运行方式
+
+```bash
+# 全局命令（推荐，任意目录可用）
+panda
+
+# 或直接运行构建产物
+bun dist/cli.js
+node dist/cli.js
+
+# 验证版本（看到 888 说明就对了）
+panda --version    # 2.1.888 (Panda Code)
+```
+
+构建采用 code splitting 多文件打包（`build.ts`），产物输出到 `dist/` 目录。构建出的版本 bun 和 node 都可以启动，publish 到私有源可以直接启动。
 
 ### Pipe 模式
 
 ```bash
 # 非交互式单次查询
-echo "say hello" | bun run dev -- -p
+echo "say hello" | panda -p
 
 # 使用构建产物
 echo "explain this code" | bun dist/cli.js -p
 ```
+
+### 发布到私有 Registry
+
+```bash
+npm publish --registry https://your-registry.example.com
+```
+
+全局安装后，`panda` 和 `claude-js` 命令均可使用。
 
 ---
 
