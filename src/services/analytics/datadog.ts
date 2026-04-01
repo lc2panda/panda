@@ -6,6 +6,7 @@ import { logError } from '../../utils/log.js'
 import { getCanonicalName } from '../../utils/model/model.js'
 import { getAPIProvider } from '../../utils/model/providers.js'
 import { MODEL_COSTS } from '../../utils/modelCost.js'
+import { isPrivacyEnhancedMode } from '../../utils/privacyMode.js'
 import { isAnalyticsDisabled } from './config.js'
 import { getEventMetadata } from './metadata.js'
 
@@ -164,6 +165,8 @@ export async function trackDatadogEvent(
   if (process.env.NODE_ENV !== 'production') {
     return
   }
+
+  if (isPrivacyEnhancedMode()) return
 
   // Don't send events for 3P providers (Bedrock, Vertex, Foundry)
   if (getAPIProvider() !== 'firstParty') {

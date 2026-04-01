@@ -3,7 +3,8 @@
 // Pos: Gate module for proactive/loop-mode tick system; consumed by screens/REPL.tsx and main.tsx.
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
-export {}
+import { registerTask } from './taskRegistry.js'
+import { BUILTIN_TASKS } from './builtinTasks.js'
 
 let _active = false
 let _paused = false
@@ -27,6 +28,9 @@ export function isProactivePaused(): boolean {
 export function activateProactive(_source?: string): void {
   if (_active) return
   _active = true
+  for (const task of BUILTIN_TASKS) {
+    registerTask(task)
+  }
   _notifySubscribers()
 }
 
