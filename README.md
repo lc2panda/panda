@@ -454,14 +454,17 @@ bun install
 ### 运行
 
 ```bash
-# 开发模式，看到版本号 888 说明就是对了
+# 开发模式（自动构建 + 运行，看到版本号 888 说明就是对了）
 bun run dev
 
-# 构建
+# 仅构建
 bun run build
+
+# 直接运行构建产物
+bun dist/cli.js
 ```
 
-构建采用 code splitting 多文件打包（`build.ts`），产物输出到 `dist/` 目录（入口 `dist/cli.js` + 约 529 个 chunk 文件）。构建出的版本 bun 和 node 都可以启动，你 publish 到私有源可以直接启动。
+`bun run dev` = 先构建（内联 91 个 feature flags）再运行 `dist/cli.js`。构建采用 code splitting 多文件打包（`build.ts`），产物输出到 `dist/` 目录（入口 `dist/cli.js` + 约 527 个 chunk 文件）。构建出的版本 bun 和 node 都可以启动，你 publish 到私有源可以直接启动。
 
 ### 打包安装
 
