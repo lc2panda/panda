@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Panda Code when working with code in this repository.
 
 ## Project Overview
 
-This is a **reverse-engineered / decompiled** version of Anthropic's official Claude Code CLI tool. The goal is to restore core functionality while trimming secondary capabilities. Many modules are stubbed or feature-flagged off. The codebase has ~1341 tsc errors from decompilation (mostly `unknown`/`never`/`{}` types) — these do **not** block Bun runtime execution.
+**Panda Code** — forked from CCB (Claude Code Best), a reverse-engineered version of Anthropic's Claude Code CLI (v2.1.88). All 92 feature flags are enabled. All feature-gated modules (tools, commands, skills, YOLO classifier) have been reverse-engineered and implemented. Brand identity: "Panda Code" with pixel-art panda logo.
 
 ## Commands
 
@@ -12,18 +12,15 @@ This is a **reverse-engineered / decompiled** version of Anthropic's official Cl
 # Install dependencies
 bun install
 
-# Dev mode (direct execution via Bun)
+# Dev mode (all 92 feature flags enabled via scripts/dev.sh)
 bun run dev
-# equivalent to: bun run src/entrypoints/cli.tsx
+
+# Build (outputs dist/ with ~529 JS files, all flags inlined as true)
+bun run build
 
 # Pipe mode
-echo "say hello" | bun run src/entrypoints/cli.tsx -p
-
-# Build (outputs dist/cli.js, ~25MB)
-bun run build
+echo "say hello" | bash scripts/dev.sh -p
 ```
-
-No test runner is configured. No linter is configured.
 
 ## Architecture
 
@@ -86,18 +83,27 @@ No test runner is configured. No linter is configured.
 
 ### Feature Flag System
 
-All `feature('FLAG_NAME')` calls come from `bun:bundle` (a build-time API). In this decompiled version, `feature()` is polyfilled to always return `false` in `cli.tsx`. This means all Anthropic-internal features (COORDINATOR_MODE, KAIROS, PROACTIVE, etc.) are disabled.
+`feature('FLAG_NAME')` calls use `bun:bundle` (a Bun compile-time macro).
 
-### Stubbed/Deleted Modules
+- **Dev mode**: `scripts/dev.sh` passes all 92 `--feature=FLAG` arguments to Bun, enabling every flag at runtime.
+- **Build mode**: `build.ts` uses a BunPlugin `onLoad` hook that strips `bun:bundle` imports and inline-replaces each `feature('X')` call with `true` or `false` based on `ENABLED_FLAGS`. This preserves Bun's dead-code elimination for any flags intentionally left off.
+- **Adding a new flag**: Add to `ENABLED_FLAGS` in `build.ts` and `--feature=FLAG` in `scripts/dev.sh`.
 
-| Module | Status |
-|--------|--------|
-| Computer Use (`@ant/*`) | Stub packages in `packages/@ant/` |
-| `*-napi` packages (audio, image, url, modifiers) | Stubs in `packages/` (except `color-diff-napi` which is fully implemented) |
-| Analytics / GrowthBook / Sentry | Empty implementations |
-| Magic Docs / Voice Mode / LSP Server | Removed |
-| Plugins / Marketplace | Removed |
-| MCP OAuth | Simplified |
+All 92 flags discovered in source are currently enabled.
+
+### Internal Packages
+
+| Package | Status |
+|---------|--------|
+| `color-diff-napi` | Full TS implementation (syntax-highlighted diff) |
+| `audio-capture-napi` | SoX/arecord alternative |
+| `image-processor-napi` | sharp + osascript alternative |
+| `modifiers-napi` | Bun FFI + Carbon |
+| `url-handler-napi` | Stub (null fallback) |
+| `@ant/computer-use-mcp` | Type-safe stub + sentinel apps |
+| `@ant/computer-use-input` | macOS AppleScript/JXA |
+| `@ant/computer-use-swift` | macOS JXA/screencapture |
+| `@ant/claude-for-chrome-mcp` | Stub |
 
 ### Key Type Files
 
@@ -109,7 +115,8 @@ All `feature('FLAG_NAME')` calls come from `bun:bundle` (a build-time API). In t
 ## Working with This Codebase
 
 - **Don't try to fix all tsc errors** — they're from decompilation and don't affect runtime.
-- **`feature()` is always `false`** — any code behind a feature flag is dead code in this build.
+- **All feature flags are ON** — both dev and build modes enable all 92 flags. No code paths are dead.
 - **React Compiler output** — Components have decompiled memoization boilerplate (`const $ = _c(N)`). This is normal.
-- **`bun:bundle` import** — In `src/main.tsx` and other files, `import { feature } from 'bun:bundle'` works at build time. At dev-time, the polyfill in `cli.tsx` provides it.
+- **`bun:bundle` import** — `import { feature } from 'bun:bundle'` is used throughout. Dev mode: Bun native `--feature=FLAG`. Build mode: plugin inline-replaces to `true`/`false`.
 - **`src/` path alias** — tsconfig maps `src/*` to `./src/*`. Imports like `import { ... } from 'src/utils/...'` are valid.
+- **Brand: "Panda Code"** — all user-visible strings use "Panda Code", not "Claude Code". Logo is a pixel-art panda in `src/components/LogoV2/Clawd.tsx`.
