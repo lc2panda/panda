@@ -10,12 +10,14 @@ import {
   handleOAuth401Error,
   isClaudeAISubscriber,
 } from './auth.js'
+import { isThirdPartyProvider } from './model/providers.js'
 import { getClaudeCodeUserAgent } from './userAgent.js'
 import { getWorkload } from './workloadContext.js'
 
 // WARNING: We rely on `claude-cli` in the user agent for log filtering.
 // Please do NOT change this without making sure that logging also gets updated!
 export function getUserAgent(): string {
+  if (isThirdPartyProvider()) return `PandaCode/${MACRO.VERSION}`
   const agentSdkVersion = process.env.CLAUDE_AGENT_SDK_VERSION
     ? `, agent-sdk/${process.env.CLAUDE_AGENT_SDK_VERSION}`
     : ''

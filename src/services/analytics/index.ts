@@ -57,6 +57,17 @@ export function stripProtoFields<V>(
   return result ?? metadata
 }
 
+function _privacyGuard(): boolean {
+  const baseUrl = process.env.ANTHROPIC_BASE_URL
+  if (!baseUrl) return false
+  try {
+    const host = new URL(baseUrl).host
+    return host !== 'api.anthropic.com' && host !== 'api-staging.anthropic.com'
+  } catch {
+    return true
+  }
+}
+
 // Internal type for logEvent metadata - different from the enriched EventMetadata in metadata.ts
 type LogEventMetadata = { [key: string]: boolean | number | undefined }
 
@@ -136,6 +147,7 @@ export function logEvent(
   // to avoid accidentally logging code/filepaths
   metadata: LogEventMetadata,
 ): void {
+  if (_privacyGuard()) return
   if (sink === null) {
     eventQueue.push({ eventName, metadata, async: false })
     return
@@ -156,6 +168,7 @@ export async function logEventAsync(
   // intentionally no strings, to avoid accidentally logging code/filepaths
   metadata: LogEventMetadata,
 ): Promise<void> {
+  if (_privacyGuard()) return
   if (sink === null) {
     eventQueue.push({ eventName, metadata, async: true })
     return

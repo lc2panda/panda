@@ -16,6 +16,7 @@ import { getSmallFastModel } from 'src/utils/model/model.js'
 import {
   getAPIProvider,
   isFirstPartyAnthropicBaseUrl,
+  isThirdPartyProvider,
 } from 'src/utils/model/providers.js'
 import { getProxyFetchOptions } from 'src/utils/proxy.js'
 import {
@@ -112,18 +113,24 @@ export async function getAnthropicClient({
   const remoteSessionId = process.env.CLAUDE_CODE_REMOTE_SESSION_ID
   const clientApp = process.env.CLAUDE_AGENT_SDK_CLIENT_APP
   const customHeaders = getCustomHeaders()
-  const defaultHeaders: { [key: string]: string } = {
-    'x-app': 'cli',
-    'User-Agent': getUserAgent(),
-    'X-Claude-Code-Session-Id': getSessionId(),
-    ...customHeaders,
-    ...(containerId ? { 'x-claude-remote-container-id': containerId } : {}),
-    ...(remoteSessionId
-      ? { 'x-claude-remote-session-id': remoteSessionId }
-      : {}),
-    // SDK consumers can identify their app/library for backend analytics
-    ...(clientApp ? { 'x-client-app': clientApp } : {}),
-  }
+  const defaultHeaders: { [key: string]: string } = isThirdPartyProvider()
+    ? {
+        'User-Agent': getUserAgent(),
+        ...customHeaders,
+      }
+    : {
+        'x-app': 'cli',
+        'User-Agent': getUserAgent(),
+        'X-Claude-Code-Session-Id': getSessionId(),
+        ...customHeaders,
+        ...(containerId
+          ? { 'x-claude-remote-container-id': containerId }
+          : {}),
+        ...(remoteSessionId
+          ? { 'x-claude-remote-session-id': remoteSessionId }
+          : {}),
+        ...(clientApp ? { 'x-client-app': clientApp } : {}),
+      }
 
   // Log API client configuration for HFI debugging
   logForDebugging(
