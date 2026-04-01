@@ -25,7 +25,7 @@ const workflows = {
 
           if (!commands || (Array.isArray(commands) && commands.length === 0)) {
             onDone(
-              'No workflow scripts found.\n\nWorkflows are executable scripts in .claude/workflows/ that can be invoked as slash commands.\nCreate a script in .claude/workflows/ to get started.',
+              'No workflow scripts found.\n\nWorkflows are executable scripts in .pandacc/workflows/ that can be invoked as slash commands.\nCreate a script in .pandacc/workflows/ to get started.',
               { display: 'system' },
             )
             return null

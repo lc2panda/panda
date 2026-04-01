@@ -1,6 +1,9 @@
 import { profileCheckpoint } from '../utils/startupProfiler.js'
 import '../bootstrap/state.js'
 import '../utils/config.js'
+import { existsSync, cpSync, copyFileSync } from 'fs'
+import { join } from 'path'
+import { homedir } from 'os'
 import type { Attributes, MetricOptions } from '@opentelemetry/api'
 import memoize from 'lodash-es/memoize.js'
 import { getIsNonInteractiveSession } from 'src/bootstrap/state.js'
@@ -54,7 +57,21 @@ import { setShellIfWindows } from '../utils/windowsPaths.js'
 // Track if telemetry has been initialized to prevent double initialization
 let telemetryInitialized = false
 
+function migrateFromClaude() {
+  const old = join(homedir(), '.claude')
+  const neu = join(homedir(), '.pandacc')
+  const oldCfg = join(homedir(), '.claude.json')
+  const newCfg = join(homedir(), '.pandacc.json')
+  if (existsSync(old) && !existsSync(neu)) {
+    try { cpSync(old, neu, { recursive: true }) } catch {}
+  }
+  if (existsSync(oldCfg) && !existsSync(newCfg)) {
+    try { copyFileSync(oldCfg, newCfg) } catch {}
+  }
+}
+
 export const init = memoize(async (): Promise<void> => {
+  migrateFromClaude()
   const initStartTime = Date.now()
   logForDiagnosticsNoPII('info', 'init_started')
   profileCheckpoint('init_function_start')

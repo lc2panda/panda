@@ -191,7 +191,7 @@ async function main(): Promise<void> {
     }
 
     // Fast-path for `claude ps|logs|attach|kill` and `--bg`/`--background`.
-    // Session management against the ~/.claude/sessions/ registry. Flag
+    // Session management against the ~/.pandacc/sessions/ registry. Flag
     // literals are inlined so bg.js only loads when actually dispatching.
     if (
         feature("BG_SESSIONS") &&

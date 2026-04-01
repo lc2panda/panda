@@ -35,7 +35,7 @@ Common issues to handle:
 
 ## Phase 3: Write the Skill
 
-Create the skill file at \`.claude/skills/run-<project-name>/SKILL.md\` using this format:
+Create the skill file at \`.pandacc/skills/run-<project-name>/SKILL.md\` using this format:
 
 \`\`\`markdown
 ---

@@ -87,7 +87,7 @@ const getRemoteHostSessionCount: (hs: string) => Promise<number> =
           'ssh',
           [
             `${homespace}.coder`,
-            'find /root/.claude/projects -name "*.jsonl" 2>/dev/null | wc -l',
+            'find /root/.pandacc/projects -name "*.jsonl" 2>/dev/null | wc -l',
           ],
           { timeout: 30000 },
         )
@@ -111,7 +111,7 @@ const collectFromRemoteHost: (
           // SCP the projects folder
           const scpResult = await execFileNoThrow(
             'scp',
-            ['-rq', `${homespace}.coder:/root/.claude/projects/`, tempDir],
+            ['-rq', `${homespace}.coder:/root/.pandacc/projects/`, tempDir],
             { timeout: 300000 },
           )
           if (scpResult.code !== 0) {
@@ -1399,11 +1399,11 @@ Include 3 friction categories with 2 examples each.`,
    - Good for: database queries, Slack integration, GitHub issue lookup, connecting to internal APIs
 
 2. **Custom Skills**: Reusable prompts you define as markdown files that run with a single /command.
-   - How to use: Create \`.claude/skills/commit/SKILL.md\` with instructions. Then type \`/commit\` to run it.
+   - How to use: Create \`.pandacc/skills/commit/SKILL.md\` with instructions. Then type \`/commit\` to run it.
    - Good for: repetitive workflows - /commit, /review, /test, /deploy, /pr, or complex multi-step workflows
 
 3. **Hooks**: Shell commands that auto-run at specific lifecycle events.
-   - How to use: Add to \`.claude/settings.json\` under "hooks" key.
+   - How to use: Add to \`.pandacc/settings.json\` under "hooks" key.
    - Good for: auto-formatting code, running type checks, enforcing conventions
 
 4. **Headless Mode**: Run Claude non-interactively from scripts and CI/CD.

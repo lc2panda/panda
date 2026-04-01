@@ -1649,7 +1649,7 @@ export function REPL({
     if (wt.creationDurationMs < 15_000) return;
     worktreeTipShownRef.current = true;
     const secs = Math.round(wt.creationDurationMs / 1000);
-    setMessages(prev => [...prev, createSystemMessage(`Worktree creation took ${secs}s. For large repos, set \`worktree.sparsePaths\` in .claude/settings.json to check out only the directories you need — e.g. \`{"worktree": {"sparsePaths": ["src", "packages/foo"]}}\`.`, 'info')]);
+    setMessages(prev => [...prev, createSystemMessage(`Worktree creation took ${secs}s. For large repos, set \`worktree.sparsePaths\` in .pandacc/settings.json to check out only the directories you need — e.g. \`{"worktree": {"sparsePaths": ["src", "packages/foo"]}}\`.`, 'info')]);
   }, [setMessages]);
 
   // Hide spinner when the only in-progress tool is Sleep
@@ -3844,7 +3844,7 @@ export function REPL({
   // empty to non-empty, not on every length change -- otherwise a render loop
   // (concurrent onQuery thrashing, etc.) spams saveGlobalConfig, which hits
   // ELOCKED under concurrent sessions and falls back to unlocked writes.
-  // That write storm is the primary trigger for ~/.claude.json corruption
+  // That write storm is the primary trigger for ~/.pandacc.json corruption
   // (GH #3117).
   const hasCountedQueueUseRef = useRef(false);
   useEffect(() => {
@@ -4046,7 +4046,7 @@ export function REPL({
     onSubmitMessage: handleIncomingPrompt
   });
 
-  // Scheduled tasks from .claude/scheduled_tasks.json (CronCreate/Delete/List)
+  // Scheduled tasks from .pandacc/scheduled_tasks.json (CronCreate/Delete/List)
   if (feature('AGENT_TRIGGERS')) {
     // Assistant mode bypasses the isLoading gate (the proactive tick →
     // Sleep → tick loop would otherwise starve the scheduler).
