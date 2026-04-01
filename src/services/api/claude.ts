@@ -23,7 +23,6 @@ import { randomUUID } from 'crypto'
 import {
   getAPIProvider,
   isFirstPartyAnthropicBaseUrl,
-  isThirdPartyProvider,
 } from 'src/utils/model/providers.js'
 import {
   getAttributionHeader,
@@ -1374,7 +1373,7 @@ async function* queryModel(
   logAPIPrefix(systemPrompt)
 
   const enablePromptCaching =
-    (options.enablePromptCaching ?? getPromptCachingEnabled(options.model)) && !isThirdPartyProvider()
+    (options.enablePromptCaching ?? getPromptCachingEnabled(options.model))
   const system = buildSystemPromptBlocks(systemPrompt, enablePromptCaching, {
     skipGlobalCacheForSystemPrompt: needsToolBasedCacheMarker,
     querySource: options.querySource,
@@ -1631,10 +1630,6 @@ async function* queryModel(
       }
     }
 
-    if (isThirdPartyProvider()) {
-      thinking = undefined
-    }
-
     // Get API context management strategies if enabled
     const contextManagement = getAPIContextManagement({
       hasThinking,
@@ -1643,7 +1638,7 @@ async function* queryModel(
     })
 
     const enablePromptCaching =
-      (options.enablePromptCaching ?? getPromptCachingEnabled(retryContext.model)) && !isThirdPartyProvider()
+      (options.enablePromptCaching ?? getPromptCachingEnabled(retryContext.model))
 
     // Fast mode: header is latched session-stable (cache-safe), but
     // `speed='fast'` stays dynamic so cooldown still suppresses the actual
