@@ -96,7 +96,7 @@ export function expandTilde(path: string): string {
  * prompt for permission when /tmp/claude/ is already in the sandbox allowlist.
  *
  * Respects the deny-within-allow list: paths in denyWithinAllow (like
- * .claude/settings.json) are still blocked even if their parent is in allowOnly.
+ * .pandacc/settings.json) are still blocked even if their parent is in allowOnly.
  */
 export function isPathInSandboxWriteAllowlist(resolvedPath: string): boolean {
   if (!SandboxManager.isSandboxingEnabled()) {
@@ -162,8 +162,8 @@ export function isPathAllowed(
   }
 
   // 2. For write/create operations, check internal editable paths (plan files, scratchpad, agent memory, job dirs)
-  // This MUST come before checkPathSafetyForAutoEdit since .claude is a dangerous directory
-  // and internal editable paths live under ~/.claude/ — matching the ordering in
+  // This MUST come before checkPathSafetyForAutoEdit since.pandacc is a dangerous directory
+  // and internal editable paths live under ~/.pandacc/ — matching the ordering in
   // checkWritePermissionForTool (filesystem.ts step 1.5)
   if (operationType !== 'read') {
     const internalEditResult = checkEditableInternalPath(resolvedPath, {})

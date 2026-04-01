@@ -180,7 +180,7 @@ export function shortErrorStack(e: unknown, maxFrames = 5): string {
  *  EACCES    — permission denied
  *  EPERM     — operation not permitted
  *  ENOTDIR   — a path component is not a directory (e.g. a file named
- *              `.claude` exists where a directory is expected)
+ *              `.pandacc` exists where a directory is expected)
  *  ELOOP     — too many symlink levels (circular symlinks)
  */
 export function isFsInaccessible(e: unknown): e is NodeJS.ErrnoException {

@@ -28,7 +28,7 @@ export function getLocalClaudePath(): string {
  */
 export function isRunningFromLocalInstallation(): boolean {
   const execPath = process.argv[1] || ''
-  return execPath.includes('/.claude/local/node_modules/')
+  return execPath.includes('/.pandacc/local/node_modules/')
 }
 
 /**

@@ -378,7 +378,7 @@ export function getProjectMcpServerStatus(
   // the user has explicitly chosen to bypass all permission checks.
   // SECURITY: We intentionally only check skipDangerousModePermissionPrompt via
   // hasSkipDangerousModePermissionPrompt(), which reads from userSettings/localSettings/
-  // flagSettings/policySettings but NOT projectSettings (repo-level .claude/settings.json).
+  // flagSettings/policySettings but NOT projectSettings (repo-level .pandacc/settings.json).
   // This is intentional: a repo should not be able to accept the bypass dialog on behalf of
   // users. We also do NOT check getSessionBypassPermissionsMode() here because
   // sessionBypassPermissionsMode can be set from project settings before the dialog is shown,
