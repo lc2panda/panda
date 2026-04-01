@@ -27,7 +27,7 @@ const subscribePr: Command = {
   contentLength: 0,
   argumentHint: '<pr-number-or-url>',
   source: 'builtin',
-  isEnabled: () => feature('KAIROS_GITHUB_WEBHOOKS'),
+  isEnabled: () => { if (feature('KAIROS_GITHUB_WEBHOOKS')) { return true } return false },
   async getPromptForCommand(args): Promise<ContentBlockParam[]> {
     return [{ type: 'text', text: SUBSCRIBE_PR_PROMPT(args) }]
   },

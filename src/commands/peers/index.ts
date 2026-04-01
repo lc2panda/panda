@@ -5,9 +5,10 @@ const peers = {
   type: 'local-jsx',
   name: 'peers',
   description: 'List and manage connected peer Claude sessions',
-  isEnabled: () => feature('UDS_INBOX'),
+  isEnabled: () => { if (feature('UDS_INBOX')) { return true } return false },
   get isHidden() {
-    return !feature('UDS_INBOX')
+    if (feature('UDS_INBOX')) { return false }
+    return true
   },
   load: () =>
     Promise.resolve({

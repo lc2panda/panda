@@ -9,7 +9,7 @@ const proactive = {
   type: 'local-jsx',
   name: 'proactive',
   description: 'Toggle proactive autonomous mode',
-  isEnabled: () => feature('PROACTIVE') || feature('KAIROS'),
+  isEnabled: () => { if (feature('PROACTIVE')) { return true } if (feature('KAIROS')) { return true } return false },
   immediate: true,
   load: () =>
     Promise.resolve({

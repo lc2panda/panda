@@ -26,9 +26,10 @@ const fork: Command = {
   contentLength: 0,
   argumentHint: '<task description>',
   source: 'builtin',
-  isEnabled: () => feature('FORK_SUBAGENT'),
+  isEnabled: () => { if (feature('FORK_SUBAGENT')) { return true } return false },
   get isHidden() {
-    return !feature('FORK_SUBAGENT')
+    if (feature('FORK_SUBAGENT')) { return false }
+    return true
   },
   async getPromptForCommand(args): Promise<ContentBlockParam[]> {
     return [{ type: 'text', text: FORK_PROMPT(args) }]

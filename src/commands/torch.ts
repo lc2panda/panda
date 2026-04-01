@@ -9,7 +9,7 @@ const torch = {
   type: 'local-jsx',
   name: 'torch',
   description: 'Toggle Torch mode for enhanced visibility into model reasoning',
-  isEnabled: () => feature('TORCH'),
+  isEnabled: () => { if (feature('TORCH')) { return true } return false },
   immediate: true,
   load: () =>
     Promise.resolve({

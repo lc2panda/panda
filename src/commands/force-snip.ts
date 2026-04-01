@@ -6,7 +6,7 @@ const forceSnip = {
   type: 'local-jsx',
   name: 'force-snip',
   description: 'Force-snip conversation history at the current point',
-  isEnabled: () => feature('HISTORY_SNIP'),
+  isEnabled: () => { if (feature('HISTORY_SNIP')) { return true } return false },
   immediate: true,
   load: () =>
     Promise.resolve({
