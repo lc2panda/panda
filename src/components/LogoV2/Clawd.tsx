@@ -26,22 +26,16 @@ export function Clawd(t0) {
   let t3;
   if ($[2] !== pose) {
     t3 = <Box flexDirection="column" alignItems="center">
-      <Text>{'░▓██░       ░███░▓██'}</Text>
-      <Text>{'▓██░         ░██▓░██'}</Text>
-      <Text>{'▓▓░           ░█▓▓▓█'}</Text>
-      <Text>{'▓░             ░▓░░█'}</Text>
-      <Text>{'░░ ░█░   █▓     ░░░█'}</Text>
-      <Text>{'░  ▓▓▓   ██▓    ░░░▓'}</Text>
-      <Text>{'░ ▓▓█░   ▓▓█░   ░░░▓'}</Text>
-      <Text>{'░ ▓██    ░██░   ░▓░▓'}</Text>
-      <Text>{'  ░░░░█▓  ░▓░   ░▓░▓'}</Text>
-      <Text>{'░     ▓         ░░░█'}</Text>
-      <Text>{'░░   ░▓░░      ░▓ ░█'}</Text>
-      <Text>{'░░░   ░░      ░██░██'}</Text>
-      <Text>{'░░█▓░      ░░▓██▓▓██'}</Text>
-      <Text>{'▓░████▓▓▓▓█████▓▓███'}</Text>
-      <Text>{'█▓▓▓██████████▓▓████'}</Text>
-      <Text>{'██▓▓▓▓██████▓▓▓█████'}</Text>
+      <Text>{'ooo#.            o#ooo'}</Text>
+      <Text>{'.oo.              .oo.'}</Text>
+      <Text>{'.oo.  o.   .o     .o..'}</Text>
+      <Text>{'..o  o#o   o#o     ...'}</Text>
+      <Text>{'... oooo   oo#o    ...'}</Text>
+      <Text>{'oo  ###    o#o#.   .oo'}</Text>
+      <Text>{'oo  o#o...  o#o    ooo'}</Text>
+      <Text>{'oo   . .##   ..    ooo'}</Text>
+      <Text>{'.o.     o  .       o..'}</Text>
+      <Text>{'ooo.   oooo       oo o'}</Text>
     </Box>;
     $[2] = pose;
     $[3] = t3;
