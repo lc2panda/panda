@@ -440,8 +440,10 @@ panda-code/
 
 ### 环境要求
 
-- [Bun](https://bun.sh/) >= 1.2.0
-- 配置 API 访问（Anthropic API Key / OAuth / Bedrock / Vertex / Foundry）
+一定要最新版本的 bun，不然一堆奇奇怪怪的 BUG！`bun upgrade`！
+
+- [Bun](https://bun.sh/) >= 1.3.11
+- 常规的配置 CC 的方式，各大提供商都有自己的配置方式
 
 ### 安装
 
@@ -452,15 +454,44 @@ bun install
 ### 运行
 
 ```bash
-# Dev 模式（全量 92 flag 启用，看到版本号 2.1.888 + Panda Code 即正确）
+# 开发模式，看到版本号 888 说明就是对了
 bun run dev
 
-# 构建（输出 dist/ 目录，529 个 JS chunk + Node.js 兼容）
+# 构建
+bun run build
+```
+
+构建采用 code splitting 多文件打包（`build.ts`），产物输出到 `dist/` 目录（入口 `dist/cli.js` + 约 529 个 chunk 文件）。构建出的版本 bun 和 node 都可以启动，你 publish 到私有源可以直接启动。
+
+### 打包安装
+
+构建完成后，可以将 `dist/` 目录打包为可分发的 npm 包：
+
+```bash
+# 1. 构建产物
 bun run build
 
-# 构建产物运行
-bun dist/cli.js
-node dist/cli.js
+# 2. 验证构建产物
+bun dist/cli.js --version    # 应输出: 2.1.888 (Panda Code)
+node dist/cli.js --version   # Node.js 同样可运行
+
+# 3. 全局安装（本地开发）
+bun link
+
+# 4. 或发布到私有 npm registry
+npm publish --registry https://your-registry.example.com
+```
+
+全局安装后，`claude-js` 命令可直接使用（bin 名称定义在 `package.json` 的 `bin` 字段）。
+
+### Pipe 模式
+
+```bash
+# 非交互式单次查询
+echo "say hello" | bun run dev -- -p
+
+# 使用构建产物
+echo "explain this code" | bun dist/cli.js -p
 ```
 
 ---
