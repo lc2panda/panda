@@ -106,9 +106,10 @@ export async function hasImageInClipboard(): Promise<boolean> {
     // as an unhandled rejection in useClipboardImageHint's setTimeout.
     try {
       const { getNativeModule } = await import('image-processor-napi')
-      const hasImage = getNativeModule()?.hasClipboardImage
-      if (hasImage) {
-        return hasImage()
+      const nativeModule = getNativeModule()
+      if (nativeModule && 'hasClipboardImage' in nativeModule) {
+        const hasImage = (nativeModule as unknown as Record<string, Function>).hasClipboardImage
+        if (hasImage) return hasImage()
       }
     } catch (e) {
       logError(e as Error)
@@ -135,7 +136,10 @@ export async function getImageFromClipboard(): Promise<ImageWithDimensions | nul
   ) {
     try {
       const { getNativeModule } = await import('image-processor-napi')
-      const readClipboard = getNativeModule()?.readClipboardImage
+      const nativeModule = getNativeModule()
+      const readClipboard = nativeModule && 'readClipboardImage' in nativeModule
+        ? (nativeModule as unknown as Record<string, Function>).readClipboardImage
+        : undefined
       if (!readClipboard) {
         throw new Error('native clipboard reader unavailable')
       }

@@ -4,32 +4,82 @@ import type { BunPlugin } from "bun";
 
 const outdir = "dist";
 
+// Feature flags to enable in production builds.
+// When a flag is in this set, `feature('FLAG')` is replaced with `true`;
+// otherwise it is replaced with `false` (same as the default bun:bundle behaviour).
 const ENABLED_FLAGS = new Set([
+    "ABLATION_BASELINE",
+    "AGENT_MEMORY_SNAPSHOT",
+    "AGENT_TRIGGERS",
+    "AGENT_TRIGGERS_REMOTE",
+    "AGENT_TRIGGERS_RUN",
     "BG_SESSIONS",
+    "BRIDGE_MODE",
+    "BUDDY",
+    "CCR_MIRROR",
+    "CCR_REMOTE_SETUP",
+    "CHICAGO_MCP",
+    "CONTEXT_COLLAPSE",
+    "COORDINATOR_MODE",
+    "DAEMON",
+    "DIRECT_CONNECT",
+    "DUMP_SYSTEM_PROMPT",
+    "EXPERIMENTAL_SKILL_SEARCH",
+    "FORK_SUBAGENT",
     "HARD_FAIL",
+    "HISTORY_SNIP",
+    "KAIROS",
+    "KAIROS_BRIEF",
+    "KAIROS_CHANNELS",
+    "KAIROS_GITHUB_WEBHOOKS",
+    "LODESTONE",
+    "MCP_SKILLS",
+    "MONITOR_TOOL",
+    "OVERFLOW_TEST_TOOL",
+    "PROACTIVE",
+    "SSH_REMOTE",
+    "TERMINAL_PANEL",
+    "TORCH",
+    "TRANSCRIPT_CLASSIFIER",
+    "UDS_INBOX",
+    "ULTRAPLAN",
+    "UPLOAD_USER_SETTINGS",
+    "VOICE_MODE",
+    "WEB_BROWSER_TOOL",
+    "WORKFLOW_SCRIPTS",
 ]);
 
-const featureFlagsPlugin: BunPlugin = {
-    name: "feature-flags",
+// BunPlugin: inline-replace `feature('FLAG')` calls and strip `bun:bundle` imports
+const featureFlagPlugin: BunPlugin = {
+    name: "feature-flag-inline",
     setup(build) {
         build.onLoad({ filter: /\.tsx?$/ }, async (args) => {
-            if (args.path.includes("node_modules")) return;
+            // Skip node_modules
+            if (args.path.includes("node_modules")) return undefined;
 
-            const text = await Bun.file(args.path).text();
-            if (!text.includes("bun:bundle")) return;
+            const src = await Bun.file(args.path).text();
 
-            const contents = text
-                .replace(
-                    /import\s*\{[^}]*\}\s*from\s*['"]bun:bundle['"]\s*;?/g,
-                    "",
-                )
-                .replace(
-                    /feature\(\s*['"]([^'"]+)['"]\s*,?\s*\)/g,
-                    (_, flag) => (ENABLED_FLAGS.has(flag) ? "true" : "false"),
-                );
+            // Only process files that reference bun:bundle
+            if (!src.includes("bun:bundle")) return undefined;
+
+            let code = src;
+
+            // Remove `import { ... } from 'bun:bundle'` (single or double quotes)
+            code = code.replace(
+                /import\s*\{[^}]*\}\s*from\s*['"]bun:bundle['"]\s*;?\n?/g,
+                "",
+            );
+
+            // Replace `feature('FLAG')` / `feature("FLAG")` calls.
+            // The call site may have a trailing comma and whitespace inside parens,
+            // e.g. `feature(\n  'FLAG',\n)`.
+            code = code.replace(
+                /feature\(\s*['"]([^'"]+)['"]\s*,?\s*\)/g,
+                (_match, flag: string) => (ENABLED_FLAGS.has(flag) ? "true" : "false"),
+            );
 
             return {
-                contents,
+                contents: code,
                 loader: args.path.endsWith(".tsx") ? "tsx" : "ts",
             };
         });
@@ -40,13 +90,13 @@ const featureFlagsPlugin: BunPlugin = {
 const { rmSync } = await import("fs");
 rmSync(outdir, { recursive: true, force: true });
 
-// Step 2: Bundle with splitting + feature flags inlining
+// Step 2: Bundle with splitting
 const result = await Bun.build({
     entrypoints: ["src/entrypoints/cli.tsx"],
     outdir,
     target: "bun",
     splitting: true,
-    plugins: [featureFlagsPlugin],
+    plugins: [featureFlagPlugin],
 });
 
 if (!result.success) {
@@ -78,7 +128,4 @@ for (const file of files) {
 
 console.log(
     `Bundled ${result.outputs.length} files to ${outdir}/ (patched ${patched} for Node.js compat)`,
-);
-console.log(
-    `Feature flags enabled: ${[...ENABLED_FLAGS].join(", ") || "none"}`,
 );
