@@ -33,7 +33,7 @@ const LOCAL_REVIEW_PROMPT = (args: string) => `
 const review: Command = {
   type: 'prompt',
   name: 'review',
-  description: 'Review a pull request',
+  description: 'Review a pull request · 审查 Pull Request',
   progressMessage: 'reviewing pull request',
   contentLength: 0,
   source: 'builtin',
@@ -48,7 +48,7 @@ const review: Command = {
 const ultrareview: Command = {
   type: 'local-jsx',
   name: 'ultrareview',
-  description: `~10–20 min · Finds and verifies bugs in your branch. Runs in Panda Code on the web. See ${CCR_TERMS_URL}`,
+  description: `~10–20 min · Finds and verifies bugs in your branch. Runs in Panda Code on the web. See ${CCR_TERMS_URL} · 深度审查：查找并验证分支中的 bug`,
   isEnabled: () => isUltrareviewEnabled(),
   load: () => import('./review/ultrareviewCommand.js'),
 }

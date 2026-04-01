@@ -8,7 +8,7 @@ import {
 const proactive = {
   type: 'local-jsx',
   name: 'proactive',
-  description: 'Toggle proactive autonomous mode',
+  description: 'Toggle proactive autonomous mode · 切换主动自主模式',
   isEnabled: () => { if (feature('PROACTIVE')) { return true } if (feature('KAIROS')) { return true } return false },
   immediate: true,
   load: () =>

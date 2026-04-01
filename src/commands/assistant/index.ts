@@ -8,7 +8,7 @@ import {
 const assistant = {
   type: 'local-jsx',
   name: 'assistant',
-  description: 'Toggle assistant mode (Kairos)',
+  description: 'Toggle assistant mode (Kairos) · 切换助手模式 (Kairos)',
   isEnabled: () => { if (feature('KAIROS')) { return true } return false },
   immediate: true,
   load: () =>

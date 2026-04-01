@@ -33,7 +33,7 @@ const command = {
       statusText += ' (managed)'
     }
 
-    return `${icon} ${statusText} (⏎ to configure)`
+    return `${icon} ${statusText} (⏎ to configure) · 沙盒设置`
   },
   argumentHint: 'exclude "command pattern"',
   get isHidden() {

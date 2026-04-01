@@ -5,7 +5,7 @@ import { logEvent } from '../services/analytics/index.js'
 const forceSnip = {
   type: 'local-jsx',
   name: 'force-snip',
-  description: 'Force-snip conversation history at the current point',
+  description: 'Force-snip conversation history at the current point · 在当前位置强制截断对话历史',
   isEnabled: () => { if (feature('HISTORY_SNIP')) { return true } return false },
   immediate: true,
   load: () =>

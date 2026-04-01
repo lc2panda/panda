@@ -21,7 +21,7 @@ Important:
 const fork: Command = {
   type: 'prompt',
   name: 'fork',
-  description: 'Fork a background sub-agent to handle a task',
+  description: 'Fork a background sub-agent to handle a task · 派生后台子 Agent 处理任务',
   progressMessage: 'forking sub-agent',
   contentLength: 0,
   argumentHint: '<task description>',

@@ -6,7 +6,7 @@ export default {
   type: 'local-jsx',
   name: 'model',
   get description() {
-    return `Set the AI model for Panda Code (currently ${renderModelName(getMainLoopModel())})`
+    return `Set the AI model for Panda Code (currently ${renderModelName(getMainLoopModel())}) · 切换 AI 模型`
   },
   argumentHint: '[model]',
   get immediate() {

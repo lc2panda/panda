@@ -17,7 +17,7 @@ const remoteControlServer = {
   type: 'local-jsx',
   name: 'remote-control-server',
   aliases: ['rcs'],
-  description: 'Start a persistent remote control server (daemon mode)',
+  description: 'Start a persistent remote control server (daemon mode) · 启动远程控制服务器（守护模式）',
   isEnabled,
   get isHidden() {
     return !isEnabled()

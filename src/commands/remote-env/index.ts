@@ -5,7 +5,7 @@ import { isClaudeAISubscriber } from '../../utils/auth.js'
 export default {
   type: 'local-jsx',
   name: 'remote-env',
-  description: 'Configure the default remote environment for teleport sessions',
+  description: 'Configure the default remote environment for teleport sessions · 配置远程环境默认设置',
   isEnabled: () =>
     isClaudeAISubscriber() && isPolicyAllowed('allow_remote_sessions'),
   get isHidden() {

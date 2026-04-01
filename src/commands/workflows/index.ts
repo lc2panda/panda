@@ -4,7 +4,7 @@ import type { Command } from '../../commands.js'
 const workflows = {
   type: 'local-jsx',
   name: 'workflows',
-  description: 'List and manage workflow scripts',
+  description: 'List and manage workflow scripts · 列出和管理工作流脚本',
   isEnabled: () => { if (feature('WORKFLOW_SCRIPTS')) { return true } return false },
   get isHidden() {
     if (feature('WORKFLOW_SCRIPTS')) { return false }

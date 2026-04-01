@@ -4,7 +4,7 @@ const btw = {
   type: 'local-jsx',
   name: 'btw',
   description:
-    'Ask a quick side question without interrupting the main conversation',
+    'Ask a quick side question without interrupting the main conversation · 快速插问，不打断主对话',
   immediate: true,
   argumentHint: '<question>',
   load: () => import('./btw.js'),

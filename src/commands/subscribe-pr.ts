@@ -22,7 +22,7 @@ PR number/URL: ${args}
 const subscribePr: Command = {
   type: 'prompt',
   name: 'subscribe-pr',
-  description: 'Subscribe to notifications for a pull request',
+  description: 'Subscribe to notifications for a pull request · 订阅 PR 通知',
   progressMessage: 'setting up PR subscription',
   contentLength: 0,
   argumentHint: '<pr-number-or-url>',

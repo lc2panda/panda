@@ -5,7 +5,7 @@ import { logEvent } from '../../services/analytics/index.js'
 const buddy = {
   type: 'local-jsx',
   name: 'buddy',
-  description: 'Toggle your coding companion buddy',
+  description: 'Toggle your coding companion buddy · 切换编程伙伴',
   isEnabled: () => { if (feature('BUDDY')) { return true } return false },
   get isHidden() {
     if (feature('BUDDY')) { return false }
