@@ -26,7 +26,15 @@ export function Clawd(t0) {
   let t3;
   if ($[2] !== pose) {
     t3 = <Box flexDirection="column" alignItems="center">
-      <Text>{'🐼'}</Text>
+      <Text>{'  ██   ██'}</Text>
+      <Text>{' ████ ████'}</Text>
+      <Text>{'  █████████'}</Text>
+      <Text>{' ██ █████ ██'}</Text>
+      <Text>{' █ '}<Text color="#44dddd">{'◉'}</Text>{' ███ '}<Text color="#44dddd">{'◉'}</Text>{' █'}</Text>
+      <Text>{' ██ █████ ██'}</Text>
+      <Text>{'  █  ▼▼  █'}</Text>
+      <Text>{'  █ ╰──╯ █'}</Text>
+      <Text>{'   ██████'}</Text>
     </Box>;
     $[2] = pose;
     $[3] = t3;
