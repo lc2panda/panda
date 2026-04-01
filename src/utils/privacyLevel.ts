@@ -1,6 +1,6 @@
 /**
  * Privacy level controls how much nonessential network traffic and telemetry
- * Claude Code generates.
+ * Panda Code generates.
  *
  * Levels are ordered by restrictiveness:
  *   default < no-telemetry < essential-traffic
