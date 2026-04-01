@@ -36,7 +36,7 @@ async function main() {
   if (false) {}
   if (process.argv[2] === "--claude-in-chrome-mcp") {
     profileCheckpoint("cli_claude_in_chrome_mcp_path");
-    const { runClaudeInChromeMcpServer } = await import("./chunk-he2h2kn5.js");
+    const { runClaudeInChromeMcpServer } = await import("./chunk-qh59cm8n.js");
     await runClaudeInChromeMcpServer();
     return;
   } else if (process.argv[2] === "--chrome-native-host") {
@@ -67,7 +67,7 @@ async function main() {
     enableConfigs();
     const { isWorktreeModeEnabled } = await import("./chunk-pwwa7s62.js");
     if (isWorktreeModeEnabled()) {
-      const { execIntoTmuxWorktree } = await import("./chunk-4krzgmg2.js");
+      const { execIntoTmuxWorktree } = await import("./chunk-n97pye0x.js");
       const result = await execIntoTmuxWorktree(args);
       if (result.handled) {
         return;
@@ -87,7 +87,7 @@ async function main() {
   const { startCapturingEarlyInput } = await import("./chunk-ywxd4qw4.js");
   startCapturingEarlyInput();
   profileCheckpoint("cli_before_main_import");
-  const { main: cliMain } = await import("./chunk-5a9rd0dk.js");
+  const { main: cliMain } = await import("./chunk-2msb1hmk.js");
   profileCheckpoint("cli_after_main_import");
   await cliMain();
   profileCheckpoint("cli_after_main_complete");
