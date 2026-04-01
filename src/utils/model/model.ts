@@ -23,7 +23,7 @@ import { getModelStrings, resolveOverriddenModel } from './modelStrings.js'
 import { formatModelPricing, getOpus46CostTier } from '../modelCost.js'
 import { getSettings_DEPRECATED } from '../settings/settings.js'
 import type { PermissionMode } from '../permissions/PermissionMode.js'
-import { getAPIProvider } from './providers.js'
+import { getAPIProvider, isThirdPartyProvider } from './providers.js'
 import { LIGHTNING_BOLT } from '../../constants/figures.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import { type ModelAlias, isModelAlias } from './aliases.js'
@@ -277,6 +277,11 @@ export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
  * @returns The short name (e.g., 'claude-3-5-haiku') if found, or the original name if no mapping exists
  */
 export function getCanonicalName(fullModelName: ModelName): ModelShortName {
+  // Third-party providers use non-Claude model names (deepseek-chat, qwen-max, etc.)
+  // that don't match any claude-* pattern. Return as-is to avoid misclassification.
+  if (isThirdPartyProvider()) {
+    return fullModelName.toLowerCase()
+  }
   // Resolve overridden model IDs (e.g. Bedrock ARNs) back to canonical names.
   // resolved is always a 1P-format ID, so firstPartyNameToCanonical can handle it.
   return firstPartyNameToCanonical(resolveOverriddenModel(fullModelName))

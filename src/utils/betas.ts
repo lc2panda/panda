@@ -27,7 +27,7 @@ import { has1mContext } from './context.js'
 import { isEnvDefinedFalsy, isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
-import { getAPIProvider } from './model/providers.js'
+import { getAPIProvider, isThirdPartyProvider } from './model/providers.js'
 import { getInitialSettings } from './settings/settings.js'
 
 /**
@@ -232,6 +232,21 @@ export function shouldUseGlobalCacheScope(): boolean {
 }
 
 export const getAllModelBetas = memoize((model: string): string[] => {
+  // Third-party providers (DeepSeek/Kimi/Qwen/MiniMax/GLM/火山引擎 etc.)
+  // do not understand Anthropic beta headers and will reject them with 400.
+  // Return empty array; user can still opt-in via ANTHROPIC_BETAS env var.
+  if (isThirdPartyProvider()) {
+    const betaHeaders: string[] = []
+    if (process.env.ANTHROPIC_BETAS) {
+      betaHeaders.push(
+        ...process.env.ANTHROPIC_BETAS.split(',')
+          .map(_ => _.trim())
+          .filter(Boolean),
+      )
+    }
+    return betaHeaders
+  }
+
   const betaHeaders = []
   const isHaiku = getCanonicalName(model).includes('haiku')
   const provider = getAPIProvider()
@@ -398,6 +413,13 @@ export function getMergedBetas(
   model: string,
   options?: { isAgenticQuery?: boolean },
 ): string[] {
+  // Third-party providers: skip all Anthropic-specific beta headers.
+  // getAllModelBetas already returns [] for third-party, but also skip
+  // the agentic-query injection of claude-code / cli-internal headers.
+  if (isThirdPartyProvider()) {
+    return [...getModelBetas(model)]
+  }
+
   const baseBetas = [...getModelBetas(model)]
 
   // Agentic queries always need claude-code and cli-internal beta headers.

@@ -17,6 +17,7 @@ import { errorMessage, toError } from '../errors.js'
 import { getAuthHeaders } from '../http.js'
 import { logError } from '../log.js'
 import { jsonStringify } from '../slowOperations.js'
+import { isThirdPartyProvider } from '../model/providers.js'
 import { getClaudeCodeUserAgent } from '../userAgent.js'
 
 type DataPoint = {
@@ -89,6 +90,16 @@ export class BigQueryMetricsExporter implements PushMetricExporter {
     resultCallback: (result: ExportResult) => void,
   ): Promise<void> {
     try {
+      // Third-party providers: silently skip telemetry — the endpoint is
+      // Anthropic-only and would fail or leak data to the wrong host.
+      if (isThirdPartyProvider()) {
+        logForDebugging(
+          'BigQuery metrics export: third-party provider detected, skipping',
+        )
+        resultCallback({ code: ExportResultCode.SUCCESS })
+        return
+      }
+
       // Skip if trust not established in interactive mode
       // This prevents triggering apiKeyHelper before trust dialog
       const hasTrust =

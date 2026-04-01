@@ -29,7 +29,7 @@ import {
   isNonCustomOpusModel,
 } from 'src/utils/model/model.js'
 import { getModelStrings } from 'src/utils/model/modelStrings.js'
-import { getAPIProvider } from 'src/utils/model/providers.js'
+import { getAPIProvider, isThirdPartyProvider } from 'src/utils/model/providers.js'
 import { getIsNonInteractiveSession } from '../../bootstrap/state.js'
 import {
   API_PDF_MAX_PAGES,
@@ -467,6 +467,21 @@ export function getAssistantMessageFromError(
     error.status === 429 &&
     shouldProcessRateLimits(isClaudeAISubscriber())
   ) {
+    // Third-party providers: read standard rate limit headers and surface a simple message.
+    // They don't use Anthropic's unified rate limit header scheme.
+    if (isThirdPartyProvider()) {
+      const retryAfter = error.headers?.get?.('retry-after')
+        || error.headers?.get?.('x-ratelimit-reset')
+      const stripped = error.message.replace(/^429\s+/, '')
+      const innerMessage = stripped.match(/"message"\s*:\s*"([^"]*)"/)?.[1]
+      const detail = innerMessage || stripped
+      const retryHint = retryAfter ? ` (retry after ${retryAfter}s)` : ''
+      return createAssistantAPIErrorMessage({
+        content: `${API_ERROR_MESSAGE_PREFIX}: Rate limit reached${retryHint} · ${detail || 'please wait and try again'}`,
+        error: 'rate_limit',
+      })
+    }
+
     // Check if this is the new API with multiple rate limit headers
     const rateLimitType = error.headers?.get?.(
       'anthropic-ratelimit-unified-representative-claim',
@@ -998,11 +1013,13 @@ export function classifyAPIError(error: unknown): string {
     return 'rate_limit'
   }
 
-  // Server overload (529)
+  // Server overload (529 Anthropic, 503 third-party providers)
   if (
     error instanceof APIError &&
     (error.status === 529 ||
-      error.message?.includes('"type":"overloaded_error"'))
+      (error.status === 503 && isThirdPartyProvider()) ||
+      error.message?.includes('"type":"overloaded_error"') ||
+      (isThirdPartyProvider() && error.message?.toLowerCase().includes('overloaded')))
   ) {
     return 'server_overload'
   }
