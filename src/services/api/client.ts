@@ -10,6 +10,7 @@ import {
   refreshAndGetAwsCredentials,
   refreshGcpCredentialsIfNeeded,
 } from 'src/utils/auth.js'
+import { getGlobalConfig } from 'src/utils/config.js'
 import { getUserAgent } from 'src/utils/http.js'
 import { getSmallFastModel } from 'src/utils/model/model.js'
 import {
@@ -98,6 +99,15 @@ export async function getAnthropicClient({
   fetchOverride?: ClientOptions['fetch']
   source?: string
 }): Promise<Anthropic> {
+  // Auto-load third-party provider config from global settings (set via `panda auth login`)
+  // Only applies env vars if they haven't been explicitly set already (??= semantics).
+  const _tpConfig = getGlobalConfig().thirdPartyProvider
+  if (_tpConfig) {
+    process.env.ANTHROPIC_BASE_URL ??= _tpConfig.baseURL
+    process.env.ANTHROPIC_AUTH_TOKEN ??= _tpConfig.apiKey
+    process.env.ANTHROPIC_MODEL ??= _tpConfig.model
+  }
+
   const containerId = process.env.CLAUDE_CODE_CONTAINER_ID
   const remoteSessionId = process.env.CLAUDE_CODE_REMOTE_SESSION_ID
   const clientApp = process.env.CLAUDE_AGENT_SDK_CLIENT_APP

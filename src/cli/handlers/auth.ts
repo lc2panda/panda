@@ -1,5 +1,6 @@
 /* eslint-disable custom-rules/no-process-exit -- CLI subcommand handler intentionally exits */
 
+import { createInterface } from 'readline'
 import {
   clearAuthRelatedCaches,
   performLogout,
@@ -30,7 +31,7 @@ import {
   saveOAuthTokensIfNeeded,
   validateForceLoginOrg,
 } from '../../utils/auth.js'
-import { saveGlobalConfig } from '../../utils/config.js'
+import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { isRunningOnHomespace } from '../../utils/envUtils.js'
 import { errorMessage } from '../../utils/errors.js'
@@ -42,6 +43,100 @@ import {
   buildAccountProperties,
   buildAPIProviderProperties,
 } from '../../utils/status.js'
+
+// ---------------------------------------------------------------------------
+// Third-party provider definitions
+// ---------------------------------------------------------------------------
+const THIRD_PARTY_PROVIDERS: Record<
+  string,
+  { name: string; baseURL: string; defaultModel: string }
+> = {
+  deepseek: { name: 'DeepSeek', baseURL: 'https://api.deepseek.com/anthropic', defaultModel: 'deepseek-chat' },
+  kimi: { name: 'Kimi (Moonshot)', baseURL: 'https://api.moonshot.ai/anthropic', defaultModel: 'kimi-k2.5' },
+  qwen: { name: 'Qwen (阿里百炼)', baseURL: 'https://dashscope.aliyuncs.com/apps/anthropic', defaultModel: 'qwen-plus' },
+  minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'MiniMax-M2.5' },
+  glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic', defaultModel: 'glm-4' },
+  volcano: { name: 'Volcano (火山引擎)', baseURL: 'https://ark.cn-beijing.volces.com/api/coding', defaultModel: 'ark-code-latest' },
+}
+
+// Full provider list including Anthropic (for interactive selection)
+const ALL_PROVIDERS: Record<string, { name: string; baseURL: string | null; defaultModel: string | null }> = {
+  anthropic: { name: 'Anthropic (Claude)', baseURL: null, defaultModel: null },
+  ...THIRD_PARTY_PROVIDERS,
+}
+
+// ---------------------------------------------------------------------------
+// readline helper (no new dependencies)
+// ---------------------------------------------------------------------------
+function readlineQuestion(prompt: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout })
+  return new Promise(resolve => {
+    rl.question(prompt, answer => {
+      rl.close()
+      resolve(answer)
+    })
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Third-party login flow
+// ---------------------------------------------------------------------------
+async function thirdPartyLogin(providerKey: string): Promise<void> {
+  const provider = THIRD_PARTY_PROVIDERS[providerKey]
+  if (!provider) {
+    process.stderr.write(`Error: unknown provider "${providerKey}".\n`)
+    process.exit(1)
+  }
+
+  process.stdout.write(`\nLogging in to ${provider.name}...\n`)
+  process.stdout.write(`Get your API key from the provider's console.\n\n`)
+  const apiKey = await readlineQuestion('API Key: ')
+
+  if (!apiKey.trim()) {
+    process.stderr.write('Error: API key is required.\n')
+    process.exit(1)
+  }
+
+  // Persist to global config
+  saveGlobalConfig(current => ({
+    ...current,
+    thirdPartyProvider: {
+      name: providerKey,
+      baseURL: provider.baseURL,
+      apiKey: apiKey.trim(),
+      model: provider.defaultModel,
+    },
+  }))
+
+  // Set env vars so the current process can use them immediately
+  process.env.ANTHROPIC_BASE_URL = provider.baseURL
+  process.env.ANTHROPIC_AUTH_TOKEN = apiKey.trim()
+  process.env.ANTHROPIC_MODEL = provider.defaultModel
+
+  process.stdout.write(`\n✓ Login successful! Provider: ${provider.name}\n`)
+  process.stdout.write(`  Model: ${provider.defaultModel}\n`)
+  process.stdout.write(`  Base URL: ${provider.baseURL}\n`)
+  process.stdout.write(`\nRun 'panda' to start.\n`)
+  process.exit(0)
+}
+
+// ---------------------------------------------------------------------------
+// Interactive provider selection (when no --provider flag)
+// ---------------------------------------------------------------------------
+async function selectProviderInteractively(): Promise<string> {
+  process.stdout.write('\nSelect provider:\n')
+  const keys = Object.keys(ALL_PROVIDERS)
+  keys.forEach((k, i) =>
+    process.stdout.write(`  ${i + 1}. ${ALL_PROVIDERS[k]!.name}\n`),
+  )
+  const choice = await readlineQuestion(`\nChoice (1-${keys.length}): `)
+  const idx = parseInt(choice, 10) - 1
+  if (idx < 0 || idx >= keys.length || Number.isNaN(idx)) {
+    process.stderr.write('Invalid choice.\n')
+    process.exit(1)
+  }
+  return keys[idx]!
+}
 
 /**
  * Shared post-token-acquisition logic. Saves tokens, fetches profile/roles,
@@ -114,12 +209,34 @@ export async function authLogin({
   sso,
   console: useConsole,
   claudeai,
+  provider,
 }: {
   email?: string
   sso?: boolean
   console?: boolean
   claudeai?: boolean
+  provider?: string
 }): Promise<void> {
+  // --provider flag: go directly to third-party login
+  if (provider) {
+    if (provider === 'anthropic') {
+      // fall through to normal OAuth flow below
+    } else {
+      await thirdPartyLogin(provider)
+      return // thirdPartyLogin calls process.exit, but for type-safety
+    }
+  }
+
+  // Interactive provider selection when no flags are given
+  if (!provider && !useConsole && !claudeai && !email && !sso) {
+    const selected = await selectProviderInteractively()
+    if (selected !== 'anthropic') {
+      await thirdPartyLogin(selected)
+      return
+    }
+    // selected === 'anthropic' → fall through to original OAuth flow
+  }
+
   if (useConsole && claudeai) {
     process.stderr.write(
       'Error: --console and --claudeai cannot be used together.\n',
@@ -240,12 +357,19 @@ export async function authStatus(opts: {
   const oauthAccount = getOauthAccountInfo()
   const subscriptionType = getSubscriptionType()
   const using3P = isUsing3PServices()
+
+  // Check third-party provider from global config
+  const globalCfg = getGlobalConfig()
+  const tp = globalCfg.thirdPartyProvider
+
   const loggedIn =
-    hasToken || apiKeySource !== 'none' || hasApiKeyEnvVar || using3P
+    hasToken || apiKeySource !== 'none' || hasApiKeyEnvVar || using3P || !!tp
 
   // Determine auth method
   let authMethod: string = 'none'
-  if (using3P) {
+  if (tp) {
+    authMethod = 'third_party_provider'
+  } else if (using3P) {
     authMethod = 'third_party'
   } else if (authTokenSource === 'claude.ai') {
     authMethod = 'claude.ai'
@@ -285,9 +409,15 @@ export async function authStatus(opts: {
     if (!hasAuthProperty && hasApiKeyEnvVar) {
       process.stdout.write('API key: ANTHROPIC_API_KEY\n')
     }
+    if (tp) {
+      const tpDisplay = ALL_PROVIDERS[tp.name]?.name ?? tp.name
+      process.stdout.write(`Provider: ${tpDisplay}\n`)
+      process.stdout.write(`Model: ${tp.model}\n`)
+      process.stdout.write(`Base URL: ${tp.baseURL}\n`)
+    }
     if (!loggedIn) {
       process.stdout.write(
-        'Not logged in. Run claude auth login to authenticate.\n',
+        'Not logged in. Run panda auth login to authenticate.\n',
       )
     }
   } else {
@@ -312,6 +442,11 @@ export async function authStatus(opts: {
       output.orgName = oauthAccount?.organizationName ?? null
       output.subscriptionType = subscriptionType ?? null
     }
+    if (tp) {
+      output.thirdPartyProvider = tp.name
+      output.thirdPartyModel = tp.model
+      output.thirdPartyBaseURL = tp.baseURL
+    }
 
     process.stdout.write(jsonStringify(output, null, 2) + '\n')
   }
@@ -319,12 +454,26 @@ export async function authStatus(opts: {
 }
 
 export async function authLogout(): Promise<void> {
+  // Clear third-party provider config if present
+  const globalCfg = getGlobalConfig()
+  if (globalCfg.thirdPartyProvider) {
+    saveGlobalConfig(current => {
+      const updated = { ...current }
+      delete updated.thirdPartyProvider
+      return updated
+    })
+    // Also clear env vars that may have been set from the config
+    delete process.env.ANTHROPIC_BASE_URL
+    delete process.env.ANTHROPIC_AUTH_TOKEN
+    delete process.env.ANTHROPIC_MODEL
+  }
+
   try {
     await performLogout({ clearOnboarding: false })
   } catch {
     process.stderr.write('Failed to log out.\n')
     process.exit(1)
   }
-  process.stdout.write('Successfully logged out from your Anthropic account.\n')
+  process.stdout.write('Successfully logged out.\n')
   process.exit(0)
 }
