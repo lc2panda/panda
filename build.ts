@@ -50,12 +50,12 @@ const ENABLED_FLAGS = new Set([
     "HOOK_PROMPTS",
     "IS_LIBC_GLIBC",
     "IS_LIBC_MUSL",
-    "KAIROS",
-    "KAIROS_BRIEF",
-    "KAIROS_CHANNELS",
-    "KAIROS_DREAM",
-    "KAIROS_GITHUB_WEBHOOKS",
-    "KAIROS_PUSH_NOTIFICATION",
+    // "KAIROS", // disabled: breaks REPL interactive input (assistant mode init)
+    // "KAIROS_BRIEF", // depends on KAIROS
+    // "KAIROS_CHANNELS", // depends on KAIROS
+    // "KAIROS_DREAM", // depends on KAIROS
+    // "KAIROS_GITHUB_WEBHOOKS", // depends on KAIROS
+    // "KAIROS_PUSH_NOTIFICATION", // depends on KAIROS
     "LODESTONE",
     "MCP_RICH_OUTPUT",
     "MCP_SKILLS",
