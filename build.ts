@@ -89,7 +89,7 @@ const ENABLED_FLAGS = new Set([
     "TRANSCRIPT_CLASSIFIER",
     "TREE_SITTER_BASH",
     "TREE_SITTER_BASH_SHADOW",
-    "UDS_INBOX",
+    // "UDS_INBOX", // disabled: blocks startup (tries to bind Unix domain socket)
     "ULTRAPLAN",
     "ULTRATHINK",
     "UNATTENDED_RETRY",

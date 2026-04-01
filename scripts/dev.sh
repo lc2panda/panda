@@ -81,7 +81,6 @@ exec bun \
   --feature=TRANSCRIPT_CLASSIFIER \
   --feature=TREE_SITTER_BASH \
   --feature=TREE_SITTER_BASH_SHADOW \
-  --feature=UDS_INBOX \
   --feature=ULTRAPLAN \
   --feature=ULTRATHINK \
   --feature=UNATTENDED_RETRY \
