@@ -25,6 +25,7 @@ import ide from './commands/ide/index.js'
 import init from './commands/init.js'
 import initVerifiers from './commands/init-verifiers.js'
 import keybindings from './commands/keybindings/index.js'
+import language from './commands/language.js'
 import login from './commands/login/index.js'
 import logout from './commands/logout/index.js'
 import installGitHubApp from './commands/install-github-app/index.js'
@@ -125,6 +126,7 @@ const buddy = feature('BUDDY')
 import thinkback from './commands/thinkback/index.js'
 import thinkbackPlay from './commands/thinkback-play/index.js'
 import persona from './commands/persona/index.js'
+import privacy from './commands/privacy.js'
 import permissions from './commands/permissions/index.js'
 import plan from './commands/plan/index.js'
 import fast from './commands/fast/index.js'
@@ -284,6 +286,7 @@ const COMMANDS = memoize((): Command[] => [
   ide,
   init,
   keybindings,
+  language,
   installGitHubApp,
   installSlackApp,
   mcp,
@@ -293,6 +296,7 @@ const COMMANDS = memoize((): Command[] => [
   nightMode,
   outputStyle,
   persona,
+  privacy,
   remoteEnv,
   plugin,
   pr_comments,
