@@ -25,6 +25,7 @@
     "bun": ">=1.2.0"
   },
   "bin": {
+    "panda": "dist/cli.js",
     "claude-js": "dist/cli.js"
   },
   "workspaces": [
