@@ -12,28 +12,12 @@ import {
 } from './auth.js'
 import { isThirdPartyProvider } from './model/providers.js'
 import { getClaudeCodeUserAgent } from './userAgent.js'
-import { getWorkload } from './workloadContext.js'
 
 // WARNING: We rely on `claude-cli` in the user agent for log filtering.
 // Please do NOT change this without making sure that logging also gets updated!
 export function getUserAgent(): string {
   if (isThirdPartyProvider()) return `PandaCode/${MACRO.VERSION}`
-  const agentSdkVersion = process.env.CLAUDE_AGENT_SDK_VERSION
-    ? `, agent-sdk/${process.env.CLAUDE_AGENT_SDK_VERSION}`
-    : ''
-  // SDK consumers can identify their app/library via CLAUDE_AGENT_SDK_CLIENT_APP
-  // e.g., "my-app/1.0.0" or "my-library/2.1"
-  const clientApp = process.env.CLAUDE_AGENT_SDK_CLIENT_APP
-    ? `, client-app/${process.env.CLAUDE_AGENT_SDK_CLIENT_APP}`
-    : ''
-  // Turn-/process-scoped workload tag for cron-initiated requests. 1P-only
-  // observability — proxies strip HTTP headers; QoS routing uses cc_workload
-  // in the billing-header attribution block instead (see constants/system.ts).
-  // getAnthropicClient (client.ts:98) calls this per-request inside withRetry,
-  // so the read picks up the same setWorkload() value as getAttributionHeader.
-  const workload = getWorkload()
-  const workloadSuffix = workload ? `, workload/${workload}` : ''
-  return `claude-cli/${MACRO.VERSION} (${process.env.USER_TYPE}, ${process.env.CLAUDE_CODE_ENTRYPOINT ?? 'cli'}${agentSdkVersion}${clientApp}${workloadSuffix})`
+  return `claude-code/${MACRO.VERSION} (external, cli)`
 }
 
 export function getMCPUserAgent(): string {
