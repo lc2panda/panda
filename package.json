@@ -36,7 +36,7 @@
   ],
   "scripts": {
     "build": "bun run build.ts",
-    "dev": "bun --feature=BG_SESSIONS --feature=HARD_FAIL --feature=TRANSCRIPT_CLASSIFIER --feature=PROACTIVE --feature=HISTORY_SNIP --feature=KAIROS --feature=BRIDGE_MODE --feature=DAEMON --feature=DIRECT_CONNECT --feature=SSH_REMOTE --feature=COORDINATOR_MODE --feature=BUDDY --feature=FORK_SUBAGENT --feature=VOICE_MODE --feature=WORKFLOW_SCRIPTS --feature=UDS_INBOX --feature=ULTRAPLAN --feature=TORCH --feature=CHICAGO_MCP --feature=WEB_BROWSER_TOOL --feature=CONTEXT_COLLAPSE --feature=TERMINAL_PANEL --feature=MONITOR_TOOL --feature=AGENT_TRIGGERS --feature=AGENT_TRIGGERS_REMOTE --feature=MCP_SKILLS --feature=KAIROS_BRIEF --feature=KAIROS_CHANNELS --feature=KAIROS_GITHUB_WEBHOOKS --feature=LODESTONE --feature=DUMP_SYSTEM_PROMPT --feature=CCR_REMOTE_SETUP --feature=CCR_MIRROR --feature=UPLOAD_USER_SETTINGS --feature=EXPERIMENTAL_SKILL_SEARCH --feature=ABLATION_BASELINE --feature=AGENT_MEMORY_SNAPSHOT --feature=OVERFLOW_TEST_TOOL --feature=HARD_FAIL --feature=AGENT_TRIGGERS_RUN run src/entrypoints/cli.tsx",
+    "dev": "bash scripts/dev.sh",
     "prepublishOnly": "bun run build",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --fix src/",
