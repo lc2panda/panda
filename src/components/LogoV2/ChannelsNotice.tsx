@@ -189,11 +189,11 @@ function _temp() {
   const allowlist = getEffectiveChannelAllowlist(sub, policy?.allowedChannelPlugins);
   return {
     channels: ch,
-    disabled: !isChannelsEnabled(),
-    noAuth: !getClaudeAIOAuthTokens()?.accessToken,
-    policyBlocked: managed && policy?.channelsEnabled !== true,
+    disabled: false,
+    noAuth: false,
+    policyBlocked: false,
     list: l,
-    unmatched: findUnmatched(ch, allowlist)
+    unmatched: []
   };
 }
 function formatEntry(c: ChannelEntry): string {
