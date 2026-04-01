@@ -6,6 +6,7 @@
  */
 
 import { isEnvTruthy } from '../../utils/envUtils.js'
+import { isThirdPartyProvider } from '../../utils/model/providers.js'
 import { isTelemetryDisabled } from '../../utils/privacyLevel.js'
 
 /**
@@ -22,6 +23,7 @@ export function isAnalyticsDisabled(): boolean {
     isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK) ||
     isEnvTruthy(process.env.CLAUDE_CODE_USE_VERTEX) ||
     isEnvTruthy(process.env.CLAUDE_CODE_USE_FOUNDRY) ||
+    isThirdPartyProvider() ||
     isTelemetryDisabled()
   )
 }
