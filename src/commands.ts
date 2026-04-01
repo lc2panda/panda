@@ -123,6 +123,7 @@ const buddy = feature('BUDDY')
 /* eslint-enable @typescript-eslint/no-require-imports */
 import thinkback from './commands/thinkback/index.js'
 import thinkbackPlay from './commands/thinkback-play/index.js'
+import persona from './commands/persona/index.js'
 import permissions from './commands/permissions/index.js'
 import plan from './commands/plan/index.js'
 import fast from './commands/fast/index.js'
@@ -289,6 +290,7 @@ const COMMANDS = memoize((): Command[] => [
   mobile,
   model,
   outputStyle,
+  persona,
   remoteEnv,
   plugin,
   pr_comments,

@@ -583,6 +583,19 @@ export type GlobalConfig = {
     apiKey: string
     model: string
   }
+
+  persona?: {
+    active: string
+    custom?: Record<string, { name: string; style: string; systemPrompt?: string }>
+  }
+
+  // Night mode configuration for proactive engine
+  nightMode?: {
+    enabled: boolean
+    dreamTime?: string
+    cleanupTime?: string
+    briefingTime?: string
+  }
 }
 
 /**

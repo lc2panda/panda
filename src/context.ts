@@ -10,6 +10,7 @@ import {
   getClaudeMds,
   getMemoryFiles,
 } from './utils/claudemd.js'
+import { getGlobalConfig } from './utils/config.js'
 import { logForDiagnosticsNoPII } from './utils/diagLogs.js'
 import { isBareMode, isEnvTruthy } from './utils/envUtils.js'
 import { execFileNoThrow } from './utils/execFileNoThrow.js'
@@ -18,6 +19,43 @@ import { shouldIncludeGitInstructions } from './utils/gitSettings.js'
 import { logError } from './utils/log.js'
 
 const MAX_STATUS_CHARS = 2000
+
+const BUILTIN_PERSONAS: Record<string, { name: string; style: string }> = {
+  work: { name: '工作模式', style: '专业简洁，高效输出，重点突出' },
+  companion: { name: '陪伴模式', style: '温暖友善，善于倾听，适度幽默' },
+  study: { name: '学习模式', style: '引导启发，循序渐进，鼓励提问' },
+  creative: { name: '创意模式', style: '发散思维，大胆想象，激发灵感' },
+  butler: { name: '管家模式', style: '周到细致，主动提醒，管理生活' },
+}
+
+export { BUILTIN_PERSONAS }
+
+function getTimeAwareness(): string {
+  const now = new Date()
+  const hour = now.getHours()
+  const timeLabel =
+    hour < 6 ? '深夜' :
+    hour < 9 ? '早晨' :
+    hour < 12 ? '上午' :
+    hour < 14 ? '午后' :
+    hour < 18 ? '下午' :
+    hour < 22 ? '晚上' : '深夜'
+  const isWorkHours = hour >= 9 && hour < 18
+  return `当前时段：${timeLabel}（${hour}:${String(now.getMinutes()).padStart(2, '0')}）${isWorkHours ? '，工作时间' : '，非工作时间'}`
+}
+
+function getPersonaContext(): string | null {
+  const config = getGlobalConfig()
+  if (!config.persona?.active) return null
+  const key = config.persona.active
+  const custom = config.persona.custom?.[key]
+  const builtin = BUILTIN_PERSONAS[key]
+  const persona = custom || builtin
+  if (!persona) return null
+  const parts = [`[Persona: ${persona.name}] 风格：${persona.style}`]
+  if (custom?.systemPrompt) parts.push(custom.systemPrompt)
+  return parts.join('\n')
+}
 
 // System prompt injection for cache breaking (ant-only, ephemeral debugging state)
 let systemPromptInjection: string | null = null
@@ -181,9 +219,13 @@ export const getUserContext = memoize(
       claudemd_disabled: Boolean(shouldDisableClaudeMd),
     })
 
+    const timeAwareness = getTimeAwareness()
+    const personaContext = getPersonaContext()
+
     return {
       ...(claudeMd && { claudeMd }),
-      currentDate: `Today's date is ${getLocalISODate()}.`,
+      currentDate: `Today's date is ${getLocalISODate()}. ${timeAwareness}`,
+      ...(personaContext && { personaContext }),
     }
   },
 )
