@@ -51,6 +51,7 @@ import { configureGlobalAgents } from '../utils/proxy.js'
 import { isBetaTracingEnabled } from '../utils/telemetry/betaSessionTracing.js'
 import { getTelemetryAttributes } from '../utils/telemetryAttributes.js'
 import { setShellIfWindows } from '../utils/windowsPaths.js'
+import { installHello2ccHooks } from '../utils/hello2ccInstaller.js'
 
 // initialize1PEventLogging is dynamically imported to defer OpenTelemetry sdk-logs/resources
 
@@ -72,6 +73,7 @@ function migrateFromClaude() {
 
 export const init = memoize(async (): Promise<void> => {
   migrateFromClaude()
+  installHello2ccHooks()
   const initStartTime = Date.now()
   logForDiagnosticsNoPII('info', 'init_started')
   profileCheckpoint('init_function_start')
