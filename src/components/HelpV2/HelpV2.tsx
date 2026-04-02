@@ -115,7 +115,7 @@ export function HelpV2(t0) {
     if (false && antOnlyCommands.length > 0) {
       let t7;
       if ($[26] !== antOnlyCommands || $[27] !== close || $[28] !== columns || $[29] !== maxHeight) {
-        t7 = <Tab key="ant-only" title="[ant-only]"><Commands commands={antOnlyCommands} maxHeight={maxHeight} columns={columns} title="Browse ant-only commands:" onCancel={close} /></Tab>;
+        t7 = <Tab key="ant-only" title="[ant-only]"><Commands commands={antOnlyCommands} maxHeight={maxHeight} columns={columns} title={t("Browse ant-only commands:", "浏览内部命令：")} onCancel={close} /></Tab>;
         $[26] = antOnlyCommands;
         $[27] = close;
         $[28] = columns;
@@ -147,7 +147,7 @@ export function HelpV2(t0) {
   }
   let t7;
   if ($[33] === Symbol.for("react.memo_cache_sentinel")) {
-    t7 = <Box marginTop={1}><Text>For more help:{" "}<Link url="https://code.claude.com/docs/en/overview" /></Text></Box>;
+    t7 = <Box marginTop={1}><Text>{t("For more help:", "更多帮助：")}{" "}<Link url="https://code.claude.com/docs/en/overview" /></Text></Box>;
     $[33] = t7;
   } else {
     t7 = $[33];
