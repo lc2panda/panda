@@ -55,7 +55,7 @@ const THIRD_PARTY_PROVIDERS: Record<
   kimi: { name: 'Kimi Code', baseURL: 'https://api.kimi.com/coding/', defaultModel: 'kimi-k2.5', consoleURL: 'https://www.kimi.com/code' },
   qwen: { name: 'Qwen (阿里百炼)', baseURL: 'https://dashscope-intl.aliyuncs.com/apps/anthropic', defaultModel: 'qwen-plus', consoleURL: 'https://dashscope.console.aliyun.com/' },
   minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'MiniMax-M2.5', consoleURL: 'https://platform.minimax.io' },
-  glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic', defaultModel: 'glm-4', consoleURL: 'https://open.bigmodel.cn/' },
+  glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic/', defaultModel: 'glm-4-plus', consoleURL: 'https://open.bigmodel.cn/' },
   volcano: { name: 'Volcano (火山引擎)', baseURL: 'https://ark.cn-beijing.volces.com/api/coding', defaultModel: 'ark-code-latest', consoleURL: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey' },
 }
 
@@ -145,18 +145,54 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
 // Interactive provider selection (when no --provider flag)
 // ---------------------------------------------------------------------------
 async function selectProviderInteractively(): Promise<string> {
-  process.stdout.write('\nSelect provider:\n')
   const keys = Object.keys(ALL_PROVIDERS)
-  keys.forEach((k, i) =>
-    process.stdout.write(`  ${i + 1}. ${ALL_PROVIDERS[k]!.name}\n`),
-  )
-  const choice = await readlineQuestion(`\nChoice (1-${keys.length}): `)
-  const idx = parseInt(choice, 10) - 1
-  if (idx < 0 || idx >= keys.length || Number.isNaN(idx)) {
-    process.stderr.write('Invalid choice.\n')
-    process.exit(1)
+  const names = keys.map(k => ALL_PROVIDERS[k]!.name)
+  let selected = 0
+
+  function render() {
+    process.stdout.write(`\x1b[${names.length + 1}A\x1b[J`)
+    process.stdout.write('Select provider:\n')
+    names.forEach((name, i) => {
+      const prefix = i === selected ? '\x1b[36m❯\x1b[0m' : ' '
+      const text = i === selected ? `\x1b[1m${name}\x1b[0m` : `\x1b[2m${name}\x1b[0m`
+      process.stdout.write(`  ${prefix} ${text}\n`)
+    })
   }
-  return keys[idx]!
+
+  process.stdout.write('Select provider:\n')
+  names.forEach((name, i) => {
+    const prefix = i === selected ? '\x1b[36m❯\x1b[0m' : ' '
+    const text = i === selected ? `\x1b[1m${name}\x1b[0m` : `\x1b[2m${name}\x1b[0m`
+    process.stdout.write(`  ${prefix} ${text}\n`)
+  })
+
+  return new Promise(resolve => {
+    if (!process.stdin.isTTY) {
+      resolve(keys[0]!)
+      return
+    }
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+    process.stdin.setEncoding('utf-8')
+    const onData = (data: string) => {
+      if (data === '\x1b[A' || data === 'k') {
+        selected = (selected - 1 + names.length) % names.length
+        render()
+      } else if (data === '\x1b[B' || data === 'j') {
+        selected = (selected + 1) % names.length
+        render()
+      } else if (data === '\r' || data === '\n') {
+        process.stdin.setRawMode(false)
+        process.stdin.pause()
+        process.stdin.removeListener('data', onData)
+        resolve(keys[selected]!)
+      } else if (data === '\x03') {
+        process.stdin.setRawMode(false)
+        process.exit(0)
+      }
+    }
+    process.stdin.on('data', onData)
+  })
 }
 
 /**
