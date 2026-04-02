@@ -108,7 +108,7 @@ export function TeammateSpinnerTree(t0) {
       }
       let t16;
       if ($[34] !== isLeaderHighlighted || $[35] !== leaderTokenCount) {
-        t16 = leaderTokenCount !== undefined && leaderTokenCount > 0 && <Text dimColor={!isLeaderHighlighted}>{" "}· {formatNumber(leaderTokenCount)} tokens</Text>;
+        t16 = leaderTokenCount !== undefined && leaderTokenCount > 0 && <Text dimColor={!isLeaderHighlighted}>{" "}· {formatNumber(leaderTokenCount)} {require('../../utils/i18n.js').isZh() ? '词元' : 'tokens'}</Text>;
         $[34] = isLeaderHighlighted;
         $[35] = leaderTokenCount;
         $[36] = t16;

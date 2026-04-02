@@ -170,7 +170,7 @@ function AgentLine(t0) {
   const arrow = lastActivity ? figures.arrowDown : figures.arrowUp;
   let t2;
   if ($[2] !== arrow || $[3] !== tokenCount) {
-    t2 = tokenCount !== undefined && tokenCount > 0 ? ` · ${arrow} ${formatNumber(tokenCount)} tokens` : "";
+    t2 = tokenCount !== undefined && tokenCount > 0 ? ` · ${arrow} ${formatNumber(tokenCount)} ${require('../utils/i18n.js').isZh() ? '词元' : 'tokens'}` : "";
     $[2] = arrow;
     $[3] = tokenCount;
     $[4] = t2;

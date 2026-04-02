@@ -127,7 +127,8 @@ export function TeammateSpinnerLine({
   // Get stats from progress
   const toolUseCount = teammate.progress?.toolUseCount ?? 0;
   const tokenCount = teammate.progress?.tokenCount ?? 0;
-  const statsText = ` · ${toolUseCount} tool ${toolUseCount === 1 ? 'use' : 'uses'} · ${formatNumber(tokenCount)} tokens`;
+  const _zh = require('../../utils/i18n.js').isZh()
+  const statsText = ` · ${toolUseCount} ${_zh ? '次工具调用' : (toolUseCount === 1 ? 'tool use' : 'tool uses')} · ${formatNumber(tokenCount)} ${_zh ? '词元' : 'tokens'}`;
   const statsWidth = stringWidth(statsText);
   const selectHintText = ` · ${TEAMMATE_SELECT_HINT}`;
   const selectHintWidth = stringWidth(selectHintText);
@@ -215,8 +216,8 @@ export function TeammateSpinnerLine({
         {/* Stats: only shown when selected and terminal is wide enough */}
         {showStats && <Text dimColor>
             {' '}
-            · {toolUseCount} tool {toolUseCount === 1 ? 'use' : 'uses'} ·{' '}
-            {formatNumber(tokenCount)} tokens
+            · {toolUseCount} {_zh ? '次工具调用' : (toolUseCount === 1 ? 'tool use' : 'tool uses')} ·{' '}
+            {formatNumber(tokenCount)} {_zh ? '词元' : 'tokens'}
           </Text>}
         {/* Hints: select hint when highlighted, view hint when selected but not foregrounded */}
         {showSelectHint && <Text dimColor> · {TEAMMATE_SELECT_HINT}</Text>}
