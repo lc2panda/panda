@@ -18,6 +18,7 @@ import { getAuthHeaders } from '../http.js'
 import { logError } from '../log.js'
 import { jsonStringify } from '../slowOperations.js'
 import { isThirdPartyProvider } from '../model/providers.js'
+import { isPrivacyEnhancedMode } from '../privacyMode.js'
 import { getClaudeCodeUserAgent } from '../userAgent.js'
 
 type DataPoint = {
@@ -92,9 +93,9 @@ export class BigQueryMetricsExporter implements PushMetricExporter {
     try {
       // Third-party providers: silently skip telemetry — the endpoint is
       // Anthropic-only and would fail or leak data to the wrong host.
-      if (isThirdPartyProvider()) {
+      if (isThirdPartyProvider() || isPrivacyEnhancedMode()) {
         logForDebugging(
-          'BigQuery metrics export: third-party provider detected, skipping',
+          'BigQuery metrics export: privacy/third-party guard, skipping',
         )
         resultCallback({ code: ExportResultCode.SUCCESS })
         return
