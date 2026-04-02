@@ -53,10 +53,10 @@ const THIRD_PARTY_PROVIDERS: Record<
 > = {
   deepseek: { name: 'DeepSeek', baseURL: 'https://api.deepseek.com/anthropic', defaultModel: 'deepseek-chat', consoleURL: 'https://platform.deepseek.com/api_keys' },
   kimi: { name: 'Kimi Code', baseURL: 'https://api.kimi.com/coding/', defaultModel: 'kimi-k2.5', consoleURL: 'https://www.kimi.com/code' },
-  qwen: { name: 'Qwen (阿里百炼)', baseURL: 'https://dashscope-intl.aliyuncs.com/apps/anthropic', defaultModel: 'qwen-plus', consoleURL: 'https://dashscope.console.aliyun.com/' },
-  minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'MiniMax-M2.5', consoleURL: 'https://platform.minimax.io' },
-  glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic/', defaultModel: 'glm-4-plus', consoleURL: 'https://open.bigmodel.cn/' },
-  volcano: { name: 'Volcano (火山引擎)', baseURL: 'https://ark.cn-beijing.volces.com/api/coding', defaultModel: 'ark-code-latest', consoleURL: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey' },
+  qwen: { name: 'Qwen (阿里百炼)', baseURL: 'https://dashscope-intl.aliyuncs.com/apps/anthropic', defaultModel: 'qwen3.5-plus', consoleURL: 'https://dashscope.console.aliyun.com/' },
+  minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'minimax-m2.7', consoleURL: 'https://platform.minimax.io' },
+  glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic/', defaultModel: 'glm-5.1', consoleURL: 'https://open.bigmodel.cn/' },
+  volcano: { name: 'Volcano (火山引擎)', baseURL: 'https://ark.cn-beijing.volces.com/api/coding', defaultModel: 'doubao-seed-code', consoleURL: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey' },
 }
 
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -64,19 +64,25 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'deepseek-reasoner': 128000,
   'kimi-k2.5': 256000,
   'kimi-k2': 256000,
-  'kimi-k2-turbo-preview': 256000,
+  'kimi-k2-thinking': 256000,
+  'kimi-k2-thinking-turbo': 256000,
+  'qwen3.5-plus': 1000000,
+  'qwen3.5-flash': 1000000,
+  'qwen3-max': 262144,
   'qwen-plus': 1000000,
   'qwen-max': 32000,
   'qwen-turbo': 1000000,
-  'qwen3-max': 1000000,
-  'MiniMax-M2.7': 200000,
-  'MiniMax-M2.5': 200000,
-  'MiniMax-M2.1': 200000,
-  'MiniMax-M2': 200000,
+  'minimax-m2.7': 204800,
+  'minimax-m2.7-highspeed': 204800,
+  'minimax-m2.5': 196608,
+  'minimax-m2.1': 200000,
+  'minimax-m2': 200000,
+  'glm-5.1': 204800,
   'glm-5': 200000,
-  'glm-4-plus': 128000,
   'glm-4.7': 200000,
-  'glm-4.5': 200000,
+  'glm-4.5': 131000,
+  'glm-4-plus': 128000,
+  'doubao-seed-code': 256000,
 }
 
 function getContextWindowForThirdPartyModel(model: string): number | undefined {
