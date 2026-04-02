@@ -49,19 +49,19 @@ import {
 // ---------------------------------------------------------------------------
 const THIRD_PARTY_PROVIDERS: Record<
   string,
-  { name: string; baseURL: string; defaultModel: string }
+  { name: string; baseURL: string; defaultModel: string; consoleURL: string }
 > = {
-  deepseek: { name: 'DeepSeek', baseURL: 'https://api.deepseek.com/anthropic', defaultModel: 'deepseek-chat' },
-  kimi: { name: 'Kimi (Moonshot)', baseURL: 'https://api.moonshot.ai/anthropic', defaultModel: 'kimi-k2.5' },
-  qwen: { name: 'Qwen (阿里百炼)', baseURL: 'https://dashscope.aliyuncs.com/apps/anthropic', defaultModel: 'qwen-plus' },
-  minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'MiniMax-M2.5' },
-  glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic', defaultModel: 'glm-4' },
-  volcano: { name: 'Volcano (火山引擎)', baseURL: 'https://ark.cn-beijing.volces.com/api/coding', defaultModel: 'ark-code-latest' },
+  deepseek: { name: 'DeepSeek', baseURL: 'https://api.deepseek.com/anthropic', defaultModel: 'deepseek-chat', consoleURL: 'https://platform.deepseek.com/api_keys' },
+  kimi: { name: 'Kimi Code', baseURL: 'https://api.kimi.com/coding', defaultModel: 'kimi-k2.5', consoleURL: 'https://www.kimi.com/code' },
+  qwen: { name: 'Qwen (阿里百炼)', baseURL: 'https://dashscope-intl.aliyuncs.com/apps/anthropic', defaultModel: 'qwen-plus', consoleURL: 'https://dashscope.console.aliyun.com/' },
+  minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'MiniMax-M2.5', consoleURL: 'https://platform.minimax.io' },
+  glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic', defaultModel: 'glm-4', consoleURL: 'https://open.bigmodel.cn/' },
+  volcano: { name: 'Volcano (火山引擎)', baseURL: 'https://ark.cn-beijing.volces.com/api/coding', defaultModel: 'ark-code-latest', consoleURL: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey' },
 }
 
 // Full provider list including Anthropic (for interactive selection)
-const ALL_PROVIDERS: Record<string, { name: string; baseURL: string | null; defaultModel: string | null }> = {
-  anthropic: { name: 'Anthropic (Claude)', baseURL: null, defaultModel: null },
+const ALL_PROVIDERS: Record<string, { name: string; baseURL: string | null; defaultModel: string | null; consoleURL: string | null }> = {
+  anthropic: { name: 'Anthropic (Claude)', baseURL: null, defaultModel: null, consoleURL: null },
   ...THIRD_PARTY_PROVIDERS,
 }
 
@@ -89,6 +89,12 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
   }
 
   process.stdout.write(`\nLogging in to ${provider.name}...\n`)
+
+  const { exec } = await import('child_process')
+  const openCmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open'
+  exec(`${openCmd} ${provider.consoleURL}`)
+  process.stdout.write(`Opening ${provider.consoleURL} ...\n`)
+
   process.stdout.write(`Get your API key from the provider's console.\n\n`)
   const apiKey = await readlineQuestion('API Key: ')
 

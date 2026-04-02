@@ -50,15 +50,15 @@ panda auth login
 # 交互式选择：Anthropic / DeepSeek / Kimi / Qwen / MiniMax / GLM / 火山引擎
 ```
 
-| Provider | Base URL | 默认模型 |
-|----------|----------|----------|
-| Anthropic | 原版 OAuth | claude-sonnet-4-6 |
-| DeepSeek | api.deepseek.com/anthropic | deepseek-chat |
-| Kimi | api.moonshot.ai/anthropic | kimi-k2.5 |
-| Qwen | dashscope.aliyuncs.com/apps/anthropic | qwen-plus |
-| MiniMax | api.minimax.io/anthropic | MiniMax-M2.5 |
-| GLM | open.bigmodel.cn/api/anthropic | glm-4 |
-| Volcano | ark.cn-beijing.volces.com/api/coding | ark-code-latest |
+| Provider | Base URL | 默认模型 | 控制台 |
+|----------|----------|----------|--------|
+| Anthropic | 原版 OAuth | claude-sonnet-4-6 | [console.anthropic.com](https://console.anthropic.com) |
+| DeepSeek | api.deepseek.com/anthropic | deepseek-chat | [platform.deepseek.com](https://platform.deepseek.com/api_keys) |
+| Kimi Code | api.kimi.com/coding | kimi-k2.5 | [kimi.com/code](https://www.kimi.com/code) |
+| Qwen | dashscope-intl.aliyuncs.com/apps/anthropic | qwen-plus | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com/) |
+| MiniMax | api.minimax.io/anthropic | MiniMax-M2.5 | [platform.minimax.io](https://platform.minimax.io) |
+| GLM | open.bigmodel.cn/api/anthropic | glm-4 | [open.bigmodel.cn](https://open.bigmodel.cn/) |
+| Volcano | ark.cn-beijing.volces.com/api/coding | ark-code-latest | [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey) |
 
 ---
 
