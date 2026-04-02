@@ -26,8 +26,16 @@
 
 ## 安装
 
+**macOS / Linux：**
 ```bash
-echo "@lc2panda:registry=https://npm.pkg.github.com" >> ~/.npmrc
+npm config set @lc2panda:registry https://npm.pkg.github.com
+npm install -g @lc2panda/panda-code
+panda
+```
+
+**Windows（CMD / PowerShell）：**
+```powershell
+npm config set @lc2panda:registry https://npm.pkg.github.com
 npm install -g @lc2panda/panda-code
 panda
 ```
