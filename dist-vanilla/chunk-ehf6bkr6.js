@@ -1,0 +1,79 @@
+// @bun
+import {
+  getGlobalConfig,
+  init_config1 as init_config,
+  saveGlobalConfig
+} from "./chunk-w5d5b7r0.js";
+import"./chunk-0f1005z8.js";
+import"./chunk-ccq9c4dq.js";
+import"./chunk-tg3zbmz7.js";
+import"./chunk-3asghxv4.js";
+import"./chunk-xk4zgzx2.js";
+import"./chunk-g0j0t6qk.js";
+import"./chunk-3c25bcsw.js";
+import"./chunk-2g1tm0n3.js";
+import"./chunk-55wgxwa9.js";
+import"./chunk-7np1pz21.js";
+import"./chunk-5cqfqj5r.js";
+import"./chunk-f5ma3nh5.js";
+import"./chunk-p2816w9z.js";
+import"./chunk-v1kzp02e.js";
+import"./chunk-ywhstzac.js";
+import"./chunk-cdz5yb0r.js";
+import {
+  init_analytics,
+  logEvent
+} from "./chunk-47cb3k0q.js";
+import"./chunk-bjwxx22f.js";
+import"./chunk-tjd99w4c.js";
+import"./chunk-qnfx3qtx.js";
+import"./chunk-7z9e9ndj.js";
+import"./chunk-sctqkknr.js";
+import"./chunk-ehab6nmr.js";
+import"./chunk-myphr2va.js";
+import"./chunk-8tnsngw2.js";
+import"./chunk-wgf77cc9.js";
+import"./chunk-7wm5s02e.js";
+import"./chunk-cv4r43rj.js";
+import"./chunk-fbv4apne.js";
+import"./chunk-er95axp1.js";
+import"./chunk-24stks7b.js";
+import"./chunk-hqmz36b3.js";
+import"./chunk-4g3v8y12.js";
+import"./chunk-7739pg2c.js";
+import"./chunk-xszk7n10.js";
+import"./chunk-sdj9b9wh.js";
+import {
+  __esm
+} from "./chunk-qp2qdcda.js";
+
+// src/commands/vim/vim.ts
+var call = async () => {
+  const config = getGlobalConfig();
+  let currentMode = config.editorMode || "normal";
+  if (currentMode === "emacs") {
+    currentMode = "normal";
+  }
+  const newMode = currentMode === "normal" ? "vim" : "normal";
+  saveGlobalConfig((current) => ({
+    ...current,
+    editorMode: newMode
+  }));
+  logEvent("tengu_editor_mode_changed", {
+    mode: newMode,
+    source: "command"
+  });
+  return {
+    type: "text",
+    value: `Editor mode set to ${newMode}. ${newMode === "vim" ? "Use Escape key to toggle between INSERT and NORMAL modes." : "Using standard (readline) keyboard bindings."}`
+  };
+};
+var init_vim = __esm(() => {
+  init_analytics();
+  init_config();
+});
+init_vim();
+
+export {
+  call
+};

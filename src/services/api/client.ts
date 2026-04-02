@@ -314,10 +314,9 @@ export async function getAnthropicClient({
     return new AnthropicVertex(vertexArgs) as unknown as Anthropic
   }
 
-  const _hasThirdParty = !!getGlobalConfig().thirdPartyProvider
   const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
-    apiKey: (_hasThirdParty || !isClaudeAISubscriber()) ? (apiKey || getAnthropicApiKey()) : null,
-    authToken: (!_hasThirdParty && isClaudeAISubscriber())
+    apiKey: isClaudeAISubscriber() ? null : apiKey || getAnthropicApiKey(),
+    authToken: isClaudeAISubscriber()
       ? getClaudeAIOAuthTokens()?.accessToken
       : undefined,
     // Set baseURL from OAuth config when using staging OAuth
