@@ -97,7 +97,6 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
     process.exit(1)
   }
 
-  // Persist to global config
   saveGlobalConfig(current => ({
     ...current,
     thirdPartyProvider: {
@@ -107,6 +106,22 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
       model: provider.defaultModel,
     },
   }))
+
+  try {
+    const { readFileSync, writeFileSync } = await import('fs')
+    const { join } = await import('path')
+    const { homedir } = await import('os')
+    const settingsPath = join(process.env.PANDA_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.pandacc'), 'settings.json')
+    const raw = readFileSync(settingsPath, 'utf-8')
+    const settings = JSON.parse(raw)
+    if (settings.env) {
+      delete settings.env.ANTHROPIC_BASE_URL
+      delete settings.env.ANTHROPIC_AUTH_TOKEN
+      delete settings.env.ANTHROPIC_MODEL
+      if (Object.keys(settings.env).length === 0) delete settings.env
+      writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
+    }
+  } catch {}
 
   // Set env vars so the current process can use them immediately
   process.env.ANTHROPIC_BASE_URL = provider.baseURL
