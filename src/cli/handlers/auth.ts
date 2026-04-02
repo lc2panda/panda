@@ -103,13 +103,52 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
     process.exit(1)
   }
 
+  let selectedModel = provider.defaultModel
+  try {
+    process.stdout.write('\nFetching available models...\n')
+    const modelsURL = provider.baseURL.replace(/\/?$/, '/v1/models')
+    const res = await fetch(modelsURL, {
+      headers: { 'x-api-key': apiKey.trim(), 'Authorization': `Bearer ${apiKey.trim()}` },
+    })
+    if (res.ok) {
+      const data = await res.json() as { data?: Array<{ id: string }> }
+      const models = data.data?.map(m => m.id).filter(Boolean) ?? []
+      if (models.length > 0) {
+        process.stdout.write(`\nAvailable models (${models.length}):\n`)
+        let sel = 0
+        const renderModels = () => {
+          process.stdout.write(`\x1b[${models.length}A\x1b[J`)
+          models.forEach((m, i) => {
+            process.stdout.write(`  ${i === sel ? '\x1b[36m❯\x1b[0m \x1b[1m' + m + '\x1b[0m' : '  \x1b[2m' + m + '\x1b[0m'}\n`)
+          })
+        }
+        models.forEach((m, i) => {
+          process.stdout.write(`  ${i === sel ? '\x1b[36m❯\x1b[0m \x1b[1m' + m + '\x1b[0m' : '  \x1b[2m' + m + '\x1b[0m'}\n`)
+        })
+        selectedModel = await new Promise<string>(resolve => {
+          if (!process.stdin.isTTY) { resolve(models[0]!); return }
+          process.stdin.setRawMode(true)
+          process.stdin.resume()
+          process.stdin.setEncoding('utf-8')
+          const onKey = (d: string) => {
+            if (d === '\x1b[A' || d === 'k') { sel = (sel - 1 + models.length) % models.length; renderModels() }
+            else if (d === '\x1b[B' || d === 'j') { sel = (sel + 1) % models.length; renderModels() }
+            else if (d === '\r' || d === '\n') { process.stdin.setRawMode(false); process.stdin.pause(); process.stdin.removeListener('data', onKey); resolve(models[sel]!) }
+            else if (d === '\x03') { process.stdin.setRawMode(false); process.exit(0) }
+          }
+          process.stdin.on('data', onKey)
+        })
+      }
+    }
+  } catch {}
+
   saveGlobalConfig(current => ({
     ...current,
     thirdPartyProvider: {
       name: providerKey,
       baseURL: provider.baseURL,
       apiKey: apiKey.trim(),
-      model: provider.defaultModel,
+      model: selectedModel,
     },
   }))
 
@@ -132,10 +171,10 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
   // Set env vars so the current process can use them immediately
   process.env.ANTHROPIC_BASE_URL = provider.baseURL
   process.env.ANTHROPIC_AUTH_TOKEN = apiKey.trim()
-  process.env.ANTHROPIC_MODEL = provider.defaultModel
+  process.env.ANTHROPIC_MODEL = selectedModel
 
   process.stdout.write(`\n✓ Login successful! Provider: ${provider.name}\n`)
-  process.stdout.write(`  Model: ${provider.defaultModel}\n`)
+  process.stdout.write(`  Model: ${selectedModel}\n`)
   process.stdout.write(`  Base URL: ${provider.baseURL}\n`)
   process.stdout.write(`\nRun 'panda' to start.\n`)
   process.exit(0)
