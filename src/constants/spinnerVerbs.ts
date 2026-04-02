@@ -1,8 +1,25 @@
 import { getInitialSettings } from '../utils/settings/settings.js'
+import { isZh } from '../utils/i18n.js'
+
+const SPINNER_VERBS_ZH = [
+  '思考中', '推理中', '分析中', '酝酿中', '构思中', '编排中',
+  '计算中', '琢磨中', '烹饪中', '调和中', '发酵中', '沉淀中',
+  '编织中', '雕琢中', '打磨中', '冶炼中', '蒸馏中', '酿造中',
+  '孵化中', '萌芽中', '生长中', '绽放中', '结晶中', '凝聚中',
+  '翻涌中', '流转中', '旋转中', '飞驰中', '奔腾中', '潜行中',
+  '探索中', '挖掘中', '搜寻中', '整合中', '编译中', '链接中',
+  '解码中', '破译中', '归纳中', '演绎中', '推敲中', '斟酌中',
+  '筹划中', '布局中', '运筹中', '调度中', '串联中', '融合中',
+]
 
 export function getSpinnerVerbs(): string[] {
   const settings = getInitialSettings()
   const config = settings.spinnerVerbs
+  if (isZh()) {
+    if (config?.mode === 'replace' && config.verbs.length > 0) return config.verbs
+    if (config?.mode === 'append') return [...SPINNER_VERBS_ZH, ...config.verbs]
+    return SPINNER_VERBS_ZH
+  }
   if (!config) {
     return SPINNER_VERBS
   }

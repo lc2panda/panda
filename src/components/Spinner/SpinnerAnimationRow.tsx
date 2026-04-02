@@ -165,11 +165,12 @@ export function SpinnerAnimationRow({
   // === Token count (leader + teammates, or foregrounded teammate) ===
   const totalTokens = foregroundedTeammate && !foregroundedTeammate.isIdle ? foregroundedTeammate.progress?.tokenCount ?? 0 : leaderTokens + teammateTokens;
   const tokenCount = formatNumber(totalTokens);
-  const tokensText = hasRunningTeammates ? `${tokenCount} tokens` : `${figures.arrowDown} ${tokenCount} tokens`;
+  const _zh = require('../../utils/i18n.js').isZh()
+  const tokensText = hasRunningTeammates ? `${tokenCount} ${_zh ? '词元' : 'tokens'}` : `${figures.arrowDown} ${tokenCount} ${_zh ? '词元' : 'tokens'}`;
   const tokensWidth = stringWidth(tokensText);
 
   // === Thinking text (may shrink to fit) ===
-  let thinkingText = thinkingStatus === 'thinking' ? `thinking${effortSuffix}` : typeof thinkingStatus === 'number' ? `thought for ${Math.max(1, Math.round(thinkingStatus / 1000))}s` : null;
+  let thinkingText = thinkingStatus === 'thinking' ? `${_zh ? '思考' : 'thinking'}${effortSuffix}` : typeof thinkingStatus === 'number' ? `${_zh ? '思考了' : 'thought for'} ${Math.max(1, Math.round(thinkingStatus / 1000))}s` : null;
   let thinkingWidthValue = thinkingText ? stringWidth(thinkingText) : 0;
 
   // === Progressive width gating ===
