@@ -26,29 +26,20 @@
 
 ## 安装
 
-**第一步：配置 registry（只需一次）**
+**第一步：配置认证（只需一次）**
+
+GitHub Packages 需要认证。在 GitHub 生成 Personal Access Token：
+[GitHub Settings → Developer settings → Personal access tokens → Generate new token](https://github.com/settings/tokens)，勾选 `read:packages`。
 
 macOS / Linux：
 ```bash
-npm config set @lc2panda:registry https://npm.pkg.github.com
+echo "//npm.pkg.github.com/:_authToken=你的TOKEN" >> ~/.npmrc
+echo "@lc2panda:registry=https://npm.pkg.github.com" >> ~/.npmrc
 ```
 
-Windows PowerShell：
-```powershell
-npm config set "@lc2panda:registry" "https://npm.pkg.github.com"
+Windows — 编辑 `%USERPROFILE%\.npmrc` 文件（如果不存在就新建），添加两行：
 ```
-
-Windows CMD：
-```cmd
-npm config set "@lc2panda:registry" "https://npm.pkg.github.com"
-```
-
-如果以上命令报错，手动创建配置文件：
-- macOS/Linux: 编辑 `~/.npmrc`
-- Windows: 编辑 `%USERPROFILE%\.npmrc`
-
-添加一行：
-```
+//npm.pkg.github.com/:_authToken=你的TOKEN
 @lc2panda:registry=https://npm.pkg.github.com
 ```
 
