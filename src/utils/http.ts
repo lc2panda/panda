@@ -17,7 +17,6 @@ import { getClaudeCodeUserAgent } from './userAgent.js'
 // WARNING: We rely on `claude-cli` in the user agent for log filtering.
 // Please do NOT change this without making sure that logging also gets updated!
 export function getUserAgent(): string {
-  if (isThirdPartyProvider() || isPrivacyEnhancedMode()) return `PandaCode/${MACRO.VERSION}`
   return `claude-code/${MACRO.VERSION} (external, cli)`
 }
 
