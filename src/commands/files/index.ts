@@ -4,7 +4,7 @@ const files = {
   type: 'local',
   name: 'files',
   description: 'List all files currently in context · 列出当前上下文中的所有文件',
-  isEnabled: () => process.env.USER_TYPE === 'ant',
+  isEnabled: () => true,
   supportsNonInteractive: true,
   load: () => import('./files.js'),
 } satisfies Command

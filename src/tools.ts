@@ -211,7 +211,7 @@ export function getAllBaseTools(): Tools {
     AskUserQuestionTool,
     SkillTool,
     EnterPlanModeTool,
-    ...(process.env.USER_TYPE === 'ant' ? [ConfigTool] : []),
+    ...(ConfigTool ? [ConfigTool] : []),
     ...(process.env.USER_TYPE === 'ant' ? [TungstenTool] : []),
     ...(SuggestBackgroundPRTool ? [SuggestBackgroundPRTool] : []),
     ...(WebBrowserTool ? [WebBrowserTool] : []),
