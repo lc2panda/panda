@@ -11,12 +11,13 @@ import {
   isClaudeAISubscriber,
 } from './auth.js'
 import { isThirdPartyProvider } from './model/providers.js'
+import { isPrivacyEnhancedMode } from './privacyMode.js'
 import { getClaudeCodeUserAgent } from './userAgent.js'
 
 // WARNING: We rely on `claude-cli` in the user agent for log filtering.
 // Please do NOT change this without making sure that logging also gets updated!
 export function getUserAgent(): string {
-  if (isThirdPartyProvider()) return `PandaCode/${MACRO.VERSION}`
+  if (isThirdPartyProvider() || isPrivacyEnhancedMode()) return `PandaCode/${MACRO.VERSION}`
   return `claude-code/${MACRO.VERSION} (external, cli)`
 }
 
