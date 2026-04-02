@@ -133,7 +133,7 @@ const featureFlagPlugin: BunPlugin = {
                 );
             }
 
-            // code = code.replace(/\("external"\s+as\s+string\)/g, '("ant" as string)'); // disabled: causes API 500
+            code = code.replace(/\("external"\s+as\s+string\)/g, '("ant" as string)');
 
             return {
                 contents: code,
