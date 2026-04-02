@@ -15,6 +15,7 @@ mint.json
 bun.lock
 .githooks/
 CLAUDE.md
+README-DEV.md
 TODO.md
 RECORD.md
 SECURITY.md
