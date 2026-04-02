@@ -149,7 +149,7 @@ function SpeechBubble(t0) {
   }
   return t9;
 }
-export const MIN_COLS_FOR_FULL_SPRITE = 100;
+export const MIN_COLS_FOR_FULL_SPRITE = 140;
 const SPRITE_BODY_WIDTH = 12;
 const NAME_ROW_PAD = 2; // focused state wraps name in spaces: ` name `
 const SPRITE_PADDING_X = 2;
