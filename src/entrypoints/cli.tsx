@@ -18,9 +18,7 @@ if (typeof globalThis.MACRO === "undefined") {
 (globalThis as any).BUILD_ENV = "production";
 (globalThis as any).INTERFACE_TYPE = "stdio";
 
-process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ??= '1';
 process.env.DISABLE_INSTALLATION_CHECKS ??= '1';
-process.env.USER_TYPE ??= 'ant';
 
 // Bugfix for corepack auto-pinning, which adds yarnpkg to peoples' package.jsons
 // eslint-disable-next-line custom-rules/no-top-level-side-effects
