@@ -271,8 +271,13 @@ async function selectProviderInteractively(): Promise<string> {
  * and sets up the local auth state.
  */
 export async function installOAuthTokens(tokens: OAuthTokens): Promise<void> {
-  // Clear old state before saving new credentials
   await performLogout({ clearOnboarding: false })
+
+  saveGlobalConfig(current => {
+    const updated = { ...current }
+    delete updated.thirdPartyProvider
+    return updated
+  })
 
   // Reuse pre-fetched profile if available, otherwise fetch fresh
   const profile =
