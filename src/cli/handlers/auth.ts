@@ -52,7 +52,7 @@ const THIRD_PARTY_PROVIDERS: Record<
   { name: string; baseURL: string; defaultModel: string; consoleURL: string }
 > = {
   deepseek: { name: 'DeepSeek', baseURL: 'https://api.deepseek.com/anthropic', defaultModel: 'deepseek-chat', consoleURL: 'https://platform.deepseek.com/api_keys' },
-  kimi: { name: 'Kimi Code', baseURL: 'https://api.kimi.com/coding', defaultModel: 'kimi-k2.5', consoleURL: 'https://www.kimi.com/code' },
+  kimi: { name: 'Kimi Code', baseURL: 'https://api.kimi.com/coding/', defaultModel: 'kimi-k2.5', consoleURL: 'https://www.kimi.com/code' },
   qwen: { name: 'Qwen (阿里百炼)', baseURL: 'https://dashscope-intl.aliyuncs.com/apps/anthropic', defaultModel: 'qwen-plus', consoleURL: 'https://dashscope.console.aliyun.com/' },
   minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'MiniMax-M2.5', consoleURL: 'https://platform.minimax.io' },
   glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic', defaultModel: 'glm-4', consoleURL: 'https://open.bigmodel.cn/' },
