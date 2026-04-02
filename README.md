@@ -30,21 +30,17 @@
 
 - [项目概述](#项目概述)
 - [核心价值](#核心价值)
+- [新增能力](#新增能力)
 - [系统架构](#系统架构)
-  - [入口与引导](#1-入口与引导)
-  - [核心对话循环](#2-核心对话循环)
-  - [工具系统](#3-工具系统)
-  - [API 与 Provider](#4-api-与-provider)
-  - [MCP 服务](#5-mcp-服务)
-  - [权限与安全](#6-权限与安全)
-  - [UI 渲染层](#7-ui-渲染层)
-  - [Feature Flag 系统](#8-feature-flag-系统)
 - [能力清单](#能力清单)
+- [多 Provider 支持](#多-provider-支持)
 - [Feature Flags](#feature-flags)
 - [项目目录结构](#项目目录结构)
 - [快速开始](#快速开始)
 - [构建说明](#构建说明)
+- [隐私保护](#隐私保护)
 - [内部包](#内部包)
+- [跨平台支持](#跨平台支持)
 - [开发规范](#开发规范)
 - [审计与验证](#审计与验证)
 
@@ -436,12 +432,66 @@ panda-code/
 
 ---
 
-## 快速开始
+## 新增能力
 
-### 新设备完整安装
+基于设计方案 `design-panda-assistant.md` 实施的全部新功能：
+
+### 多 Provider 接入（7 家）
 
 ```bash
-# 1. 安装 Bun（必须最新版，旧版有兼容问题）
+panda auth login
+# 交互式选择：Anthropic / DeepSeek / Kimi / Qwen / MiniMax / GLM / 火山引擎
+# 输入 API Key 即完成，无需手动配环境变量
+```
+
+| Provider | Base URL | 默认模型 |
+|----------|----------|----------|
+| Anthropic | 原版 OAuth | claude-sonnet-4-6 |
+| DeepSeek | api.deepseek.com/anthropic | deepseek-chat |
+| Kimi | api.moonshot.ai/anthropic | kimi-k2.5 |
+| Qwen | dashscope.aliyuncs.com/apps/anthropic | qwen-plus |
+| MiniMax | api.minimax.io/anthropic | MiniMax-M2.5 |
+| GLM | open.bigmodel.cn/api/anthropic | glm-4 |
+| Volcano | ark.cn-beijing.volces.com/api/coding | ark-code-latest |
+
+### 私人助理命令
+
+| 命令 | 功能 |
+|------|------|
+| `/persona work\|companion\|study\|creative\|butler` | 切换助理人格（工作/陪伴/学习/创意/管家） |
+| `/night-mode on\|off` | 夜间自主模式开关 |
+| `/language en\|zh` | 切换显示语言 |
+| `/privacy` | 查看隐私保护状态 |
+| `/morning` | 晨间工作简报 |
+| `/organize [path]` | 文件整理建议 |
+| `/health-check` | 代码健康诊断 |
+| `/remind <msg> <time>` | 设置提醒 |
+| `/cleanup [path]` | 清理临时文件 |
+| `/files` | 列出当前上下文文件 |
+| `/tag` | 会话标签管理 |
+| `/version` | 版本详细信息 |
+
+### 隐私零泄露
+
+非 Anthropic 渠道使用时，零数据离开本地：
+- 1104 个遥测调用点全部拦截
+- GrowthBook / Datadog / BigQuery / 1P 事件全部禁用
+- User-Agent 规范化（参考 cc-gateway 标准）
+- 敏感 headers（session-id 等）自动移除
+- 独立存储空间 `~/.pandacc/`（不与原版 claude 混用）
+
+### 命令中文化
+
+所有 80+ 命令描述支持双语显示（English · 中文）。
+
+---
+
+## 快速开始
+
+### 方式一：从源码安装（推荐）
+
+```bash
+# 1. 安装 Bun（必须最新版）
 curl -fsSL https://bun.sh/install | bash
 bun upgrade
 
@@ -449,23 +499,47 @@ bun upgrade
 git clone <仓库地址> cc-panda
 cd cc-panda
 
-# 3. 安装依赖
-bun install
+# 3. 安装依赖 + 构建 + 注册全局命令
+bun install && bun run build && bun link
 
-# 4. 构建（内联 91 个 feature flags，输出 ~527 个 JS 文件到 dist/）
-bun run build
-
-# 5. 注册全局命令
-bun link
-
-# 6. 任意目录使用
+# 4. 任意目录使用
 panda
 ```
 
-首次使用需要配置 API 访问（和原版 claude 一样）：
+### 方式二：npm 本地安装（无需发布）
 
 ```bash
+# 在项目目录中
+bun install && bun run build
+npm install -g .
+
+# 或打包成 .tgz 拷贝到其他机器
+npm pack
+# 在目标机器上
+npm install -g panda-code-1.0.2.tgz
+```
+
+### 方式三：发布到 npm Registry
+
+```bash
+# 发布到 npmjs.com
+npm publish
+
+# 发布到私有源
+npm publish --registry https://your-registry.example.com
+
+# 任意机器安装
+npm install -g panda-code
+```
+
+### 首次使用
+
+```bash
+# 配置 API 访问（交互式选择 Provider）
 panda auth login
+
+# 查看认证状态
+panda auth status
 ```
 
 ### 后续更新
@@ -477,10 +551,10 @@ cd cc-panda && git pull && bun install && bun run build && bun link
 ### 运行方式
 
 ```bash
-# 全局命令（推荐，任意目录可用）
+# 全局命令（推荐）
 panda
 
-# 或直接运行构建产物
+# 直接运行构建产物
 bun dist/cli.js
 node dist/cli.js
 
@@ -488,25 +562,13 @@ node dist/cli.js
 panda --version    # 2.1.888 (Panda Code)
 ```
 
-构建采用 code splitting 多文件打包（`build.ts`），产物输出到 `dist/` 目录。构建出的版本 bun 和 node 都可以启动，publish 到私有源可以直接启动。
-
 ### Pipe 模式
 
 ```bash
-# 非交互式单次查询
 echo "say hello" | panda -p
-
-# 使用构建产物
-echo "explain this code" | bun dist/cli.js -p
 ```
 
-### 发布到私有 Registry
-
-```bash
-npm publish --registry https://your-registry.example.com
-```
-
-全局安装后，`panda` 和 `claude-js` 命令均可使用。
+构建采用 code splitting 多文件打包（`build.ts`），产物输出到 `dist/`（~528 个 JS chunk）。bun 和 node 都可以运行。
 
 ---
 
@@ -550,13 +612,42 @@ bun --feature=BG_SESSIONS --feature=KAIROS --feature=PROACTIVE ... run src/entry
 
 ---
 
+## 隐私保护
+
+非 Anthropic 渠道（DeepSeek/Kimi/Qwen 等）使用时，自动启用零泄露模式：
+
+| 防护层 | 内容 | 状态 |
+|--------|------|------|
+| 遥测拦截 | 1104 个 logEvent 调用点全部拦截 | 自动 |
+| 分析禁用 | GrowthBook / Datadog / BigQuery / 1P 事件 | 自动 |
+| UA 规范化 | 精简为 `PandaCode/{version}`，不泄露设备信息 | 自动 |
+| Header 清理 | 移除 x-app、session-id 等跟踪头 | 自动 |
+| 独立存储 | `~/.pandacc/` 独立空间，不与原版 claude 混用 | 自动 |
+| 首次迁移 | 自动从 `~/.claude/` 复制配置（不删除原目录） | 一次性 |
+
+查看当前隐私状态：`/privacy`
+
+---
+
+## 跨平台支持
+
+| 平台 | 状态 | 说明 |
+|------|------|------|
+| macOS | 完整支持 | Keychain 存储、osascript 集成 |
+| Windows | 完整支持 | PowerShell 自动检测、git-bash Shell、路径转换 |
+| Linux | 完整支持 | 标准 POSIX 环境 |
+| WSL | 完整支持 | 自动检测 WSL 环境 |
+
+---
+
 ## 开发规范
 
 - **运行时**：Bun（非 Node.js）。所有 import、构建、执行使用 Bun API
 - **模块**：ESM (`"type": "module"`)，TSX with `react-jsx` transform
 - **Monorepo**：Bun workspaces，内部包通过 `workspace:*` 解析
-- **Feature Flags**：新增 flag 需同时更新 `build.ts` ENABLED_FLAGS 和 `scripts/dev.sh`
+- **Feature Flags**：新增 flag 需同时更新 `build.ts` ENABLED_FLAGS
 - **品牌**：所有用户可见文本使用 "Panda Code"，不使用 "Claude Code"
+- **存储**：所有配置路径使用 `~/.pandacc/`，不使用 `~/.claude/`
 - **React Compiler**：组件含反编译 `_c()` 记忆化模板，正常现象
 
 ---
@@ -567,13 +658,10 @@ bun --feature=BG_SESSIONS --feature=KAIROS --feature=PROACTIVE ... run src/entry
 
 | 报告 | 内容 | 判定 |
 |------|------|------|
+| `monitor/design-panda-assistant.md` | **深度设计方案 v2.1** | 指导文件 |
+| `monitor/VA-final-v2.md` | **最终全量验证（Phase 1-6）** | **24/24 通过** |
+| `monitor/15-func-summary.md` | 功能评分卡 + 实施记录 | 9.78/10 |
 | `monitor/00-summary.md` | 安全审计汇总 | 参考 |
-| `monitor/01~09` | 安全+对比审计 (9份) | 参考 |
-| `monitor/10~14` | 功能审计 (5份) | 参考 |
-| `monitor/15-func-summary.md` | **主报告：评分卡 + 实施记录** | 9.78/10 |
-| `monitor/VA-final.md` | **最终全量验证** | **全量通过** |
-
-功能完整性评分：**9.78/10**（内部包 stub 为平台限制，非功能缺失）
 
 ---
 
