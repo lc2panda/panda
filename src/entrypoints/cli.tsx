@@ -20,6 +20,17 @@ if (typeof globalThis.MACRO === "undefined") {
 
 process.env.DISABLE_INSTALLATION_CHECKS ??= '1';
 
+try {
+    const _h = require('os').homedir();
+    const _r = require('fs').readFileSync(require('path').join(_h, '.pandacc.json'), 'utf-8');
+    const _c = JSON.parse(_r);
+    if (_c.thirdPartyProvider) {
+        process.env.ANTHROPIC_BASE_URL = _c.thirdPartyProvider.baseURL;
+        process.env.ANTHROPIC_AUTH_TOKEN = _c.thirdPartyProvider.apiKey;
+        process.env.ANTHROPIC_MODEL = _c.thirdPartyProvider.model;
+    }
+} catch {}
+
 // Bugfix for corepack auto-pinning, which adds yarnpkg to peoples' package.jsons
 // eslint-disable-next-line custom-rules/no-top-level-side-effects
 process.env.COREPACK_ENABLE_AUTO_PIN = "0";
