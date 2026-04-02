@@ -222,7 +222,27 @@ function SpinnerWithVerbInner({
   // re-render cadence, same as the old ApiMetricsLine did.
   let ttftText: string | null = null;
   if (typeof apiMetricsRef !== 'undefined' && apiMetricsRef?.current && apiMetricsRef.current.length > 0) {
-    ttftText = computeTtftText(apiMetricsRef.current);
+    // Inline implementation of computeTtftText (ant-only, no external definition exists)
+    const entries = apiMetricsRef.current;
+    const ttfts = entries.map(e => e.ttftMs);
+    const otpsValues = entries.map(e => {
+      const delta = Math.round((e.endResponseLength - e.responseLengthBaseline) / 4);
+      const samplingMs = e.lastTokenTime - e.firstTokenTime;
+      return samplingMs > 0 ? Math.round(delta / (samplingMs / 1000)) : 0;
+    });
+    const isMulti = entries.length > 1;
+    const medianOf = (vals: number[]): number => {
+      const sorted = [...vals].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0 ? Math.round((sorted[mid - 1]! + sorted[mid]!) / 2) : sorted[mid]!;
+    };
+    const ttft = isMulti ? medianOf(ttfts) : ttfts[0]!;
+    const otps = isMulti ? medianOf(otpsValues) : otpsValues[0]!;
+    const prefix = isMulti ? 'P50 ' : '';
+    const parts: string[] = [];
+    if (ttft > 0) parts.push(`${prefix}TTFT ${(ttft / 1000).toFixed(1)}s`);
+    if (otps > 0) parts.push(`${prefix}${otps} tok/s`);
+    ttftText = parts.length > 0 ? parts.join(' · ') : null;
   }
 
   // When leader is idle but teammates are running (and we're viewing the leader),

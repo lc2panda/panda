@@ -2805,7 +2805,7 @@ export function REPL({
     })) {
       onQueryEvent(event);
     }
-    if (feature('BUDDY')) {
+    if (feature('BUDDY') && typeof fireCompanionObserver === 'function') {
       void fireCompanionObserver(messagesRef.current, reaction => setAppState(prev => prev.companionReaction === reaction ? prev : {
         ...prev,
         companionReaction: reaction as string | undefined
@@ -4851,9 +4851,9 @@ export function REPL({
 
                 {focusedInputDialog === 'desktop-upsell' && <DesktopUpsellStartup onDone={() => setShowDesktopUpsellStartup(false)} />}
 
-                {feature('ULTRAPLAN') ? focusedInputDialog === 'ultraplan-choice' && ultraplanPendingChoice && <UltraplanChoiceDialog plan={ultraplanPendingChoice.plan} sessionId={ultraplanPendingChoice.sessionId} taskId={ultraplanPendingChoice.taskId} setMessages={setMessages} readFileState={readFileState.current} getAppState={() => store.getState()} setConversationId={setConversationId} /> : null}
+                {feature('ULTRAPLAN') && typeof UltraplanChoiceDialog === 'function' ? focusedInputDialog === 'ultraplan-choice' && ultraplanPendingChoice && <UltraplanChoiceDialog plan={ultraplanPendingChoice.plan} sessionId={ultraplanPendingChoice.sessionId} taskId={ultraplanPendingChoice.taskId} setMessages={setMessages} readFileState={readFileState.current} getAppState={() => store.getState()} setConversationId={setConversationId} /> : null}
 
-                {feature('ULTRAPLAN') ? focusedInputDialog === 'ultraplan-launch' && ultraplanLaunchPending && <UltraplanLaunchDialog onChoice={(choice, opts) => {
+                {feature('ULTRAPLAN') && typeof UltraplanLaunchDialog === 'function' ? focusedInputDialog === 'ultraplan-launch' && ultraplanLaunchPending && <UltraplanLaunchDialog onChoice={(choice, opts) => {
             const blurb = ultraplanLaunchPending.blurb;
             setAppState(prev => prev.ultraplanLaunchPending ? {
               ...prev,

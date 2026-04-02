@@ -60,6 +60,7 @@ import { logForDebugging } from '../utils/debug.js'
 import { loadMemoryPrompt } from '../memdir/memdir.js'
 import { isUndercover } from '../utils/undercover.js'
 import { isMcpInstructionsDeltaEnabled } from '../utils/mcpInstructionsDelta.js'
+import { getAntModelOverrideConfig } from '../utils/model/antModels.js'
 
 // Dead code elimination: conditional imports for feature-gated modules
 /* eslint-disable @typescript-eslint/no-require-imports */
