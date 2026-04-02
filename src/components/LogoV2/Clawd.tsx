@@ -26,19 +26,16 @@ export function Clawd(t0) {
   const pose = t2 === undefined ? "default" : t2;
   let t3;
   if ($[2] !== pose) {
-    t3 = <Box flexDirection="column">
-      <Text color="#ff9955">{' ██████╗   █████╗  ███╗   ██╗ ██████╗   █████╗'}</Text>
-      <Text color="#ff8866">{' ██╔══██╗ ██╔══██╗ ████╗  ██║ ██╔══██╗ ██╔══██╗'}</Text>
-      <Text color="#ff7777">{' ██████╔╝ ███████║ ██╔██╗ ██║ ██║  ██║ ███████║'}</Text>
-      <Text color="#ff6688">{' ██╔═══╝  ██╔══██║ ██║╚██╗██║ ██║  ██║ ██╔══██║'}</Text>
-      <Text color="#ff5599">{' ██║      ██║  ██║ ██║ ╚████║ ██████╔╝ ██║  ██║'}</Text>
-      <Text color="#ff44aa">{' ╚═╝      ╚═╝  ╚═╝ ╚═╝  ╚═══╝ ╚═════╝  ╚═╝  ╚═╝'}</Text>
-      <Text color="#ff9955">{' ██████╗  ██████╗  ██████╗  ███████╗'}</Text>
-      <Text color="#ff8866">{' ██╔════╝ ██╔═══██╗██╔══██╗ ██╔════╝'}</Text>
-      <Text color="#ff7777">{' ██║      ██║   ██║██║  ██║ █████╗'}</Text>
-      <Text color="#ff6688">{' ██║      ██║   ██║██║  ██║ ██╔══╝'}</Text>
-      <Text color="#ff5599">{' ╚██████╗ ╚██████╔╝██████╔╝ ███████╗'}</Text>
-      <Text color="#ff44aa">{' ╚═════╝  ╚═════╝ ╚═════╝  ╚══════╝'}</Text>
+    t3 = <Box flexDirection="column" alignItems="center">
+      <Text>{'▀▄████▀▀▀▀▀▀██████'}</Text>
+      <Text>{'████▀        ▀████'}</Text>
+      <Text>{'▀▀▀            ▀▀█'}</Text>
+      <Text>{'▀▀ ▄█▄   ▄█▄     ▄'}</Text>
+      <Text>{'  █▄█▀   █▄██'}</Text>
+      <Text>{'  ▀▀▀ ▄▄  ▀▀▀    ▄'}</Text>
+      <Text>{'▄     ▄▄▄        █'}</Text>
+      <Text>{'▀█▄▄▄ ▀▀     ▄▄▄██'}</Text>
+      <Text>{'▄▀██████████████▀▄'}</Text>
     </Box>;
     $[2] = pose;
     $[3] = t3;
