@@ -177,6 +177,13 @@ for (const file of files) {
     }
 }
 
+// Step 4: Ensure dist/cli.js has a shebang for `npm install -g` / `npx` usage
+const cliPath = join(outdir, "cli.js");
+const cliContent = await readFile(cliPath, "utf-8");
+if (!cliContent.startsWith("#!")) {
+    await writeFile(cliPath, `#!/usr/bin/env node\n${cliContent}`);
+}
+
 console.log(
     `Bundled ${result.outputs.length} files to ${outdir}/ (patched ${patched} for Node.js compat)`,
 );

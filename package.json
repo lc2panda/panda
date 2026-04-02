@@ -1,7 +1,8 @@
 {
-  "name": "claude-js",
+  "name": "panda-code",
   "version": "1.0.2",
   "description": "Reverse-engineered Anthropic Claude Code CLI — interactive AI coding assistant in the terminal",
+  "main": "dist/cli.js",
   "type": "module",
   "author": "claude-code-best <claude-code-best@proton.me>",
   "repository": {
