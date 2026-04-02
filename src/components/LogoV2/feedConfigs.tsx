@@ -3,6 +3,7 @@ import { homedir } from 'os';
 import * as React from 'react';
 import { Box, Text } from '../../ink.js';
 import type { Step } from '../../projectOnboardingState.js';
+import { t } from '../../utils/i18n.js';
 import { formatCreditAmount, getCachedReferrerReward } from '../../services/api/referral.js';
 import type { LogOption } from '../../types/logs.js';
 import { getCwd } from '../../utils/cwd.js';
@@ -18,10 +19,10 @@ export function createRecentActivityFeed(activities: LogOption[]): FeedConfig {
     };
   });
   return {
-    title: 'Recent activity',
+    title: t('Recent activity', '最近活动'),
     lines,
-    footer: lines.length > 0 ? '/resume for more' : undefined,
-    emptyMessage: 'No recent activity'
+    footer: lines.length > 0 ? t('/resume for more', '/resume 查看更多') : undefined,
+    emptyMessage: t('No recent activity', '暂无最近活动')
   };
 }
 export function createWhatsNewFeed(releaseNotes: string[]): FeedConfig {
@@ -39,11 +40,11 @@ export function createWhatsNewFeed(releaseNotes: string[]): FeedConfig {
       text: note
     };
   });
-  const emptyMessage = ("external" as string) === 'ant' ? 'Unable to fetch latest claude-cli-internal commits' : 'Check the Panda Code changelog for updates';
+  const emptyMessage = ("external" as string) === 'ant' ? t('Unable to fetch latest commits', '无法获取最新提交') : t('Check the Panda Code changelog for updates', '查看 Panda Code 更新日志');
   return {
-    title: ("external" as string) === 'ant' ? "What's new [ANT-ONLY: Latest CC commits]" : "What's new",
+    title: ("external" as string) === 'ant' ? t("What's new [Latest commits]", '最新动态 [最新提交]') : t("What's new", '最新动态'),
     lines,
-    footer: lines.length > 0 ? '/release-notes for more' : undefined,
+    footer: lines.length > 0 ? t('/release-notes for more', '/release-notes 查看更多') : undefined,
     emptyMessage
   };
 }

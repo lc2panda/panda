@@ -86,7 +86,7 @@ export function calculateOptimalLeftWidth(
     stringWidth(welcomeMessage),
     stringWidth(truncatedCwd),
     stringWidth(modelLine),
-    20, // Minimum for clawd art
+    30, // Minimum for clawd art + model info
   )
   return Math.min(contentWidth + 4, MAX_LEFT_WIDTH) // +4 for padding
 }
@@ -95,10 +95,11 @@ export function calculateOptimalLeftWidth(
  * Formats the welcome message based on username
  */
 export function formatWelcomeMessage(username: string | null): string {
+  const { t } = require('./i18n.js')
   if (!username || username.length > MAX_USERNAME_LENGTH) {
-    return 'Welcome back!'
+    return t('Welcome back!', '欢迎回来！')
   }
-  return `Welcome back ${username}!`
+  return t(`Welcome back ${username}!`, `欢迎回来 ${username}！`)
 }
 
 /**
