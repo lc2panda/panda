@@ -104,9 +104,9 @@ export async function getAnthropicClient({
   // Only applies env vars if they haven't been explicitly set already (??= semantics).
   const _tpConfig = getGlobalConfig().thirdPartyProvider
   if (_tpConfig) {
-    process.env.ANTHROPIC_BASE_URL ??= _tpConfig.baseURL
-    process.env.ANTHROPIC_AUTH_TOKEN ??= _tpConfig.apiKey
-    process.env.ANTHROPIC_MODEL ??= _tpConfig.model
+    process.env.ANTHROPIC_BASE_URL = _tpConfig.baseURL
+    process.env.ANTHROPIC_AUTH_TOKEN = _tpConfig.apiKey
+    process.env.ANTHROPIC_MODEL = _tpConfig.model
   }
 
   const containerId = process.env.CLAUDE_CODE_CONTAINER_ID
