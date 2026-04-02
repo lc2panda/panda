@@ -154,6 +154,7 @@ import sandboxToggle from './commands/sandbox-toggle/index.js'
 import chrome from './commands/chrome/index.js'
 import stickers from './commands/stickers/index.js'
 import advisor from './commands/advisor.js'
+import { getLocalizedDescription } from './utils/i18n.js'
 import { logError } from './utils/log.js'
 import { toError } from './utils/errors.js'
 import { logForDebugging } from './utils/debug.js'
@@ -734,29 +735,30 @@ export function getCommand(commandName: string, commands: Command[]): Command {
  * For model-facing prompts (like SkillTool), use cmd.description directly.
  */
 export function formatDescriptionWithSource(cmd: Command): string {
+  const desc = getLocalizedDescription(cmd.description)
   if (cmd.type !== 'prompt') {
-    return cmd.description
+    return desc
   }
 
   if (cmd.kind === 'workflow') {
-    return `${cmd.description} (workflow)`
+    return `${desc} (workflow)`
   }
 
   if (cmd.source === 'plugin') {
     const pluginName = cmd.pluginInfo?.pluginManifest.name
     if (pluginName) {
-      return `(${pluginName}) ${cmd.description}`
+      return `(${pluginName}) ${desc}`
     }
-    return `${cmd.description} (plugin)`
+    return `${desc} (plugin)`
   }
 
   if (cmd.source === 'builtin' || cmd.source === 'mcp') {
-    return cmd.description
+    return desc
   }
 
   if (cmd.source === 'bundled') {
-    return `${cmd.description} (bundled)`
+    return `${desc} (bundled)`
   }
 
-  return `${cmd.description} (${getSettingSourceName(cmd.source)})`
+  return `${desc} (${getSettingSourceName(cmd.source)})`
 }
