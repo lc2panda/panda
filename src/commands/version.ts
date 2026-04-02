@@ -14,7 +14,7 @@ const version = {
   name: 'version',
   description:
     'Print the version this session is running (not what autoupdate downloaded) · 显示当前运行版本',
-  isEnabled: () => process.env.USER_TYPE === 'ant',
+  isEnabled: () => true,
   supportsNonInteractive: true,
   load: () => Promise.resolve({ call }),
 } satisfies Command
