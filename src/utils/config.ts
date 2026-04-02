@@ -582,6 +582,7 @@ export type GlobalConfig = {
     baseURL: string
     apiKey: string
     model: string
+    contextWindow?: number
   }
 
   language?: string
