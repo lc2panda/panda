@@ -110,24 +110,30 @@ const featureFlagPlugin: BunPlugin = {
 
             const src = await Bun.file(args.path).text();
 
-            // Only process files that reference bun:bundle
-            if (!src.includes("bun:bundle")) return undefined;
+            const hasBunBundle = src.includes("bun:bundle");
+            const hasUserType = src.includes('"external" as string');
+
+            if (!hasBunBundle && !hasUserType) return undefined;
 
             let code = src;
 
-            // Remove `import { ... } from 'bun:bundle'` (single or double quotes)
-            code = code.replace(
-                /import\s*\{[^}]*\}\s*from\s*['"]bun:bundle['"]\s*;?\n?/g,
-                "",
-            );
+            if (hasBunBundle) {
+                // Remove `import { ... } from 'bun:bundle'` (single or double quotes)
+                code = code.replace(
+                    /import\s*\{[^}]*\}\s*from\s*['"]bun:bundle['"]\s*;?\n?/g,
+                    "",
+                );
 
-            // Replace `feature('FLAG')` / `feature("FLAG")` calls.
-            // The call site may have a trailing comma and whitespace inside parens,
-            // e.g. `feature(\n  'FLAG',\n)`.
-            code = code.replace(
-                /feature\(\s*['"]([^'"]+)['"]\s*,?\s*\)/g,
-                (_match, flag: string) => (ENABLED_FLAGS.has(flag) ? "true" : "false"),
-            );
+                // Replace `feature('FLAG')` / `feature("FLAG")` calls.
+                // The call site may have a trailing comma and whitespace inside parens,
+                // e.g. `feature(\n  'FLAG',\n)`.
+                code = code.replace(
+                    /feature\(\s*['"]([^'"]+)['"]\s*,?\s*\)/g,
+                    (_match, flag: string) => (ENABLED_FLAGS.has(flag) ? "true" : "false"),
+                );
+            }
+
+            code = code.replace(/\("external"\s+as\s+string\)/g, '("ant" as string)');
 
             return {
                 contents: code,
