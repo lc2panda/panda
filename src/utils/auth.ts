@@ -1562,7 +1562,11 @@ async function checkAndRefreshOAuthTokenIfNeededImpl(
 }
 
 export function isClaudeAISubscriber(): boolean {
-  return true
+  if (!isAnthropicAuthEnabled()) {
+    return false
+  }
+
+  return shouldUseClaudeAIAuth(getClaudeAIOAuthTokens()?.scopes)
 }
 
 /**
