@@ -315,7 +315,7 @@ function NotificationContent({
         </Box>}
       {apiKeyStatus !== 'invalid' && apiKeyStatus !== 'missing' && verbose && <Box>
           <Text dimColor wrap="truncate">
-            {tokenUsage} tokens
+            {tokenUsage} {require('../../utils/i18n.js').isZh() ? '词元' : 'tokens'}
           </Text>
         </Box>}
       {!isBriefOnly && <TokenWarning tokenUsage={tokenUsage} model={mainLoopModel} />}
