@@ -33,7 +33,7 @@ export function Clawd(t0) {
       <Text>{'   ▄█▄   ▄█▄     '}</Text>
       <Text>{'  █▄█▀   █▄██    '}</Text>
       <Text>{'  ▀▀▀ ▄▄  ▀▀▀    '}</Text>
-      <Text>{'      ╰──╯        '}</Text>
+      <Text>{'       ▄▄▄        '}</Text>
       <Text>{' █▄▄▄       ▄▄▄█ '}</Text>
       <Text>{'  ▀██████████████▀ '}</Text>
     </Box>;
