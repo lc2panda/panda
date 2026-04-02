@@ -252,11 +252,13 @@ export const getUserContext = memoize(
 
     const timeAwareness = getTimeAwareness()
     const personaContext = getPersonaContext()
+    const thirdPartyGuidance = getThirdPartyModelGuidance()
 
     return {
       ...(claudeMd && { claudeMd }),
       currentDate: `Today's date is ${getLocalISODate()}. ${timeAwareness}`,
       ...(personaContext && { personaContext }),
+      ...(thirdPartyGuidance && { thirdPartyGuidance }),
     }
   },
 )
