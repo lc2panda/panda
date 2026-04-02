@@ -27,13 +27,13 @@ const buddy = {
         const config = getGlobalConfig()
 
         if (subcommand === 'info') {
-          const companion = config.companion
+          let companion = config.companion
           if (!companion) {
-            onDone(
-              'No companion generated yet. Toggle buddy on to meet your companion!',
-              { display: 'system' },
-            )
-            return null
+            const { roll, companionUserId } = await import('../../buddy/companion.js')
+            const { bones } = roll(companionUserId())
+            const defaultCompanion = { name: bones.species ?? 'Panda', ...bones, hatchedAt: Date.now() }
+            saveGlobalConfig(prev => ({ ...prev, companion: defaultCompanion }))
+            companion = defaultCompanion
           }
           const info = [
             `Species: ${companion.species ?? 'unknown'}`,
