@@ -10,6 +10,10 @@ type Props = {
   pose?: ClawdPose;
 };
 
+const C = '#22c5d6';
+const D = '#2a3a5e';
+const P = '#e8a0a8';
+
 export function Clawd(t0) {
   const $ = _c(4);
   let t1;
@@ -27,15 +31,15 @@ export function Clawd(t0) {
   let t3;
   if ($[2] !== pose) {
     t3 = <Box flexDirection="column" alignItems="center">
-      <Text>{'▀▄████▀▀▀▀▀▀██████'}</Text>
-      <Text>{'████▀        ▀████'}</Text>
-      <Text>{'▀▀▀            ▀▀█'}</Text>
-      <Text>{'▀▀ ▄█▄   ▄█▄     ▄'}</Text>
-      <Text>{'  █▄█▀   █▄██'}</Text>
-      <Text>{'  ▀▀▀ ▄▄  ▀▀▀    ▄'}</Text>
-      <Text>{'▄     ▄▄▄        █'}</Text>
-      <Text>{'▀█▄▄▄ ▀▀     ▄▄▄██'}</Text>
-      <Text>{'▄▀██████████████▀▄'}</Text>
+      <Text><Text color={C}>{'▀▄'}</Text><Text color={D}>{'████'}</Text><Text color={C}>{'▀▀▀▀▀▀'}</Text><Text color={D}>{'████'}</Text><Text color={C}>{'██'}</Text></Text>
+      <Text><Text color={D}>{'████'}</Text><Text color={C}>{'▀'}</Text>{'        '}<Text color={C}>{'▀'}</Text><Text color={D}>{'████'}</Text></Text>
+      <Text><Text color={C}>{'▀▀▀'}</Text>{'            '}<Text color={C}>{'▀▀'}</Text><Text color={D}>{'█'}</Text></Text>
+      <Text><Text color={C}>{'▀▀'}</Text>{' '}<Text color={D}>{'▄█▄'}</Text>{'   '}<Text color={D}>{'▄█▄'}</Text>{'     '}<Text color={C}>{'▄'}</Text></Text>
+      <Text>{'  '}<Text color={D}>{'█▄█▀'}</Text>{'   '}<Text color={D}>{'█▄██'}</Text></Text>
+      <Text>{'  '}<Text color={D}>{'▀▀▀'}</Text>{' '}<Text color={P}>{'▄▄'}</Text>{'  '}<Text color={D}>{'▀▀▀'}</Text>{'    '}<Text color={C}>{'▄'}</Text></Text>
+      <Text><Text color={C}>{'▄'}</Text>{'     '}<Text color={P}>{'▄▄▄'}</Text>{'        '}<Text color={C}>{'█'}</Text></Text>
+      <Text><Text color={C}>{'▀█'}</Text><Text color={D}>{'▄▄▄'}</Text>{' '}<Text color={P}>{'▀▀'}</Text>{'     '}<Text color={D}>{'▄▄▄'}</Text><Text color={C}>{'██'}</Text></Text>
+      <Text><Text color={C}>{'▄▀██████████████▀▄'}</Text></Text>
     </Box>;
     $[2] = pose;
     $[3] = t3;
