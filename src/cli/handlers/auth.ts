@@ -52,7 +52,7 @@ const THIRD_PARTY_PROVIDERS: Record<
   { name: string; baseURL: string; defaultModel: string; consoleURL: string }
 > = {
   deepseek: { name: 'DeepSeek', baseURL: 'https://api.deepseek.com/anthropic', defaultModel: 'deepseek-chat', consoleURL: 'https://platform.deepseek.com/api_keys' },
-  kimi: { name: 'Kimi Code', baseURL: 'https://api.kimi.com/coding/', defaultModel: 'kimi-k2.5', consoleURL: 'https://www.kimi.com/code' },
+  kimi: { name: 'Kimi Code', baseURL: 'https://api.kimi.com/coding/', defaultModel: 'kimi-for-coding', consoleURL: 'https://www.kimi.com/code' },
   qwen: { name: 'Qwen (阿里百炼)', baseURL: 'https://dashscope-intl.aliyuncs.com/apps/anthropic', defaultModel: 'qwen3.5-plus', consoleURL: 'https://dashscope.console.aliyun.com/' },
   minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'minimax-m2.7', consoleURL: 'https://platform.minimax.io' },
   glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic/', defaultModel: 'glm-5.1', consoleURL: 'https://open.bigmodel.cn/' },
@@ -62,10 +62,11 @@ const THIRD_PARTY_PROVIDERS: Record<
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'deepseek-chat': 128000,
   'deepseek-reasoner': 128000,
-  'kimi-k2.5': 256000,
-  'kimi-k2': 256000,
-  'kimi-k2-thinking': 256000,
-  'kimi-k2-thinking-turbo': 256000,
+  'kimi-for-coding': 262144,
+  'kimi-k2.5': 262144,
+  'kimi-k2': 262144,
+  'kimi-k2-thinking': 262144,
+  'kimi-k2-thinking-turbo': 262144,
   'qwen3.5-plus': 1000000,
   'qwen3.5-flash': 1000000,
   'qwen3-max': 262144,
