@@ -17,6 +17,7 @@ import { execFileNoThrow } from './utils/execFileNoThrow.js'
 import { getBranch, getDefaultBranch, getIsGit, gitExe } from './utils/git.js'
 import { shouldIncludeGitInstructions } from './utils/gitSettings.js'
 import { logError } from './utils/log.js'
+import { isThirdPartyProvider } from './utils/model/providers.js'
 
 const MAX_STATUS_CHARS = 2000
 
@@ -29,6 +30,36 @@ const BUILTIN_PERSONAS: Record<string, { name: string; style: string }> = {
 }
 
 export { BUILTIN_PERSONAS }
+
+function getThirdPartyModelGuidance(): string | null {
+  if (!isThirdPartyProvider()) return null
+  return [
+    'You are running inside Panda Code (a Claude Code fork). Follow these native tool and workflow conventions:',
+    '',
+    '## Native Tools First',
+    '- Prefer dedicated read/edit/write/search tools (Read, Edit, Write, Glob, Grep) over shell commands.',
+    '- Use ToolSearch to discover available tools, agent types, MCP capabilities, and permissions before assuming they exist.',
+    '- When multiple independent tool calls can run in parallel, make them parallel.',
+    '- Use the shell (Bash) only for real terminal work that no dedicated tool covers.',
+    '',
+    '## Planning & Delegation',
+    '- For non-trivial tasks, prefer entering plan mode first; only maintain explicit task boards when a real task tracker is needed.',
+    '- For open-ended exploration, prefer Agent with Explore or Plan type.',
+    '- For bounded implementation, fixes, or verification, prefer Agent with General-Purpose type.',
+    '- For multi-track work, default to launching parallel native Agent workers; after launch, wait for completion notifications instead of polling.',
+    '- For ordinary parallel workers, omit name and team_name to keep them on the plain subagent path.',
+    '- Reserve TeamCreate/TeamDelete for explicit team workflows with durable identity, not as the default parallel-worker path.',
+    '',
+    '## Output Style',
+    '- Stay within the requested scope; do not gold-plate, refactor unrelated code, or invent future-facing abstractions.',
+    '- Read relevant code before proposing or making changes; prefer editing existing files over creating new ones.',
+    '- Match the user\'s current language for all visible text unless the user explicitly asks for another language.',
+    '- Do not expose internal chain-of-thought or meta self-talk; keep preambles to one short action-oriented line.',
+    '- Report outcomes faithfully: if you did not run a validation, say so; if a check failed, say so plainly.',
+    '- Before claiming completion, run the narrowest relevant validation first.',
+    '- When a table helps, prefer standard Markdown tables; use ASCII only when Markdown cannot express the layout.',
+  ].join('\n')
+}
 
 function getTimeAwareness(): string {
   const now = new Date()

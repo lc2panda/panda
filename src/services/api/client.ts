@@ -100,8 +100,8 @@ export async function getAnthropicClient({
   fetchOverride?: ClientOptions['fetch']
   source?: string
 }): Promise<Anthropic> {
-  // Auto-load third-party provider config from global settings (set via `panda auth login`)
-  // Only applies env vars if they haven't been explicitly set already (??= semantics).
+  // Auto-load third-party provider config from global settings (set via `panda auth login`).
+  // Uses = (not ??=) to override stale env vars from settings.json.
   const _tpConfig = getGlobalConfig().thirdPartyProvider
   if (_tpConfig) {
     process.env.ANTHROPIC_BASE_URL = _tpConfig.baseURL
