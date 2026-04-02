@@ -1,17 +1,20 @@
 {
-  "name": "panda-code",
+  "name": "@lc2panda/panda-code",
   "version": "1.0.2",
-  "description": "Reverse-engineered Anthropic Claude Code CLI — interactive AI coding assistant in the terminal",
+  "description": "AI terminal assistant — multi-provider, privacy-first, cross-platform",
   "main": "dist/cli.js",
   "type": "module",
-  "author": "claude-code-best <claude-code-best@proton.me>",
+  "author": "lc2panda",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/claude-code-best/claude-code.git"
+    "url": "git+https://github.com/lc2panda/panda-code.git"
   },
-  "homepage": "https://github.com/claude-code-best/claude-code#readme",
+  "homepage": "https://github.com/lc2panda/panda-code#readme",
   "bugs": {
-    "url": "https://github.com/claude-code-best/claude-code/issues"
+    "url": "https://github.com/lc2panda/panda-code/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "keywords": [
     "claude",
