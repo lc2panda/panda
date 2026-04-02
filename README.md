@@ -26,21 +26,43 @@
 
 ## 安装
 
-**macOS / Linux：**
+**第一步：配置 registry（只需一次）**
+
+macOS / Linux：
 ```bash
 npm config set @lc2panda:registry https://npm.pkg.github.com
-npm install -g @lc2panda/panda-code
-panda
 ```
 
-**Windows（CMD / PowerShell）：**
+Windows PowerShell：
 ```powershell
-npm config set @lc2panda:registry https://npm.pkg.github.com
+npm config set "@lc2panda:registry" "https://npm.pkg.github.com"
+```
+
+Windows CMD：
+```cmd
+npm config set "@lc2panda:registry" "https://npm.pkg.github.com"
+```
+
+如果以上命令报错，手动创建配置文件：
+- macOS/Linux: 编辑 `~/.npmrc`
+- Windows: 编辑 `%USERPROFILE%\.npmrc`
+
+添加一行：
+```
+@lc2panda:registry=https://npm.pkg.github.com
+```
+
+**第二步：安装**
+```bash
 npm install -g @lc2panda/panda-code
+```
+
+**第三步：使用**
+```bash
 panda
 ```
 
-更新：`npm update -g @lc2panda/panda-code`
+**更新**：`npm update -g @lc2panda/panda-code`
 
 ### 首次使用
 
