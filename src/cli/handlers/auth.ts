@@ -59,6 +59,30 @@ const THIRD_PARTY_PROVIDERS: Record<
   volcano: { name: 'Volcano (火山引擎)', baseURL: 'https://ark.cn-beijing.volces.com/api/coding', defaultModel: 'ark-code-latest', consoleURL: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey' },
 }
 
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  'deepseek-chat': 128000,
+  'deepseek-reasoner': 128000,
+  'kimi-k2.5': 256000,
+  'kimi-k2': 256000,
+  'kimi-k2-turbo-preview': 256000,
+  'qwen-plus': 1000000,
+  'qwen-max': 32000,
+  'qwen-turbo': 1000000,
+  'qwen3-max': 1000000,
+  'MiniMax-M2.7': 200000,
+  'MiniMax-M2.5': 200000,
+  'MiniMax-M2.1': 200000,
+  'MiniMax-M2': 200000,
+  'glm-5': 200000,
+  'glm-4-plus': 128000,
+  'glm-4.7': 200000,
+  'glm-4.5': 200000,
+}
+
+function getContextWindowForThirdPartyModel(model: string): number | undefined {
+  return MODEL_CONTEXT_WINDOWS[model]
+}
+
 // Full provider list including Anthropic (for interactive selection)
 const ALL_PROVIDERS: Record<string, { name: string; baseURL: string | null; defaultModel: string | null; consoleURL: string | null }> = {
   anthropic: { name: 'Anthropic (Claude)', baseURL: null, defaultModel: null, consoleURL: null },
@@ -149,6 +173,7 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
       baseURL: provider.baseURL,
       apiKey: apiKey.trim(),
       model: selectedModel,
+      contextWindow: getContextWindowForThirdPartyModel(selectedModel),
     },
   }))
 

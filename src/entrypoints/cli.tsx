@@ -28,6 +28,9 @@ try {
         process.env.ANTHROPIC_BASE_URL = _c.thirdPartyProvider.baseURL;
         process.env.ANTHROPIC_AUTH_TOKEN = _c.thirdPartyProvider.apiKey;
         process.env.ANTHROPIC_MODEL = _c.thirdPartyProvider.model;
+        if (_c.thirdPartyProvider.contextWindow) {
+            process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS = String(_c.thirdPartyProvider.contextWindow);
+        }
     }
 } catch {}
 
