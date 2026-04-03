@@ -4,6 +4,8 @@ import { isEnvTruthy } from 'src/utils/envUtils.js'
 type OauthConfigType = 'prod' | 'staging' | 'local'
 
 function getOauthConfigType(): OauthConfigType {
+  // Panda Code: preserve ant guard — local/staging OAuth endpoints are Anthropic
+  // internal infrastructure (staging.ant.dev) and not useful for external users.
   if (process.env.USER_TYPE === 'ant') {
     if (isEnvTruthy(process.env.USE_LOCAL_OAUTH)) {
       return 'local'
