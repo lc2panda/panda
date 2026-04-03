@@ -113,6 +113,11 @@ function readlineQuestion(prompt: string): Promise<string> {
 // Third-party login flow
 // ---------------------------------------------------------------------------
 async function thirdPartyLogin(providerKey: string): Promise<void> {
+  // Clear previous auth state to prevent conflicts between providers
+  // Fixes: https://github.com/panda-ai/panda-code/issues/XXX
+  await performLogout({ clearOnboarding: false })
+  clearOAuthTokenCache()
+
   const provider = THIRD_PARTY_PROVIDERS[providerKey]
   if (!provider) {
     process.stderr.write(`Error: unknown provider "${providerKey}".\n`)
@@ -272,6 +277,7 @@ async function selectProviderInteractively(): Promise<string> {
  */
 export async function installOAuthTokens(tokens: OAuthTokens): Promise<void> {
   await performLogout({ clearOnboarding: false })
+  clearOAuthTokenCache()
 
   saveGlobalConfig(current => {
     const updated = { ...current }
