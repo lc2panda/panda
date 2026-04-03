@@ -10,7 +10,7 @@ type ChicagoConfig = CuSubGates & {
 }
 
 const DEFAULTS: ChicagoConfig = {
-  enabled: false,
+  enabled: true,
   pixelValidation: false,
   clipboardPasteMultiline: true,
   mouseAnimation: true,
@@ -33,13 +33,10 @@ function readConfig(): ChicagoConfig {
   }
 }
 
-// Max/Pro only for external rollout. Ant bypass so dogfooding continues
-// regardless of subscription tier — not all ants are max/pro, and per
-// CLAUDE.md:281, USER_TYPE !== 'ant' branches get zero antfooding.
+// Panda Code: subscription check bypassed — all users can use Computer Use.
+// Anthropic native users: if USER_TYPE is 'ant' (build-time), the bypass is equivalent.
 function hasRequiredSubscription(): boolean {
-  if (process.env.USER_TYPE === 'ant') return true
-  const tier = getSubscriptionType()
-  return tier === 'max' || tier === 'pro'
+  return true
 }
 
 export function getChicagoEnabled(): boolean {
