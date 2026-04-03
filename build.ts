@@ -136,16 +136,14 @@ const featureFlagPlugin: BunPlugin = {
 
             code = code.replace(/\("external"\s+as\s+string\)/g, '("ant" as string)');
 
-            // NOTE: Do NOT globally replace process.env.USER_TYPE → "ant" here.
-            // That activates Anthropic-infra-dependent paths (bridge, advisor,
-            // session upload, etc.) and causes startup hangs (see commit ed34940).
-            // Instead, individual feature gates are surgically unlocked in source:
-            //   - src/commands.ts: INTERNAL_ONLY_COMMANDS made unconditional
-            //   - src/services/analytics/growthbook.ts: ant-only guards removed
-            //   - src/utils/agentSwarmsEnabled.ts: simplified to killswitch
-            //   - src/utils/computerUse/gates.ts: subscription bypass added
-            // The ("external" as string) → ("ant" as string) replacement above
-            // handles compile-time feature flags safely.
+            // Replace process.env.USER_TYPE runtime checks to "ant" at build time.
+            // This unlocks ALL ant-only code paths (commands, GrowthBook, debug,
+            // bridge debug, model options, enhanced prompts, etc.).
+            // Safe because cli.tsx sets CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+            // for third-party providers, which prevents Anthropic infrastructure
+            // connections (bridge, advisor, session upload, analytics) from hanging.
+            // Matches clawgod approach: global USER_TYPE=ant + traffic guard rails.
+            code = code.replace(/process\.env\.USER_TYPE/g, '"ant"');
 
             return {
                 contents: code,
