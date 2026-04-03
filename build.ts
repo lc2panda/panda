@@ -136,12 +136,16 @@ const featureFlagPlugin: BunPlugin = {
 
             code = code.replace(/\("external"\s+as\s+string\)/g, '("ant" as string)');
 
-            // Replace process.env.USER_TYPE runtime checks to "ant" at build time.
-            // This unlocks all ant-only code paths (INTERNAL_ONLY_COMMANDS, GrowthBook
-            // config overrides, bridge debug logging, etc.) without setting the env var
-            // at runtime — which would activate Anthropic-infra-dependent paths and
-            // cause startup hangs (see commit ed34940).
-            code = code.replace(/process\.env\.USER_TYPE/g, '"ant"');
+            // NOTE: Do NOT globally replace process.env.USER_TYPE → "ant" here.
+            // That activates Anthropic-infra-dependent paths (bridge, advisor,
+            // session upload, etc.) and causes startup hangs (see commit ed34940).
+            // Instead, individual feature gates are surgically unlocked in source:
+            //   - src/commands.ts: INTERNAL_ONLY_COMMANDS made unconditional
+            //   - src/services/analytics/growthbook.ts: ant-only guards removed
+            //   - src/utils/agentSwarmsEnabled.ts: simplified to killswitch
+            //   - src/utils/computerUse/gates.ts: subscription bypass added
+            // The ("external" as string) → ("ant" as string) replacement above
+            // handles compile-time feature flags safely.
 
             return {
                 contents: code,
