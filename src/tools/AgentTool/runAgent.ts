@@ -358,12 +358,10 @@ export async function* runAgent({
     registerPerfettoAgent(agentId, agentDefinition.agentType, parentId)
   }
 
-  // Log API calls path for subagents (ant-only)
-  if (process.env.USER_TYPE === 'ant') {
-    logForDebugging(
-      `[Subagent ${agentDefinition.agentType}] API calls: ${getDisplayPath(getDumpPromptsPath(agentId))}`,
-    )
-  }
+  // Panda Code: unlocked — debug logging for all users
+  logForDebugging(
+    `[Subagent ${agentDefinition.agentType}] API calls: ${getDisplayPath(getDumpPromptsPath(agentId))}`,
+  )
 
   // Handle message forking for context sharing
   // Filter out incomplete tool calls from parent messages to avoid API errors

@@ -464,8 +464,8 @@ export async function initReplBridge(
   // Everything from here down is passed explicitly to bridgeCore.
   const branch = await getBranch()
   const gitRepoUrl = await getRemoteUrl()
+  // Panda Code: session ingress URL override available for all users
   const sessionIngressUrl =
-    process.env.USER_TYPE === 'ant' &&
     process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       ? process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       : baseUrl

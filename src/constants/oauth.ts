@@ -115,7 +115,8 @@ const PROD_OAUTH_CONFIG = {
 export const MCP_CLIENT_METADATA_URL =
   'https://claude.ai/oauth/claude-code-client-metadata'
 
-// Staging OAuth configuration - only included in ant builds with staging flag
+// Panda Code: preserve ant guard — staging OAuth config points to internal
+// Anthropic staging endpoints (staging.ant.dev) not accessible externally.
 // Uses literal check for dead code elimination
 const STAGING_OAUTH_CONFIG =
   process.env.USER_TYPE === 'ant'

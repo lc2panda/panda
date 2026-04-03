@@ -43,7 +43,8 @@ export const TaskStopTool = buildTool({
   // with existing transcripts and SDK users
   aliases: ['KillShell'],
   maxResultSizeChars: 100_000,
-  userFacingName: () => (process.env.USER_TYPE === 'ant' ? '' : 'Stop Task'),
+  // Panda Code: simplified — always show user-friendly name
+  userFacingName: () => 'Stop Task',
   get inputSchema(): InputSchema {
     return inputSchema()
   },

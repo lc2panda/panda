@@ -340,7 +340,8 @@ export async function runBridgeLoop(
 
   // For ant users, show where session debug logs will land so they can tail them.
   // sessionRunner.ts uses the same base path. File appears once a session spawns.
-  if (process.env.USER_TYPE === 'ant') {
+  // Panda Code: debug log path shown for all users
+  if (true) {
     let debugGlob: string
     if (config.debugFile) {
       const ext = config.debugFile.lastIndexOf('.')
@@ -1132,7 +1133,8 @@ export async function runBridgeLoop(
             } else {
               sessionDebugFile = `${config.debugFile}-${safeId}`
             }
-          } else if (config.verbose || process.env.USER_TYPE === 'ant') {
+          // Panda Code: auto-create debug log for all users
+          } else if (config.verbose || true) {
             sessionDebugFile = join(
               tmpdir(),
               'claude',
@@ -2196,9 +2198,8 @@ export async function bridgeMain(args: string[]): Promise<void> {
   // same as baseUrl (Envoy routes /v1/session_ingress/* to session-ingress).
   // Locally, session-ingress runs on a different port (9413) than the
   // contain-provide-api (8211), so CLAUDE_BRIDGE_SESSION_INGRESS_URL must be
-  // set explicitly. Ant-only, matching CLAUDE_BRIDGE_BASE_URL.
+  // set explicitly. Panda Code: available for all users.
   const sessionIngressUrl =
-    process.env.USER_TYPE === 'ant' &&
     process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       ? process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       : baseUrl
@@ -2850,8 +2851,8 @@ export async function runBridgeHeadless(
       'Remote Control base URL uses HTTP. Only HTTPS or localhost HTTP is allowed.',
     )
   }
+  // Panda Code: session ingress URL override available for all users
   const sessionIngressUrl =
-    process.env.USER_TYPE === 'ant' &&
     process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       ? process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       : baseUrl

@@ -168,19 +168,18 @@ async function executeForkedSkill(
         parentAgentId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     }),
     ...wasDiscoveredField,
-    ...(process.env.USER_TYPE === 'ant' && {
-      skill_name:
-        commandName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      skill_source:
-        command.source as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      ...(command.loadedFrom && {
-        skill_loaded_from:
-          command.loadedFrom as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      }),
-      ...(command.kind && {
-        skill_kind:
-          command.kind as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      }),
+    // Panda Code: unlocked — skill analytics for all users
+    skill_name:
+      commandName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    skill_source:
+      command.source as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    ...(command.loadedFrom && {
+      skill_loaded_from:
+        command.loadedFrom as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    }),
+    ...(command.kind && {
+      skill_kind:
+        command.kind as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     }),
     ...(command.pluginInfo && {
       // _PROTO_* routes to PII-tagged plugin_name/marketplace_name BQ columns
@@ -375,9 +374,9 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
     // Remote canonical skill handling (ant-only experimental). Intercept
     // `_canonical_<slug>` names before local command lookup since remote
     // skills are not in the local command registry.
+    // Panda Code: unlocked — remote canonical skill lookup for all users
     if (
-      feature('EXPERIMENTAL_SKILL_SEARCH') &&
-      process.env.USER_TYPE === 'ant'
+      feature('EXPERIMENTAL_SKILL_SEARCH')
     ) {
       const slug = remoteSkillModules!.stripCanonicalPrefix(
         normalizedCommandName,
@@ -490,9 +489,9 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
     // Placed AFTER the deny loop so a user-configured Skill(_canonical_:*)
     // deny rule is honored (same pattern as safe-properties auto-allow below).
     // The skill content itself is canonical/curated, not user-authored.
+    // Panda Code: unlocked — remote canonical skill auto-grant for all users
     if (
-      feature('EXPERIMENTAL_SKILL_SEARCH') &&
-      process.env.USER_TYPE === 'ant'
+      feature('EXPERIMENTAL_SKILL_SEARCH')
     ) {
       const slug = remoteSkillModules!.stripCanonicalPrefix(commandName)
       if (slug !== null) {
@@ -603,9 +602,9 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
     // AKI/GCS (with local cache), injects content directly as a user message.
     // Remote skills are declarative markdown so no slash-command expansion
     // (no !command substitution, no $ARGUMENTS interpolation) is needed.
+    // Panda Code: unlocked — remote canonical skill execution for all users
     if (
-      feature('EXPERIMENTAL_SKILL_SEARCH') &&
-      process.env.USER_TYPE === 'ant'
+      feature('EXPERIMENTAL_SKILL_SEARCH')
     ) {
       const slug = remoteSkillModules!.stripCanonicalPrefix(commandName)
       if (slug !== null) {
@@ -692,21 +691,20 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
           parentAgentId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       }),
       ...wasDiscoveredField,
-      ...(process.env.USER_TYPE === 'ant' && {
-        skill_name:
-          commandName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        ...(command?.type === 'prompt' && {
-          skill_source:
-            command.source as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        }),
-        ...(command?.loadedFrom && {
-          skill_loaded_from:
-            command.loadedFrom as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        }),
-        ...(command?.kind && {
-          skill_kind:
-            command.kind as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-        }),
+      // Panda Code: unlocked — skill analytics for all users
+      skill_name:
+        commandName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      ...(command?.type === 'prompt' && {
+        skill_source:
+          command.source as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      }),
+      ...(command?.loadedFrom && {
+        skill_loaded_from:
+          command.loadedFrom as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      }),
+      ...(command?.kind && {
+        skill_kind:
+          command.kind as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       }),
       ...(command?.type === 'prompt' &&
         command.pluginInfo && {
@@ -1049,12 +1047,11 @@ async function executeRemoteSkill(
     is_remote: true,
     remote_cache_hit: cacheHit,
     remote_load_latency_ms: latencyMs,
-    ...(process.env.USER_TYPE === 'ant' && {
-      skill_name:
-        commandName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-      remote_slug:
-        slug as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
-    }),
+    // Panda Code: unlocked — remote skill analytics for all users
+    skill_name:
+      commandName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    remote_slug:
+      slug as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
   })
 
   recordSkillUsage(commandName)
