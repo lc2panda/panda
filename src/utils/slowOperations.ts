@@ -37,7 +37,8 @@ const SLOW_OPERATION_THRESHOLD_MS = (() => {
   if (process.env.NODE_ENV === 'development') {
     return 20
   }
-  if (process.env.USER_TYPE === 'ant') {
+  // Panda Code: slow operation tracking with 300ms threshold for all users
+  if (true) {
     return 300
   }
   return Infinity

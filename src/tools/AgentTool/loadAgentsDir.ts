@@ -91,9 +91,10 @@ const AgentJsonSchema = lazySchema(() =>
     initialPrompt: z.string().optional(),
     memory: z.enum(['user', 'project', 'local']).optional(),
     background: z.boolean().optional(),
+    // Panda Code: unlocked — remote isolation available for all users
     isolation: (process.env.USER_TYPE === 'ant'
       ? z.enum(['worktree', 'remote'])
-      : z.enum(['worktree'])
+      : z.enum(['worktree', 'remote'])
     ).optional(),
   }),
 )
@@ -606,8 +607,9 @@ export function parseAgentFromMarkdown(
 
     // Parse isolation mode. 'remote' is ant-only; external builds reject it at parse time.
     type IsolationMode = 'worktree' | 'remote'
+    // Panda Code: unlocked — remote isolation available for all users
     const VALID_ISOLATION_MODES: readonly IsolationMode[] =
-      process.env.USER_TYPE === 'ant' ? ['worktree', 'remote'] : ['worktree']
+      ['worktree', 'remote']
     const isolationRaw = frontmatter['isolation'] as string | undefined
     let isolation: IsolationMode | undefined
     if (isolationRaw !== undefined) {

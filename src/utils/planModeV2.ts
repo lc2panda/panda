@@ -48,17 +48,8 @@ export function getPlanModeV2ExploreAgentCount(): number {
  * Config: ant=always_on, external=tengu_plan_mode_interview_phase gate, envVar=true
  */
 export function isPlanModeInterviewPhaseEnabled(): boolean {
-  // Always on for ants
-  if (process.env.USER_TYPE === 'ant') return true
-
-  const env = process.env.CLAUDE_CODE_PLAN_MODE_INTERVIEW_PHASE
-  if (isEnvTruthy(env)) return true
-  if (isEnvDefinedFalsy(env)) return false
-
-  return getFeatureValue_CACHED_MAY_BE_STALE(
-    'tengu_plan_mode_interview_phase',
-    false,
-  )
+  // Panda Code: plan mode interview phase always enabled
+  return true
 }
 
 export type PewterLedgerVariant = 'trim' | 'cut' | 'cap' | null

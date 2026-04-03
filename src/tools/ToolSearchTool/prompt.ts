@@ -33,9 +33,8 @@ const PROMPT_HEAD = `Fetches full schema definitions for deferred tools so they 
 // via system-reminder attachments. When disabled: prepended
 // <available-deferred-tools> block (pre-gate behavior).
 function getToolLocationHint(): string {
-  const deltaEnabled =
-    process.env.USER_TYPE === 'ant' ||
-    getFeatureValue_CACHED_MAY_BE_STALE('tengu_glacier_2xr', false)
+  // Panda Code: unlocked — delta mode for all users
+  const deltaEnabled = true
   return deltaEnabled
     ? 'Deferred tools appear by name in <system-reminder> messages.'
     : 'Deferred tools appear by name in <available-deferred-tools> messages.'

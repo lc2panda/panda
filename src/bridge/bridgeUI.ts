@@ -221,9 +221,10 @@ export function createBridgeLogger(options: {
       suffix += chalk.dim(' \u00b7 ') + chalk.dim(branch)
     }
 
-    if (process.env.USER_TYPE === 'ant' && debugLogPath) {
+    // Panda Code: show debug log path for all users
+    if (debugLogPath) {
       writeStatus(
-        `${chalk.yellow('[ANT-ONLY] Logs:')} ${chalk.dim(debugLogPath)}\n`,
+        `${chalk.yellow('[DEBUG] Logs:')} ${chalk.dim(debugLogPath)}\n`,
       )
     }
     writeStatus(`${indicatorColor(indicator)} ${stateText}${suffix}\n`)
