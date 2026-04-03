@@ -548,16 +548,116 @@
 
 ---
 
-## 十四、内部/调试命令
+## 十四、Ant-Only 高级命令（已通过 Feature Flag 启用）
 
-> 以下命令为 Anthropic 内部命令或调试工具，大部分为存根实现（🚫）
+> 以下命令原为 Anthropic 内部专用，现已在 Panda Code 中通过编译时 Feature Flag 启用。
+> 这些命令有完整源码实现，功能可正常使用。
 
-| 命令 | 说明 | 状态 |
-|------|------|------|
-| `/heapdump` | 转储 JS 堆到 ~/Desktop | 🚫 隐藏 |
-| `/bridge-kick` | 注入 bridge 故障用于测试 | 🚫 内部 |
-| `/force-snip` | 强制截断对话历史 | 🚫 Feature-gated |
-| `/autofix-pr` | 自动修复 PR 问题 | 🚫 存根 |
+### `/ultraplan`
+- **用法**: `/ultraplan`
+- **说明**: 超级计划模式 — 在 CCR 远程环境启动 10-30 分钟的深度规划会话
+- **状态**: ✅ 已启用（ULTRAPLAN Feature Flag）
+- **适用场景**: 
+  - 大型重构规划
+  - 复杂架构设计
+  - 多文件协调修改前的规划
+- **技巧**: 规划结果会保存，可在后续会话中继续执行
+
+### `/ultrareview`
+- **用法**: `/ultrareview`
+- **说明**: 深度代码审查（约 10-20 分钟），在 Web 端运行
+- **状态**: ✅ 已启用（GrowthBook `tengu_review_bughunter_config` 控制）
+- **适用场景**: 
+  - 上线前深度检查
+  - 寻找隐藏 bug
+  - 安全漏洞扫描
+- **技巧**: 比普通 `/review` 更深入，会验证发现的 bug
+
+### `/proactive`
+- **用法**: `/proactive [on|off]`
+- **说明**: 切换主动自主模式 — AI 在空闲时会主动检测并提出改进建议
+- **状态**: ✅ 已启用（PROACTIVE + KAIROS Feature Flags）
+- **技巧**:
+  - 开启后 AI 会在你不发消息时自动工作
+  - 适合长时间后台任务
+  - 配合 `/night-mode` 设置工作时段
+
+### `/assistant`
+- **用法**: `/assistant`
+- **说明**: 切换 Kairos 助手模式 — 类似 ChatGPT 的持续对话体验
+- **状态**: ✅ 已启用（KAIROS Feature Flag）
+- **技巧**: 启用后进入持续助手状态，适合需要多轮交互的场景
+
+### `/brief`
+- **用法**: `/brief [on|off]`
+- **说明**: 切换简报模式 — AI 只输出简洁摘要，不展开详细内容
+- **状态**: ✅ 已启用（KAIROS + KAIROS_BRIEF Feature Flags）
+- **技巧**: 需要快速浏览结果时开启，减少输出冗长
+
+### `/buddy`
+- **用法**: `/buddy [show|hide|mute|unmute|info]`
+- **说明**: 编程伙伴模式 — 显示可交互的熊猫伙伴
+- **状态**: ✅ 已启用（BUDDY Feature Flag）
+- **技巧**:
+  - `show` — 显示伙伴
+  - `hide` — 隐藏伙伴
+  - `mute` — 静音提示
+  - `info` — 查看伙伴状态
+
+### `/voice`
+- **用法**: `/voice`
+- **说明**: 语音模式 — 启用语音输入/输出
+- **状态**: ⚠️ 需要额外条件（VOICE_MODE Flag + GrowthBook + Claude.ai 订阅）
+- **条件**: 仅 Claude.ai 订阅用户可用
+- **技巧**: 按住 Space 录音，松开发送
+
+### `/torch`
+- **用法**: `/torch`
+- **说明**: Torch 模式 — 增强模型推理过程可见性
+- **状态**: ✅ 已启用（TORCH Feature Flag）
+- **技巧**: 想了解 AI 如何推理时开启，会显示更多中间过程
+
+### `/init-verifiers`
+- **用法**: `/init-verifiers`
+- **说明**: 初始化验证器技能 — 为项目创建自动化验证脚本
+- **状态**: ✅ 已启用（INTERNAL_ONLY_COMMANDS 中）
+- **适用场景**: 
+  - 创建 CI/CD 验证流程
+  - 生成测试脚本
+  - 设置代码质量检查
+
+### `/subscribe-pr`
+- **用法**: `/subscribe-pr [PR number]`
+- **说明**: 订阅 PR 更新通知 — PR 有新评论/状态变化时通知你
+- **状态**: ✅ 已启用（KAIROS_GITHUB_WEBHOOKS Feature Flag）
+- **技巧**: 监控重要 PR，无需手动刷新
+
+### `/bridge-kick`
+- **用法**: `/bridge-kick`
+- **说明**: 注入 bridge 故障用于测试（调试工具）
+- **状态**: ✅ 已启用（仅 ant 用户可见）
+
+### `/force-snip`
+- **用法**: `/force-snip`
+- **说明**: 强制截断对话历史 — 比 /compact 更激进
+- **状态**: ✅ 已启用（HISTORY_SNIP Feature Flag）
+- **技巧**: 上下文接近满且 /compact 效果不够时使用
+
+### `/heapdump`
+- **用法**: `/heapdump`
+- **说明**: 转储 JS 堆到 ~/Desktop — 用于内存分析
+- **状态**: ✅ 可用（隐藏命令）
+- **技巧**: 排查内存泄漏时使用
+
+---
+
+## 十五、不可用的存根命令
+
+> 以下命令在原版 Claude Code 发布时已被替换为存根（源码不在 npm 包中）。
+> 无论 USER_TYPE 如何设置，这些命令都无法使用。
+
+| 命令 | 原功能 | 状态 |
+|------|--------|------|
 | `/backfill-sessions` | 回填会话数据 | 🚫 存根 |
 | `/break-cache` | 打破提示缓存 | 🚫 存根 |
 | `/bughunter` | Bug 猎人 | 🚫 存根 |
@@ -573,14 +673,26 @@
 | `/share` | 分享对话 | 🚫 存根 |
 | `/ant-trace` | Ant 追踪 | 🚫 存根 |
 | `/perf-issue` | 性能问题报告 | 🚫 存根 |
-| `/summary` | 生成对话摘要 | 🚫 内部 |
-| `/ultraplan` | 超级计划模式 | 🚫 内部 |
-| `/init-verifiers` | 初始化验证器 | 🚫 内部 |
-| `/feedback` | 提交反馈 | ⚠️ 技能未注册 |
+| `/summary` | 生成对话摘要 | 🚫 存根 |
+| `/teleport` | 传送到远程环境 | 🚫 存根 |
+| `/autofix-pr` | 自动修复 PR 问题 | 🚫 存根 |
+| `/agents-platform` | Agents 平台管理 | 🚫 存根 |
+
+**存根实现示例**（所有存根命令内容相同）：
+```javascript
+export default { isEnabled: () => false, isHidden: true, name: 'stub' };
+```
+
+### 反向禁用的命令
+
+| 命令 | 说明 | 原因 |
+|------|------|------|
+| `/feedback` | 提交反馈 | `USER_TYPE === 'ant'` 时主动禁用（Anthropic 内部用其他渠道） |
+| `/peers` | 对等会话 | `UDS_INBOX` Flag 未启用（会阻塞管道模式） |
 
 ---
 
-## 十五、Feature Flag 对照表
+## 十六、Feature Flag 对照表
 
 | Feature Flag | 控制的命令 | 说明 |
 |-------------|-----------|------|
@@ -599,7 +711,7 @@
 
 ---
 
-## 十六、命令类型说明
+## 十七、命令类型说明
 
 | 类型 | 说明 | 执行方式 |
 |------|------|----------|
@@ -609,7 +721,7 @@
 
 ---
 
-## 十七、实用技巧集锦
+## 十八、实用技巧集锦
 
 ### 快捷键速查
 
@@ -654,7 +766,7 @@
 
 ---
 
-## 十八、验证结果汇总
+## 十九、验证结果汇总
 
 > 基于 v2.1.124 实机 PTY 测试（2026-04-03）
 
