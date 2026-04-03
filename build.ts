@@ -4,6 +4,14 @@ import type { BunPlugin } from "bun";
 
 const outdir = "dist";
 
+// Read package.json for MACRO injection
+const pkg = JSON.parse(await Bun.file("package.json").text());
+const PANDA_MACROS = {
+    VERSION: pkg.version,
+    PACKAGE_URL: pkg.name,
+    NATIVE_PACKAGE_URL: pkg.name,
+};
+
 // Feature flags to enable in production builds.
 // When a flag is in this set, `feature('FLAG')` is replaced with `true`;
 // otherwise it is replaced with `false` (same as the default bun:bundle behaviour).
@@ -113,8 +121,9 @@ const featureFlagPlugin: BunPlugin = {
             const hasBunBundle = src.includes("bun:bundle");
             const hasUserType = src.includes('"external" as string');
             const hasUserTypeEnv = src.includes('process.env.USER_TYPE');
+            const hasMacro = src.includes('MACRO') && args.path.includes('cli.tsx');
 
-            if (!hasBunBundle && !hasUserType && !hasUserTypeEnv) return undefined;
+            if (!hasBunBundle && !hasUserType && !hasUserTypeEnv && !hasMacro) return undefined;
 
             let code = src;
 
@@ -144,6 +153,13 @@ const featureFlagPlugin: BunPlugin = {
             // connections (bridge, advisor, session upload, analytics) from hanging.
             // Matches clawgod approach: global USER_TYPE=ant + traffic guard rails.
             code = code.replace(/process\.env\.USER_TYPE/g, '"ant"');
+
+            // Replace MACRO defaults in cli.tsx with build-time values from package.json
+            if (hasMacro) {
+                code = code.replace(/VERSION: "[\d.]+"/, `VERSION: "${PANDA_MACROS.VERSION}"`);
+                code = code.replace(/PACKAGE_URL: ""/, `PACKAGE_URL: "${PANDA_MACROS.PACKAGE_URL}"`);
+                code = code.replace(/NATIVE_PACKAGE_URL: ""/, `NATIVE_PACKAGE_URL: "${PANDA_MACROS.NATIVE_PACKAGE_URL}"`);
+            }
 
             return {
                 contents: code,
