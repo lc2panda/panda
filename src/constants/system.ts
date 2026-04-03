@@ -4,21 +4,16 @@ import { feature } from 'bun:bundle'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import { logForDebugging } from '../utils/debug.js'
 import { isEnvDefinedFalsy } from '../utils/envUtils.js'
-import { getAPIProvider, isThirdPartyProvider } from '../utils/model/providers.js'
+import { getAPIProvider } from '../utils/model/providers.js'
 import { getWorkload } from '../utils/workloadContext.js'
 
-// Anthropic API validates this prefix — keep original for native channel compatibility
 const DEFAULT_PREFIX = `You are Claude Code, Anthropic's official CLI for Claude.`
-const PANDA_PREFIX = `You are Panda Code, PandaAI's official CLI for Claude.`
 const AGENT_SDK_CLAUDE_CODE_PRESET_PREFIX = `You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.`
-const PANDA_AGENT_SDK_CLAUDE_CODE_PRESET_PREFIX = `You are Panda Code, PandaAI's official CLI for Claude, running within the Claude Agent SDK.`
 const AGENT_SDK_PREFIX = `You are a Claude agent, built on Anthropic's Claude Agent SDK.`
 
 const CLI_SYSPROMPT_PREFIX_VALUES = [
   DEFAULT_PREFIX,
-  PANDA_PREFIX,
   AGENT_SDK_CLAUDE_CODE_PRESET_PREFIX,
-  PANDA_AGENT_SDK_CLAUDE_CODE_PRESET_PREFIX,
   AGENT_SDK_PREFIX,
 ] as const
 
@@ -37,7 +32,6 @@ export function getCLISyspromptPrefix(options?: {
   hasAppendSystemPrompt: boolean
 }): CLISyspromptPrefix {
   const apiProvider = getAPIProvider()
-  const isPanda = isThirdPartyProvider()
 
   if (apiProvider === 'vertex') {
     return DEFAULT_PREFIX
@@ -45,11 +39,11 @@ export function getCLISyspromptPrefix(options?: {
 
   if (options?.isNonInteractive) {
     if (options.hasAppendSystemPrompt) {
-      return isPanda ? PANDA_AGENT_SDK_CLAUDE_CODE_PRESET_PREFIX : AGENT_SDK_CLAUDE_CODE_PRESET_PREFIX
+      return AGENT_SDK_CLAUDE_CODE_PRESET_PREFIX
     }
     return AGENT_SDK_PREFIX
   }
-  return isPanda ? PANDA_PREFIX : DEFAULT_PREFIX
+  return DEFAULT_PREFIX
 }
 
 /**
