@@ -112,8 +112,9 @@ const featureFlagPlugin: BunPlugin = {
 
             const hasBunBundle = src.includes("bun:bundle");
             const hasUserType = src.includes('"external" as string');
+            const hasUserTypeEnv = src.includes('process.env.USER_TYPE');
 
-            if (!hasBunBundle && !hasUserType) return undefined;
+            if (!hasBunBundle && !hasUserType && !hasUserTypeEnv) return undefined;
 
             let code = src;
 
@@ -134,6 +135,13 @@ const featureFlagPlugin: BunPlugin = {
             }
 
             code = code.replace(/\("external"\s+as\s+string\)/g, '("ant" as string)');
+
+            // Replace process.env.USER_TYPE runtime checks to "ant" at build time.
+            // This unlocks all ant-only code paths (INTERNAL_ONLY_COMMANDS, GrowthBook
+            // config overrides, bridge debug logging, etc.) without setting the env var
+            // at runtime — which would activate Anthropic-infra-dependent paths and
+            // cause startup hangs (see commit ed34940).
+            code = code.replace(/process\.env\.USER_TYPE/g, '"ant"');
 
             return {
                 contents: code,
