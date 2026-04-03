@@ -269,7 +269,6 @@ export function setGrowthBookConfigOverride(
 }
 
 export function clearGrowthBookConfigOverrides(): void {
-  if (process.env.USER_TYPE !== 'ant') return
   try {
     saveGlobalConfig(c => {
       if (

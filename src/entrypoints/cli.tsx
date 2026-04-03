@@ -27,14 +27,33 @@ process.env.DISABLE_INSTALLATION_CHECKS ??= '1';
 // These overrides only activate when GrowthBook is disabled (e.g. third-party providers).
 if (!process.env.CLAUDE_INTERNAL_FC_OVERRIDES) {
   process.env.CLAUDE_INTERNAL_FC_OVERRIDES = JSON.stringify({
+    // Agent Teams
     tengu_harbor: true,
     tengu_session_memory: true,
-    tengu_amber_flint: true,       // Agent Teams
+    tengu_amber_flint: true,
     tengu_auto_background_agents: true,
+    // Bridge / Remote Control
+    tengu_ccr_bridge: true,
+    tengu_bridge_repl_v2: true,
+    tengu_cobalt_harbor: true,
+    // Voice kill-switch override (false = not killed = enabled)
+    tengu_amber_quartz_disabled: false,
+    // Keybindings
+    tengu_keybinding_customization_release: true,
+    // Thinkback
+    tengu_thinkback: true,
+    // Brief
+    tengu_kairos_brief_config: { enable_slash_command: true },
+    // Ultrareview
+    tengu_review_bughunter_config: { enabled: true },
+    // Computer Use
+    tengu_malort_pedway: { enabled: true },
+    // Advisor
+    tengu_sage_compass: { enabled: true, canUserConfigure: true },
+    // General
     tengu_destructive_command_warning: true,
     tengu_immediate_model_command: true,
     tengu_desktop_upsell: false,
-    tengu_review_bughunter_config: { enabled: true },  // Ultrareview
   });
 }
 

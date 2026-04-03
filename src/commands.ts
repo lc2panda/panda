@@ -47,10 +47,8 @@ import status from './commands/status/index.js'
 import tasks from './commands/tasks/index.js'
 import teleport from './commands/teleport/index.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
-const agentsPlatform =
-  process.env.USER_TYPE === 'ant'
-    ? require('./commands/agents-platform/index.js').default
-    : null
+// Panda Code: unconditionally load agents-platform (was gated by USER_TYPE === 'ant')
+const agentsPlatform = require('./commands/agents-platform/index.js').default
 /* eslint-enable @typescript-eslint/no-require-imports */
 import securityReview from './commands/security-review.js'
 import bughunter from './commands/bughunter/index.js'
@@ -349,9 +347,10 @@ const COMMANDS = memoize((): Command[] => [
   tasks,
   ...(workflowsCmd ? [workflowsCmd] : []),
   ...(torch ? [torch] : []),
-  ...(process.env.USER_TYPE === 'ant' && !process.env.IS_DEMO
-    ? INTERNAL_ONLY_COMMANDS
-    : []),
+  // Panda Code: INTERNAL_ONLY_COMMANDS unconditionally registered.
+  // Original: gated by process.env.USER_TYPE === 'ant' (runtime check).
+  // Build-time external→ant replacement does not affect process.env reads.
+  ...(!process.env.IS_DEMO ? INTERNAL_ONLY_COMMANDS : []),
 ])
 
 export const builtInCommandNames = memoize(
