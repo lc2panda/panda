@@ -20,33 +20,13 @@ if (typeof globalThis.MACRO === "undefined") {
 
 process.env.DISABLE_INSTALLATION_CHECKS ??= '1';
 
-// Panda Code: Disable nonessential traffic to Anthropic infrastructure.
-// This prevents startup hangs caused by unreachable bridge, session upload,
-// advisor, telemetry, and analytics endpoints when USER_TYPE is 'ant'.
-// Matches clawgod approach: global USER_TYPE=ant + traffic guard rails.
-// Anthropic native users: if ANTHROPIC_BASE_URL is default (api.anthropic.com)
-// and no thirdPartyProvider is configured, skip the traffic guard to preserve
-// full Anthropic-native experience.
-if (!process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC) {
-  try {
-    const _h = require('os').homedir();
-    const _r = require('fs').readFileSync(require('path').join(_h, '.pandacc.json'), 'utf-8');
-    const _cfg = JSON.parse(_r);
-    const _isThirdParty = !!_cfg.thirdPartyProvider;
-    const _baseUrl = process.env.ANTHROPIC_BASE_URL || '';
-    const _isNonAnthropicUrl = _baseUrl && !_baseUrl.includes('anthropic.com');
-    if (_isThirdParty || _isNonAnthropicUrl) {
-      process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1';
-    }
-  } catch {
-    // No config file or parse error — default to disabling for safety
-    // (unless ANTHROPIC_BASE_URL points to anthropic.com)
-    const _baseUrl = process.env.ANTHROPIC_BASE_URL || '';
-    if (_baseUrl && !_baseUrl.includes('anthropic.com')) {
-      process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1';
-    }
-  }
-}
+// Panda Code: UNCONDITIONALLY disable nonessential traffic to Anthropic infrastructure.
+// No Panda Code user is an Anthropic employee — none can reach internal endpoints
+// (bridge, advisor, session upload, analytics, telemetry). With USER_TYPE baked to
+// "ant" at build time, these 31 guard points would attempt connections to unreachable
+// Anthropic infra → startup hang with no input bar.
+// Matches clawgod approach: wrapper sets this env var BEFORE bundle loads.
+process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ??= '1';
 
 // Panda Code: Default GrowthBook feature overrides
 // Ensures all core features work regardless of GrowthBook remote availability.
