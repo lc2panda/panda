@@ -20,6 +20,24 @@ if (typeof globalThis.MACRO === "undefined") {
 
 process.env.DISABLE_INSTALLATION_CHECKS ??= '1';
 
+// Panda Code: Default GrowthBook feature overrides
+// Ensures all core features work regardless of GrowthBook remote availability.
+// Anthropic native users: GrowthBook remote eval takes priority over these defaults
+// because remoteEvalFeatureValues is checked before disk cache in getFeatureValue_CACHED_MAY_BE_STALE.
+// These overrides only activate when GrowthBook is disabled (e.g. third-party providers).
+if (!process.env.CLAUDE_INTERNAL_FC_OVERRIDES) {
+  process.env.CLAUDE_INTERNAL_FC_OVERRIDES = JSON.stringify({
+    tengu_harbor: true,
+    tengu_session_memory: true,
+    tengu_amber_flint: true,       // Agent Teams
+    tengu_auto_background_agents: true,
+    tengu_destructive_command_warning: true,
+    tengu_immediate_model_command: true,
+    tengu_desktop_upsell: false,
+    tengu_review_bughunter_config: { enabled: true },  // Ultrareview
+  });
+}
+
 try {
     const _h = require('os').homedir();
     const _r = require('fs').readFileSync(require('path').join(_h, '.pandacc.json'), 'utf-8');

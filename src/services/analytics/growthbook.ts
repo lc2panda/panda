@@ -160,7 +160,8 @@ export function onGrowthBookRefresh(
  * Parse env var overrides for GrowthBook features.
  * Set CLAUDE_INTERNAL_FC_OVERRIDES to a JSON object mapping feature keys to values
  * to bypass remote eval and disk cache. Useful for eval harnesses that need to
- * test specific feature flag configurations. Only active when USER_TYPE is 'ant'.
+ * test specific feature flag configurations.
+ * Panda Code: ant-only guard removed — all users can use env var overrides.
  *
  * Example: CLAUDE_INTERNAL_FC_OVERRIDES='{"my_feature": true, "my_config": {"key": "val"}}'
  */
@@ -170,21 +171,19 @@ let envOverridesParsed = false
 function getEnvOverrides(): Record<string, unknown> | null {
   if (!envOverridesParsed) {
     envOverridesParsed = true
-    if (process.env.USER_TYPE === 'ant') {
-      const raw = process.env.CLAUDE_INTERNAL_FC_OVERRIDES
-      if (raw) {
-        try {
-          envOverrides = JSON.parse(raw) as Record<string, unknown>
-          logForDebugging(
-            `GrowthBook: Using env var overrides for ${Object.keys(envOverrides!).length} features: ${Object.keys(envOverrides!).join(', ')}`,
-          )
-        } catch {
-          logError(
-            new Error(
-              `GrowthBook: Failed to parse CLAUDE_INTERNAL_FC_OVERRIDES: ${raw}`,
-            ),
-          )
-        }
+    const raw = process.env.CLAUDE_INTERNAL_FC_OVERRIDES
+    if (raw) {
+      try {
+        envOverrides = JSON.parse(raw) as Record<string, unknown>
+        logForDebugging(
+          `GrowthBook: Using env var overrides for ${Object.keys(envOverrides!).length} features: ${Object.keys(envOverrides!).join(', ')}`,
+        )
+      } catch {
+        logError(
+          new Error(
+            `GrowthBook: Failed to parse CLAUDE_INTERNAL_FC_OVERRIDES: ${raw}`,
+          ),
+        )
       }
     }
   }
@@ -202,14 +201,14 @@ export function hasGrowthBookEnvOverride(feature: string): boolean {
 }
 
 /**
- * Local config overrides set via /config Gates tab (ant-only). Checked after
+ * Local config overrides set via /config Gates tab. Checked after
  * env-var overrides — env wins so eval harnesses remain deterministic. Unlike
  * getEnvOverrides this is not memoized: the user can change overrides at
  * runtime, and getGlobalConfig() is already memory-cached (pointer-chase)
  * until the next saveGlobalConfig() invalidates it.
+ * Panda Code: ant-only guard removed — all users can use config overrides.
  */
 function getConfigOverrides(): Record<string, unknown> | undefined {
-  if (process.env.USER_TYPE !== 'ant') return undefined
   try {
     return getGlobalConfig().growthBookOverrides
   } catch {
@@ -246,7 +245,6 @@ export function setGrowthBookConfigOverride(
   feature: string,
   value: unknown,
 ): void {
-  if (process.env.USER_TYPE !== 'ant') return
   try {
     saveGlobalConfig(c => {
       const current = c.growthBookOverrides ?? {}
