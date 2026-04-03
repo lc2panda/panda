@@ -4,12 +4,12 @@
 import { feature } from 'bun:bundle';
 if (typeof globalThis.MACRO === "undefined") {
     (globalThis as any).MACRO = {
-        VERSION: "2.1.90",
+        VERSION: "2.1.123",
         BUILD_TIME: new Date().toISOString(),
         FEEDBACK_CHANNEL: "",
         ISSUES_EXPLAINER: "",
-        NATIVE_PACKAGE_URL: "",
-        PACKAGE_URL: "",
+        NATIVE_PACKAGE_URL: "@lc2panda/panda-code",
+        PACKAGE_URL: "@lc2panda/panda-code",
         VERSION_CHANGELOG: "",
     };
 }
