@@ -733,8 +733,10 @@ export function REPL({
   const [ideInstallationStatus, setIDEInstallationStatus] = useState<IDEExtensionInstallationStatus | null>(null);
   const [showIdeOnboarding, setShowIdeOnboarding] = useState(false);
   // Dead code elimination: model switch callout state (ant-only)
+  // Panda Code: Also guard on AntModelSwitchCallout existence — if the component
+  // is null, enabling the state creates a dead-lock (same as undercover callout).
   const [showModelSwitchCallout, setShowModelSwitchCallout] = useState(() => {
-    if (("external" as string) === 'ant') {
+    if (("external" as string) === 'ant' && AntModelSwitchCallout) {
       return shouldShowAntModelSwitch();
     }
     return false;
@@ -1013,7 +1015,12 @@ export function REPL({
   }, []);
   const [showUndercoverCallout, setShowUndercoverCallout] = useState(false);
   useEffect(() => {
-    if (("external" as string) === 'ant') {
+    // Panda Code: Only trigger undercover callout if the component exists.
+    // UndercoverAutoCallout is null in non-Anthropic builds — setting
+    // showUndercoverCallout=true without a renderable component creates a
+    // dead-lock: focusedInputDialog='undercover-callout' hides the input bar,
+    // but no dialog renders to allow dismissal.
+    if (("external" as string) === 'ant' && UndercoverAutoCallout) {
       void (async () => {
         // Wait for repo classification to settle (memoized, no-op if primed).
         const {
