@@ -5,6 +5,7 @@
 
 import { registerTask } from './taskRegistry.js'
 import { BUILTIN_TASKS } from './builtinTasks.js'
+import { getNextNightTickAt } from './nightMode.js'
 
 let _active = false
 let _paused = false
@@ -67,5 +68,6 @@ export function subscribeToProactiveChanges(cb: () => void): () => void {
 }
 
 export function getNextTickAt(): number | null {
-  return null
+  if (!_active) return null
+  return getNextNightTickAt()
 }

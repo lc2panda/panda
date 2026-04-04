@@ -1,9 +1,12 @@
-// Input: System clock + GlobalConfig nightMode settings.
-// Output: Night-time detection and night mode configuration.
-// Pos: Consumed by night-mode command and proactive engine for time-aware behavior.
+// Input: System clock + GlobalConfig nightMode settings + task registry.
+// Output: Night-time detection, configuration, and task orchestration.
+// Pos: Consumed by night-mode command, proactive engine, and builtinTasks for time-aware behavior.
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
 import { getGlobalConfig } from '../utils/config.js'
+import { getEnabledTasks } from './taskRegistry.js'
+import { safeExecute } from './safeExecutor.js'
+import { logForDebugging } from '../utils/debug.js'
 
 export interface NightModeConfig {
   enabled: boolean
@@ -18,9 +21,15 @@ const DEFAULT_NIGHT_MODE: NightModeConfig = {
   briefingTime: '0 6 * * *',
 }
 
+const NIGHT_START_HOUR = 22
+const NIGHT_END_HOUR = 6
+const TASK_INTERVAL_MS = 5 * 60 * 1000 // 5 min between tasks
+
+let _lastOrchestratorRun = 0
+
 export function isNightTime(): boolean {
   const hour = new Date().getHours()
-  return hour >= 22 || hour < 6
+  return hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR
 }
 
 export function getNightModeConfig(): NightModeConfig {
@@ -34,4 +43,76 @@ export function isNightModeEnabled(): boolean {
 
 export function isNightModeActive(): boolean {
   return isNightModeEnabled() && isNightTime()
+}
+
+/**
+ * Run all enabled tasks whose condition passes, sequentially with error
+ * isolation. Each task failure is logged but does not block subsequent tasks.
+ */
+export async function runNightTasks(): Promise<void> {
+  const now = Date.now()
+  if (now - _lastOrchestratorRun < TASK_INTERVAL_MS) {
+    logForDebugging('[nightMode] orchestrator throttled — too soon since last run')
+    return
+  }
+  _lastOrchestratorRun = now
+
+  const tasks = getEnabledTasks()
+  if (tasks.length === 0) {
+    logForDebugging('[nightMode] no enabled tasks to run')
+    return
+  }
+
+  logForDebugging(`[nightMode] orchestrator starting — ${tasks.length} enabled task(s)`)
+
+  for (const task of tasks) {
+    if (task.condition && !task.condition()) {
+      logForDebugging(`[nightMode] skipping ${task.id} — condition not met`)
+      continue
+    }
+
+    logForDebugging(`[nightMode] executing ${task.id}: ${task.description}`)
+    const result = await safeExecute(
+      task.id,
+      async () => {
+        await task.action()
+        return `Task ${task.id} completed`
+      },
+      'execute',
+    )
+
+    if (result.success) {
+      logForDebugging(`[nightMode] ${task.id} succeeded: ${result.output}`)
+    } else {
+      logForDebugging(`[nightMode] ${task.id} failed: ${result.output}`)
+    }
+  }
+
+  logForDebugging('[nightMode] orchestrator complete')
+}
+
+/**
+ * Compute the next time a night task should fire.
+ * - If night mode is disabled: null
+ * - If currently night time: next tick is TASK_INTERVAL_MS from last run
+ * - If daytime: next tick at NIGHT_START_HOUR:00 today or tomorrow
+ */
+export function getNextNightTickAt(): number | null {
+  if (!isNightModeEnabled()) return null
+
+  const now = new Date()
+
+  if (isNightTime()) {
+    return _lastOrchestratorRun > 0
+      ? _lastOrchestratorRun + TASK_INTERVAL_MS
+      : now.getTime()
+  }
+
+  // Daytime: compute next 22:00
+  const next = new Date(now)
+  next.setHours(NIGHT_START_HOUR, 0, 0, 0)
+  if (next.getTime() <= now.getTime()) {
+    next.setDate(next.getDate() + 1)
+  }
+  return next.getTime()
 }
