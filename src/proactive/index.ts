@@ -3,9 +3,10 @@
 // Pos: Gate module for proactive/loop-mode tick system; consumed by screens/REPL.tsx and main.tsx.
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
-import { registerTask } from './taskRegistry.js'
+import { registerTask, getEnabledTasks } from './taskRegistry.js'
 import { BUILTIN_TASKS } from './builtinTasks.js'
 import { getNextNightTickAt } from './nightMode.js'
+import { parseCronExpression, computeNextCronRun } from '../utils/cron.js'
 
 let _active = false
 let _paused = false
@@ -69,5 +70,24 @@ export function subscribeToProactiveChanges(cb: () => void): () => void {
 
 export function getNextTickAt(): number | null {
   if (!_active) return null
-  return getNextNightTickAt()
+
+  // Gather candidate next-fire times from multiple sources
+  const candidates: number[] = []
+
+  // Night mode scheduler
+  const nightTick = getNextNightTickAt()
+  if (nightTick !== null) candidates.push(nightTick)
+
+  // Enabled tasks with cron expressions — compute their next fire time
+  const now = new Date()
+  for (const task of getEnabledTasks()) {
+    if (!task.cron) continue
+    const fields = parseCronExpression(task.cron)
+    if (!fields) continue
+    const next = computeNextCronRun(fields, now)
+    if (next) candidates.push(next.getTime())
+  }
+
+  // Return earliest candidate, or null if none
+  return candidates.length > 0 ? Math.min(...candidates) : null
 }

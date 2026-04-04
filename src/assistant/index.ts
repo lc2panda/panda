@@ -5,11 +5,14 @@
 //
 // Previously: Auto-generated stub (all no-ops).
 // Phase 1.1: real implementation backed by bootstrap state + AppStateStore.
+// Phase 2.2: wired to proactive engine — /assistant activates scheduled tasks.
 
 import { getKairosActive, setKairosActive } from '../bootstrap/state.js'
+import { activateProactive, deactivateProactive, isProactiveActive } from '../proactive/index.js'
 
 let _forced = false
 let _activationPath: string | undefined
+let _assistantOwnedProactive = false
 
 export function isAssistantMode(): boolean {
   return _forced || getKairosActive()
@@ -19,6 +22,24 @@ export async function initializeAssistantTeam(): Promise<void> {
   setKairosActive(true)
   if (!_activationPath) {
     _activationPath = _forced ? 'forced' : 'slash_command'
+  }
+  // Assistant mode activates proactive engine for scheduled tasks (dream, briefing, health).
+  // Track ownership so deactivation only stops proactive if assistant started it.
+  if (!isProactiveActive()) {
+    activateProactive('assistant')
+    _assistantOwnedProactive = true
+  }
+}
+
+export function deactivateAssistant(): void {
+  if (!isAssistantMode()) return
+  setKairosActive(false)
+  _forced = false
+  _activationPath = undefined
+  // Only deactivate proactive if assistant owns it (user may have /proactive on independently)
+  if (_assistantOwnedProactive) {
+    deactivateProactive()
+    _assistantOwnedProactive = false
   }
 }
 
