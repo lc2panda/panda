@@ -77,14 +77,28 @@ function getTimeAwareness(): string {
 
 function getPersonaContext(): string | null {
   const config = getGlobalConfig()
-  if (!config.persona?.active) return null
-  const key = config.persona.active
-  const custom = config.persona.custom?.[key]
+  let key = config.persona?.active
+  // Panda Code: auto-detect persona from time/mood when set to 'auto' or not set
+  if (!key || key === 'auto') {
+    try {
+      const { detectPersona } = require('./assistant/personaDetector.js')
+      key = detectPersona()
+    } catch {
+      return null
+    }
+  }
+  const custom = config.persona?.custom?.[key]
   const builtin = BUILTIN_PERSONAS[key]
   const persona = custom || builtin
   if (!persona) return null
   const parts = [`[Persona: ${persona.name}] 风格：${persona.style}`]
   if (custom?.systemPrompt) parts.push(custom.systemPrompt)
+  // Panda Code: append mood from sense pipeline when available
+  try {
+    const { getMoodSense } = require('./assistant/moodSense.js')
+    const mood = getMoodSense()
+    if (mood && mood !== 'neutral') parts.push(`用户情绪：${mood}`)
+  } catch {}
   return parts.join('\n')
 }
 

@@ -189,6 +189,13 @@ export async function handlePromptSubmit(
     return
   }
 
+  // Panda Code: feed user input to mood sense pipeline (lightweight keyword match)
+  try {
+    const { updateMoodFromMessage } = await import('../assistant/moodSense.js')
+    updateMoodFromMessage(input)
+  } catch {}
+
+
   // Handle exit commands by triggering the exit command instead of direct process.exit
   // Skip for remote bridge messages — "exit" typed on iOS shouldn't kill the local session
   if (

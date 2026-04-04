@@ -2,6 +2,7 @@ import { getAutoMemPath } from '../../memdir/paths.js'
 import { getOriginalCwd } from '../../bootstrap/state.js'
 import { getProjectDir } from '../../utils/sessionStorage.js'
 import { registerBundledSkill } from '../bundledSkills.js'
+import { getMemorySummary } from '../../assistant/memoryManager.js'
 
 const MEMORY_INDEX_FILENAME = 'MEMORY.md'
 const INDEX_MAX_LINES = 200
@@ -78,10 +79,26 @@ export function registerDreamSkill(): void {
     async getPromptForCommand(args) {
       const memoryDir = getAutoMemPath()
       const transcriptDir = getProjectDir(getOriginalCwd())
+      // Panda Code: inject working/emotional memory summary for dream consolidation
+      let extraContext = args.trim() || undefined
+      try {
+        const summary = getMemorySummary()
+        const parts: string[] = []
+        if (summary.emotional.length > 0) {
+          parts.push(`Recent emotional events (${summary.emotional.length}):\n${summary.emotional.map(e => `- [${e.emotion}] ${e.description}`).join('\n')}`)
+        }
+        const workingEntries = Object.entries(summary.working)
+        if (workingEntries.length > 0) {
+          parts.push(`Working memory (${workingEntries.length} keys):\n${workingEntries.map(([k, v]) => `- ${k}: ${JSON.stringify(v.value)}`).join('\n')}`)
+        }
+        if (parts.length > 0) {
+          extraContext = [extraContext, '## Session memory state\n', ...parts].filter(Boolean).join('\n\n')
+        }
+      } catch {}
       const prompt = buildDreamPrompt(
         memoryDir,
         transcriptDir,
-        args.trim() || undefined,
+        extraContext,
       )
       return [{ type: 'text', text: prompt }]
     },
