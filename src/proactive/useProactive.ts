@@ -3,6 +3,7 @@ import {
   isProactiveActive,
   isProactivePaused,
 } from './index.js'
+import { isNightModeActive, runNightTasks } from './nightMode.js'
 
 type UseProactiveOptions = {
   isLoading: boolean
@@ -50,6 +51,10 @@ export function useProactive(options: UseProactiveOptions): void {
 
     if (tickTimerRef.current === null) {
       if (!isLoading) {
+        // During night hours, run scheduled tasks (dream, health) before the tick prompt
+        if (isNightModeActive()) {
+          void runNightTasks().catch(() => {})
+        }
         onSubmitTick(tickPrompt)
       }
     }
