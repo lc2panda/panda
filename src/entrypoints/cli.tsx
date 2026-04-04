@@ -35,30 +35,50 @@ process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ??= '1';
 // These overrides only activate when GrowthBook is disabled (e.g. third-party providers).
 if (!process.env.CLAUDE_INTERNAL_FC_OVERRIDES) {
   process.env.CLAUDE_INTERNAL_FC_OVERRIDES = JSON.stringify({
-    // Agent Teams
+    // ── Agent Teams & Coordination ──
     tengu_harbor: true,
-    tengu_session_memory: true,
     tengu_amber_flint: true,
     tengu_auto_background_agents: true,
-    // Bridge / Remote Control
+    tengu_agent_list_attach: true,
+    tengu_slim_subagent_claudemd: true,
+    // ── Session Memory ──
+    tengu_session_memory: true,
+    // ── Bridge / Remote Control ──
     tengu_ccr_bridge: true,
     tengu_bridge_repl_v2: true,
     tengu_cobalt_harbor: true,
-    // Voice kill-switch override (false = not killed = enabled)
+    tengu_bridge_system_init: true,
+    tengu_cobalt_lantern: true,
+    // ── Voice kill-switch override (false = not killed = enabled) ──
     tengu_amber_quartz_disabled: false,
-    // Keybindings
+    // ── Keybindings & UI ──
     tengu_keybinding_customization_release: true,
-    // Thinkback
+    tengu_terminal_panel: true,
+    tengu_terminal_sidebar: true,
+    // ── Thinkback ──
     tengu_thinkback: true,
-    // Brief
+    // ── Kairos / Brief ──
+    tengu_kairos_brief: true,
     tengu_kairos_brief_config: { enable_slash_command: true },
-    // Ultrareview
+    // ── Ultrareview / Bughunter ──
     tengu_review_bughunter_config: { enabled: true },
-    // Computer Use
+    // ── Computer Use ──
     tengu_malort_pedway: { enabled: true },
-    // Advisor
+    // ── Advisor ──
     tengu_sage_compass: { enabled: true, canUserConfigure: true },
-    // General
+    // ── Model & API behavior ──
+    tengu_amber_stoat: true,
+    tengu_birch_trellis: true,
+    tengu_collage_kaleidoscope: true,
+    tengu_turtle_carbon: true,
+    tengu_attribution_header: true,
+    // ── Skill improvement ──
+    tengu_copper_panda: true,
+    // ── Deep links ──
+    tengu_lodestone_enabled: true,
+    // ── Idle return hints ──
+    tengu_willow_mode: 'hint_v2',
+    // ── General ──
     tengu_destructive_command_warning: true,
     tengu_immediate_model_command: true,
     tengu_desktop_upsell: false,
