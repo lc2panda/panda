@@ -53,24 +53,24 @@
 > 详见: monitor/capability-alignment-plan.md
 > 约束: 不得破坏当前已有能力
 
-### Phase 1: CRITICAL 修复 → v2.1.125
-- [ ] 1.1 assistant/index.ts 反存根 (isAssistantMode→真实判断)
-- [ ] 1.2 moodSense 自动检测 (关键词+情绪分析)
-- [ ] 1.3 builtinTasks 启用 + 接入 cronTasks 引擎
-- [ ] 1.4 夜间任务链编排器 (nightTaskOrchestrator)
-- [ ] 1.5 emotionalMemory + workingMemory 持久化 (JSON+LRU+TTL)
+### Phase 1: CRITICAL 修复 ✅ (v2.1.125)
+- [x] 1.1 assistant/index.ts 反存根 (isAssistantMode→真实判断)
+- [x] 1.2 moodSense 自动检测 (关键词+情绪分析，中英双语)
+- [x] 1.3 builtinTasks 启用 + 接入 cronTasks 引擎 (dream/briefing/health)
+- [x] 1.4 夜间任务链编排器 (nightTaskOrchestrator + 5分钟节流)
+- [x] 1.5 emotionalMemory + workingMemory 持久化 (JSON+LRU100+TTL24h)
 
-### Phase 2: 能力对齐 → v2.1.126
-- [ ] 2.1 Coordinator 多智能体协作反存根
-- [ ] 2.2 KAIROS 持久 Agent 完善 (assistant→proactive→sense 链路)
-- [ ] 2.3 GrowthBook flag 全面补全
-- [ ] 2.4 sense pipeline 贯通
-- [ ] 2.5 contextCollapse 实装
+### Phase 2: 能力对齐 ✅ (v2.1.125, 2.5 推迟)
+- [x] 2.1 Coordinator 多智能体协作反存根
+- [x] 2.2 KAIROS 持久 Agent 完善 (assistant→proactive→sense 链路)
+- [x] 2.3 GrowthBook flag 全面补全 (+13 新 flag)
+- [x] 2.4 sense pipeline 贯通 (mood on input + persona auto-switch + dream context)
+- [ ] 2.5 contextCollapse 实装 — 推迟（高风险，需单独设计）
 
-### Phase 3: 安全研究 → v2.1.127
-- [ ] 3.1 安全边界完整映射文档
-- [ ] 3.2 安全限制可配置化 (PANDA_SECURITY_RESEARCH env)
-- [ ] 3.3 红队测试环境配置文档
+### Phase 3: 安全研究 ✅ (v2.1.125)
+- [x] 3.1 安全边界完整映射文档 (monitor/security-boundary-map.md)
+- [x] 3.2 安全限制可配置化 (PANDA_SECURITY_RESEARCH env)
+- [x] 3.3 红队测试环境配置文档 (monitor/red-team-setup-guide.md)
 
 ### 其他待办
 - [ ] `@ant/claude-for-chrome-mcp` — Chrome MCP 完整实现
