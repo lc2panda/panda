@@ -1,23 +1,98 @@
+// Auto-generated stub — replaced with persistent implementation (Phase 1.5)
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { homedir } from 'os'
+import { join } from 'path'
+
 interface WorkingMemoryEntry {
   key: string
   value: string
   updatedAt: number
 }
 
-const _entries = new Map<string, WorkingMemoryEntry>()
+const MAX_ENTRIES = 50
+const TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
+const PERSIST_DIR = join(homedir(), '.pandacc', 'assistant')
+const PERSIST_PATH = join(PERSIST_DIR, 'working-memory.json')
+
+let _entries: Map<string, WorkingMemoryEntry> | null = null
+
+function load(): Map<string, WorkingMemoryEntry> {
+  if (_entries !== null) return _entries
+  _entries = new Map()
+  try {
+    const raw = readFileSync(PERSIST_PATH, 'utf-8')
+    const arr = JSON.parse(raw) as WorkingMemoryEntry[]
+    if (Array.isArray(arr)) {
+      for (const e of arr) _entries.set(e.key, e)
+    }
+  } catch {
+    // first run or corrupted — start empty
+  }
+  return _entries
+}
+
+function save(): void {
+  try {
+    mkdirSync(PERSIST_DIR, { recursive: true })
+    writeFileSync(PERSIST_PATH, JSON.stringify(Array.from(load().values()), null, 2))
+  } catch {
+    // silently ignore write errors
+  }
+}
+
+function isExpired(entry: WorkingMemoryEntry): boolean {
+  return Date.now() - entry.updatedAt > TTL_MS
+}
+
+function evictIfNeeded(): void {
+  const entries = load()
+  if (entries.size <= MAX_ENTRIES) return
+  const sorted = Array.from(entries.entries()).sort(
+    (a, b) => a[1].updatedAt - b[1].updatedAt,
+  )
+  while (sorted.length > MAX_ENTRIES) {
+    const oldest = sorted.shift()!
+    entries.delete(oldest[0])
+  }
+}
 
 export function setWorkingMemory(key: string, value: string) {
-  _entries.set(key, { key, value, updatedAt: Date.now() })
+  const entries = load()
+  entries.set(key, { key, value, updatedAt: Date.now() })
+  evictIfNeeded()
+  save()
 }
 
 export function getWorkingMemory(key: string) {
-  return _entries.get(key)?.value
+  const entry = load().get(key)
+  if (!entry) return undefined
+  if (isExpired(entry)) {
+    load().delete(key)
+    save()
+    return undefined
+  }
+  return entry.value
 }
 
 export function getAllWorkingMemory() {
-  return Array.from(_entries.values())
+  const now = Date.now()
+  const entries = load()
+  const result: WorkingMemoryEntry[] = []
+  let changed = false
+  for (const [k, e] of entries) {
+    if (now - e.updatedAt > TTL_MS) {
+      entries.delete(k)
+      changed = true
+    } else {
+      result.push(e)
+    }
+  }
+  if (changed) save()
+  return result
 }
 
 export function clearWorkingMemory() {
-  _entries.clear()
+  const entries = load()
+  entries.clear()
+  save()
 }
