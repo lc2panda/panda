@@ -38,8 +38,40 @@
 - [x] 签名行添加
 - [x] 零 "Claude Code" 残留确认
 
-## 待办
+### v2.1.120→v2.1.124 修复 (2026-04-03)
+- [x] REPL 输入栏回归修复 (UndercoverAutoCallout 死锁)
+- [x] 编译时 MACRO 注入 (VERSION/PACKAGE_URL)
+- [x] 无条件 traffic guard (启动挂起修复)
+- [x] 69 个 / 命令 PTY 验证 (65 PASS / 3 BLOCKED / 1 N/A)
+- [x] CC命令使用手册.md 全面更新
+- [x] wsh badge hook 修复 (Wave Terminal 环境检测)
+- [x] 能力审计完成 (109 存根 + 5 CRITICAL + 12 HIGH)
+- [x] OpenClaw/ClawGod 对比分析完成
 
+## 待办 — 能力对齐方案 (审批: 2026-04-04)
+
+> 详见: monitor/capability-alignment-plan.md
+> 约束: 不得破坏当前已有能力
+
+### Phase 1: CRITICAL 修复 → v2.1.125
+- [ ] 1.1 assistant/index.ts 反存根 (isAssistantMode→真实判断)
+- [ ] 1.2 moodSense 自动检测 (关键词+情绪分析)
+- [ ] 1.3 builtinTasks 启用 + 接入 cronTasks 引擎
+- [ ] 1.4 夜间任务链编排器 (nightTaskOrchestrator)
+- [ ] 1.5 emotionalMemory + workingMemory 持久化 (JSON+LRU+TTL)
+
+### Phase 2: 能力对齐 → v2.1.126
+- [ ] 2.1 Coordinator 多智能体协作反存根
+- [ ] 2.2 KAIROS 持久 Agent 完善 (assistant→proactive→sense 链路)
+- [ ] 2.3 GrowthBook flag 全面补全
+- [ ] 2.4 sense pipeline 贯通
+- [ ] 2.5 contextCollapse 实装
+
+### Phase 3: 安全研究 → v2.1.127
+- [ ] 3.1 安全边界完整映射文档
+- [ ] 3.2 安全限制可配置化 (PANDA_SECURITY_RESEARCH env)
+- [ ] 3.3 红队测试环境配置文档
+
+### 其他待办
 - [ ] `@ant/claude-for-chrome-mcp` — Chrome MCP 完整实现
 - [ ] 终端实际渲染验证 (熊猫 Logo 视觉效果)
-- [ ] 端到端交互测试 (REPL 完整对话流程)
