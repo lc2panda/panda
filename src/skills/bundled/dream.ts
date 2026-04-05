@@ -77,6 +77,11 @@ export function registerDreamSkill(): void {
       'Run a memory consolidation pass — synthesize recent learnings into durable, well-organized memories.',
     userInvocable: true,
     async getPromptForCommand(args) {
+      // Stamp the consolidation lock so the 24h background gate resets
+      try {
+        const { recordConsolidation } = await import('../../services/autoDream/consolidationLock.js')
+        await recordConsolidation()
+      } catch {}
       const memoryDir = getAutoMemPath()
       const transcriptDir = getProjectDir(getOriginalCwd())
       // Panda Code: inject working/emotional memory summary for dream consolidation
