@@ -94,7 +94,11 @@ function getConfig(): AutoDreamConfig {
 }
 
 function isGateOpen(): boolean {
-  if (getKairosActive()) return false // KAIROS mode uses disk-skill dream
+  // Panda Code: KAIROS gate removed — background autoDream safe because we
+  // have isolated memory dir (~/.pandacc/projects/*/memory/), our own lock
+  // files, and fork processes (not shared Anthropic infrastructure).
+  // This makes autoDream MORE proactive: it runs in both normal and
+  // assistant/KAIROS mode, providing always-on memory consolidation.
   if (getIsRemoteMode()) return false
   if (!isAutoMemoryEnabled()) return false
   return isAutoDreamEnabled()
