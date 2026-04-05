@@ -20,10 +20,10 @@ export const BUILTIN_TASKS: ProactiveTask[] = [
     enabled: true,
     condition: canRun,
     action: async () => {
-      logForDebugging('[builtinTasks] dream-consolidate: triggering autoDream pipeline')
+      logForDebugging('[builtinTasks] dream-consolidate: executing autoDream pipeline')
       try {
-        const { initAutoDream } = await import('../services/autoDream/autoDream.js')
-        initAutoDream()
+        const { executeAutoDreamStandalone } = await import('../services/autoDream/autoDream.js')
+        await executeAutoDreamStandalone()
       } catch (e) {
         logForDebugging(`[builtinTasks] dream-consolidate failed: ${(e as Error).message}`)
       }
@@ -36,10 +36,13 @@ export const BUILTIN_TASKS: ProactiveTask[] = [
     enabled: true,
     condition: canRun,
     action: async () => {
-      logForDebugging('[builtinTasks] morning-briefing: preparing briefing context')
-      // The actual briefing is delivered via the proactive tick mechanism.
-      // This action primes the system — the /morning skill runs when the
-      // next proactive tick fires after this action completes.
+      logForDebugging('[builtinTasks] morning-briefing: setting pending flag in working memory')
+      try {
+        const { setWorkingMemory } = await import('../assistant/workingMemory.js')
+        setWorkingMemory('morning-briefing-pending', new Date().toISOString())
+      } catch (e) {
+        logForDebugging(`[builtinTasks] morning-briefing flag set failed: ${(e as Error).message}`)
+      }
     },
   },
   {
@@ -49,9 +52,13 @@ export const BUILTIN_TASKS: ProactiveTask[] = [
     enabled: true,
     condition: canRun,
     action: async () => {
-      logForDebugging('[builtinTasks] code-health: running health check')
-      // Similar to morning-briefing: primes the system for health check
-      // delivery on the next proactive tick.
+      logForDebugging('[builtinTasks] code-health: setting pending flag in working memory')
+      try {
+        const { setWorkingMemory } = await import('../assistant/workingMemory.js')
+        setWorkingMemory('code-health-pending', new Date().toISOString())
+      } catch (e) {
+        logForDebugging(`[builtinTasks] code-health flag set failed: ${(e as Error).message}`)
+      }
     },
   },
 ]
