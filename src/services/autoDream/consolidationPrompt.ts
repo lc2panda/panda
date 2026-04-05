@@ -50,6 +50,10 @@ Focus on:
 - Converting relative dates ("yesterday", "last week") to absolute dates so they remain interpretable after time passes
 - Deleting contradicted facts — if today's investigation disproves an old memory, fix it at the source
 
+## Phase 3.5 — Emotional memory
+
+Scan for emotionally salient moments: frustration spikes, breakthroughs, repeated user corrections, or praise. These signals reveal what matters most to the user beyond raw facts. Persist a brief emotional-context note alongside the relevant topic file (e.g., "user was frustrated by X — avoid suggesting Y in future").
+
 ## Phase 4 — Prune and index
 
 Update \`${ENTRYPOINT_NAME}\` so it stays under ${MAX_ENTRYPOINT_LINES} lines AND under ~25KB. It's an **index**, not a dump — each entry should be one line under ~150 characters: \`- [Title](file.md) — one-line hook\`. Never write memory content directly into it.
