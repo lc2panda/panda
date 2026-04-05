@@ -42,7 +42,9 @@ export function initBundledSkills(): void {
   registerCleanupSkill()
   registerHealthCheckSkill()
   registerRemindSkill()
-  if (feature('KAIROS') || feature('KAIROS_DREAM')) {
+  // Panda Code: /dream skill available unconditionally — memory consolidation
+  // should be accessible to all users, not just KAIROS mode.
+  {
     /* eslint-disable @typescript-eslint/no-require-imports */
     const { registerDreamSkill } = require('./dream.js')
     /* eslint-enable @typescript-eslint/no-require-imports */
