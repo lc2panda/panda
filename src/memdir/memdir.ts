@@ -102,6 +102,30 @@ export function truncateEntrypointContent(raw: string): EntrypointTruncation {
   }
 }
 
+/**
+ * Write-time validation for MEMORY.md content. Returns a warning string
+ * if the content exceeds line or byte caps, null if within limits.
+ * Does NOT block writes — callers can log or surface the warning.
+ */
+export function warnIfEntrypointExceedsLimits(content: string): string | null {
+  const trimmed = content.trim()
+  const lineCount = trimmed.split('\n').length
+  const byteCount = trimmed.length
+
+  if (lineCount <= MAX_ENTRYPOINT_LINES && byteCount <= MAX_ENTRYPOINT_BYTES) {
+    return null
+  }
+
+  const issues: string[] = []
+  if (lineCount > MAX_ENTRYPOINT_LINES) {
+    issues.push(`${lineCount} lines (limit: ${MAX_ENTRYPOINT_LINES})`)
+  }
+  if (byteCount > MAX_ENTRYPOINT_BYTES) {
+    issues.push(`${byteCount} bytes (limit: ${MAX_ENTRYPOINT_BYTES})`)
+  }
+  return `${ENTRYPOINT_NAME} exceeds limits: ${issues.join(', ')}. Consider pruning.`
+}
+
 /* eslint-disable @typescript-eslint/no-require-imports */
 const teamMemPrompts = feature('TEAMMEM')
   ? (require('./teamMemPrompts.js') as typeof import('./teamMemPrompts.js'))
