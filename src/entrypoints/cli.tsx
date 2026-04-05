@@ -78,6 +78,11 @@ if (!process.env.CLAUDE_INTERNAL_FC_OVERRIDES) {
     tengu_lodestone_enabled: true,
     // ── Idle return hints ──
     tengu_willow_mode: 'hint_v2',
+    // ── Prompt Cache 1h TTL ──
+    // Unlocks 1-hour prompt caching for all query sources (vs default 5-min).
+    // USER_TYPE=ant already passes the eligibility check; the allowlist wildcard
+    // ensures all querySource values (repl_main_thread, sdk, hook_agent, etc.) match.
+    tengu_prompt_cache_1h_config: { allowlist: ['*'] },
     // ── General ──
     tengu_destructive_command_warning: true,
     tengu_immediate_model_command: true,
