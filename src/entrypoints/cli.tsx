@@ -28,6 +28,11 @@ process.env.DISABLE_INSTALLATION_CHECKS ??= '1';
 // Matches clawgod approach: wrapper sets this env var BEFORE bundle loads.
 process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ??= '1';
 
+// Panda Code: Enable ToolSearch for all providers. Without this, ToolSearch is
+// silently disabled when ANTHROPIC_BASE_URL points to a non-Anthropic host
+// (e.g. proxy, DeepSeek, Bedrock). The user can still override with =false.
+process.env.ENABLE_TOOL_SEARCH ??= 'true';
+
 // Panda Code: Default GrowthBook feature overrides
 // Ensures all core features work regardless of GrowthBook remote availability.
 // Anthropic native users: GrowthBook remote eval takes priority over these defaults
