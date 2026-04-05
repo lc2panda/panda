@@ -113,7 +113,9 @@ export function calculateTokenWarningState(
   const warningThreshold = threshold - WARNING_THRESHOLD_BUFFER_TOKENS
   const errorThreshold = threshold - ERROR_THRESHOLD_BUFFER_TOKENS
 
-  const isAboveWarningThreshold = tokenUsage >= warningThreshold
+  const isAboveWarningThreshold = process.env.PANDA_HIDE_CONTEXT_WARNING === '1'
+    ? false
+    : tokenUsage >= warningThreshold
   const isAboveErrorThreshold = tokenUsage >= errorThreshold
 
   const isAboveAutoCompactThreshold =

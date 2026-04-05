@@ -237,13 +237,15 @@ export function getToolSearchOrReadInfo(
     toolInput as { [x: string]: unknown },
   )
   const isList = result.isList ?? false
-  const isCollapsible = result.isSearch || result.isRead || isList
+  const isCollapsible = process.env.PANDA_NO_AUTO_COLLAPSE === '1'
+    ? false
+    : (result.isSearch || result.isRead || isList)
   // Under fullscreen mode, non-search/read Bash commands are also collapsible
   // as their own category — "Ran N bash commands" instead of breaking the group.
   return {
     isCollapsible:
       isCollapsible ||
-      (isFullscreenEnvEnabled() ? toolName === BASH_TOOL_NAME : false),
+      (isFullscreenEnvEnabled() && process.env.PANDA_NO_AUTO_COLLAPSE !== '1' ? toolName === BASH_TOOL_NAME : false),
     isSearch: result.isSearch,
     isRead: result.isRead,
     isList,
