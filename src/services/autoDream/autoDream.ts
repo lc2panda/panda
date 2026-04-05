@@ -324,3 +324,31 @@ export async function executeAutoDream(
 ): Promise<void> {
   await runner?.(context, appendSystemMessage)
 }
+
+/**
+ * Standalone entry point for cron / proactive tasks that lack a live
+ * REPLHookContext.  Constructs a minimal synthetic context from bootstrap
+ * state and runs the dream pipeline without an appendSystemMessage callback
+ * (the forked agent handles its own output).
+ *
+ * Panda Code: this bridges the gap between the cron scheduler
+ * (builtinTasks.ts) and the autoDream pipeline which was designed for
+ * per-turn invocation via stopHooks.
+ */
+export async function executeAutoDreamStandalone(): Promise<void> {
+  // Ensure the closure runner is installed
+  if (!runner) initAutoDream()
+  if (!runner) return
+
+  const { getAppState, setAppState } = await import('../../bootstrap/state.js')
+  const syntheticContext: REPLHookContext = {
+    toolUseContext: {
+      getAppState,
+      setAppState,
+      setAppStateForTasks: setAppState,
+    } as unknown as REPLHookContext['toolUseContext'],
+    messages: [],
+  } as unknown as REPLHookContext
+
+  await runner(syntheticContext, undefined)
+}
