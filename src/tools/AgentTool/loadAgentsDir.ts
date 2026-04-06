@@ -131,6 +131,24 @@ export type BaseAgentDefinition = {
    * full CLAUDE.md and interprets their output. Saves ~5-15 Gtok/week across
    * 34M+ Explore spawns. Kill-switch: tengu_slim_subagent_claudemd. */
   omitClaudeMd?: boolean
+  // ── Multi-Model Agent Routing (Panda Code extension) ──────
+  /**
+   * Model preferences for routing — when enableModelRouting is on,
+   * the router uses these to select the optimal model for this agent.
+   * All fields optional — omitted = use default routing behavior.
+   */
+  modelPreferences?: {
+    /** Preferred model alias (e.g., "best-reasoning", "gemini-pro") */
+    preferred?: string
+    /** Fallback aliases in priority order */
+    fallbacks?: string[]
+    /** Minimum capability requirements */
+    minimumCapabilities?: Record<string, number | boolean>
+    /** Capability weights for scoring (dimension → weight multiplier) */
+    capabilityWeights?: Record<string, number>
+  }
+  /** Named routing preset for this agent (overrides global activePreset) */
+  modelPreset?: string
 }
 
 // Built-in agents - dynamic prompts only, no static systemPrompt field
@@ -539,6 +557,48 @@ export function parseAgentsFromJson(
 /**
  * Parses agent definition from markdown file data
  */
+/**
+ * Parse modelPreferences and modelPreset from agent frontmatter.
+ * All fields are optional — returns empty object if nothing is specified.
+ * Panda Code: Multi-Model Agent Routing extension.
+ */
+function parseModelPreferences(frontmatter: Record<string, unknown>): {
+  modelPreferences?: BaseAgentDefinition['modelPreferences']
+  modelPreset?: string
+} {
+  const result: { modelPreferences?: BaseAgentDefinition['modelPreferences']; modelPreset?: string } = {}
+
+  // Parse modelPreset (simple string)
+  const preset = frontmatter['modelPreset']
+  if (typeof preset === 'string' && preset.trim()) {
+    result.modelPreset = preset.trim()
+  }
+
+  // Parse modelPreferences (object with optional fields)
+  const prefs = frontmatter['modelPreferences']
+  if (prefs && typeof prefs === 'object' && !Array.isArray(prefs)) {
+    const p = prefs as Record<string, unknown>
+    const parsed: NonNullable<BaseAgentDefinition['modelPreferences']> = {}
+
+    if (typeof p['preferred'] === 'string') parsed.preferred = p['preferred']
+    if (Array.isArray(p['fallbacks'])) {
+      parsed.fallbacks = p['fallbacks'].filter((f): f is string => typeof f === 'string')
+    }
+    if (p['minimumCapabilities'] && typeof p['minimumCapabilities'] === 'object') {
+      parsed.minimumCapabilities = p['minimumCapabilities'] as Record<string, number | boolean>
+    }
+    if (p['capabilityWeights'] && typeof p['capabilityWeights'] === 'object') {
+      parsed.capabilityWeights = p['capabilityWeights'] as Record<string, number>
+    }
+
+    if (Object.keys(parsed).length > 0) {
+      result.modelPreferences = parsed
+    }
+  }
+
+  return result
+}
+
 export function parseAgentFromMarkdown(
   filePath: string,
   baseDir: string,
@@ -746,6 +806,8 @@ export function parseAgentFromMarkdown(
       ...(background ? { background } : {}),
       ...(memory ? { memory } : {}),
       ...(isolation ? { isolation } : {}),
+      // Panda Code: Multi-Model Routing preferences from frontmatter
+      ...parseModelPreferences(frontmatter),
     }
     return agentDef
   } catch (error) {
