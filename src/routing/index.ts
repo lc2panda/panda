@@ -18,3 +18,5 @@ export type {
 } from './types.js'
 
 export { capabilityRegistry } from './capabilityRegistry.js'
+export { validateRoutingConfig } from './configValidator.js'
+export type { ValidationError, ValidationErrorCode } from './configValidator.js'
