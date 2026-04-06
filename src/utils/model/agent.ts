@@ -39,9 +39,35 @@ export function getAgentModel(
   parentModel: string,
   toolSpecifiedModel?: ModelAlias,
   permissionMode?: PermissionMode,
+  /** Panda Code: agent definition for Multi-Model Routing (optional, no-op when routing disabled) */
+  agentDefinition?: { modelPreferences?: Record<string, unknown>; modelPreset?: string; agentType?: string; name?: string },
 ): string {
   if (process.env.CLAUDE_CODE_SUBAGENT_MODEL) {
     return parseUserSpecifiedModel(process.env.CLAUDE_CODE_SUBAGENT_MODEL)
+  }
+
+  // ── Panda Code: Multi-Model Agent Routing ──────────────
+  // When enabled, try routing-based model selection before falling through
+  // to the default logic. The routing layer respects all existing overrides
+  // (env var, tool-specified model) — it only activates when:
+  // 1. isRoutingEnabled() is true (PANDA_MODEL_ROUTING=1 or settings)
+  // 2. No env var or tool-specified override is active
+  // 3. Agent has modelPreferences or modelPreset
+  if (agentDefinition && (agentDefinition.modelPreferences || agentDefinition.modelPreset)) {
+    try {
+      const { isRoutingEnabled, resolveModelTarget, classifyTask } = require('../../routing/index.js')
+      if (isRoutingEnabled()) {
+        const taskProfile = classifyTask('', agentDefinition)
+        const target = resolveModelTarget(agentDefinition, taskProfile, null, parentModel)
+        if (target && target.reason !== 'default: inherit from parent') {
+          const { logForDebugging } = require('../debug.js')
+          logForDebugging(`[routing] getAgentModel: ${agentDefinition.name ?? agentDefinition.agentType} → ${target.modelId} (${target.reason})`)
+          return target.modelId
+        }
+      }
+    } catch {
+      // Routing module not available or error — fall through to default logic
+    }
   }
 
   // Extract Bedrock region prefix from parent model to inherit for subagents.
