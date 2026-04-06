@@ -20,3 +20,5 @@ export type {
 export { capabilityRegistry } from './capabilityRegistry.js'
 export { validateRoutingConfig } from './configValidator.js'
 export type { ValidationError, ValidationErrorCode } from './configValidator.js'
+export { classifyTask } from './taskClassifier.js'
+export type { TaskProfile, TaskComplexity, TaskDomain, TokenEstimate } from './taskClassifier.js'
