@@ -16,3 +16,5 @@ export type {
   ThirdPartyModelConfig,
   RoutingSettings,
 } from './types.js'
+
+export { capabilityRegistry } from './capabilityRegistry.js'
