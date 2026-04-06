@@ -22,3 +22,38 @@ export { validateRoutingConfig } from './configValidator.js'
 export type { ValidationError, ValidationErrorCode } from './configValidator.js'
 export { classifyTask } from './taskClassifier.js'
 export type { TaskProfile, TaskComplexity, TaskDomain, TokenEstimate } from './taskClassifier.js'
+export { resolveModelTarget } from './routeResolver.js'
+export type { ModelTarget } from './routeResolver.js'
+
+// ─────────────────────────────────────────────────────────────
+// Feature Toggle — master switch for model routing
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Check if Multi-Model Agent Routing is enabled.
+ *
+ * Resolution order:
+ * 1. Environment variable PANDA_MODEL_ROUTING (highest priority, for CI/CD)
+ * 2. settings.json enableModelRouting field
+ * 3. Default: false (routing disabled)
+ *
+ * When false, all routing functions are no-ops and agents use the
+ * session default model — identical to pre-routing behavior.
+ */
+export function isRoutingEnabled(): boolean {
+  // Env var takes precedence (CI/CD override)
+  const envVal = process.env.PANDA_MODEL_ROUTING
+  if (envVal === '1' || envVal === 'true') return true
+  if (envVal === '0' || envVal === 'false') return false
+
+  // Settings check (lazy — avoid import cycle at module load)
+  try {
+    const { getGlobalConfig } = require('../utils/config.js')
+    const config = getGlobalConfig()
+    if (config.enableModelRouting === true) return true
+  } catch {
+    // Config not yet available (early startup) — default off
+  }
+
+  return false
+}
