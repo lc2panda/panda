@@ -24,6 +24,8 @@ export { classifyTask } from './taskClassifier.js'
 export type { TaskProfile, TaskComplexity, TaskDomain, TokenEstimate } from './taskClassifier.js'
 export { resolveModelTarget } from './routeResolver.js'
 export type { ModelTarget } from './routeResolver.js'
+export { getAdapter, registerAdapter, anthropicAdapter, openaiCompatAdapter } from './formatAlignment.js'
+export type { FormatAdapter } from './formatAlignment.js'
 
 // ─────────────────────────────────────────────────────────────
 // Feature Toggle — master switch for model routing
