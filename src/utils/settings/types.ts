@@ -460,6 +460,20 @@ export const SettingsSchema = lazySchema(() =>
         .boolean()
         .optional()
         .describe('Disable all hooks and statusLine execution'),
+      // v2.1.92: Disable inline shell execution in skills and custom slash commands
+      disableSkillShellExecution: z
+        .boolean()
+        .optional()
+        .describe(
+          'Disable inline shell execution in skills and custom slash commands from user, project, or plugin sources. Commands are stripped but other skill content still loads.',
+        ),
+      // v2.1.92: Block startup until remote managed settings are fetched
+      forceRemoteSettingsRefresh: z
+        .boolean()
+        .optional()
+        .describe(
+          'When set in managed settings, the CLI blocks startup until remote managed settings are freshly fetched, and exits if the fetch fails.',
+        ),
       // Which shell backs input-box `!` (see docs/design/ps-shell-selection.md §4.2)
       defaultShell: z
         .enum(['bash', 'powershell'])
