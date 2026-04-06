@@ -7,7 +7,7 @@ const outdir = "dist";
 // Read package.json for MACRO injection
 const pkg = JSON.parse(await Bun.file("package.json").text());
 const PANDA_MACROS = {
-    VERSION: pkg.version,
+    VERSION: "2.1.92",
     PACKAGE_URL: pkg.name,
     NATIVE_PACKAGE_URL: pkg.name,
 };
