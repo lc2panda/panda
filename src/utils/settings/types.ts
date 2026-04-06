@@ -1082,6 +1082,82 @@ export const SettingsSchema = lazySchema(() =>
             'Useful for enterprise administrators to add organization-specific context ' +
             '(e.g., "All plugins from our internal marketplace are vetted and approved.").',
         ),
+      // ── Multi-Model Agent Routing (Panda Code extension) ──────
+      enableModelRouting: z
+        .boolean()
+        .optional()
+        .describe(
+          'Master switch for Multi-Model Agent Routing. When false (default), ' +
+            'all agents use the session default model. When true, agents can ' +
+            'be routed to different models based on their capability preferences.',
+        ),
+      activeRoutingPreset: z
+        .string()
+        .optional()
+        .describe(
+          'Name of the active routing preset (e.g., "quality", "cost-saving", "balanced"). ' +
+            'Presets define per-agent model overrides and global capability weights.',
+        ),
+      routingPresets: z
+        .record(
+          z.string(),
+          z.object({
+            description: z.string().optional(),
+            defaultModel: z.string().optional(),
+            agentOverrides: z.record(z.string(), z.string()).optional(),
+            globalWeights: z.record(z.string(), z.number()).optional(),
+          }),
+        )
+        .optional()
+        .describe(
+          'Named routing presets. Each preset can override the default model ' +
+            'and per-agent model assignments. Switch via /routing preset <name>.',
+        ),
+      modelRegistry: z
+        .record(
+          z.string(),
+          z.object({
+            provider: z.literal('thirdParty'),
+            endpoint: z.object({
+              baseURL: z.string(),
+              apiKeyEnv: z.string(),
+            }),
+            modelId: z.string(),
+            capabilities: z.object({
+              vision: z.boolean(),
+              toolUse: z.boolean(),
+              extendedContext: z.boolean(),
+              megaContext: z.boolean(),
+              streaming: z.boolean(),
+              thinking: z.boolean(),
+              structuredOutput: z.boolean(),
+              codeExecution: z.boolean().optional().default(false),
+              reasoning: z.number().min(0).max(100),
+              coding: z.number().min(0).max(100),
+              speed: z.number().min(0).max(100),
+              costEfficiency: z.number().min(0).max(100),
+              instruction: z.number().min(0).max(100),
+              creativity: z.number().min(0).max(100),
+              multilingual: z.number().min(0).max(100),
+            }),
+            displayName: z.string().optional(),
+            maxContextTokens: z.number().optional(),
+            inputCostPer1M: z.number().optional(),
+            outputCostPer1M: z.number().optional(),
+          }),
+        )
+        .optional()
+        .describe(
+          'Third-party model registrations with user-declared capabilities. ' +
+            'Each entry maps an alias to a model endpoint and its capability profile.',
+        ),
+      customModelAliases: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe(
+          'Custom semantic aliases mapping task-type labels to model aliases. ' +
+            'Example: {"frontend-expert": "gemini-pro", "quick-task": "haiku-latest"}',
+        ),
     })
     .passthrough(),
 )
