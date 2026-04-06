@@ -18,7 +18,7 @@
 ```
 
 **项目代号**：Panda Code
-**版本**：2.1.888
+**版本**：v2.1.92（基线 Claude Code v2.1.92）
 **技术栈**：Bun + TypeScript + React/Ink + Commander.js
 **运行时**：Bun >= 1.2.0 / Node.js >= 18.0.0
 
@@ -83,22 +83,66 @@ panda auth login
 
 ---
 
-## 新增命令
+## 命令参考
 
-| 命令 | 功能 |
+> 完整手册请查看 [CC命令使用手册.md](CC命令使用手册.md)
+
+### 核心命令速查
+
+| 分类 | 命令 | 说明 |
+|------|------|------|
+| **基础** | `/help` `/clear` `/exit` `/status` `/version` | 帮助、清空、退出、状态、版本 |
+| **对话** | `/compact` `/resume` `/branch` `/rewind` `/copy` `/export` | 压缩、恢复、分支、回退、复制、导出 |
+| **代码** | `/commit` `/diff` `/review` `/security-review` `/pr-comments` | 提交、差异、审查、安全审查、PR评论 |
+| **模型** | `/model` `/effort` `/fast` `/advisor` `/torch` | 切换模型、推理深度、高速、顾问、推理可见 |
+| **配置** | `/config` `/theme` `/color` `/vim` `/language` `/persona` | 设置、主题、颜色、Vim、语言、人格 |
+| **工具** | `/permissions` `/mcp` `/hooks` `/tasks` `/plugin` | 权限、MCP、钩子、任务、插件 |
+| **Agent** | `/plan` `/fork` `/agents` `/workflows` `/skills` | 计划、派生、Agent、工作流、技能 |
+| **查询** | `/context` `/files` `/doctor` `/cost` `/stats` `/memory` | 上下文、文件、诊断、费用、统计、记忆 |
+
+### 🆕 v2.1.92 私人助手命令
+
+| 命令 | 说明 |
 |------|------|
-| `/persona work\|companion\|study\|creative\|butler` | 切换助理人格（工作/陪伴/学习/创意/管家） |
-| `/night-mode on\|off` | 夜间自主模式开关 |
-| `/language en\|zh` | 切换显示语言 |
-| `/privacy` | 查看隐私保护状态 |
-| `/morning` | 晨间工作简报 |
-| `/organize [path]` | 文件整理建议 |
-| `/health-check` | 代码健康诊断 |
-| `/remind <msg> <time>` | 设置提醒 |
-| `/cleanup [path]` | 清理临时文件 |
-| `/files` | 列出当前上下文文件 |
-| `/tag` | 会话标签管理 |
-| `/version` | 版本详细信息 |
+| `/dream` | 四阶段记忆整合（Orient→Gather→Consolidate→Prune），支持 cron 定时 |
+| `/assistant` | 启用 KAIROS 助手模式 — 激活主动引擎 + 定时任务 |
+| `/proactive` | 切换主动自主模式 — 含 dream/briefing/health 三个内置任务 |
+| `/night-mode` | 夜间自主模式（22:00-06:00）— 顺序执行 + 错误隔离 |
+| `/buddy` | 编程伙伴 — 可交互的熊猫伙伴 |
+| `/brief` | 简报模式 — AI 只输出简洁摘要 |
+| `/persona auto` | 自动人格切换 — 根据时间/情绪/活动自动调整 |
+
+### Ant-Only 高级命令（已全部启用）
+
+| 命令 | 说明 |
+|------|------|
+| `/ultraplan` | CCR 远程深度规划（10-30 分钟） |
+| `/ultrareview` | 深度代码审查 + bug 验证 |
+| `/force-snip` | 强制截断对话历史 |
+| `/init-verifiers` | 初始化验证器脚本 |
+| `/subscribe-pr` | 订阅 PR 更新通知 |
+| `/heapdump` | JS 堆转储 |
+
+### 快捷键
+
+| 快捷键 | 功能 | 快捷键 | 功能 |
+|--------|------|--------|------|
+| `Shift+Tab` | 切换权限模式 | `Ctrl+D` | 退出 |
+| `Meta+P` | 切换模型 | `Ctrl+T` | 任务面板 |
+| `Ctrl+G` | $EDITOR 编辑 | `Ctrl+O` | 详细输出 |
+| `\` + `Enter` | 换行 | `!` | Bash 模式 |
+| `@` | 文件补全 | `&` | 后台运行 |
+
+### 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `PANDA_SECURITY_RESEARCH=1` | 禁用安全限制（安全研究用） |
+| `PANDA_HIDE_CONTEXT_WARNING=1` | 隐藏上下文满警告 |
+| `PANDA_NO_AUTO_COLLAPSE=1` | 禁止 Read/Grep 自动折叠 |
+| `PANDA_SHOW_DEVBAR=1` | 非 dev 构建显示 DevBar |
+| `CLAUDE_CODE_COORDINATOR_MODE=1` | 启用 Coordinator 多 Agent |
+| `ENABLE_TOOL_SEARCH=true` | ToolSearch（默认已启用） |
 
 ---
 
@@ -157,8 +201,14 @@ panda auth login
 │  Compact │ Skills │ LSP │ Cron │ PolicyLimits │ Persona       │
 └─────────────────────────────────────────────────────────────────┘
 
+┌─────────────────────────────────────────────────────────────────┐
+│                  私 人 助 手 系 统 (v2.1.92 新增)                 │
+│  autoDream │ KAIROS │ Proactive │ NightMode │ Mood │ Sense    │
+│  Coordinator │ Buddy │ Brief │ Persona │ Memory │ Dream     │
+└─────────────────────────────────────────────────────────────────┘
+
 ╔═════════════════════════════════════════════════════════════════╗
-║              Feature Flag 系 统 (92 个，全部启用)                ║
+║      Feature Flag 系 统 (92 个全开 + 31 GrowthBook tengu flags)  ║
 ╚═════════════════════════════════════════════════════════════════╝
 ```
 

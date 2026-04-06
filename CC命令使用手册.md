@@ -1,8 +1,8 @@
-# Panda Code / 命令使用手册 (v2.1.124)
+# Panda Code / 命令使用手册 (v2.1.92 极限版)
 
-> 本手册基于 v2.1.124 实机 PTY 验证，覆盖 **69 个已验证命令** + 内部/存根命令。
+> 本手册基于 v2.1.92 实机 PTY 验证，覆盖 **80+ 个命令** + Phase 1-5 全部新增能力。
 >
-> 最后更新: 2026-04-03 · 版本: v2.1.124 · 验证: 65 PASS / 3 BLOCKED / 1 N/A
+> 最后更新: 2026-04-06 · 显示版本: v2.1.92 · 基线: Claude Code v2.1.92
 
 ---
 
@@ -11,6 +11,7 @@
 | 标记 | 含义 |
 |------|------|
 | ✅ | 已验证正常工作 |
+| 🆕 | v2.1.92 新增/增强 |
 | 🔒 | 需要特定认证（Claude.ai 订阅/消费者账户） |
 | ⚠️ | 功能受限或有已知问题 |
 | 🔧 | 需要特定环境（Feature Flag / 硬件 / 平台） |
@@ -30,6 +31,7 @@
 | `/model` | | 切换模型（Opus/Sonnet/Haiku） | ✅ |
 | `/diff` | | 查看未提交变更和每轮代码差异 | ✅ |
 | `/commit` | | 智能生成 commit message 并提交 | ✅ |
+| `/dream` | | 记忆整合 — 四阶段巩固 | 🆕✅ |
 | `/exit` | `/quit` | 退出 REPL | ✅ |
 
 ### 高频使用
@@ -41,9 +43,9 @@
 | `/copy` | | 复制最后回复到剪贴板 | ✅ |
 | `/config` | `/settings` | 打开配置面板 | ✅ |
 | `/resume` | `/continue` | 恢复历史对话 | ✅ |
-| `/btw` | | 快速插问不打断主线 | ✅ |
+| `/assistant` | | 启用 KAIROS 助手 + 主动引擎 | 🆕✅ |
+| `/proactive` | | 切换主动自主模式 | 🆕✅ |
 | `/context` | | 可视化上下文使用情况 | ✅ |
-| `/files` | | 列出当前上下文中的文件 | ✅ |
 
 ---
 
@@ -52,29 +54,25 @@
 ### `/help`
 - **用法**: `/help`
 - **说明**: 显示交互式帮助界面，包含所有可用命令和快捷键
-- **实测**: ✅ 显示 Panda Code v2.1.124 帮助信息、快捷键列表
-- **技巧**: 新手首选，快速了解所有功能
+- **实测**: ✅ 显示 Panda Code v2.1.92 帮助信息
 
 ### `/exit` (别名: `/quit`)
 - **用法**: `/exit`
 - **说明**: 退出 REPL，等同于按 `Ctrl+D`
-- **实测**: ✅ 立即退出
 
 ### `/clear` (别名: `/reset`, `/new`)
 - **用法**: `/clear`
 - **说明**: 清除对话历史并释放上下文，相当于开始新对话
-- **实测**: ✅ 清空会话，返回空提示符
 - **技巧**: 对话过长导致回复质量下降时使用
 
 ### `/version`
 - **用法**: `/version`
 - **说明**: 显示当前版本和构建时间
-- **实测**: ✅ 输出 `2.1.124 (built 2026-04-03T12:54:39.270Z)`
+- **实测**: ✅ 输出 `2.1.92 (Panda Code)`
 
 ### `/status`
 - **用法**: `/status`
 - **说明**: 显示完整状态信息（版本、Session ID、工作目录、模型、认证方式、API URL）
-- **实测**: ✅ 显示版本、登录方式、Anthropic base URL 等
 - **技巧**: 排查问题时首先运行此命令
 
 ---
@@ -84,58 +82,43 @@
 ### `/compact`
 - **用法**: `/compact [自定义摘要指令]`
 - **说明**: 压缩对话历史但保留摘要在上下文中
-- **实测**: ✅ 空会话正确返回 "No messages to compact"
 - **技巧**:
   - 上下文接近满时自动提醒，此时用 `/compact` 可继续长任务
   - 可传自定义指令：`/compact 重点保留架构决策和代码路径`
-  - 支持非交互式模式（管道使用）
 
 ### `/copy`
 - **用法**: `/copy [N]`
 - **说明**: 复制最后一条回复到系统剪贴板，`/copy 3` 复制倒数第3条
-- **实测**: ✅ 空会话正确提示 "No assistant message to copy"
-- **技巧**: 将 AI 生成的代码片段直接粘贴到其他编辑器
 
 ### `/export`
 - **用法**: `/export [filename]`
-- **说明**: 导出当前对话到文件或剪贴板
-- **实测**: ✅ 弹出交互选择对话框（JSON/Markdown/剪贴板）
-- **技巧**: 导出为 Markdown 方便分享给团队
+- **说明**: 导出当前对话到文件或剪贴板（JSON/Markdown/剪贴板）
 
 ### `/resume` (别名: `/continue`)
 - **用法**: `/resume [conversation_id 或搜索词]`
 - **说明**: 从历史会话中搜索并恢复
-- **实测**: ✅ 显示会话选择界面，支持搜索
 - **技巧**: 可用关键词搜索历史会话，如 `/resume 修复bug`
 
 ### `/branch` (别名: `/fork` [条件性])
 - **用法**: `/branch [name]`
 - **说明**: 在当前对话节点创建分支，探索不同方案
-- **实测**: ✅ 空会话正确返回 "Failed to branch"
-- **技巧**: 在做出关键决策前分支，方便后续对比
 
 ### `/rewind` (别名: `/checkpoint`)
 - **用法**: `/rewind`
 - **说明**: 将代码和/或对话回退到之前的节点
-- **实测**: ✅ 显示回退界面，可选择回退点
-- **技巧**: AI 改错了代码？`/rewind` 立即回退到修改前
+- **技巧**: AI 改错了代码？`/rewind` 立即回退
 
 ### `/tag`
 - **用法**: `/tag <tag-name>`
 - **说明**: 为当前会话添加/移除可搜索标签
-- **实测**: ✅ 正确提示用法 "Usage: /tag \<name\>"
-- **技巧**: 给重要会话打标签，方便 `/resume` 搜索
 
 ### `/rename`
 - **用法**: `/rename [name]`
 - **说明**: 重命名当前对话
-- **实测**: ✅ 显示重命名交互提示
 
 ### `/btw`
 - **用法**: `/btw <问题>`
 - **说明**: 快速插问，不打断主对话上下文
-- **实测**: ✅ 正确提示用法
-- **技巧**: 编码过程中突然想到无关问题，用 `/btw` 避免污染主线
 
 ---
 
@@ -144,44 +127,32 @@
 ### `/commit`
 - **用法**: `/commit`
 - **说明**: 分析 git diff，自动生成符合项目风格的 commit message 并提交
-- **实测**: ✅ 正确识别并显示在命令菜单中
-- **技巧**:
-  - 自动遵循 Conventional Commits 风格
-  - 会分析最近几次提交的风格来匹配
-  - Undercover 模式下自动屏蔽内部信息
+- **技巧**: Undercover 模式下自动屏蔽内部信息
 
 ### `/commit-push-pr` (别名: `/cpp`)
 - **用法**: `/commit-push-pr`
-- **说明**: 一键完成 commit → push → 创建 PR 的完整流程
-- **技巧**: 适合快速发布小改动
+- **说明**: 一键完成 commit → push → 创建 PR
 
 ### `/diff`
 - **用法**: `/diff`
 - **说明**: 显示 `git diff HEAD` 和每轮对话的代码变更
-- **实测**: ✅ 显示 "Uncommitted changes" 及文件列表
-- **技巧**: 提交前检查 AI 修改了哪些文件
 
 ### `/review`
 - **用法**: `/review [PR number]`
 - **说明**: 审查 Pull Request，无 PR 编号时列出 open PRs
-- **实测**: ✅ 正确识别命令
-- **技巧**: `gh pr list` 找到 PR 号后 `/review 123`
 
 ### `/pr-comments` (别名: `/pr_comments`)
 - **用法**: `/pr-comments [PR number]`
 - **说明**: 获取 GitHub PR 的所有评论并总结
-- **实测**: ✅ 正确识别命令
 
 ### `/security-review`
 - **用法**: `/security-review`
 - **说明**: 对待提交变更做安全审查
-- **实测**: ✅ 正确识别命令
 - **技巧**: 上线前必做，检查 XSS/注入/敏感信息泄露
 
 ### `/ultrareview`
 - **用法**: `/ultrareview`
-- **说明**: 深度审查（约 10-20 分钟），在 Web 端运行
-- **条件**: 🔧 Feature-gated
+- **说明**: 深度审查（约 10-20 分钟），自动化 bug 查找
 
 ---
 
@@ -189,42 +160,27 @@
 
 ### `/model`
 - **用法**: `/model [model_name]`
-- **说明**: 切换 AI 模型，支持 Claude 全系列
-- **实测**: ✅ 弹出模型选择菜单
-- **可选模型**:
-  - `opus` — Opus 4.6（最强，复杂任务）
-  - `sonnet` — Sonnet 4.6（日常推荐）
-  - `haiku` — Haiku 4.5（最快，简单问答）
+- **说明**: 切换 AI 模型
+- **可选**: `opus`（最强）、`sonnet`（日常推荐）、`haiku`（最快）
 - **技巧**: 复杂架构设计用 Opus，日常编码用 Sonnet，快速查询用 Haiku
 
 ### `/effort`
 - **用法**: `/effort [low|medium|high|max|auto]`
 - **说明**: 调节模型推理深度
-- **实测**: ✅ 显示 "Effort level: auto (currently high)"
-- **级别说明**:
-  - `low` — 快速响应，适合简单问答
-  - `medium` — 平衡模式
-  - `high` — 深入推理（默认）
-  - `max` — 最高质量，适合复杂问题
-  - `auto` — 自动判断（推荐）
-- **技巧**: 格式化/重命名等简单任务用 `low`，节省 token
+- **技巧**: 简单任务用 `low` 节省 token
 
 ### `/fast`
 - **用法**: `/fast [on|off]`
-- **说明**: 切换高速模式（Opus 4.6 专用，按额外用量计费）
-- **实测**: ✅ 显示 toggle 界面和计费说明
+- **说明**: 切换高速模式（Opus 4.6 专用）
 - **条件**: 🔒 需要 Claude.ai 订阅
 
 ### `/advisor`
 - **用法**: `/advisor [model_name]`
 - **说明**: 配置顾问模型（辅助主模型决策）
-- **实测**: ✅ 显示 "Advisor: not set"，提示用法
 
 ### `/torch`
 - **用法**: `/torch`
-- **说明**: 切换 Torch 模式，增强模型推理过程可见性
-- **实测**: ✅ 正常 toggle
-- **条件**: 🔧 TORCH Feature Flag
+- **说明**: Torch 模式 — 增强模型推理过程可见性
 
 ---
 
@@ -233,68 +189,45 @@
 ### `/config` (别名: `/settings`)
 - **用法**: `/config`
 - **说明**: 打开交互式配置面板
-- **实测**: ✅ 显示配置面板（model/select 选项）
-- **技巧**: 一站式管理所有设置
 
 ### `/theme`
 - **用法**: `/theme`
 - **说明**: 选择终端配色主题
-- **实测**: ✅ 显示主题选择器（dark/light 等）
-- **可选**: auto, dark, light, light-daltonized, dark-daltonized, light-ansi, dark-ansi
 
 ### `/color`
 - **用法**: `/color <color|default>`
 - **说明**: 设置本次会话提示栏颜色
-- **实测**: ✅ 显示颜色选择界面
 - **技巧**: 多窗口工作时用不同颜色区分
 
 ### `/vim`
 - **用法**: `/vim`
 - **说明**: 切换 Vim/普通编辑模式
-- **实测**: ✅ 切换模式
-- **技巧**: Vim 党福音，支持 hjkl 导航和命令模式
 
 ### `/keybindings`
 - **用法**: `/keybindings`
-- **说明**: 打开快捷键配置文件 (`~/.pandacc/keybindings.json`)
-- **实测**: ✅ 显示当前键绑定配置
+- **说明**: 打开快捷键配置文件
 
 ### `/language`
 - **用法**: `/language [en|zh|...]`
 - **说明**: 切换界面语言
-- **实测**: ✅ 显示 English/中文 切换
 
 ### `/persona`
 - **用法**: `/persona [模式]`
 - **说明**: 切换人格模式
-- **实测**: ✅ 显示人格选项
-- **模式**:
-  - `work` — 工作模式：专业简洁，高效输出
-  - `companion` — 陪伴模式：更友好更耐心
-  - `study` — 学习模式：详细解释
-  - `creative` — 创意模式：更发散思维
-  - `butler` — 管家模式：主动服务
+- **模式**: `work`（专业）、`companion`（陪伴）、`study`（学习）、`creative`（创意）、`butler`（管家）
+- 🆕 **Sense Pipeline 联动**: auto 模式下根据时间/mood/活动自动切换
 
 ### `/privacy`
 - **用法**: `/privacy`
-- **说明**: 查看隐私状态（telemetry/analytics）
-- **实测**: ✅ 显示隐私设置面板
-
-### `/privacy-settings`
-- **用法**: `/privacy-settings`
-- **说明**: 查看和更新隐私设置（详细版）
-- **条件**: 🔒 仅消费者订阅用户可用
+- **说明**: 查看隐私状态
 
 ### `/sandbox`
 - **用法**: `/sandbox`
 - **说明**: 配置 Bash 命令沙盒模式
-- **实测**: ✅ 显示 "sandbox disabled" 及配置入口
-- **技巧**: 在不信任的代码库中启用，防止误操作
 
 ### `/statusline`
 - **用法**: `/statusline`
 - **说明**: 设置状态栏 UI 显示
-- **实测**: ✅ 显示状态栏设置界面
 
 ---
 
@@ -303,427 +236,294 @@
 ### `/permissions` (别名: `/allowed-tools`)
 - **用法**: `/permissions`
 - **说明**: 管理 Allow/Ask/Deny 工具权限规则
-- **实测**: ✅ 显示权限规则列表（含搜索框和已配置 Bash 规则）
-- **技巧**:
-  - `Allow` — 永远允许该工具
-  - `Ask` — 每次询问（默认）
-  - `Deny` — 永远拒绝
-  - 可配置 Bash 正则：如允许 `git *` 但拒绝 `rm -rf *`
+- **技巧**: 可配置 Bash 正则，如允许 `git *` 但拒绝 `rm -rf *`
 
 ### `/mcp`
 - **用法**: `/mcp [enable|disable server-name]`
-- **说明**: 管理 MCP (Model Context Protocol) 服务器扩展
-- **实测**: ✅ 显示 Plugins 管理 UI，已安装插件列表
-- **技巧**: 管理已连接的 MCP 服务器，启用/禁用特定扩展
+- **说明**: 管理 MCP 服务器扩展
+- 🆕 MCP 工具结果上限提升至 **500K 字符**（原 100K）
 
 ### `/hooks`
 - **用法**: `/hooks`
 - **说明**: 查看工具事件钩子配置
-- **实测**: ✅ 显示 "5 hooks configured"（PreToolUse/PostToolUse 等）
-- **技巧**: 可在 settings.json 中配置钩子实现自动化
 
 ### `/tasks` (别名: `/bashes`)
 - **用法**: `/tasks`
 - **说明**: 列出和管理后台任务
-- **实测**: ✅ 显示 "No tasks currently running"
-- **技巧**: 用 `&` 启动后台任务后，用 `/tasks` 管理
 
 ---
 
-## 七、Agent 与高级功能
+## 七、🆕 私人助手系统（v2.1.92 核心新增）
+
+### `/dream` 🆕
+- **用法**: `/dream`
+- **说明**: 手动触发记忆整合 — 四阶段流程
+- **四阶段**: Orient(盘点) → Gather(采集) → Consolidate(整合) → Prune(裁剪)
+- **后台 cron**: 每天 22:00 自动执行（需启用 `/proactive` 或 `/night-mode`）
+- **技巧**:
+  - 手动 `/dream` 后自动重置 24h 冷却门控
+  - 包含 Phase 3.5 情绪记忆扫描
+  - MEMORY.md 保持 ≤200 行 / 25KB
+
+### `/assistant` 🆕
+- **用法**: `/assistant`
+- **说明**: 启用 KAIROS 助手模式 — 激活主动引擎 + 定时任务
+- **效果**:
+  - `isAssistantMode()` 返回 true
+  - 自动激活 `/proactive` 引擎
+  - 启动 builtinTasks（dream/briefing/health）
+- **技巧**: 长时间工作时开启，AI 会在空闲时自动整理记忆
+
+### `/proactive` 🆕
+- **用法**: `/proactive [on|off]`
+- **说明**: 切换主动自主模式
+- **内置任务**:
+  - `dream-consolidate` — 22:00 自动记忆整合（调用 autoDream）
+  - `morning-briefing` — 07:00 设置晨间简报 pending flag
+  - `code-health` — 23:00 设置健康检查 pending flag
+- **技巧**: 配合 `/night-mode` 实现全天候自主工作
+
+### `/night-mode` 🆕
+- **用法**: `/night-mode`
+- **说明**: 夜间自主模式（22:00-06:00）
+- **编排器**: 顺序执行启用任务，5 分钟节流，单任务失败不阻塞后续
+- **技巧**: 适合离开电脑时让 AI 自动整理记忆和检查代码
+
+### `/buddy`
+- **用法**: `/buddy [show|hide|mute|unmute|info]`
+- **说明**: 编程伙伴 — 可交互的熊猫伙伴
+
+### `/brief`
+- **用法**: `/brief [on|off]`
+- **说明**: 简报模式 — AI 只输出简洁摘要
+
+### 🆕 Mood 检测（自动）
+- **无需命令** — 每条用户消息自动分析情绪
+- **6 类情绪**: neutral / focused / frustrated / curious / satisfied / urgent
+- **中英双语**: 支持中英文关键词匹配
+- **5 分钟衰减**: 无强信号时自动回归 neutral
+- **联动**: persona 自动切换 + dream 上下文注入
+
+### 🆕 Memory 持久化（自动）
+- **emotionalMemory**: 情绪事件记录，JSON 持久化，LRU 100 条
+- **workingMemory**: 键值对工作记忆，JSON 持久化，LRU 50 条，TTL 24h
+- **存储路径**: `~/.pandacc/assistant/emotional-memory.json` / `working-memory.json`
+
+---
+
+## 八、Agent 与协作
 
 ### `/agents`
 - **用法**: `/agents`
 - **说明**: 管理自定义 Agent 配置
-- **实测**: ✅ 显示 Agent 管理面板
-- **技巧**: 在 `.pandacc/agents/` 下创建自定义 Agent
 
 ### `/plan`
 - **用法**: `/plan [open|描述]`
-- **说明**: 启用计划模式或查看/创建计划
-- **实测**: ✅ "Enabled plan mode"
-- **技巧**:
-  - `/plan` — 切换计划模式（先计划后执行）
-  - `/plan open` — 打开计划编辑器
-  - `Shift+Tab` — 循环切换权限模式（含 plan）
-  - **强烈推荐复杂任务先用计划模式**
+- **说明**: 启用计划模式
+- **技巧**: 强烈推荐复杂任务先用计划模式
 
 ### `/fork`
 - **用法**: `/fork <任务描述>`
-- **说明**: 派生后台子 Agent 并行执行任务
-- **实测**: ✅ 创建新会话（⚠️ 有非致命 JS 警告但功能正常）
-- **条件**: 🔧 FORK_SUBAGENT Feature Flag
+- **说明**: 派生后台子 Agent 并行执行
 
 ### `/workflows`
 - **用法**: `/workflows`
 - **说明**: 列出和管理工作流脚本
-- **实测**: ✅ 显示 "No workflow scripts found" + 创建提示
-- **技巧**: 在 `.pandacc/workflows/` 下创建可复用的自动化脚本
 
 ### `/skills`
 - **用法**: `/skills`
-- **说明**: 列出所有可用技能（内置 + 插件 + 目录）
-- **实测**: ✅ 显示技能列表
+- **说明**: 列出所有可用技能
 
-### `/night-mode`
-- **用法**: `/night-mode`
-- **说明**: 切换夜间模式（配合 proactive 引擎）
-- **实测**: ✅ 显示 "Night mode: OFF" + 时间范围配置
+### 🆕 Coordinator 多 Agent 模式
+- **启用**: `CLAUDE_CODE_COORDINATOR_MODE=1`
+- **说明**: 多智能体协作模式，自动分配 worker agent
+- **Worker**: 具有完整工具权限的通用 worker
 
 ---
 
-## 八、插件与扩展
+## 九、插件与扩展
 
 ### `/plugin` (别名: `/plugins`, `/marketplace`)
 - **用法**: `/plugin`
-- **说明**: 浏览、安装、配置插件市场
-- **实测**: ✅ 显示 138 个可用插件，含 Discover/Installed/Errors 标签
-- **技巧**:
-  - 搜索安装：`/plugin` → Discover → 搜索
-  - 热门插件：superpowers, context7, code-review
-  - 安装后用 `/reload-plugins` 立即生效
+- **说明**: 浏览、安装、配置插件市场（138+ 插件）
 
 ### `/reload-plugins`
 - **用法**: `/reload-plugins`
 - **说明**: 热重载插件变更，无需重启
-- **实测**: ✅ "Reloaded: 1 plugin · 0 skills · 5 agents · 0 hooks"
 
 ---
 
-## 九、信息查询命令
+## 十、信息查询命令
 
 ### `/context`
 - **用法**: `/context`
 - **说明**: 以彩色网格可视化上下文使用情况
-- **实测**: ✅ 启动可视化动画
-- **技巧**: 上下文快满时考虑 `/compact` 或 `/clear`
 
 ### `/files`
 - **用法**: `/files`
 - **说明**: 列出当前上下文中的所有文件
-- **实测**: ✅ 列出 MEMORY.md, CLAUDE.md 等
-- **技巧**: 检查哪些文件已加载到上下文
 
 ### `/doctor`
 - **用法**: `/doctor`
 - **说明**: 诊断并验证安装和配置
-- **实测**: ✅ 显示完整诊断（版本、路径、安装方式、搜索状态、自动更新状态）
-- **技巧**: 排障首选，检查配置是否正确
+- **技巧**: 排障首选
 
 ### `/cost`
 - **用法**: `/cost`
 - **说明**: 显示当前会话总花费和持续时间
-- **实测**: ✅ 正确识别命令
 
 ### `/usage`
 - **用法**: `/usage`
 - **说明**: 显示套餐用量限额
-- **实测**: ✅ 正确识别命令
 
 ### `/stats`
 - **用法**: `/stats`
 - **说明**: 显示使用统计（月度热力图 + token 统计）
-- **实测**: ✅ 显示 Overview/Models 标签页 + 活跃热力图
 
 ### `/insights`
 - **用法**: `/insights`
-- **说明**: 生成会话分析报告（调用 API）
-- **实测**: ✅ 启动加载动画并开始生成
+- **说明**: 生成会话分析报告
 
 ### `/memory`
 - **用法**: `/memory`
 - **说明**: 编辑记忆文件（auto-memory/project memory/user memory）
-- **实测**: ✅ 显示 Memory 面板（auto-memory on, auto-dream off）
-- **技巧**: 在 memory 中存储项目上下文，新对话自动加载
 
 ---
 
-## 十、远程与连接命令
+## 十一、远程与连接命令
 
 ### `/remote-control` (别名: `/rc`)
 - **用法**: `/remote-control`
 - **说明**: 连接终端进行远程控制会话
-- **实测**: ✅ 显示 Remote Control 界面（Disconnect/Show QR/Continue）
 
 ### `/session` (别名: `/remote`)
 - **用法**: `/session`
 - **说明**: 显示远程会话 URL 和二维码
-- **实测**: ✅ 渲染 QR 码
 
 ### `/mobile` (别名: `/ios`, `/android`)
 - **用法**: `/mobile`
 - **说明**: 显示移动应用下载二维码
-- **实测**: ✅ 渲染下载 QR 码
-
-### `/remote-env`
-- **用法**: `/remote-env`
-- **说明**: 配置远程环境默认设置
-- **条件**: 🔒 需要 Claude.ai 账户认证
 
 ### `/desktop` (别名: `/app`)
 - **用法**: `/desktop`
 - **说明**: 在 Claude Desktop 中继续当前会话
-- **实测**: ✅ 尝试打开（需安装 Claude Desktop）
 
 ### `/chrome`
 - **用法**: `/chrome`
 - **说明**: Chrome 扩展设置 (Beta)
-- **实测**: ✅ 显示 Chrome 扩展设置界面
 
 ---
 
-## 十一、初始化与安装
+## 十二、初始化与安装
 
 ### `/init`
 - **用法**: `/init`
 - **说明**: 初始化 CLAUDE.md 项目记忆文件
-- **实测**: ✅ 启动 Composing 过程
-- **技巧**: 新项目首先运行，AI 会分析代码库并生成项目文档
+- **技巧**: 新项目首先运行
 
 ### `/terminal-setup`
 - **用法**: `/terminal-setup`
 - **说明**: 安装 Shift+Enter 换行键绑定
-- **实测**: ✅ 显示安装提示
 
 ### `/release-notes`
 - **用法**: `/release-notes`
 - **说明**: 查看版本发布说明
-- **实测**: ✅ 显示 v2.x 版本说明
 
 ### `/add-dir`
 - **用法**: `/add-dir <path>`
 - **说明**: 添加新工作目录
-- **实测**: ✅ 显示添加提示
-
-### `/stickers`
-- **用法**: `/stickers`
-- **说明**: 在浏览器中打开贴纸订购页面
-- **实测**: ✅ "Opening sticker page in browser…"
 
 ---
 
-## 十二、账户认证命令
+## 十三、Ant-Only 高级命令
 
-> ⚠️ 以下命令与 Anthropic 原生登录相关，按指示未做验证测试
+> 以下命令原为 Anthropic 内部专用，已在 Panda Code 中全部启用。
 
-### `/login`
-- **用法**: `/login`
-- **说明**: 登录 Anthropic 账户
-- **条件**: API Key 模式下无需使用
-
-### `/logout`
-- **用法**: `/logout`
-- **说明**: 退出 Anthropic 账户登录
-
-### `/passes`
-- **用法**: `/passes`
-- **说明**: 分享免费体验周给朋友，赚取额外用量
-
-### `/extra-usage`
-- **用法**: `/extra-usage`
-- **说明**: 配置额外用量（超限时自动购买）
-- **条件**: 🔒 需要消费者订阅 + 交互模式
-
-### `/upgrade`
-- **用法**: `/upgrade`
-- **说明**: 升级到 Max 获得更高限额
-
----
-
-## 十三、GitHub 集成命令
-
-### `/install-github-app`
-- **用法**: `/install-github-app`
-- **说明**: 为仓库设置 Claude GitHub Actions
-- **条件**: 🔒 需要 Claude.ai 或 Console 认证
-
-### `/install-slack-app`
-- **用法**: `/install-slack-app`
-- **说明**: 安装 Claude Slack 应用
-
-### `/subscribe-pr`
-- **用法**: `/subscribe-pr [PR number]`
-- **说明**: 订阅 PR 更新通知
-- **条件**: 🔧 KAIROS_GITHUB_WEBHOOKS Feature Flag
-
----
-
-## 十四、Ant-Only 高级命令（已通过 Feature Flag 启用）
-
-> 以下命令原为 Anthropic 内部专用，现已在 Panda Code 中通过编译时 Feature Flag 启用。
-> 这些命令有完整源码实现，功能可正常使用。
-
-### `/ultraplan`
-- **用法**: `/ultraplan`
-- **说明**: 超级计划模式 — 在 CCR 远程环境启动 10-30 分钟的深度规划会话
-- **状态**: ✅ 已启用（ULTRAPLAN Feature Flag）
-- **适用场景**: 
-  - 大型重构规划
-  - 复杂架构设计
-  - 多文件协调修改前的规划
-- **技巧**: 规划结果会保存，可在后续会话中继续执行
-
-### `/ultrareview`
-- **用法**: `/ultrareview`
-- **说明**: 深度代码审查（约 10-20 分钟），在 Web 端运行
-- **状态**: ✅ 已启用（GrowthBook `tengu_review_bughunter_config` 控制）
-- **适用场景**: 
-  - 上线前深度检查
-  - 寻找隐藏 bug
-  - 安全漏洞扫描
-- **技巧**: 比普通 `/review` 更深入，会验证发现的 bug
-
-### `/proactive`
-- **用法**: `/proactive [on|off]`
-- **说明**: 切换主动自主模式 — AI 在空闲时会主动检测并提出改进建议
-- **状态**: ✅ 已启用（PROACTIVE + KAIROS Feature Flags）
-- **技巧**:
-  - 开启后 AI 会在你不发消息时自动工作
-  - 适合长时间后台任务
-  - 配合 `/night-mode` 设置工作时段
-
-### `/assistant`
-- **用法**: `/assistant`
-- **说明**: 切换 Kairos 助手模式 — 类似 ChatGPT 的持续对话体验
-- **状态**: ✅ 已启用（KAIROS Feature Flag）
-- **技巧**: 启用后进入持续助手状态，适合需要多轮交互的场景
-
-### `/brief`
-- **用法**: `/brief [on|off]`
-- **说明**: 切换简报模式 — AI 只输出简洁摘要，不展开详细内容
-- **状态**: ✅ 已启用（KAIROS + KAIROS_BRIEF Feature Flags）
-- **技巧**: 需要快速浏览结果时开启，减少输出冗长
-
-### `/buddy`
-- **用法**: `/buddy [show|hide|mute|unmute|info]`
-- **说明**: 编程伙伴模式 — 显示可交互的熊猫伙伴
-- **状态**: ✅ 已启用（BUDDY Feature Flag）
-- **技巧**:
-  - `show` — 显示伙伴
-  - `hide` — 隐藏伙伴
-  - `mute` — 静音提示
-  - `info` — 查看伙伴状态
-
-### `/voice`
-- **用法**: `/voice`
-- **说明**: 语音模式 — 启用语音输入/输出
-- **状态**: ⚠️ 需要额外条件（VOICE_MODE Flag + GrowthBook + Claude.ai 订阅）
-- **条件**: 仅 Claude.ai 订阅用户可用
-- **技巧**: 按住 Space 录音，松开发送
-
-### `/torch`
-- **用法**: `/torch`
-- **说明**: Torch 模式 — 增强模型推理过程可见性
-- **状态**: ✅ 已启用（TORCH Feature Flag）
-- **技巧**: 想了解 AI 如何推理时开启，会显示更多中间过程
-
-### `/init-verifiers`
-- **用法**: `/init-verifiers`
-- **说明**: 初始化验证器技能 — 为项目创建自动化验证脚本
-- **状态**: ✅ 已启用（INTERNAL_ONLY_COMMANDS 中）
-- **适用场景**: 
-  - 创建 CI/CD 验证流程
-  - 生成测试脚本
-  - 设置代码质量检查
-
-### `/subscribe-pr`
-- **用法**: `/subscribe-pr [PR number]`
-- **说明**: 订阅 PR 更新通知 — PR 有新评论/状态变化时通知你
-- **状态**: ✅ 已启用（KAIROS_GITHUB_WEBHOOKS Feature Flag）
-- **技巧**: 监控重要 PR，无需手动刷新
-
-### `/bridge-kick`
-- **用法**: `/bridge-kick`
-- **说明**: 注入 bridge 故障用于测试（调试工具）
-- **状态**: ✅ 已启用（仅 ant 用户可见）
-
-### `/force-snip`
-- **用法**: `/force-snip`
-- **说明**: 强制截断对话历史 — 比 /compact 更激进
-- **状态**: ✅ 已启用（HISTORY_SNIP Feature Flag）
-- **技巧**: 上下文接近满且 /compact 效果不够时使用
-
-### `/heapdump`
-- **用法**: `/heapdump`
-- **说明**: 转储 JS 堆到 ~/Desktop — 用于内存分析
-- **状态**: ✅ 可用（隐藏命令）
-- **技巧**: 排查内存泄漏时使用
-
----
-
-## 十五、不可用的存根命令
-
-> 以下命令在原版 Claude Code 发布时已被替换为存根（源码不在 npm 包中）。
-> 无论 USER_TYPE 如何设置，这些命令都无法使用。
-
-| 命令 | 原功能 | 状态 |
-|------|--------|------|
-| `/backfill-sessions` | 回填会话数据 | 🚫 存根 |
-| `/break-cache` | 打破提示缓存 | 🚫 存根 |
-| `/bughunter` | Bug 猎人 | 🚫 存根 |
-| `/ctx_viz` | 高级上下文可视化 | 🚫 存根 |
-| `/debug-tool-call` | 调试工具调用 | 🚫 存根 |
-| `/env` | 管理环境变量 | 🚫 存根 |
-| `/good-claude` | Good Claude 模式 | 🚫 存根 |
-| `/issue` | 创建内部 Issue | 🚫 存根 |
-| `/mock-limits` | 模拟速率限制 | 🚫 存根 |
-| `/oauth-refresh` | 刷新 OAuth | 🚫 存根 |
-| `/onboarding` | 重新运行引导 | 🚫 存根 |
-| `/reset-limits` | 重置速率限制 | 🚫 存根 |
-| `/share` | 分享对话 | 🚫 存根 |
-| `/ant-trace` | Ant 追踪 | 🚫 存根 |
-| `/perf-issue` | 性能问题报告 | 🚫 存根 |
-| `/summary` | 生成对话摘要 | 🚫 存根 |
-| `/teleport` | 传送到远程环境 | 🚫 存根 |
-| `/autofix-pr` | 自动修复 PR 问题 | 🚫 存根 |
-| `/agents-platform` | Agents 平台管理 | 🚫 存根 |
-
-**存根实现示例**（所有存根命令内容相同）：
-```javascript
-export default { isEnabled: () => false, isHidden: true, name: 'stub' };
-```
-
-### 反向禁用的命令
-
-| 命令 | 说明 | 原因 |
+| 命令 | 说明 | 状态 |
 |------|------|------|
-| `/feedback` | 提交反馈 | `USER_TYPE === 'ant'` 时主动禁用（Anthropic 内部用其他渠道） |
-| `/peers` | 对等会话 | `UDS_INBOX` Flag 未启用（会阻塞管道模式） |
+| `/ultraplan` | 超级计划模式（CCR 远程 10-30 分钟深度规划） | ✅ |
+| `/ultrareview` | 深度代码审查 + bug 验证 | ✅ |
+| `/init-verifiers` | 初始化验证器脚本 | ✅ |
+| `/subscribe-pr` | 订阅 PR 更新通知 | ✅ |
+| `/bridge-kick` | Bridge 故障注入（调试） | ✅ |
+| `/force-snip` | 强制截断对话历史 | ✅ |
+| `/heapdump` | JS 堆转储到 ~/Desktop | ✅ |
+| `/voice` | 语音输入输出 | 🔒 需 Claude.ai |
+
+---
+
+## 十四、不可用的存根命令
+
+> 原版 Claude Code 发布时已替换为存根（源码不在 npm 包中），无法使用。
+
+| 命令 | 原功能 | 命令 | 原功能 |
+|------|--------|------|--------|
+| `/backfill-sessions` | 回填会话 | `/break-cache` | 打破缓存 |
+| `/bughunter` | Bug 猎人 | `/ctx_viz` | 上下文可视化 |
+| `/debug-tool-call` | 调试工具 | `/env` | 环境变量 |
+| `/good-claude` | Good 模式 | `/issue` | 创建 Issue |
+| `/mock-limits` | 模拟限额 | `/oauth-refresh` | 刷新 OAuth |
+| `/onboarding` | 引导流程 | `/reset-limits` | 重置限额 |
+| `/share` | 分享对话 | `/ant-trace` | Ant 追踪 |
+| `/perf-issue` | 性能报告 | `/summary` | 对话摘要 |
+| `/teleport` | 远程传送 | `/autofix-pr` | 自动修 PR |
+| `/agents-platform` | Agent 平台 | | |
+
+**反向禁用**: `/feedback`（ant 内部渠道）、`/peers`（UDS_INBOX 未启用）
+
+---
+
+## 十五、🆕 环境变量参考
+
+### Panda Code 专属
+
+| 环境变量 | 默认 | 说明 |
+|---------|------|------|
+| `PANDA_SECURITY_RESEARCH` | 未设置 | 设为 `1` 禁用 4 项安全限制（CYBER_RISK/URL限制/谨慎操作/恶意提醒） |
+| `PANDA_HIDE_CONTEXT_WARNING` | 未设置 | 设为 `1` 隐藏 "上下文快满" 警告 |
+| `PANDA_NO_AUTO_COLLAPSE` | 未设置 | 设为 `1` 禁止 Read/Grep 结果自动折叠 |
+| `PANDA_SHOW_DEVBAR` | 未设置 | 设为 `1` 在非 dev 构建中显示 DevBar |
+
+### 功能控制
+
+| 环境变量 | 默认 | 说明 |
+|---------|------|------|
+| `CLAUDE_CODE_COORDINATOR_MODE` | 未设置 | 设为 `1` 启用 Coordinator 多 Agent 模式 |
+| `ENABLE_TOOL_SEARCH` | `true` | ToolSearch 默认启用（支持非 Anthropic Provider） |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | 禁用非必要网络流量（遥测/分析/GrowthBook） |
+| `CLAUDE_INTERNAL_FC_OVERRIDES` | 自动设置 | GrowthBook Feature Flag 覆盖（31+ tengu flags） |
+
+### API 配置
+
+| 环境变量 | 说明 |
+|---------|------|
+| `ANTHROPIC_API_KEY` | API 密钥 |
+| `ANTHROPIC_BASE_URL` | API 基础 URL |
+| `ANTHROPIC_MODEL` | 默认模型 |
+| `ANTHROPIC_SMALL_FAST_MODEL` | 快速模型 |
 
 ---
 
 ## 十六、Feature Flag 对照表
 
-| Feature Flag | 控制的命令 | 说明 |
-|-------------|-----------|------|
-| `PROACTIVE` / `KAIROS` | `/proactive`, `/assistant` | 主动模式/助手模式 |
-| `KAIROS_BRIEF` | `/brief` | 简报模式 |
-| `BRIDGE_MODE` | `/remote-control`, `/rc` | 远程控制 |
-| `DAEMON` + `BRIDGE_MODE` | `/rcs` | 远程控制服务器 |
-| `VOICE_MODE` | `/voice` | 语音模式 |
-| `HISTORY_SNIP` | `/force-snip` | 强制截断历史 |
-| `WORKFLOW_SCRIPTS` | `/workflows` | 工作流脚本 |
-| `ULTRAPLAN` | `/ultraplan` | 超级计划 |
-| `TORCH` | `/torch` | Torch 模式 |
-| `UDS_INBOX` | `/peers` | 对等会话 |
-| `FORK_SUBAGENT` | `/fork` | 派生子 Agent |
-| `BUDDY` | `/buddy` | 编程伙伴 |
+| Feature Flag | 控制的命令/功能 | 状态 |
+|-------------|----------------|------|
+| `PROACTIVE` / `KAIROS` | `/proactive`, `/assistant` | ✅ 已启用 |
+| `KAIROS_BRIEF` | `/brief` | ✅ 已启用 |
+| `KAIROS_DREAM` | `/dream` | ✅ 已启用 |
+| `BRIDGE_MODE` | `/remote-control` | ✅ 已启用 |
+| `VOICE_MODE` | `/voice` | ✅ 已启用 |
+| `HISTORY_SNIP` | `/force-snip` | ✅ 已启用 |
+| `WORKFLOW_SCRIPTS` | `/workflows` | ✅ 已启用 |
+| `ULTRAPLAN` | `/ultraplan` | ✅ 已启用 |
+| `TORCH` | `/torch` | ✅ 已启用 |
+| `FORK_SUBAGENT` | `/fork` | ✅ 已启用 |
+| `BUDDY` | `/buddy` | ✅ 已启用 |
+| `COORDINATOR_MODE` | Coordinator 模式 | ✅ 已启用 |
 
 ---
 
-## 十七、命令类型说明
-
-| 类型 | 说明 | 执行方式 |
-|------|------|----------|
-| `local` | 本地执行，返回文本结果 | 立即执行，输出文本到终端 |
-| `local-jsx` | 本地执行，渲染交互式 UI | 打开交互界面（可用方向键/Tab 操作） |
-| `prompt` | 展开为提示词发送给模型 | 由 AI 模型处理并返回响应 |
-
----
-
-## 十八、实用技巧集锦
-
-### 快捷键速查
+## 十七、快捷键速查
 
 | 快捷键 | 功能 |
 |--------|------|
@@ -742,15 +542,22 @@ export default { isEnabled: () => false, isHidden: true, name: 'stub' };
 | `@` | 文件路径自动补全 |
 | `&` | 后台运行（加在命令末尾） |
 
-### 工作流建议
+---
 
-1. **新项目**: `/init` → `/plan` → 开始编码
-2. **日常编码**: `/model sonnet` → 编码 → `/diff` → `/commit`
-3. **复杂任务**: `/plan` → `/effort max` → `/model opus` → 执行 → `/compact`
-4. **代码审查**: `/review PR号` → `/security-review`
-5. **上下文管理**: `/context` 查看 → `/compact` 压缩 → `/files` 确认
-6. **排障**: `/doctor` → `/status` → `/version`
-7. **长会话**: 定期 `/compact` → `/tag 项目名` → 下次 `/resume 项目名`
+## 十八、工作流建议
+
+| 场景 | 推荐流程 |
+|------|---------|
+| **新项目** | `/init` → `/plan` → 开始编码 |
+| **日常编码** | `/model sonnet` → 编码 → `/diff` → `/commit` |
+| **复杂任务** | `/plan` → `/effort max` → `/model opus` → 执行 → `/compact` |
+| **代码审查** | `/review PR号` → `/security-review` |
+| **上下文管理** | `/context` 查看 → `/compact` 压缩 → `/files` 确认 |
+| **排障** | `/doctor` → `/status` → `/version` |
+| **长会话** | 定期 `/compact` → `/tag 项目名` → 下次 `/resume 项目名` |
+| **自主模式** | `/assistant` → `/night-mode` → 离开让 AI 自动工作 |
+| **记忆整理** | `/dream` 手动整合 or `/proactive` 自动定时 |
+| **多 Agent** | `CLAUDE_CODE_COORDINATOR_MODE=1` → 自动分配 worker |
 
 ### 常见问题
 
@@ -763,32 +570,28 @@ export default { isEnabled: () => false, isHidden: true, name: 'stub' };
 | 需要快速回答 | `/effort low` 或 `/model haiku` |
 | 插件不生效 | `/reload-plugins` |
 | 配置不确定 | `/doctor` 诊断 |
+| Read/Grep 结果被折叠 | `PANDA_NO_AUTO_COLLAPSE=1` |
+| 安全限制阻碍研究 | `PANDA_SECURITY_RESEARCH=1` |
 
 ---
 
-## 十九、验证结果汇总
+## 十九、🆕 v2.1.92 新增能力总览
 
-> 基于 v2.1.124 实机 PTY 测试（2026-04-03）
-
-| 分类 | 测试数 | PASS | BLOCKED | N/A |
-|------|--------|------|---------|-----|
-| 基础控制 | 5 | 5 | 0 | 0 |
-| 对话管理 | 10 | 10 | 0 | 0 |
-| 代码操作 | 6 | 6 | 0 | 0 |
-| 模型推理 | 5 | 5 | 0 | 0 |
-| 配置设置 | 11 | 11 | 0 | 0 |
-| 工具权限 | 4 | 4 | 0 | 0 |
-| Agent 高级 | 6 | 6 | 0 | 0 |
-| 插件扩展 | 3 | 3 | 0 | 0 |
-| 信息查询 | 8 | 8 | 0 | 0 |
-| 远程连接 | 6 | 4 | 1 | 0 |
-| 初始化安装 | 5 | 5 | 0 | 0 |
-| 账户认证 | 3 | 1 | 2 | 0 |
-| 杂项 | 2 | 1 | 0 | 1 |
-| **合计** | **69** | **65** | **3** | **1** |
-
-- **BLOCKED 命令** (3): `/extra-usage` `/privacy-settings` `/remote-env` — 设计上需特定认证类型
-- **N/A 命令** (1): `/feedback` — 技能未注册（非代码 bug）
+| 能力 | 来源 | 说明 |
+|------|------|------|
+| autoDream 四阶段 + cron | Phase 4A | 后台记忆整合，22:00 自动执行 |
+| KAIROS 助手模式 | Phase 1.1 | /assistant 激活完整主动引擎 |
+| Mood 双语检测 | Phase 1.2 | 每条消息自动分析 6 类情绪 |
+| 夜间任务链 | Phase 1.4 | 顺序执行 + 错误隔离 + 5min 节流 |
+| Memory 持久化 | Phase 1.5 | 情绪/工作记忆 JSON + LRU + TTL |
+| Coordinator 多 Agent | Phase 2.1 | COORDINATOR_MODE + worker agent |
+| Sense Pipeline | Phase 2.4 | mood→persona→dream 全链路 |
+| GrowthBook 31+ flags | Phase 2.3 | 含 1h prompt cache |
+| 安全限制可配置 | Phase 3.2 | PANDA_SECURITY_RESEARCH env |
+| 1h prompt cache | Phase 4B | tengu_prompt_cache_1h_config |
+| ToolSearch 全 Provider | Phase 4B | ENABLE_TOOL_SEARCH=true |
+| MCP 500K 结果 | Phase 5 | maxResultSizeChars 提升 |
+| UX 双开关 | Phase 4B | 隐藏 context 警告 + 禁止折叠 |
 
 ---
 
