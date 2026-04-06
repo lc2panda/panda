@@ -1768,8 +1768,12 @@ export const fetchToolsForClient = memoizeWithLRU(
       return toolsToProcess
         .map((tool): Tool => {
           const fullyQualifiedName = buildMcpToolName(client.name, tool.name)
+          // v2.1.92: MCP tools can override maxResultSizeChars via _meta
+          const metaMaxChars = tool._meta?.['anthropic/maxResultSizeChars']
+          const hasMaxCharsOverride = typeof metaMaxChars === 'number' && Number.isFinite(metaMaxChars) && metaMaxChars > 0
           return {
             ...MCPTool,
+            ...(hasMaxCharsOverride ? { maxResultSizeChars: Math.min(metaMaxChars, 500_000) } : {}),
             // In skip-prefix mode, use the original name for model invocation so MCP tools
             // can override builtins by name. mcpInfo is used for permission checking.
             name: skipPrefix ? tool.name : fullyQualifiedName,
