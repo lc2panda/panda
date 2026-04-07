@@ -124,6 +124,7 @@ const buddy = feature('BUDDY')
 import thinkback from './commands/thinkback/index.js'
 import thinkbackPlay from './commands/thinkback-play/index.js'
 import persona from './commands/persona/index.js'
+import routing from './commands/routing.js'
 import privacy from './commands/privacy.js'
 import permissions from './commands/permissions/index.js'
 import plan from './commands/plan/index.js'
@@ -294,6 +295,7 @@ const COMMANDS = memoize((): Command[] => [
   nightMode,
   outputStyle,
   persona,
+  routing,
   privacy,
   remoteEnv,
   plugin,
