@@ -2932,20 +2932,30 @@ export function updateUsage(
     return { ...usage }
   }
 
-  // 第三方 API 兼容：从 OpenAI 格式的 prompt_tokens_details.cached_tokens 提取缓存数据。
-  // Anthropic 原生 API 返回 cache_read_input_tokens，但第三方（OpenRouter/DeepSeek/
-  // Gemini/Groq/Together 等）通常返回 prompt_tokens_details.cached_tokens。
-  // 当 Anthropic 原生字段为空时，fallback 到第三方格式。
+  // 多 provider cache 兼容层：不同第三方 API 的缓存命中字段各不相同。
+  // 按优先级提取，首个非零值胜出：
+  //   1. Anthropic 原生: cache_read_input_tokens
+  //   2. OpenAI 格式:    prompt_tokens_details.cached_tokens (OpenAI/Mistral/OpenRouter透传)
+  //   3. DeepSeek 格式:  prompt_cache_hit_tokens (顶层字段)
+  //   4. Groq 格式:      input_tokens_details.cached_tokens
+  //   5. Kimi 格式:      cached_tokens (usage 顶层)
+  //   6. 火山引擎格式:   prompt_tokens_details.cached_tokens (同 OpenAI)
+  //   7. GLM/MiniMax:     跟随 OpenAI 标准或同 Kimi (cached_tokens 顶层)
   const raw = partUsage as unknown as Record<string, unknown>
   const promptDetails = raw.prompt_tokens_details as Record<string, unknown> | undefined
-  const thirdPartyCachedTokens = (promptDetails?.cached_tokens as number) ?? 0
+  const inputDetails = raw.input_tokens_details as Record<string, unknown> | undefined
+  const thirdPartyCachedTokens =
+    (promptDetails?.cached_tokens as number) ||        // OpenAI / Mistral / 火山引擎
+    (raw.prompt_cache_hit_tokens as number) ||          // DeepSeek
+    (inputDetails?.cached_tokens as number) ||          // Groq
+    (raw.cached_tokens as number) ||                    // Kimi / GLM / MiniMax
+    0
 
   let cacheRead =
     partUsage.cache_read_input_tokens !== null &&
     partUsage.cache_read_input_tokens > 0
       ? partUsage.cache_read_input_tokens
       : usage.cache_read_input_tokens
-  // 如果 Anthropic 原生字段仍为 0，使用第三方兼容字段
   if (cacheRead === 0 && thirdPartyCachedTokens > 0) {
     cacheRead = thirdPartyCachedTokens
   }
@@ -2954,12 +2964,14 @@ export function updateUsage(
     partUsage.input_tokens !== null && partUsage.input_tokens > 0
       ? partUsage.input_tokens
       : usage.input_tokens
-  // 第三方 API 的 input_tokens 可能包含 cached_tokens，需要去重
-  // 避免 cache + input 重复计算
+  // 第三方 API 的 input_tokens 通常 = cached + uncached，需要去重避免双计
   if (thirdPartyCachedTokens > 0 && inputTokens > thirdPartyCachedTokens) {
-    // 也检查 prompt_tokens（OpenAI 格式）与 input_tokens 是否一致
     const promptTokens = (raw.prompt_tokens as number) ?? 0
-    if (promptTokens > 0 && promptTokens === inputTokens) {
+    // DeepSeek 特殊处理：prompt_tokens = cache_hit + cache_miss
+    const cacheMissTokens = (raw.prompt_cache_miss_tokens as number) ?? 0
+    if (cacheMissTokens > 0) {
+      inputTokens = cacheMissTokens
+    } else if (promptTokens > 0 && promptTokens === inputTokens) {
       inputTokens = promptTokens - thirdPartyCachedTokens
     }
   }
