@@ -3,8 +3,7 @@
 // Pos: User-facing command for Multi-Model Agent Routing management.
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
-import type { Command, LocalCommandContext, LocalCommandOnDone } from '../types/command.js'
-import { logForDebugging } from '../utils/debug.js'
+import type { Command } from '../types/command.js'
 
 const routing = {
   type: 'local' as const,
@@ -15,11 +14,8 @@ const routing = {
   isEnabled: () => true,
   load: () =>
     Promise.resolve({
-      async call(
-        onDone: LocalCommandOnDone,
-        context: LocalCommandContext,
-      ): Promise<void> {
-        const args = (context.args ?? '').trim().split(/\s+/)
+      call: async (argsRaw: string) => {
+        const args = (argsRaw ?? '').trim().split(/\s+/)
         const subcommand = args[0]?.toLowerCase() ?? 'status'
 
         try {
@@ -35,45 +31,40 @@ const routing = {
               const enabled = isRoutingEnabled()
               const models = capabilityRegistry.getAllModels()
               const lines = [
-                `**Multi-Model Routing**: ${enabled ? '✅ Enabled' : '❌ Disabled'}`,
-                `**Registered Models**: ${models.length}`,
+                `Multi-Model Routing: ${enabled ? '✅ Enabled' : '❌ Disabled'}`,
+                `Registered Models: ${models.length}`,
               ]
               if (models.length > 0) {
                 lines.push('')
-                lines.push('| Alias | Tier | Provider | Model ID |')
-                lines.push('|-------|------|----------|----------|')
                 for (const m of models) {
-                  lines.push(
-                    `| ${m.alias} | ${m.tier} | ${m.provider} | ${m.resolveModelId()} |`,
-                  )
+                  lines.push(`  ${m.alias} (${m.tier}) → ${m.resolveModelId()}`)
                 }
               }
               lines.push('')
               lines.push(
                 enabled
-                  ? 'Routing is active. Agents with `modelPreferences` will be routed to optimal models.'
-                  : 'Enable with: `PANDA_MODEL_ROUTING=1` or set `enableModelRouting: true` in settings.json',
+                  ? 'Routing active. Agents with modelPreferences will be routed.'
+                  : 'Enable: PANDA_MODEL_ROUTING=1 or enableModelRouting: true in settings.json',
               )
-              onDone({ type: 'local', displayText: lines.join('\n') })
-              return
+              return { type: 'text' as const, value: lines.join('\n') }
             }
 
             case 'preset': {
               const presetName = args[1]
               if (!presetName) {
-                onDone({
-                  type: 'local',
-                  displayText:
-                    'Usage: `/routing preset <name>`\n\nAvailable presets: quality, cost-saving, balanced, multi-provider\n\nConfigure in settings.json → routingPresets',
-                })
-                return
+                return {
+                  type: 'text' as const,
+                  value: 'Usage: /routing preset <name>\n\nAvailable: quality, cost-saving, balanced, multi-provider',
+                }
               }
-              // TODO: Apply preset to global config
-              onDone({
-                type: 'local',
-                displayText: `Routing preset set to: **${presetName}**\n\n(Effective on next agent spawn)`,
-              })
-              return
+              const { setActivePreset } = await import('../routing/presets.js')
+              const success = setActivePreset(presetName)
+              return {
+                type: 'text' as const,
+                value: success
+                  ? `Routing preset: ${presetName} (effective on next agent spawn)`
+                  : `Unknown preset: ${presetName}. Available: quality, cost-saving, balanced, multi-provider`,
+              }
             }
 
             case 'test': {
@@ -84,55 +75,44 @@ const routing = {
                 name: agentName,
               })
 
-              const parentModel = context.model ?? 'claude-sonnet-4-6'
               const target = resolveModelTarget(
-                {
-                  name: agentName,
-                  agentType: agentName,
-                },
+                { name: agentName, agentType: agentName },
                 taskProfile,
                 null,
-                parentModel,
+                'claude-sonnet-4-6',
               )
 
               const lines = [
-                `**Routing Dry-Run Test**`,
+                `Routing Dry-Run: ${agentName}`,
+                `Prompt: "${prompt.slice(0, 80)}${prompt.length > 80 ? '...' : ''}"`,
                 '',
-                `Agent: ${agentName}`,
-                `Prompt: "${prompt.slice(0, 100)}${prompt.length > 100 ? '...' : ''}"`,
+                `Task: ${taskProfile.complexity} / ${taskProfile.domain}`,
+                `Required: ${taskProfile.requiredCapabilities.join(', ') || 'none'}`,
+                `Tokens: ${taskProfile.estimatedTokens}`,
                 '',
-                '**Task Classification:**',
-                `  Complexity: ${taskProfile.complexity}`,
-                `  Domain: ${taskProfile.domain}`,
-                `  Required: ${taskProfile.requiredCapabilities.join(', ') || 'none'}`,
-                `  Token estimate: ${taskProfile.estimatedTokens}`,
-                '',
-                '**Routing Decision:**',
-                `  Model: ${target.modelId}`,
+                `→ Model: ${target.modelId}`,
                 `  Provider: ${target.provider}`,
                 `  Reason: ${target.reason}`,
                 `  Fallbacks: ${target.fallbackChain.join(' → ') || 'none'}`,
               ]
-              onDone({ type: 'local', displayText: lines.join('\n') })
-              return
+              return { type: 'text' as const, value: lines.join('\n') }
             }
 
             default:
-              onDone({
-                type: 'local',
-                displayText:
-                  'Usage: `/routing [status|preset <name>|test <agent> <prompt>]`\n\n' +
-                  '• `/routing status` — Show routing configuration\n' +
-                  '• `/routing preset quality` — Switch routing preset\n' +
-                  '• `/routing test triage "fix typo"` — Dry-run routing test',
-              })
+              return {
+                type: 'text' as const,
+                value:
+                  'Usage: /routing [status|preset <name>|test <agent> <prompt>]\n\n' +
+                  '  /routing status              — Show routing config\n' +
+                  '  /routing preset quality       — Switch preset\n' +
+                  '  /routing test triage "fix typo" — Dry-run test',
+              }
           }
         } catch (e) {
-          logForDebugging(`[routing] command error: ${(e as Error).message}`)
-          onDone({
-            type: 'local',
-            displayText: `Routing error: ${(e as Error).message}`,
-          })
+          return {
+            type: 'text' as const,
+            value: `Routing error: ${(e as Error).message}`,
+          }
         }
       },
     }),
