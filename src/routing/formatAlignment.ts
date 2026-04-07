@@ -241,6 +241,9 @@ export const openaiCompatAdapter: FormatAdapter = {
     }
 
     const usage = r.usage as Record<string, unknown> | undefined
+    const promptDetails = usage?.prompt_tokens_details as Record<string, unknown> | undefined
+    const cachedTokens = (promptDetails?.cached_tokens as number) ?? 0
+    const promptTokens = (usage?.prompt_tokens as number) ?? 0
 
     return {
       id: r.id ?? `msg_${Date.now()}`,
@@ -249,8 +252,10 @@ export const openaiCompatAdapter: FormatAdapter = {
       content: contentBlocks,
       stop_reason: mapFinishReason(choice.finish_reason as string),
       usage: {
-        input_tokens: usage?.prompt_tokens ?? 0,
+        input_tokens: cachedTokens > 0 ? promptTokens - cachedTokens : promptTokens,
         output_tokens: usage?.completion_tokens ?? 0,
+        cache_read_input_tokens: cachedTokens,
+        cache_creation_input_tokens: 0,
       },
     }
   },
@@ -282,12 +287,30 @@ export const openaiCompatAdapter: FormatAdapter = {
       }
     }
 
-    // Finish
+    // Finish or usage-only chunk
     const finishReason = (choices[0] as Record<string, unknown>).finish_reason
     if (finishReason) {
       return {
         type: 'message_delta',
         delta: { stop_reason: mapFinishReason(finishReason as string) },
+      }
+    }
+
+    // OpenAI streams emit a final chunk with usage stats and empty choices
+    const streamUsage = e.usage as Record<string, unknown> | undefined
+    if (streamUsage && (!choices || choices.length === 0 || !delta)) {
+      const sPromptDetails = streamUsage.prompt_tokens_details as Record<string, unknown> | undefined
+      const sCached = (sPromptDetails?.cached_tokens as number) ?? 0
+      const sPrompt = (streamUsage.prompt_tokens as number) ?? 0
+      return {
+        type: 'message_delta',
+        delta: { stop_reason: 'end_turn' },
+        usage: {
+          input_tokens: sCached > 0 ? sPrompt - sCached : sPrompt,
+          output_tokens: streamUsage.completion_tokens ?? 0,
+          cache_read_input_tokens: sCached,
+          cache_creation_input_tokens: 0,
+        },
       }
     }
 
