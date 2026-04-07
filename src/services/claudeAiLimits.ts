@@ -218,8 +218,9 @@ async function makeTestQuery() {
 }
 
 export async function checkQuotaStatus(): Promise<void> {
-  // Skip network requests if nonessential traffic is disabled
-  if (isEssentialTrafficOnly()) {
+  // Quota check uses the standard messages API, not Anthropic-internal infra.
+  // Allow it for claude.ai subscribers even when nonessential traffic is disabled.
+  if (isEssentialTrafficOnly() && !isClaudeAISubscriber()) {
     return
   }
 
