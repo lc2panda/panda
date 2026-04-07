@@ -339,6 +339,28 @@
 - **说明**: 多智能体协作模式，自动分配 worker agent
 - **Worker**: 具有完整工具权限的通用 worker
 
+### 🆕 Multi-Model Agent Routing
+- **启用**: `PANDA_MODEL_ROUTING=1` 或 settings.json `enableModelRouting: true`
+- **说明**: 不同 agent 使用不同模型，按能力路由，版本无关
+- **命令**: `/routing [status|preset <name>|test <agent> <prompt>]`
+  - `/routing status` — 查看路由配置和已注册模型
+  - `/routing preset quality` — 切换到质量优先预设
+  - `/routing test triage "fix typo"` — 干跑路由决策测试
+- **内建预设**:
+  - `quality` — 全部用 Opus（最高质量）
+  - `cost-saving` — 默认 Haiku（最低成本）
+  - `balanced` — Sonnet 为主，架构用 Opus，分类用 Haiku
+  - `multi-provider` — 分发到不同 Provider（需配置 modelRegistry）
+- **Agent 模板**（`.pandacc/agents/`）:
+  - `architecture-reviewer` — 强推理模型（min reasoning≥85）
+  - `code-generator` — 编码速度优化
+  - `triage` — 快速分类（maxTurns=3）
+- **技巧**:
+  - Agent .md frontmatter 支持 `modelPreferences` 和 `modelPreset`
+  - 第三方模型通过 settings.json `modelRegistry` 注册
+  - 自定义别名通过 `customModelAliases` 配置
+  - 路由默认关闭（`enableModelRouting: false`），不影响现有行为
+
 ---
 
 ## 九、插件与扩展
