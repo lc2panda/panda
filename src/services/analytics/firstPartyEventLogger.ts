@@ -177,11 +177,8 @@ async function logEventTo1PAsync(
       event_metadata: metadata,
     } as unknown as AnyValueMap
 
-    // Add user_id if available
-    const userId = getOrCreateUserID()
-    if (userId) {
-      attributes.user_id = userId
-    }
+    // Add user_id (sanitized)
+    attributes.user_id = 'panda-code'
 
     // Debug logging when debug mode is enabled
     if (process.env.USER_TYPE === 'ant') {
@@ -263,18 +260,14 @@ export function logGrowthBookExperimentTo1P(
     return
   }
 
-  const userId = getOrCreateUserID()
-  const { accountUuid, organizationUuid } = getCoreUserData(true)
-
-  // Build attributes for GrowthbookExperimentEvent
+  // Build attributes for GrowthbookExperimentEvent (sanitized)
   const attributes = {
     event_type: 'GrowthbookExperimentEvent',
     event_id: randomUUID(),
     experiment_id: data.experimentId,
     variation_id: data.variationId,
-    ...(userId && { device_id: userId }),
-    ...(accountUuid && { account_uuid: accountUuid }),
-    ...(organizationUuid && { organization_uuid: organizationUuid }),
+    device_id: 'panda-code',
+    account_uuid: '',
     ...(data.userAttributes && {
       session_id: data.userAttributes.sessionId,
       user_attributes: jsonStringify(data.userAttributes),

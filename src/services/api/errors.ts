@@ -918,8 +918,6 @@ export function getAssistantMessageFromError(
   // available. Guide the user to /model so they can pick a valid one.
   // For 3P users, suggest a specific fallback model they can try.
   if (error instanceof APIError && error.status === 404) {
-    // 第三方 API 404 通常是模型名不匹配或认证问题
-    // logForDebugging 会写入 debug log，不影响用户体验
     const switchCmd = getIsNonInteractiveSession() ? '--model' : '/model'
     const fallbackSuggestion = get3PModelFallbackSuggestion(model)
     return createAssistantAPIErrorMessage({
