@@ -955,7 +955,6 @@ export function reorderMessagesInUI(
         })
       }
       toolUseGroups.get(toolUseID)!.postHooks.push(message)
-      continue
     }
   }
 
@@ -2284,7 +2283,6 @@ export function normalizeMessagesForAPI(
                 result[i] = mergeAssistantMessages(msg, normalizedMessage)
                 return
               }
-              continue
             }
           }
 
@@ -3562,7 +3560,6 @@ Read the team config to discover your teammates' names. Check the task list peri
   }
 
   // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- teammate_mailbox/team_context/skill_discovery/bagel_console handled above
-  // biome-ignore lint/nursery/useExhaustiveSwitchCases: teammate_mailbox/team_context/max_turns_reached/skill_discovery/bagel_console handled above, can't add case for dead code elimination
   switch (attachment.type) {
     case 'directory': {
       return wrapMessagesInSystemReminder([

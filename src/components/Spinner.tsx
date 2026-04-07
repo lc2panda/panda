@@ -1,5 +1,5 @@
-import { c as _c } from "react/compiler-runtime";
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
+import { c as _c } from "react/compiler-runtime";
 import { Box, Text } from '../ink.js';
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -69,7 +69,6 @@ export function SpinnerWithVerb(props: Props): React.ReactNode {
   const viewingAgentTaskId = useAppState(s_0 => s_0.viewingAgentTaskId);
   // Hoisted to mount-time — this component re-renders at animation framerate.
   const briefEnvEnabled = feature('KAIROS') || feature('KAIROS_BRIEF') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useMemo(() => isEnvTruthy(process.env.CLAUDE_CODE_BRIEF), []) : false;
 
   // Runtime gate mirrors isBriefEnabled() but inlined — importing from
