@@ -2951,6 +2951,21 @@ export function updateUsage(
     (raw.cached_tokens as number) ||                    // Kimi / GLM / MiniMax
     0
 
+  // 调试模式：DEBUG_CACHE=1 时输出原始 usage 数据到 stderr，帮助定位 cache 字段位置
+  if (process.env.DEBUG_CACHE) {
+    const cacheFields = {
+      'cache_read_input_tokens': partUsage.cache_read_input_tokens,
+      'cache_creation_input_tokens': partUsage.cache_creation_input_tokens,
+      'prompt_tokens_details': promptDetails,
+      'input_tokens_details': inputDetails,
+      'prompt_cache_hit_tokens': raw.prompt_cache_hit_tokens,
+      'cached_tokens': raw.cached_tokens,
+      'thirdPartyCachedTokens': thirdPartyCachedTokens,
+    }
+    process.stderr.write(`[DEBUG_CACHE] raw usage keys: ${JSON.stringify(Object.keys(raw))}\n`)
+    process.stderr.write(`[DEBUG_CACHE] cache fields: ${JSON.stringify(cacheFields)}\n`)
+  }
+
   let cacheRead =
     partUsage.cache_read_input_tokens !== null &&
     partUsage.cache_read_input_tokens > 0
