@@ -2976,13 +2976,19 @@ export function updateUsage(
     }
   }
 
+  // OpenRouter 返回 prompt_tokens_details.cache_write_tokens 表示写入缓存的 token 数
+  const thirdPartyCacheWriteTokens =
+    (promptDetails?.cache_write_tokens as number) || 0
+
   return {
     input_tokens: inputTokens,
     cache_creation_input_tokens:
       partUsage.cache_creation_input_tokens !== null &&
       partUsage.cache_creation_input_tokens > 0
         ? partUsage.cache_creation_input_tokens
-        : usage.cache_creation_input_tokens,
+        : thirdPartyCacheWriteTokens > 0
+          ? thirdPartyCacheWriteTokens
+          : usage.cache_creation_input_tokens,
     cache_read_input_tokens: cacheRead,
     output_tokens: partUsage.output_tokens ?? usage.output_tokens,
     server_tool_use: {
