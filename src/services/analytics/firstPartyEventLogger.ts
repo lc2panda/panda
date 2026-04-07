@@ -178,7 +178,7 @@ async function logEventTo1PAsync(
     } as unknown as AnyValueMap
 
     // Add user_id (sanitized)
-    attributes.user_id = 'panda-code'
+    attributes.user_id = 'a'.repeat(64)
 
     // Debug logging when debug mode is enabled
     if (process.env.USER_TYPE === 'ant') {
@@ -266,7 +266,7 @@ export function logGrowthBookExperimentTo1P(
     event_id: randomUUID(),
     experiment_id: data.experimentId,
     variation_id: data.variationId,
-    device_id: 'panda-code',
+    device_id: 'a'.repeat(64),
     account_uuid: '',
     ...(data.userAttributes && {
       session_id: data.userAttributes.sessionId,
