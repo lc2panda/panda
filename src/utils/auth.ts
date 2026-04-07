@@ -10,7 +10,7 @@ import {
   logEvent,
 } from 'src/services/analytics/index.js'
 import { getModelStrings } from 'src/utils/model/modelStrings.js'
-import { getAPIProvider } from 'src/utils/model/providers.js'
+import { getAPIProvider, isThirdPartyProvider } from 'src/utils/model/providers.js'
 import {
   getIsNonInteractiveSession,
   preferThirdPartyAuthentication,
@@ -253,9 +253,9 @@ export function getAnthropicApiKeyWithSource(
     ? undefined
     : process.env.ANTHROPIC_API_KEY
 
-  // Always check for direct environment variable when the user ran claude --print.
-  // This is useful for CI, etc.
-  if (preferThirdPartyAuthentication() && apiKeyEnv) {
+  // Always check for direct environment variable when the user ran claude --print,
+  // or when using a third-party provider (key was set programmatically by us, not by the user).
+  if ((preferThirdPartyAuthentication() || isThirdPartyProvider()) && apiKeyEnv) {
     return {
       key: apiKeyEnv,
       source: 'ANTHROPIC_API_KEY',
