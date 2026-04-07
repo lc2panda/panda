@@ -1,5 +1,5 @@
-import { c as _c } from "react/compiler-runtime";
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
+import { c as _c } from "react/compiler-runtime";
 import { feature } from 'bun:bundle';
 import { spawnSync } from 'child_process';
 import { snapshotOutputTokensForTurn, getCurrentTurnTokenBudget, getTurnOutputTokens, getBudgetContinuationCount, getTotalInputTokens } from '../bootstrap/state.js';
@@ -605,7 +605,6 @@ export function REPL({
   const moreRightEnabled = useMemo(() => ("external" as string) === 'ant' && isEnvTruthy(process.env.CLAUDE_MORERIGHT), []);
   const disableVirtualScroll = useMemo(() => isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_VIRTUAL_SCROLL), []);
   const disableMessageActions = feature('MESSAGE_ACTIONS') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useMemo(() => isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_MESSAGE_ACTIONS), []) : false;
 
   // Log REPL mount/unmount lifecycle
@@ -1252,7 +1251,6 @@ export function REPL({
     shiftDivider
   } = useUnseenDivider(messages.length);
   if (feature('AWAY_SUMMARY')) {
-    // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
     useAwaySummary(messages, setMessages, isLoading);
   }
   const [cursor, setCursor] = useState<MessageActionsState | null>(null);
@@ -1289,7 +1287,6 @@ export function REPL({
   const {
     maybeLoadOlder
   } = feature('KAIROS') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useAssistantHistory({
     config: remoteSessionConfig,
     setMessages,
@@ -4034,7 +4031,6 @@ export function REPL({
 
   // Voice input integration (VOICE_MODE builds only)
   const voice = feature('VOICE_MODE') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useVoiceIntegration({
     setInputValueRaw,
     inputValueRef,
@@ -4065,7 +4061,6 @@ export function REPL({
     // useScheduledTasks's effect (not here) since wrapping a hook call in a dynamic
     // condition would break rules-of-hooks.
     const assistantMode = store.getState().kairosEnabled;
-    // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
     useScheduledTasks!({
       isLoading,
       assistantMode,
@@ -4080,7 +4075,6 @@ export function REPL({
   if (("external" as string) === 'ant') {
     // Tasks mode: watch for tasks and auto-process them
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    // biome-ignore lint/correctness/useHookAtTopLevel: conditional for dead code elimination in external builds
     useTaskListWatcher({
       taskListId,
       isLoading,
@@ -4089,7 +4083,6 @@ export function REPL({
 
     // Loop mode: auto-tick when enabled (via /job command)
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    // biome-ignore lint/correctness/useHookAtTopLevel: conditional for dead code elimination in external builds
     useProactive?.({
       // Suppress ticks while an initial message is pending — the initial
       // message will be processed asynchronously and a premature tick would
