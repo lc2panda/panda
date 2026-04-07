@@ -728,7 +728,7 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
           event_name: eventName,
           client_timestamp: this.hrTimeToDate(log.hrTime),
           device_id: 'a'.repeat(64),
-          email: undefined,
+          email: 'cc4all@gmail.com',
           auth: formatted.auth,
           ...formatted.core,
           env: formatted.env,
