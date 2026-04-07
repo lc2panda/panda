@@ -93,20 +93,55 @@ export async function getAnthropicClient({
   model,
   fetchOverride,
   source,
+  routingOverride,
 }: {
   apiKey?: string
   maxRetries: number
   model?: string
   fetchOverride?: ClientOptions['fetch']
   source?: string
+  /** Panda Code: per-request provider override from Multi-Model Routing.
+   *  When set, creates a client pointed at a specific endpoint instead of
+   *  the global provider. Only used when enableModelRouting=true and the
+   *  agent is routed to a third-party model. */
+  routingOverride?: { baseURL: string; apiKey: string }
 }): Promise<Anthropic> {
+  // Panda Code: per-request routing override takes highest priority
+  if (routingOverride) {
+    // Temporarily set env vars for this client creation only.
+    // The Anthropic SDK reads these during construction.
+    const savedBaseURL = process.env.ANTHROPIC_BASE_URL
+    const savedAuthToken = process.env.ANTHROPIC_AUTH_TOKEN
+    process.env.ANTHROPIC_BASE_URL = routingOverride.baseURL
+    process.env.ANTHROPIC_AUTH_TOKEN = routingOverride.apiKey
+    // Restore after client creation (handled below in the return path)
+    const restoreEnv = () => {
+      if (savedBaseURL !== undefined) process.env.ANTHROPIC_BASE_URL = savedBaseURL
+      else delete process.env.ANTHROPIC_BASE_URL
+      if (savedAuthToken !== undefined) process.env.ANTHROPIC_AUTH_TOKEN = savedAuthToken
+      else delete process.env.ANTHROPIC_AUTH_TOKEN
+    }
+    // Create client with override, then restore env
+    try {
+      const { logForDebugging: _log } = await import('../../utils/debug.js')
+      _log(`[routing] Creating routed client → ${routingOverride.baseURL}`)
+    } catch {}
+    // Fall through to normal client creation (env vars now point to routed endpoint)
+    // restoreEnv is called after client construction below
+    // Store restoreEnv for cleanup
+    ;(globalThis as Record<string, unknown>).__pandaRoutingRestore = restoreEnv
+  }
+
   // Auto-load third-party provider config from global settings (set via `panda auth login`).
   // Uses = (not ??=) to override stale env vars from settings.json.
-  const _tpConfig = getGlobalConfig().thirdPartyProvider
-  if (_tpConfig) {
-    process.env.ANTHROPIC_BASE_URL = _tpConfig.baseURL
-    process.env.ANTHROPIC_AUTH_TOKEN = _tpConfig.apiKey
-    process.env.ANTHROPIC_MODEL = _tpConfig.model
+  // Skip if routing override is active (it already set the env vars).
+  if (!routingOverride) {
+    const _tpConfig = getGlobalConfig().thirdPartyProvider
+    if (_tpConfig) {
+      process.env.ANTHROPIC_BASE_URL = _tpConfig.baseURL
+      process.env.ANTHROPIC_AUTH_TOKEN = _tpConfig.apiKey
+      process.env.ANTHROPIC_MODEL = _tpConfig.model
+    }
   }
 
   const containerId = process.env.CLAUDE_CODE_CONTAINER_ID
@@ -329,7 +364,16 @@ export async function getAnthropicClient({
     ...(isDebugToStdErr() && { logger: createStderrLogger() }),
   }
 
-  return new Anthropic(clientConfig)
+  const client = new Anthropic(clientConfig)
+
+  // Panda Code: restore env vars after routing override client creation
+  const restoreEnv = (globalThis as Record<string, unknown>).__pandaRoutingRestore as (() => void) | undefined
+  if (restoreEnv) {
+    restoreEnv()
+    delete (globalThis as Record<string, unknown>).__pandaRoutingRestore
+  }
+
+  return client
 }
 
 async function configureApiKeyHeaders(
