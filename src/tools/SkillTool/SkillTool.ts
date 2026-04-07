@@ -417,8 +417,10 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
       }
     }
 
-    // Check if command is a prompt-based command
-    if (foundCommand.type !== 'prompt') {
+    // Check if command is a prompt-based command (compact is whitelisted as
+    // the only local command callable via Skill — it lets agents compress
+    // their own context without user intervention)
+    if (foundCommand.type !== 'prompt' && normalizedCommandName !== 'compact') {
       return {
         result: false,
         message: `Skill ${normalizedCommandName} is not a prompt-based skill`,
@@ -629,6 +631,52 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
         parentMessage,
         onProgress,
       )
+    }
+
+    // Handle compact as a special local command — the only non-prompt command
+    // callable via Skill. Agents use this to compress their own context.
+    if (commandName === 'compact' && command?.type === 'local') {
+      try {
+        const compactMod = await command.load()
+        const result = await compactMod.call(args || '', context as any)
+        if (result.type === 'compact') {
+          const { resetMicrocompactState } = await import(
+            '../../services/compact/microCompact.js'
+          )
+          const { buildPostCompactMessages } = await import(
+            '../../services/compact/compact.js'
+          )
+          resetMicrocompactState()
+          return {
+            data: {
+              success: true,
+              commandName,
+              status: 'forked' as const,
+              agentId: 'compact',
+              result: result.displayText ?? 'Context compacted successfully',
+            },
+          }
+        }
+        return {
+          data: {
+            success: true,
+            commandName,
+            status: 'forked' as const,
+            agentId: 'compact',
+            result: 'Compact completed',
+          },
+        }
+      } catch (e) {
+        return {
+          data: {
+            success: false,
+            commandName,
+            status: 'forked' as const,
+            agentId: 'compact',
+            result: `Compact failed: ${errorMessage(e)}`,
+          },
+        }
+      }
     }
 
     // Process the skill with optional args
