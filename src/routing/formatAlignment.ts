@@ -1,5 +1,5 @@
-// Input: Model-specific API request/response formats.
-// Output: Adapter layer translating between Anthropic format and third-party formats.
+// Input: Model-specific API request/response formats (Anthropic, OpenAI, DeepSeek, Groq, 火山引擎).
+// Output: Adapter layer translating between Anthropic format and third-party formats, with multi-provider cache token extraction.
 // Pos: Called by the routing system when an agent is routed to a non-Anthropic model.
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
@@ -242,8 +242,23 @@ export const openaiCompatAdapter: FormatAdapter = {
 
     const usage = r.usage as Record<string, unknown> | undefined
     const promptDetails = usage?.prompt_tokens_details as Record<string, unknown> | undefined
-    const cachedTokens = (promptDetails?.cached_tokens as number) ?? 0
+    const inputDetails = usage?.input_tokens_details as Record<string, unknown> | undefined
+    // 多 provider 兼容：OpenAI/Mistral → prompt_tokens_details.cached_tokens
+    //                   DeepSeek → prompt_cache_hit_tokens
+    //                   Groq → input_tokens_details.cached_tokens
+    //                   Kimi/GLM/MiniMax → cached_tokens (顶层)
+    const cachedTokens =
+      (promptDetails?.cached_tokens as number) ||
+      (usage?.prompt_cache_hit_tokens as number) ||
+      (inputDetails?.cached_tokens as number) ||
+      (usage?.cached_tokens as number) ||
+      0
     const promptTokens = (usage?.prompt_tokens as number) ?? 0
+    const cacheMissTokens = (usage?.prompt_cache_miss_tokens as number) ?? 0
+    // DeepSeek: prompt_tokens = hit + miss, 直接用 miss 作为非缓存输入
+    const effectiveInputTokens = cacheMissTokens > 0
+      ? cacheMissTokens
+      : cachedTokens > 0 ? promptTokens - cachedTokens : promptTokens
 
     return {
       id: r.id ?? `msg_${Date.now()}`,
@@ -252,7 +267,7 @@ export const openaiCompatAdapter: FormatAdapter = {
       content: contentBlocks,
       stop_reason: mapFinishReason(choice.finish_reason as string),
       usage: {
-        input_tokens: cachedTokens > 0 ? promptTokens - cachedTokens : promptTokens,
+        input_tokens: effectiveInputTokens,
         output_tokens: usage?.completion_tokens ?? 0,
         cache_read_input_tokens: cachedTokens,
         cache_creation_input_tokens: 0,
@@ -300,13 +315,23 @@ export const openaiCompatAdapter: FormatAdapter = {
     const streamUsage = e.usage as Record<string, unknown> | undefined
     if (streamUsage && (!choices || choices.length === 0 || !delta)) {
       const sPromptDetails = streamUsage.prompt_tokens_details as Record<string, unknown> | undefined
-      const sCached = (sPromptDetails?.cached_tokens as number) ?? 0
+      const sInputDetails = streamUsage.input_tokens_details as Record<string, unknown> | undefined
+      const sCached =
+        (sPromptDetails?.cached_tokens as number) ||
+        (streamUsage.prompt_cache_hit_tokens as number) ||
+        (sInputDetails?.cached_tokens as number) ||
+        (streamUsage.cached_tokens as number) ||
+        0
       const sPrompt = (streamUsage.prompt_tokens as number) ?? 0
+      const sCacheMiss = (streamUsage.prompt_cache_miss_tokens as number) ?? 0
+      const sEffectiveInput = sCacheMiss > 0
+        ? sCacheMiss
+        : sCached > 0 ? sPrompt - sCached : sPrompt
       return {
         type: 'message_delta',
         delta: { stop_reason: 'end_turn' },
         usage: {
-          input_tokens: sCached > 0 ? sPrompt - sCached : sPrompt,
+          input_tokens: sEffectiveInput,
           output_tokens: streamUsage.completion_tokens ?? 0,
           cache_read_input_tokens: sCached,
           cache_creation_input_tokens: 0,
