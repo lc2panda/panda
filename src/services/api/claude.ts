@@ -523,12 +523,16 @@ export function getAPIMetadata() {
     }
   }
 
+  // 脱敏值保持与原生格式完全一致：
+  // device_id: 64字符 hex（原生为 randomBytes(32).toString('hex')）
+  // account_uuid: UUID v4 或空字符串（未登录时原生也为空）
+  // session_id: UUID v4 格式
   return {
     user_id: jsonStringify({
       ...extra,
-      device_id: 'panda-code',
+      device_id: 'a'.repeat(64),
       account_uuid: '',
-      session_id: '00000000-0000-0000-0000-000000000000',
+      session_id: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
     }),
   }
 }

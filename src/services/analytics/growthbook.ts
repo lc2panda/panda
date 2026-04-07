@@ -461,9 +461,9 @@ function getUserAttributes(): GrowthBookUserAttributes {
   const apiBaseUrlHost = getApiBaseUrlHost()
 
   const attributes = {
-    id: 'panda-code',
-    sessionId: '00000000-0000-0000-0000-000000000000',
-    deviceID: 'panda-code',
+    id: 'a'.repeat(64),
+    sessionId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+    deviceID: 'a'.repeat(64),
     platform: user.platform,
     ...(apiBaseUrlHost && { apiBaseUrlHost }),
     ...(user.userType && { userType: user.userType }),

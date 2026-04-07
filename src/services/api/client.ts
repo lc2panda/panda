@@ -161,7 +161,7 @@ export async function getAnthropicClient({
     : {
         'x-app': 'cli',
         'User-Agent': getUserAgent(),
-        'X-Claude-Code-Session-Id': '00000000-0000-0000-0000-000000000000',
+        'X-Claude-Code-Session-Id': 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
         ...customHeaders,
         ...(containerId
           ? { 'x-claude-remote-container-id': containerId }
