@@ -27,6 +27,7 @@ import { SYNTHETIC_OUTPUT_TOOL_NAME } from '../tools/SyntheticOutputTool/Synthet
 import { ENTER_WORKTREE_TOOL_NAME } from '../tools/EnterWorktreeTool/constants.js'
 import { EXIT_WORKTREE_TOOL_NAME } from '../tools/ExitWorktreeTool/constants.js'
 import { WORKFLOW_TOOL_NAME } from '../tools/WorkflowTool/constants.js'
+import { SLEEP_TOOL_NAME } from '../tools/SleepTool/prompt.js'
 import {
   CRON_CREATE_TOOL_NAME,
   CRON_DELETE_TOOL_NAME,
@@ -68,6 +69,7 @@ export const ASYNC_AGENT_ALLOWED_TOOLS = new Set([
   TOOL_SEARCH_TOOL_NAME,
   ENTER_WORKTREE_TOOL_NAME,
   EXIT_WORKTREE_TOOL_NAME,
+  SLEEP_TOOL_NAME,
 ])
 /**
  * Tools allowed only for in-process teammates (not general async agents).
