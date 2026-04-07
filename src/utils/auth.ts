@@ -247,15 +247,25 @@ export function getAnthropicApiKeyWithSource(
     return { key: null, source: 'none' }
   }
 
+  // 第三方 provider 最高优先：直接从 config 读取 key，跳过所有其他逻辑。
+  // 必须在最前面，因为后续逻辑（approved 检查、OAuth 等）都是 Anthropic 专有的。
+  const _tpConfig = getGlobalConfig().thirdPartyProvider
+  if (_tpConfig?.apiKey) {
+    return {
+      key: _tpConfig.apiKey,
+      source: 'ANTHROPIC_API_KEY',
+    }
+  }
+
   // On homespace, don't use ANTHROPIC_API_KEY (use Console key instead)
   // https://anthropic.slack.com/archives/C08428WSLKV/p1747331773214779
   const apiKeyEnv = isRunningOnHomespace()
     ? undefined
     : process.env.ANTHROPIC_API_KEY
 
-  // Always check for direct environment variable when the user ran claude --print,
-  // or when using a third-party provider (key was set programmatically by us, not by the user).
-  if ((preferThirdPartyAuthentication() || isThirdPartyProvider()) && apiKeyEnv) {
+  // Always check for direct environment variable when the user ran claude --print.
+  // This is useful for CI, etc.
+  if (preferThirdPartyAuthentication() && apiKeyEnv) {
     return {
       key: apiKeyEnv,
       source: 'ANTHROPIC_API_KEY',
