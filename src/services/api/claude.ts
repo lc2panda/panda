@@ -2934,21 +2934,47 @@ export function updateUsage(
   if (!partUsage) {
     return { ...usage }
   }
+
+  // 第三方 API 兼容：从 OpenAI 格式的 prompt_tokens_details.cached_tokens 提取缓存数据。
+  // Anthropic 原生 API 返回 cache_read_input_tokens，但第三方（OpenRouter/DeepSeek/
+  // Gemini/Groq/Together 等）通常返回 prompt_tokens_details.cached_tokens。
+  // 当 Anthropic 原生字段为空时，fallback 到第三方格式。
+  const raw = partUsage as unknown as Record<string, unknown>
+  const promptDetails = raw.prompt_tokens_details as Record<string, unknown> | undefined
+  const thirdPartyCachedTokens = (promptDetails?.cached_tokens as number) ?? 0
+
+  let cacheRead =
+    partUsage.cache_read_input_tokens !== null &&
+    partUsage.cache_read_input_tokens > 0
+      ? partUsage.cache_read_input_tokens
+      : usage.cache_read_input_tokens
+  // 如果 Anthropic 原生字段仍为 0，使用第三方兼容字段
+  if (cacheRead === 0 && thirdPartyCachedTokens > 0) {
+    cacheRead = thirdPartyCachedTokens
+  }
+
+  let inputTokens =
+    partUsage.input_tokens !== null && partUsage.input_tokens > 0
+      ? partUsage.input_tokens
+      : usage.input_tokens
+  // 第三方 API 的 input_tokens 可能包含 cached_tokens，需要去重
+  // 避免 cache + input 重复计算
+  if (thirdPartyCachedTokens > 0 && inputTokens > thirdPartyCachedTokens) {
+    // 也检查 prompt_tokens（OpenAI 格式）与 input_tokens 是否一致
+    const promptTokens = (raw.prompt_tokens as number) ?? 0
+    if (promptTokens > 0 && promptTokens === inputTokens) {
+      inputTokens = promptTokens - thirdPartyCachedTokens
+    }
+  }
+
   return {
-    input_tokens:
-      partUsage.input_tokens !== null && partUsage.input_tokens > 0
-        ? partUsage.input_tokens
-        : usage.input_tokens,
+    input_tokens: inputTokens,
     cache_creation_input_tokens:
       partUsage.cache_creation_input_tokens !== null &&
       partUsage.cache_creation_input_tokens > 0
         ? partUsage.cache_creation_input_tokens
         : usage.cache_creation_input_tokens,
-    cache_read_input_tokens:
-      partUsage.cache_read_input_tokens !== null &&
-      partUsage.cache_read_input_tokens > 0
-        ? partUsage.cache_read_input_tokens
-        : usage.cache_read_input_tokens,
+    cache_read_input_tokens: cacheRead,
     output_tokens: partUsage.output_tokens ?? usage.output_tokens,
     server_tool_use: {
       web_search_requests:
