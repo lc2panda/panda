@@ -123,6 +123,23 @@ panda auth login
 | `/subscribe-pr` | 订阅 PR 更新通知 |
 | `/heapdump` | JS 堆转储 |
 
+### 🆕 Multi-Model Agent Routing
+
+不同 agent 使用不同模型，按能力路由：
+
+| 命令 | 说明 |
+|------|------|
+| `/routing status` | 查看路由配置和已注册模型 |
+| `/routing preset <name>` | 切换预设（quality/cost-saving/balanced） |
+| `/routing test <agent> <prompt>` | 干跑路由决策测试 |
+
+内建 agent 模板（`.pandacc/agents/`）：
+- `architecture-reviewer` — 强推理模型（Opus）
+- `code-generator` — 编码优化（Sonnet）
+- `triage` — 快速分类（Haiku）
+
+> 详见 [CC命令使用手册.md](CC命令使用手册.md) Multi-Model Routing 章节
+
 ### 快捷键
 
 | 快捷键 | 功能 | 快捷键 | 功能 |
@@ -142,6 +159,7 @@ panda auth login
 | `PANDA_NO_AUTO_COLLAPSE=1` | 禁止 Read/Grep 自动折叠 |
 | `PANDA_SHOW_DEVBAR=1` | 非 dev 构建显示 DevBar |
 | `CLAUDE_CODE_COORDINATOR_MODE=1` | 启用 Coordinator 多 Agent |
+| `PANDA_MODEL_ROUTING=1` | 启用 Multi-Model Agent Routing |
 | `ENABLE_TOOL_SEARCH=true` | ToolSearch（默认已启用） |
 
 ---
