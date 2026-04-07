@@ -112,14 +112,18 @@ export async function getAnthropicClient({
     // The Anthropic SDK reads these during construction.
     const savedBaseURL = process.env.ANTHROPIC_BASE_URL
     const savedAuthToken = process.env.ANTHROPIC_AUTH_TOKEN
+    const savedApiKey = process.env.ANTHROPIC_API_KEY
     process.env.ANTHROPIC_BASE_URL = routingOverride.baseURL
     process.env.ANTHROPIC_AUTH_TOKEN = routingOverride.apiKey
+    process.env.ANTHROPIC_API_KEY = routingOverride.apiKey
     // Restore after client creation (handled below in the return path)
     const restoreEnv = () => {
       if (savedBaseURL !== undefined) process.env.ANTHROPIC_BASE_URL = savedBaseURL
       else delete process.env.ANTHROPIC_BASE_URL
       if (savedAuthToken !== undefined) process.env.ANTHROPIC_AUTH_TOKEN = savedAuthToken
       else delete process.env.ANTHROPIC_AUTH_TOKEN
+      if (savedApiKey !== undefined) process.env.ANTHROPIC_API_KEY = savedApiKey
+      else delete process.env.ANTHROPIC_API_KEY
     }
     // Create client with override, then restore env
     try {
@@ -140,6 +144,7 @@ export async function getAnthropicClient({
     if (_tpConfig) {
       process.env.ANTHROPIC_BASE_URL = _tpConfig.baseURL
       process.env.ANTHROPIC_AUTH_TOKEN = _tpConfig.apiKey
+      process.env.ANTHROPIC_API_KEY = _tpConfig.apiKey
       process.env.ANTHROPIC_MODEL = _tpConfig.model
     }
   }
@@ -184,7 +189,9 @@ export async function getAnthropicClient({
   await checkAndRefreshOAuthTokenIfNeeded()
   logForDebugging('[API:auth] OAuth token check complete')
 
-  if (!isClaudeAISubscriber()) {
+  // 第三方 provider 必须注入 API key header，即使 isClaudeAISubscriber() 为 true
+  // （因为 isClaudeAISubscriber 在 fork 中硬编码返回 true，但第三方不走 OAuth）
+  if (!isClaudeAISubscriber() || isThirdPartyProvider()) {
     await configureApiKeyHeaders(defaultHeaders, getIsNonInteractiveSession())
   }
 

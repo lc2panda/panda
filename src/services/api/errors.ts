@@ -918,12 +918,8 @@ export function getAssistantMessageFromError(
   // available. Guide the user to /model so they can pick a valid one.
   // For 3P users, suggest a specific fallback model they can try.
   if (error instanceof APIError && error.status === 404) {
-    // 始终输出 404 诊断信息到 stderr，帮助定位第三方 API 兼容问题
-    process.stderr.write(`[PANDA_404] model=${model} message=${error.message} requestID=${error.requestID ?? 'unknown'}\n`)
-    process.stderr.write(`[PANDA_404] ANTHROPIC_BASE_URL=${process.env.ANTHROPIC_BASE_URL ?? '(unset)'}\n`)
-    process.stderr.write(`[PANDA_404] ANTHROPIC_MODEL=${process.env.ANTHROPIC_MODEL ?? '(unset)'}\n`)
-    process.stderr.write(`[PANDA_404] error body: ${JSON.stringify((error as any).error ?? {})}\n`)
-    try { process.stderr.write(`[PANDA_404] stack: ${error.stack?.split('\n').slice(0, 8).join('\n')}\n`) } catch {}
+    // 第三方 API 404 通常是模型名不匹配或认证问题
+    // logForDebugging 会写入 debug log，不影响用户体验
     const switchCmd = getIsNonInteractiveSession() ? '--model' : '/model'
     const fallbackSuggestion = get3PModelFallbackSuggestion(model)
     return createAssistantAPIErrorMessage({
