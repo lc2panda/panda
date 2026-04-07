@@ -359,9 +359,11 @@ export function getPromptCachingEnabled(model: string): boolean {
 export function getCacheControl({
   scope,
   querySource,
+  isSystemLevel,
 }: {
   scope?: CacheScope
   querySource?: QuerySource
+  isSystemLevel?: boolean
 } = {}): {
   type: 'ephemeral'
   ttl?: '1h'
@@ -369,7 +371,7 @@ export function getCacheControl({
 } {
   return {
     type: 'ephemeral',
-    ...(should1hCacheTTL(querySource) && { ttl: '1h' }),
+    ...(should1hCacheTTL(querySource, isSystemLevel) && { ttl: '1h' }),
     ...(scope === 'global' && { scope }),
   }
 }
@@ -377,23 +379,20 @@ export function getCacheControl({
 /**
  * Determines if 1h TTL should be used for prompt caching.
  *
- * Only applied when:
- * 1. User is eligible (ant or subscriber within rate limits)
- * 2. The query source matches a pattern in the GrowthBook allowlist
+ * Multi-tier strategy:
+ * - System-level content (system prompt, tools schema, CLAUDE.md) → 1h TTL
+ *   for all firstParty users (bypasses GrowthBook allowlist)
+ * - Message-level content → 5m TTL (standard ephemeral with sliding window)
+ *
+ * The extended TTL requires the `extended-cache-ttl-2025-04-11` beta header.
+ * Long-TTL breakpoints must appear before short-TTL breakpoints in the request.
  *
  * GrowthBook config shape: { allowlist: string[] }
  * Patterns support trailing '*' for prefix matching.
- * Examples:
- * - { allowlist: ["repl_main_thread*", "sdk"] } — main thread + SDK only
- * - { allowlist: ["repl_main_thread*", "sdk", "agent:*"] } — also subagents
- * - { allowlist: ["*"] } — all sources
- *
- * The allowlist is cached in STATE for session stability — prevents mixed
- * TTLs when GrowthBook's disk cache updates mid-request.
+ * The allowlist is cached in STATE for session stability.
  */
-function should1hCacheTTL(querySource?: QuerySource): boolean {
-  // 3P Bedrock users get 1h TTL when opted in via env var — they manage their own billing
-  // No GrowthBook gating needed since 3P users don't have GrowthBook configured
+function should1hCacheTTL(querySource?: QuerySource, isSystemLevel?: boolean): boolean {
+  // 3P Bedrock users get 1h TTL when opted in via env var
   if (
     getAPIProvider() === 'bedrock' &&
     isEnvTruthy(process.env.ENABLE_PROMPT_CACHING_1H_BEDROCK)
@@ -413,8 +412,14 @@ function should1hCacheTTL(querySource?: QuerySource): boolean {
   }
   if (!userEligible) return false
 
-  // Cache allowlist in bootstrap state for session stability — prevents mixed
-  // TTLs when GrowthBook's disk cache updates mid-request
+  // System-level content (system prompt, tools) always gets 1h TTL for
+  // eligible firstParty users — these rarely change within a session and
+  // benefit most from extended caching to avoid costly cache_creation writes.
+  if (isSystemLevel) {
+    return true
+  }
+
+  // Message-level content: check GrowthBook allowlist for gradual rollout
   let allowlist = getPromptCache1hAllowlist()
   if (allowlist === null) {
     const config = getFeatureValue_CACHED_MAY_BE_STALE<{
@@ -3231,6 +3236,7 @@ export function buildSystemPromptBlocks(
           cache_control: getCacheControl({
             scope: block.cacheScope,
             querySource: options?.querySource,
+            isSystemLevel: true,
           }),
         }),
     }

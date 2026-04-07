@@ -11,6 +11,7 @@ import {
   CLI_INTERNAL_BETA_HEADER,
   CONTEXT_1M_BETA_HEADER,
   CONTEXT_MANAGEMENT_BETA_HEADER,
+  EXTENDED_CACHE_TTL_BETA_HEADER,
   INTERLEAVED_THINKING_BETA_HEADER,
   PROMPT_CACHING_SCOPE_BETA_HEADER,
   REDACT_THINKING_BETA_HEADER,
@@ -369,6 +370,7 @@ export const getAllModelBetas = memoize((model: string): string[] => {
   // Always send the beta header for 1P. The header is a no-op without a scope field.
   if (includeFirstPartyOnlyBetas) {
     betaHeaders.push(PROMPT_CACHING_SCOPE_BETA_HEADER)
+    betaHeaders.push(EXTENDED_CACHE_TTL_BETA_HEADER)
   }
 
   // If ANTHROPIC_BETAS is set, split it by commas and add to betaHeaders.
