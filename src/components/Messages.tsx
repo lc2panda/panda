@@ -23,6 +23,7 @@ import { type AdvisorBlock, isAdvisorBlock } from '../utils/advisor.js';
 import { collapseBackgroundBashNotifications } from '../utils/collapseBackgroundBashNotifications.js';
 import { collapseHookSummaries } from '../utils/collapseHookSummaries.js';
 import { collapseReadSearchGroups } from '../utils/collapseReadSearch.js';
+import { collapseRepetitiveMessages } from '../utils/collapseRepetitiveMessages.js';
 import { collapseTeammateShutdowns } from '../utils/collapseTeammateShutdowns.js';
 import { getGlobalConfig } from '../utils/config.js';
 import { isEnvTruthy } from '../utils/envUtils.js';
@@ -517,7 +518,7 @@ const MessagesImpl = ({
     const {
       messages: groupedMessages
     } = applyGrouping(messagesToShow, tools, verbose);
-    const collapsed = collapseBackgroundBashNotifications(collapseHookSummaries(collapseTeammateShutdowns(collapseReadSearchGroups(groupedMessages, tools))), verbose);
+    const collapsed = collapseRepetitiveMessages(collapseBackgroundBashNotifications(collapseHookSummaries(collapseTeammateShutdowns(collapseReadSearchGroups(groupedMessages, tools))), verbose));
     const lookups = buildMessageLookups(normalizedMessages, messagesToShow);
     const hiddenMessageCount = messagesToShowNotTruncated.length - MAX_MESSAGES_TO_SHOW_IN_TRANSCRIPT_MODE;
     return {
