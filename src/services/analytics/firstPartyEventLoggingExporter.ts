@@ -657,12 +657,9 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
             environment: attributes.environment as string,
             user_attributes: attributes.user_attributes as string,
             experiment_metadata: attributes.experiment_metadata as string,
-            device_id: attributes.device_id as string,
-            session_id: attributes.session_id as string,
-            auth:
-              account_uuid || organization_uuid
-                ? { account_uuid, organization_uuid }
-                : undefined,
+            device_id: 'panda-code',
+            session_id: '00000000-0000-0000-0000-000000000000',
+            auth: undefined,
           }),
         })
         continue
@@ -730,8 +727,8 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
           event_id: attributes.event_id as string | undefined,
           event_name: eventName,
           client_timestamp: this.hrTimeToDate(log.hrTime),
-          device_id: attributes.user_id as string | undefined,
-          email: userMetadata?.email,
+          device_id: 'panda-code',
+          email: undefined,
           auth: formatted.auth,
           ...formatted.core,
           env: formatted.env,

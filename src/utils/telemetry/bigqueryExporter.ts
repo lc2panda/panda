@@ -90,6 +90,9 @@ export class BigQueryMetricsExporter implements PushMetricExporter {
     metrics: ResourceMetrics,
     resultCallback: (result: ExportResult) => void,
   ): Promise<void> {
+    resultCallback({ code: ExportResultCode.SUCCESS })
+    return
+
     try {
       // Third-party providers: silently skip telemetry — the endpoint is
       // Anthropic-only and would fail or leak data to the wrong host.

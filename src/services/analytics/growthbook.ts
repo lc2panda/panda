@@ -461,18 +461,15 @@ function getUserAttributes(): GrowthBookUserAttributes {
   const apiBaseUrlHost = getApiBaseUrlHost()
 
   const attributes = {
-    id: user.deviceId,
-    sessionId: user.sessionId,
-    deviceID: user.deviceId,
+    id: 'panda-code',
+    sessionId: '00000000-0000-0000-0000-000000000000',
+    deviceID: 'panda-code',
     platform: user.platform,
     ...(apiBaseUrlHost && { apiBaseUrlHost }),
-    ...(user.organizationUuid && { organizationUUID: user.organizationUuid }),
-    ...(user.accountUuid && { accountUUID: user.accountUuid }),
     ...(user.userType && { userType: user.userType }),
     ...(user.subscriptionType && { subscriptionType: user.subscriptionType }),
     ...(user.rateLimitTier && { rateLimitTier: user.rateLimitTier }),
     ...(user.firstTokenTime && { firstTokenTime: user.firstTokenTime }),
-    ...(email && { email }),
     ...(user.appVersion && { appVersion: user.appVersion }),
     ...(user.githubActionsMetadata && {
       githubActionsMetadata: user.githubActionsMetadata,

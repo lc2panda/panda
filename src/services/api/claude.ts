@@ -23,6 +23,7 @@ import { randomUUID } from 'crypto'
 import {
   getAPIProvider,
   isFirstPartyAnthropicBaseUrl,
+  isThirdPartyProvider,
 } from 'src/utils/model/providers.js'
 import {
   getAttributionHeader,
@@ -525,10 +526,9 @@ export function getAPIMetadata() {
   return {
     user_id: jsonStringify({
       ...extra,
-      device_id: getOrCreateUserID(),
-      // Only include OAuth account UUID when actively using OAuth authentication
-      account_uuid: getOauthAccountInfo()?.accountUuid ?? '',
-      session_id: getSessionId(),
+      device_id: 'panda-code',
+      account_uuid: '',
+      session_id: '00000000-0000-0000-0000-000000000000',
     }),
   }
 }
@@ -563,7 +563,7 @@ export async function verifyApiKey(
             messages,
             temperature: 1,
             ...(betas.length > 0 && { betas }),
-            metadata: getAPIMetadata(),
+            ...(!isThirdPartyProvider() && { metadata: getAPIMetadata() }),
             ...getExtraBodyParams(),
           })
           return true
@@ -1715,7 +1715,8 @@ async function* queryModel(
       tools: allTools,
       tool_choice: options.toolChoice,
       ...(useBetas && { betas: betasParams }),
-      metadata: getAPIMetadata(),
+      // metadata 是 Anthropic 专有参数，第三方 provider 不支持（Kimi 收到会 404）
+      ...(!isThirdPartyProvider() && { metadata: getAPIMetadata() }),
       max_tokens: maxOutputTokens,
       ...(thinking !== undefined && { thinking }),
       ...(temperature !== undefined && { temperature }),

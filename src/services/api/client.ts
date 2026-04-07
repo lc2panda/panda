@@ -161,7 +161,7 @@ export async function getAnthropicClient({
     : {
         'x-app': 'cli',
         'User-Agent': getUserAgent(),
-        'X-Claude-Code-Session-Id': getSessionId(),
+        'X-Claude-Code-Session-Id': '00000000-0000-0000-0000-000000000000',
         ...customHeaders,
         ...(containerId
           ? { 'x-claude-remote-container-id': containerId }
@@ -357,11 +357,13 @@ export async function getAnthropicClient({
   }
 
   const _hasThirdParty = !!getGlobalConfig().thirdPartyProvider
+  const resolvedApiKey = (_hasThirdParty || !isClaudeAISubscriber()) ? (apiKey || getAnthropicApiKey()) : null
+  const resolvedAuthToken = (!_hasThirdParty && isClaudeAISubscriber())
+    ? getClaudeAIOAuthTokens()?.accessToken
+    : undefined
   const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
-    apiKey: (_hasThirdParty || !isClaudeAISubscriber()) ? (apiKey || getAnthropicApiKey()) : null,
-    authToken: (!_hasThirdParty && isClaudeAISubscriber())
-      ? getClaudeAIOAuthTokens()?.accessToken
-      : undefined,
+    apiKey: resolvedApiKey,
+    authToken: resolvedAuthToken,
     // Set baseURL from OAuth config when using staging OAuth
     ...(process.env.USER_TYPE === 'ant' &&
     isEnvTruthy(process.env.USE_STAGING_OAUTH)

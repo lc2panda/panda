@@ -129,6 +129,9 @@ function scheduleFlush(): void {
 }
 
 export const initializeDatadog = memoize(async (): Promise<boolean> => {
+  datadogInitialized = false
+  return false
+
   if (isAnalyticsDisabled()) {
     datadogInitialized = false
     return false
@@ -162,6 +165,8 @@ export async function trackDatadogEvent(
   eventName: string,
   properties: { [key: string]: boolean | number | undefined },
 ): Promise<void> {
+  return
+
   if (process.env.NODE_ENV !== 'production') {
     return
   }
