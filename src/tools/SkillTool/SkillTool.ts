@@ -17,7 +17,7 @@ import type {
   ValidationResult,
 } from 'src/Tool.js'
 import { buildTool, type ToolDef } from 'src/Tool.js'
-import type { Command } from 'src/types/command.js'
+import type { Command, LocalJSXCommandContext } from 'src/types/command.js'
 import type {
   AssistantMessage,
   AttachmentMessage,
@@ -444,6 +444,17 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
     const appState = context.getAppState()
     const permissionContext = appState.toolPermissionContext
 
+    // compact 是安全的内部命令（只做上下文压缩，不执行外部操作），
+    // agent 调用时自动放行，无需触发权限提示。
+    // 放在 deny 规则检查之前，因为 compact 永远不应被阻止。
+    if (commandName === 'compact') {
+      return {
+        behavior: 'allow',
+        updatedInput: { skill, args },
+        decisionReason: undefined,
+      }
+    }
+
     // Look up the command object to pass as metadata
     const commands = await getAllCommands(context)
     const commandObj = findCommand(commandName, commands)
@@ -638,7 +649,22 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
     if (commandName === 'compact' && command?.type === 'local') {
       try {
         const compactMod = await command.load()
-        const result = await compactMod.call(args || '', context as any)
+        // compact.call() 的签名是 LocalCommandCall(args, LocalJSXCommandContext)，
+        // 但实际只使用 ToolUseContext 的字段（messages, abortController, options 等），
+        // 不依赖 setMessages/onChangeAPIKey/theme 等 LocalJSXCommandContext 扩展字段。
+        // 构造最小兼容 context，避免 `as any` 的类型不安全。
+        const compactContext: LocalJSXCommandContext = {
+          ...context,
+          setMessages: () => {},
+          onChangeAPIKey: () => {},
+          options: {
+            ...context.options,
+            theme: 'dark' as const,
+            dynamicMcpConfig: undefined,
+            ideInstallationStatus: null,
+          },
+        }
+        const result = await compactMod.call(args || '', compactContext)
         if (result.type === 'compact') {
           const { resetMicrocompactState } = await import(
             '../../services/compact/microCompact.js'
@@ -647,6 +673,15 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
             '../../services/compact/compact.js'
           )
           resetMicrocompactState()
+
+          // 与 processSlashCommand 中 compact 正常流程一致：
+          // 使用 buildPostCompactMessages 构建压缩后的消息列表，
+          // 并通过 contextModifier 替换会话中的 messages，
+          // 确保后续 query loop 使用压缩后的消息继续。
+          const postCompactMessages = buildPostCompactMessages(
+            result.compactionResult,
+          )
+
           return {
             data: {
               success: true,
@@ -654,6 +689,12 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
               status: 'forked' as const,
               agentId: 'compact',
               result: result.displayText ?? 'Context compacted successfully',
+            },
+            contextModifier(ctx) {
+              return {
+                ...ctx,
+                messages: postCompactMessages,
+              }
             },
           }
         }

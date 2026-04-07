@@ -28,6 +28,7 @@ import {
   createAssistantMessage,
   createUserMessage,
   filterOrphanedThinkingOnlyMessages,
+  filterProactiveTickMessages,
   filterUnresolvedToolUses,
   filterWhitespaceOnlyAssistantMessages,
   isToolUseResultMessage,
@@ -197,8 +198,15 @@ export function deserializeMessagesWithInterruptDetection(
 
     // Filter out assistant messages with only whitespace text content.
     // This can happen when model outputs "\n\n" before thinking, user cancels mid-stream.
-    const filteredMessages = filterWhitespaceOnlyAssistantMessages(
+    const filteredWhitespace = filterWhitespaceOnlyAssistantMessages(
       filteredThinking,
+    ) as NormalizedMessage[]
+
+    // 过滤 proactive tick 心跳消息对（"/proactive-tick" user + "." assistant）。
+    // 这些消息在长时间运行的会话中大量累积，resume 时挤占 API 上下文窗口，
+    // 导致真正有价值的对话历史被截断丢弃。
+    const filteredMessages = filterProactiveTickMessages(
+      filteredWhitespace,
     ) as NormalizedMessage[]
 
     const internalState = detectTurnInterruption(filteredMessages)

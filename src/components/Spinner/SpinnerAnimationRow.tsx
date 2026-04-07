@@ -66,6 +66,9 @@ export type SpinnerAnimationRowProps = {
   // Thinking (state owned by parent, mode-dependent)
   thinkingStatus: 'thinking' | number | null;
   effortSuffix: string;
+
+  // cache tokens 命中数（从 API usage 累计）
+  cacheReadTokens: number;
 };
 
 /**
@@ -98,7 +101,8 @@ export function SpinnerAnimationRow({
   foregroundedTeammate,
   leaderIsIdle = false,
   thinkingStatus,
-  effortSuffix
+  effortSuffix,
+  cacheReadTokens
 }: SpinnerAnimationRowProps): React.ReactNode {
   const [viewportRef, time] = useAnimationFrame(reducedMotion ? null : 50);
 
@@ -166,7 +170,9 @@ export function SpinnerAnimationRow({
   const totalTokens = foregroundedTeammate && !foregroundedTeammate.isIdle ? foregroundedTeammate.progress?.tokenCount ?? 0 : leaderTokens + teammateTokens;
   const tokenCount = formatNumber(totalTokens);
   const _zh = require('../../utils/i18n.js').isZh()
-  const tokensText = hasRunningTeammates ? `${tokenCount} ${_zh ? '词元' : 'tokens'}` : `${figures.arrowDown} ${tokenCount} ${_zh ? '词元' : 'tokens'}`;
+  // cache 命中信息：仅当 cacheReadTokens > 0 时追加显示
+  const cacheText = cacheReadTokens > 0 ? ` (cache: ${formatNumber(cacheReadTokens)})` : '';
+  const tokensText = hasRunningTeammates ? `${tokenCount} ${_zh ? '词元' : 'tokens'}${cacheText}` : `${figures.arrowDown} ${tokenCount} ${_zh ? '词元' : 'tokens'}${cacheText}`;
   const tokensWidth = stringWidth(tokensText);
 
   // === Thinking text (may shrink to fit) ===
@@ -207,7 +213,7 @@ export function SpinnerAnimationRow({
             {timerText}
           </Text>] : []), ...(showTokens ? [<Box flexDirection="row" key="tokens">
             {!hasRunningTeammates && <SpinnerModeGlyph mode={mode} />}
-            <Text dimColor>{tokenCount} {_zh ? '词元' : 'tokens'}</Text>
+            <Text dimColor>{tokenCount} {_zh ? '词元' : 'tokens'}{cacheText}</Text>
           </Box>] : []), ...(showThinking && thinkingText ? [thinkingStatus === 'thinking' && !reducedMotion ? <Text key="thinking" color={thinkingShimmerColor}>
               {thinkingOnly ? `(${thinkingText})` : thinkingText}
             </Text> : <Text dimColor key="thinking">

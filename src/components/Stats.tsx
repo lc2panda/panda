@@ -842,7 +842,7 @@ type ModelEntryProps = {
   totalTokens: number;
 };
 function ModelEntry(t0) {
-  const $ = _c(21);
+  const $ = _c(25);
   const {
     model,
     usage,
@@ -908,12 +908,23 @@ function ModelEntry(t0) {
   } else {
     t8 = $[14];
   }
+  // cache 命中为 0 时不显示，避免噪音
+  const cacheReadTokens = usage.cacheReadInputTokens ?? 0;
+  let t8b;
+  if ($[20] !== cacheReadTokens) {
+    t8b = cacheReadTokens > 0 ? formatNumber(cacheReadTokens) : null;
+    $[20] = cacheReadTokens;
+    $[21] = t8b;
+  } else {
+    t8b = $[21];
+  }
   let t9;
-  if ($[15] !== t7 || $[16] !== t8) {
-    t9 = <Text color="subtle">{"  "}In: {t7} · Out:{" "}{t8}</Text>;
+  if ($[15] !== t7 || $[16] !== t8 || $[22] !== t8b) {
+    t9 = <Text color="subtle">{"  "}In: {t7} · Out:{" "}{t8}{t8b ? ` · Cache: ${t8b}` : ''}</Text>;
     $[15] = t7;
     $[16] = t8;
     $[17] = t9;
+    $[22] = t8b;
   } else {
     t9 = $[17];
   }
@@ -922,9 +933,9 @@ function ModelEntry(t0) {
     t10 = <Box flexDirection="column">{t6}{t9}</Box>;
     $[18] = t6;
     $[19] = t9;
-    $[20] = t10;
+    $[23] = t10;
   } else {
-    t10 = $[20];
+    t10 = $[23];
   }
   return t10;
 }
@@ -1221,7 +1232,8 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
     const modelTokens = usage.inputTokens + usage.outputTokens;
     const percentage = (modelTokens / totalTokens * 100).toFixed(1);
     lines.push(`${figures.bullet} ${chalk.bold(renderModelName(model))} ${chalk.gray(`(${percentage}%)`)}`);
-    lines.push(chalk.dim(`  In: ${formatNumber(usage.inputTokens)} · Out: ${formatNumber(usage.outputTokens)}`));
+    const cacheStr = usage.cacheReadInputTokens > 0 ? ` · Cache: ${formatNumber(usage.cacheReadInputTokens)}` : '';
+    lines.push(chalk.dim(`  In: ${formatNumber(usage.inputTokens)} · Out: ${formatNumber(usage.outputTokens)}${cacheStr}`));
   }
   return lines;
 }

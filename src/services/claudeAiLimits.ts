@@ -161,6 +161,14 @@ export function getRawUtilization(): RawUtilization {
   return rawUtilization
 }
 
+// rawUtilization变化监听器，StatusLine等组件订阅后可在每次API响应更新用量时刷新
+type RawUtilizationListener = (raw: RawUtilization) => void
+export const rawUtilizationListeners: Set<RawUtilizationListener> = new Set()
+
+function emitRawUtilizationChange(raw: RawUtilization): void {
+  rawUtilizationListeners.forEach(listener => listener(raw))
+}
+
 function extractRawUtilization(headers: globalThis.Headers): RawUtilization {
   const result: RawUtilization = {}
   for (const [key, abbrev] of [
@@ -460,7 +468,11 @@ export function extractQuotaStatusFromHeaders(
 
   if (!shouldProcessRateLimits(isSubscriber)) {
     // If we have any rate limit state, clear it
+    const hadRawData = rawUtilization.five_hour !== undefined || rawUtilization.seven_day !== undefined
     rawUtilization = {}
+    if (hadRawData) {
+      emitRawUtilizationChange(rawUtilization)
+    }
     if (currentLimits.status !== 'allowed' || currentLimits.resetsAt) {
       const defaultLimits: ClaudeAILimits = {
         status: 'allowed',
@@ -474,7 +486,9 @@ export function extractQuotaStatusFromHeaders(
 
   // Process headers (applies mocks from /mock-limits command if active)
   const headersToUse = processRateLimitHeaders(headers)
-  rawUtilization = extractRawUtilization(headersToUse)
+  const newRawUtilization = extractRawUtilization(headersToUse)
+  const rawChanged = !isEqual(rawUtilization, newRawUtilization)
+  rawUtilization = newRawUtilization
   const newLimits = computeNewLimitsFromHeaders(headersToUse)
 
   // Cache extra usage status (persists across sessions)
@@ -482,6 +496,10 @@ export function extractQuotaStatusFromHeaders(
 
   if (!isEqual(currentLimits, newLimits)) {
     emitStatusChange(newLimits)
+  }
+  // 即使limits未变，rawUtilization变化也要通知StatusLine刷新用量百分比
+  if (rawChanged) {
+    emitRawUtilizationChange(rawUtilization)
   }
 }
 
@@ -498,11 +516,16 @@ export function extractQuotaStatusFromError(error: APIError): void {
     if (error.headers) {
       // Process headers (applies mocks from /mock-limits command if active)
       const headersToUse = processRateLimitHeaders(error.headers)
-      rawUtilization = extractRawUtilization(headersToUse)
+      const newRawUtilization = extractRawUtilization(headersToUse)
+      const rawChanged = !isEqual(rawUtilization, newRawUtilization)
+      rawUtilization = newRawUtilization
       newLimits = computeNewLimitsFromHeaders(headersToUse)
 
       // Cache extra usage status (persists across sessions)
       cacheExtraUsageDisabledReason(headersToUse)
+      if (rawChanged) {
+        emitRawUtilizationChange(rawUtilization)
+      }
     }
     // For errors, always set status to rejected even if headers are not present.
     newLimits.status = 'rejected'

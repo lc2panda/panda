@@ -4,14 +4,14 @@ import { memo, useCallback, useEffect, useRef } from 'react';
 import { logEvent } from 'src/services/analytics/index.js';
 import { useAppState, useSetAppState } from 'src/state/AppState.js';
 import type { PermissionMode } from 'src/utils/permissions/PermissionMode.js';
-import { getIsRemoteMode, getKairosActive, getMainThreadAgentType, getOriginalCwd, getSdkBetas, getSessionId } from '../bootstrap/state.js';
+import { getIsNonInteractiveSession, getIsRemoteMode, getKairosActive, getMainThreadAgentType, getOriginalCwd, getSdkBetas, getSessionId, getTotalCacheReadInputTokens, getTotalCacheCreationInputTokens } from '../bootstrap/state.js';
 import { DEFAULT_OUTPUT_STYLE_NAME } from '../constants/outputStyles.js';
 import { useNotifications } from '../context/notifications.js';
 import { getTotalAPIDuration, getTotalCost, getTotalDuration, getTotalInputTokens, getTotalLinesAdded, getTotalLinesRemoved, getTotalOutputTokens } from '../cost-tracker.js';
 import { useMainLoopModel } from '../hooks/useMainLoopModel.js';
 import { type ReadonlySettings, useSettings } from '../hooks/useSettings.js';
 import { Ansi, Box, Text } from '../ink.js';
-import { getRawUtilization } from '../services/claudeAiLimits.js';
+import { checkQuotaStatus, getRawUtilization, rawUtilizationListeners, statusListeners } from '../services/claudeAiLimits.js';
 import type { Message } from '../types/message.js';
 import type { StatusLineCommandInput } from '../types/statusLine.js';
 import type { VimMode } from '../types/textInputTypes.js';
@@ -90,6 +90,8 @@ function buildStatusLineCommandInput(permissionMode: PermissionMode, exceeds200k
     context_window: {
       total_input_tokens: getTotalInputTokens(),
       total_output_tokens: getTotalOutputTokens(),
+      cache_read_input_tokens: getTotalCacheReadInputTokens(),
+      cache_creation_input_tokens: getTotalCacheCreationInputTokens(),
       context_window_size: contextWindowSize,
       current_usage: currentUsage,
       used_percentage: contextPercentages.used,
@@ -302,6 +304,32 @@ function StatusLineInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
   }, []); // Only run once on mount, not when doUpdate changes
+
+  // 订阅rawUtilization和limits变化，每次API响应后自动刷新状态栏用量
+  useEffect(() => {
+    const onRawChange = () => {
+      scheduleUpdate();
+    };
+    const onLimitsChange = () => {
+      scheduleUpdate();
+    };
+    rawUtilizationListeners.add(onRawChange);
+    statusListeners.add(onLimitsChange);
+    return () => {
+      rawUtilizationListeners.delete(onRawChange);
+      statusListeners.delete(onLimitsChange);
+    };
+  }, [scheduleUpdate]);
+
+  // 定时轮询用量状态（每5分钟），非交互模式(-p)不轮询
+  useEffect(() => {
+    if (getIsNonInteractiveSession()) return;
+    const POLL_INTERVAL_MS = 5 * 60 * 1000;
+    const timer = setInterval(() => {
+      void checkQuotaStatus();
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, []);
 
   // Get padding from settings or default to 0
   const paddingX = settings?.statusLine?.padding ?? 0;

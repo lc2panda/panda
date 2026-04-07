@@ -4006,6 +4006,7 @@ export function REPL({
   // Returns true if submission succeeded, false if a query is already running
   const handleIncomingPrompt = useCallback((content: string, options?: {
     isMeta?: boolean;
+    isProactiveTick?: boolean;
   }): boolean => {
     if (queryGuard.isActive) return false;
 
@@ -4023,7 +4024,9 @@ export function REPL({
     // Create a user message with the formatted content (includes XML wrapper)
     const userMessage = createUserMessage({
       content,
-      isMeta: options?.isMeta ? true : undefined
+      isMeta: options?.isMeta ? true : undefined,
+      // 标记 proactive tick 消息，便于 resume 时精确过滤
+      isProactiveTick: options?.isProactiveTick ? true : undefined
     });
     void onQuery([userMessage], newAbortController, true, [], mainLoopModel);
     return true;
@@ -4096,7 +4099,8 @@ export function REPL({
       hasActiveLocalJsxUI: isShowingLocalJSXCommand,
       isInPlanMode: toolPermissionContext.mode === 'plan',
       onSubmitTick: (prompt: string) => handleIncomingPrompt(prompt, {
-        isMeta: true
+        isMeta: true,
+        isProactiveTick: true
       }),
       onQueueTick: (prompt: string) => enqueue({
         mode: 'prompt',
