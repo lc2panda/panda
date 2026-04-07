@@ -473,6 +473,7 @@ export function createUserMessage({
   sourceToolAssistantUUID,
   permissionMode,
   origin,
+  isProactiveTick,
 }: {
   content: string | ContentBlockParam[]
   isMeta?: true
@@ -499,6 +500,8 @@ export function createUserMessage({
   }
   // Provenance of this message. undefined = human (keyboard).
   origin?: MessageOrigin
+  // 标记为 proactive tick 产生的消息，resume 时可精确过滤
+  isProactiveTick?: true
 }): UserMessage {
   const m: UserMessage = {
     type: 'user',
@@ -519,6 +522,7 @@ export function createUserMessage({
     sourceToolAssistantUUID,
     permissionMode,
     origin,
+    isProactiveTick,
   }
   return m
 }
@@ -2343,7 +2347,10 @@ export function normalizeMessagesForAPI(
     filterTrailingThinkingFromLastAssistant(withFilteredOrphans)
   const withFilteredWhitespace =
     filterWhitespaceOnlyAssistantMessages(withFilteredThinking)
-  const withNonEmpty = ensureNonEmptyAssistantContent(withFilteredWhitespace)
+  // 过滤 proactive tick 心跳消息，防止其进入 API 调用
+  const withFilteredProactive =
+    filterProactiveTickMessages(withFilteredWhitespace)
+  const withNonEmpty = ensureNonEmptyAssistantContent(withFilteredProactive)
 
   // filterOrphanedThinkingOnlyMessages doesn't merge adjacent users (whitespace
   // filter does, but only when IT fires). Merge here so smoosh can fold the
@@ -4951,6 +4958,122 @@ export function filterWhitespaceOnlyAssistantMessages(
     const prev = merged.at(-1)
     if (message.type === 'user' && prev?.type === 'user') {
       merged[merged.length - 1] = mergeUserMessages(prev as UserMessage, message as UserMessage) // lvalue
+    } else {
+      merged.push(message)
+    }
+  }
+  return merged
+}
+
+/**
+ * 判断 assistant 消息是否为 proactive tick 产生的无意义心跳回复。
+ * 保守策略：内容≤5字符且全部由标点/空白组成（如 "." / ".." / "..." / "…"）。
+ */
+function isProactiveTickHeartbeat(message: Message): boolean {
+  if (message.type !== 'assistant') return false
+
+  // 显式标记优先（修复点3在源头打的标记）
+  if (message.isProactiveTick) return true
+
+  const content = message.message?.content
+  if (typeof content === 'string') {
+    const trimmed = content.trim()
+    return trimmed.length > 0 && trimmed.length <= 5 && /^[\s.…·。、,，;；!！?？…\-—_]+$/.test(trimmed)
+  }
+  if (Array.isArray(content) && content.length === 1) {
+    const block = content[0] as { type?: string; text?: string }
+    if (block?.type === 'text' && typeof block.text === 'string') {
+      const trimmed = block.text.trim()
+      return trimmed.length > 0 && trimmed.length <= 5 && /^[\s.…·。、,，;；!！?？…\-—_]+$/.test(trimmed)
+    }
+  }
+  return false
+}
+
+/**
+ * 判断 user 消息是否为 proactive-tick 触发消息。
+ * 检查内容是否包含 "proactive-tick" 或 "/proactive-tick"。
+ */
+function isProactiveTickUserMessage(message: Message): boolean {
+  if (message.type !== 'user') return false
+
+  // 显式标记优先
+  if (message.isProactiveTick) return true
+
+  const content = message.message?.content
+  if (typeof content === 'string') {
+    return content.includes('proactive-tick') || content.includes('/proactive-tick')
+  }
+  if (Array.isArray(content)) {
+    return content.some(block => {
+      if (typeof block === 'string') return block.includes('proactive-tick')
+      const b = block as { type?: string; text?: string }
+      return b?.type === 'text' && typeof b.text === 'string' && b.text.includes('proactive-tick')
+    })
+  }
+  return false
+}
+
+/**
+ * 过滤 proactive tick 产生的心跳消息对（user + assistant）。
+ *
+ * proactive tick 周期性发送 "/proactive-tick" user 消息，模型通常回复 "." 等极短
+ * 无意义内容。这些消息被写入 JSONL 后，resume 时大量加载会挤占 API 上下文窗口，
+ * 导致有价值的对话历史被截断丢弃。
+ *
+ * 识别策略（保守）：
+ * 1. proactive-tick user 消息 + 紧邻的极短 assistant 回复 → 成对过滤
+ * 2. 仅标记为 isProactiveTick 的消息 → 直接过滤
+ * 3. 不影响正常短回复（如用户问"继续"，模型回复"好"）
+ */
+export function filterProactiveTickMessages(
+  messages: (UserMessage | AssistantMessage)[],
+): (UserMessage | AssistantMessage)[]
+export function filterProactiveTickMessages(
+  messages: Message[],
+): Message[]
+export function filterProactiveTickMessages(
+  messages: Message[],
+): Message[] {
+  if (messages.length === 0) return messages
+
+  // 构建需要过滤的消息索引集合
+  const removeSet = new Set<number>()
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]!
+
+    // 情况1：找到 proactive-tick user 消息，检查后续 assistant 是否为心跳
+    if (isProactiveTickUserMessage(msg)) {
+      removeSet.add(i)
+      // 向后找对应的 assistant 回复（跳过 system/progress 等中间消息）
+      for (let j = i + 1; j < messages.length; j++) {
+        const next = messages[j]!
+        if (next.type === 'system' || next.type === 'progress') continue
+        if (isProactiveTickHeartbeat(next)) {
+          removeSet.add(j)
+        }
+        break // 只检查紧邻的第一个 user/assistant
+      }
+      continue
+    }
+
+    // 情况2：孤立的 isProactiveTick 标记消息（无配对 user 消息）
+    if (msg.isProactiveTick && (msg.type === 'assistant' || msg.type === 'user')) {
+      removeSet.add(i)
+    }
+  }
+
+  if (removeSet.size === 0) return messages
+
+  const filtered = messages.filter((_, idx) => !removeSet.has(idx))
+
+  // 过滤后可能出现相邻的同角色消息，需要合并 user 消息
+  const merged: Message[] = []
+  for (const message of filtered) {
+    const prev = merged.at(-1)
+    if (message.type === 'user' && prev?.type === 'user') {
+      merged[merged.length - 1] = mergeUserMessages(prev as UserMessage, message as UserMessage)
     } else {
       merged.push(message)
     }

@@ -4351,6 +4351,11 @@ export async function loadAllSubagentTranscriptsFromDisk(): Promise<{
 // without awaiting recordTranscript's return value (race-free hint tracking).
 export function isLoggableMessage(m: Message): boolean {
   if (m.type === 'progress') return false
+  // 从源头阻止 proactive tick 心跳 user 消息写入 JSONL，避免长会话磁盘膨胀。
+  // 这些消息内容仅为 "/proactive-tick"，无调试价值。
+  // 对应的极短 assistant 回复仍写入（保留可审计性），resume 时由
+  // filterProactiveTickMessages 在内容检测层兜底清理。
+  if (m.type === 'user' && m.isProactiveTick) return false
   // IMPORTANT: We deliberately filter out most attachments for non-ants because
   // they have sensitive info for training that we don't want exposed to the public.
   // When enabled, we allow hook_additional_context through since it contains
