@@ -578,6 +578,8 @@ export async function loadMemoryPrompt(): Promise<string | null> {
   // means the !autoEnabled case falls through to the tengu_memdir_disabled
   // telemetry block below, matching the non-KAIROS path.
   if (feature('KAIROS') && autoEnabled && getKairosActive()) {
+    // 确保五层记忆目录在 KAIROS 路径下也被创建
+    await ensureMemoryDirExists(getAutoMemPath())
     logMemoryDirCounts(getAutoMemPath(), {
       memory_type:
         'auto' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
