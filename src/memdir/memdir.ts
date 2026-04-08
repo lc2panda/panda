@@ -702,20 +702,61 @@ export async function updateUserProfile(messages: readonly any[]): Promise<void>
 
   if (traits.length === 0) return
 
-  // 增量追加到进化日志 + 膨胀控制
+  // 分层画像架构（与 Anthropic 原生 MEMORY.md + topic files 对齐）：
+  // - semantic/profile.md — 蒸馏索引（自动加载，≤25KB/200行）
+  // - semantic/profile-logs/YYYY-MM.md — 月度原始日志（按需读取，无限积累）
+  // 当 profile.md 超限时，旧日志蒸馏到月度文件，profile.md 只保留摘要。
   try {
-    const existing = await readFile(profilePath, 'utf-8').catch(() => '')
     const logEntry = traits.map(t => `- ${t}`).join('\n')
+
+    // 先写入月度日志文件（append-only，不截断）
+    const monthStr = new Date().toISOString().slice(0, 7) // YYYY-MM
+    const logsDir = join(memoryDir, 'semantic', 'profile-logs')
+    await mkdir(logsDir, { recursive: true })
+    const monthLogPath = join(logsDir, `${monthStr}.md`)
+    await appendFile(monthLogPath, logEntry + '\n')
+
+    // 再增量追加到 profile.md 索引
+    const existing = await readFile(profilePath, 'utf-8').catch(() => '')
     if (!existing.includes(logEntry.split('\n')[0])) {
       await appendFile(profilePath, '\n' + logEntry + '\n')
+    }
 
-      // 控制 profile.md 大小：超过 200 行时截断旧日志
-      const updated = await readFile(profilePath, 'utf-8')
-      const allLines = updated.split('\n')
-      if (allLines.length > 200) {
-        // 保留前 50 行（结构化部分）+ 最后 100 行（最新日志）
-        const trimmed = [...allLines.slice(0, 50), '... (older entries trimmed)', ...allLines.slice(-100)]
-        await writeFile(profilePath, trimmed.join('\n'), 'utf-8')
+    // 蒸馏控制：profile.md 超过 150 行时，将旧日志条目蒸馏
+    const updated = await readFile(profilePath, 'utf-8').catch(() => '')
+    const allLines = updated.split('\n')
+    if (allLines.length > 150) {
+      // 找到"## 进化日志"之后的行
+      const logStart = allLines.findIndex(l => l.includes('进化日志'))
+      if (logStart > 0) {
+        const structuredPart = allLines.slice(0, logStart + 1) // 保留结构化部分
+        const logPart = allLines.slice(logStart + 1).filter(l => l.trim())
+
+        // 蒸馏：统计每种模式的出现频率，保留频率最高的 top-30
+        const patternCounts = new Map<string, number>()
+        for (const line of logPart) {
+          // 去掉日期前缀，提取模式
+          const pattern = line.replace(/^-\s*\d{4}-\d{2}-\d{2}:\s*/, '').trim()
+          if (pattern) patternCounts.set(pattern, (patternCounts.get(pattern) || 0) + 1)
+        }
+        const topPatterns = [...patternCounts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 30)
+
+        const distilled = topPatterns.map(([pattern, count]) =>
+          `- [×${count}] ${pattern}`
+        )
+
+        const newProfile = [
+          ...structuredPart,
+          '',
+          '> 以下为蒸馏后的高频特征（完整日志在 profile-logs/ 下）',
+          '',
+          ...distilled,
+          '',
+        ].join('\n')
+
+        await writeFile(profilePath, newProfile, 'utf-8')
       }
     }
   } catch {}
