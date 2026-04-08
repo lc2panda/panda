@@ -18,7 +18,7 @@
 ```
 
 **项目代号**：Panda Code
-**版本**：v2.1.942（基线 Claude Code v2.1.92）
+**版本**：v2.1.943（基线 Claude Code v2.1.92）
 **技术栈**：Bun + TypeScript + React/Ink + Commander.js
 **运行时**：Bun >= 1.2.0 / Node.js >= 18.0.0
 
@@ -134,9 +134,31 @@ panda auth login
 | `/routing test <agent> <prompt>` | 干跑路由决策测试 |
 
 内建 agent 模板（`.pandacc/agents/`）：
-- `architecture-reviewer` — 强推理模型（Opus）
-- `code-generator` — 编码优化（Sonnet）
-- `triage` — 快速分类（Haiku）
+- `architecture-reviewer` — 强推理模型（model: best-reasoning → Opus）
+- `code-generator` — 编码优化（model: balanced → Sonnet）
+- `triage` — 快速分类（model: fast → Haiku）
+
+**完整功能**（26/26 任务实装）：
+- 5 Phase: Capability Registry → Routing Core → Format Alignment → UX & Presets → Production Hardening
+- 8 级优先级模型选择：显式 pin > 工具覆盖 > 能力要求 > 预设 > 偏好 > 别名 > 任务 > 默认
+- Fallback Chain：primary 模型不可用时自动降级
+- Capability 预检：Agent spawn 前验证模型能力
+- 路由决策历史：`/routing status` 显示最近 5 条决策
+- Format Alignment：OpenAI↔Anthropic 格式转换层（预留）
+
+**配置示例**（`settings.json`）：
+```json
+{
+  "enableModelRouting": true,
+  "routingPresets": {
+    "cost-saving": {
+      "agentModelMap": { "Explore": "haiku", "Plan": "sonnet" }
+    }
+  }
+}
+```
+
+**环境变量启用**：`PANDA_MODEL_ROUTING=1 panda`
 
 > 详见 [CC命令使用手册.md](CC命令使用手册.md) Multi-Model Routing 章节
 
