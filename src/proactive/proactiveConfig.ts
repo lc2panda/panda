@@ -119,6 +119,10 @@ const HIGH_PRIVACY_SCENARIOS = new Set([
   // 敏感文件扫描（读取文件内容）
   'sensitive-file-scan',
   'duplicate-file-scan',
+  // 系统通知中心（读取通知数据库，含消息内容）
+  'notification-digest',
+  'notification-urgent',
+  'notification-stats',
 ])
 
 export function isScenarioEnabled(scenarioId: string): boolean {
