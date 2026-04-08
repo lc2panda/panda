@@ -336,7 +336,8 @@ export function LogoV2() {
   const optimalLeftWidth = calculateOptimalLeftWidth(welcomeMessage_0, cwdLine, modelLine);
   const {
     leftWidth,
-    rightWidth
+    rightWidth,
+    totalWidth
   } = calculateLayoutDimensions(columns, layoutMode, optimalLeftWidth);
   const T0 = OffscreenFreeze;
   const T1 = Box;
