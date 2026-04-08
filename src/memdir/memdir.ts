@@ -356,6 +356,23 @@ export function buildMemoryLines(
   lines.push('If the user asks to search memories, use the Read tool to scan files in the memory directory.')
   lines.push('')
 
+  // 用户画像自主维护指引
+  lines.push('## User Profile (自主维护)')
+  lines.push(`Your memory directory has a \`semantic/profile.md\` file — this is the user's evolving profile.`)
+  lines.push('**You MUST proactively update it** when you learn new things about the user during conversation:')
+  lines.push('- Communication style, language preferences, tone preferences')
+  lines.push('- Work habits, active hours, project focus areas')
+  lines.push('- Technical preferences (languages, frameworks, tools, conventions)')
+  lines.push('- Decision-making patterns, priorities, management style')
+  lines.push('- Interests, goals, recurring topics')
+  lines.push('- People they work with, relationships, team structure')
+  lines.push('')
+  lines.push('Use the Edit tool to update `semantic/profile.md` directly — fill in structured sections and append to the evolution log.')
+  lines.push('Also append raw observations to the monthly log: `semantic/profile-logs/YYYY-MM.md`')
+  lines.push('Do NOT wait until the end of the conversation — update as soon as you observe something noteworthy.')
+  lines.push('The longer the user uses you, the more accurate and detailed this profile should become.')
+  lines.push('')
+
   // 非编码能力指引
   lines.push('## Non-coding capabilities')
   lines.push('The assistant has these built-in functions available through natural language:')
@@ -657,12 +674,13 @@ export async function loadMemoryPrompt(): Promise<string | null> {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// SA-P0-02: 用户画像自动维护
+// SA-P0-02: 用户画像
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * 从对话中提取用户特征，增量更新 semantic/profile.md。
- * 异步执行，不阻塞主循环。仅提取非敏感的行为模式。
+ * 用户画像维护——主要由模型在对话中直接通过 Edit/Write 工具更新 profile.md。
+ * 这个函数仅作为 fallback，记录会话时间戳到月度日志。
+ * 真正的画像内容由 memory prompt 中的指引驱动模型自主写入。
  */
 export async function updateUserProfile(messages: readonly any[]): Promise<void> {
   if (!isAutoMemoryEnabled()) return
@@ -670,97 +688,17 @@ export async function updateUserProfile(messages: readonly any[]): Promise<void>
   const memoryDir = getAutoMemPath()
   if (!memoryDir) return
 
-  const profilePath = join(memoryDir, 'semantic', 'profile.md')
-
-  // 提取用户消息的语言、长度、风格特征
-  const userMessages = messages.filter((m: any) => m.type === 'user')
-  if (userMessages.length === 0) return
-
-  // 简单特征提取（纯本地，不调 API）
-  const traits: string[] = []
-  const now = new Date().toISOString().split('T')[0]
-
-  // 检测语言偏好
-  const allText = userMessages.map((m: any) => {
-    const content = m.message?.content
-    if (typeof content === 'string') return content
-    if (Array.isArray(content)) return content.filter((b: any) => b.type === 'text').map((b: any) => b.text || '').join(' ')
-    return ''
-  }).join(' ')
-
-  const chineseRatio = (allText.match(/[\u4e00-\u9fff]/g) || []).length / Math.max(allText.length, 1)
-  if (chineseRatio > 0.3) traits.push(`${now}: 本次会话使用中文为主`)
-  else if (chineseRatio < 0.05 && allText.length > 50) traits.push(`${now}: 本次会话使用英文为主`)
-
-  // 检测消息风格
-  const avgLength = allText.length / Math.max(userMessages.length, 1)
-  if (avgLength < 30) traits.push(`${now}: 沟通风格简洁直接`)
-  else if (avgLength > 200) traits.push(`${now}: 沟通风格详细完整`)
-
-  // 检测活跃时段
-  const hour = new Date().getHours()
-  if (hour >= 22 || hour < 6) traits.push(`${now}: 深夜活跃 (${hour}:00)`)
-  else if (hour >= 6 && hour < 9) traits.push(`${now}: 早起工作 (${hour}:00)`)
-
-  if (traits.length === 0) return
-
-  // 分层画像架构（与 Anthropic 原生 MEMORY.md + topic files 对齐）：
-  // - semantic/profile.md — 蒸馏索引（自动加载，≤25KB/200行）
-  // - semantic/profile-logs/YYYY-MM.md — 月度原始日志（按需读取，无限积累）
-  // 当 profile.md 超限时，旧日志蒸馏到月度文件，profile.md 只保留摘要。
+  // 仅记录会话活跃时间到月度日志（轻量 fallback）
   try {
-    const logEntry = traits.map(t => `- ${t}`).join('\n')
-
-    // 先写入月度日志文件（append-only，不截断）
-    const monthStr = new Date().toISOString().slice(0, 7) // YYYY-MM
+    const monthStr = new Date().toISOString().slice(0, 7)
     const logsDir = join(memoryDir, 'semantic', 'profile-logs')
     await mkdir(logsDir, { recursive: true })
     const monthLogPath = join(logsDir, `${monthStr}.md`)
-    await appendFile(monthLogPath, logEntry + '\n')
-
-    // 再增量追加到 profile.md 索引
-    const existing = await readFile(profilePath, 'utf-8').catch(() => '')
-    if (!existing.includes(logEntry.split('\n')[0])) {
-      await appendFile(profilePath, '\n' + logEntry + '\n')
-    }
-
-    // 蒸馏控制：profile.md 超过 150 行时，将旧日志条目蒸馏
-    const updated = await readFile(profilePath, 'utf-8').catch(() => '')
-    const allLines = updated.split('\n')
-    if (allLines.length > 150) {
-      // 找到"## 进化日志"之后的行
-      const logStart = allLines.findIndex(l => l.includes('进化日志'))
-      if (logStart > 0) {
-        const structuredPart = allLines.slice(0, logStart + 1) // 保留结构化部分
-        const logPart = allLines.slice(logStart + 1).filter(l => l.trim())
-
-        // 蒸馏：统计每种模式的出现频率，保留频率最高的 top-30
-        const patternCounts = new Map<string, number>()
-        for (const line of logPart) {
-          // 去掉日期前缀，提取模式
-          const pattern = line.replace(/^-\s*\d{4}-\d{2}-\d{2}:\s*/, '').trim()
-          if (pattern) patternCounts.set(pattern, (patternCounts.get(pattern) || 0) + 1)
-        }
-        const topPatterns = [...patternCounts.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 30)
-
-        const distilled = topPatterns.map(([pattern, count]) =>
-          `- [×${count}] ${pattern}`
-        )
-
-        const newProfile = [
-          ...structuredPart,
-          '',
-          '> 以下为蒸馏后的高频特征（完整日志在 profile-logs/ 下）',
-          '',
-          ...distilled,
-          '',
-        ].join('\n')
-
-        await writeFile(profilePath, newProfile, 'utf-8')
-      }
-    }
+    const timestamp = new Date().toISOString()
+    const userMsgCount = messages.filter((m: any) => m.type === 'user').length
+    const toolCount = messages.filter((m: any) => m.type === 'assistant')
+      .reduce((sum: number, m: any) => sum + ((m.message?.content || []).filter((b: any) => b.type === 'tool_use').length), 0)
+    await appendFile(monthLogPath, `- ${timestamp}: session (${userMsgCount} user msgs, ${toolCount} tool calls)\n`)
   } catch {}
 }
 
