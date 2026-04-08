@@ -1,5 +1,5 @@
 // Input: SmartCronTask definitions for scheduled autonomous work.
-// Output: 核心内置任务 + Phase 1 场景模块（系统健康/开发/文件/个人生活）
+// Output: 核心内置任务 + Phase 1~4 场景模块（系统健康/开发/文件/个人生活/安全/效率/高级系统/高级文件/通信/扩展）
 // Pos: Registered by proactive/index.ts on activateProactive(); executed by night orchestrator.
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
@@ -404,6 +404,9 @@ function loadScenarioModules(): SmartCronTask[] {
     // Phase 3
     { path: './tasks/advancedSystem.js', getter: 'getAdvancedSystemTasks' },
     { path: './tasks/advancedFiles.js', getter: 'getAdvancedFileTasks' },
+    // Phase 4
+    { path: './tasks/communicationScenarios.js', getter: 'getCommunicationTasks' },
+    { path: './tasks/extendedScenarios.js', getter: 'getExtendedTasks' },
   ]
   for (const { path, getter } of modules) {
     try {
