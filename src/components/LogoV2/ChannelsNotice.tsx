@@ -9,6 +9,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import { type ChannelEntry, getAllowedChannels, getHasDevChannels } from '../../bootstrap/state.js';
 import { Box, Text } from '../../ink.js';
+import { t } from '../../utils/i18n.js';
 import { isChannelsEnabled } from '../../services/mcp/channelAllowlist.js';
 import { getEffectiveChannelAllowlist } from '../../services/mcp/channelNotification.js';
 import { getMcpConfigsByScope } from '../../services/mcp/config.js';
@@ -127,7 +128,7 @@ export function ChannelsNotice() {
   }
   let t1;
   if ($[22] !== list) {
-    t1 = <Text color="error">Listening for channel messages from: {list}</Text>;
+    t1 = <Text color="error">{t('Listening for channel messages from:', '正在监听来自以下频道的消息:')} {list}</Text>;
     $[22] = list;
     $[23] = t1;
   } else {
@@ -135,7 +136,7 @@ export function ChannelsNotice() {
   }
   let t2;
   if ($[24] !== flag) {
-    t2 = <Text dimColor={true}>Experimental · inbound messages will be pushed into this session, this carries prompt injection risks. Restart Panda Code without {flag} to disable.</Text>;
+    t2 = <Text dimColor={true}>{t(`Experimental · inbound messages will be pushed into this session, this carries prompt injection risks. Restart Panda Code without ${flag} to disable.`, `实验性功能 · 入站消息将推送到此会话，存在提示注入风险。不带 ${flag} 重启 Panda Code 可禁用。`)}</Text>;
     $[24] = flag;
     $[25] = t2;
   } else {

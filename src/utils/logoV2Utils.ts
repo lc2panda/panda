@@ -15,7 +15,7 @@ import { loadMessageLogs } from './sessionStorage.js'
 import { getInitialSettings } from './settings/settings.js'
 
 // Layout constants
-const MAX_LEFT_WIDTH = 50
+const MAX_LEFT_WIDTH = 40
 const MAX_USERNAME_LENGTH = 20
 const BORDER_PADDING = 4
 const DIVIDER_WIDTH = 1

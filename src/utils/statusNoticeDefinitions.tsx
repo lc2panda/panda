@@ -9,6 +9,7 @@ import { formatNumber } from './format.js';
 import { getGlobalConfig } from './config.js';
 import { getAnthropicApiKeyWithSource, getApiKeyFromConfigOrMacOSKeychain, getAuthTokenSource, isClaudeAISubscriber } from './auth.js';
 import { isThirdPartyProvider } from './model/providers.js';
+import { t } from './i18n.js';
 import type { AgentDefinitionsResult } from '../tools/AgentTool/loadAgentsDir.js';
 import { getAgentDescriptionsTotalTokens, AGENT_DESCRIPTIONS_THRESHOLD } from './statusNoticeHelpers.js';
 import { isSupportedJetBrainsTerminal, toIDEDisplayName, getTerminalIdeType } from './ide.js';
@@ -41,10 +42,10 @@ const largeMemoryFilesNotice: StatusNoticeDefinition = {
         return <Box key={file.path} flexDirection="row">
               <Text color="warning">{figures.warning}</Text>
               <Text color="warning">
-                Large <Text bold>{displayPath}</Text> will impact performance (
-                {formatNumber(file.content.length)} chars &gt;{' '}
+                {t('Large', '大型')} <Text bold>{displayPath}</Text> {t('will impact performance', '会影响性能')} (
+                {formatNumber(file.content.length)} {t('chars', '字符')} &gt;{' '}
                 {formatNumber(MAX_MEMORY_CHARACTER_COUNT)})
-                <Text dimColor> · /memory to edit</Text>
+                <Text dimColor> · {t('/memory to edit', '/memory 编辑')}</Text>
               </Text>
             </Box>;
       })}
@@ -56,6 +57,7 @@ const claudeAiSubscriberExternalTokenNotice: StatusNoticeDefinition = {
   type: 'warning',
   isActive: () => {
     if (getGlobalConfig().thirdPartyProvider) return false
+    if (isThirdPartyProvider()) return false
     const authTokenInfo = getAuthTokenSource();
     return isClaudeAISubscriber() && (authTokenInfo.source === 'ANTHROPIC_AUTH_TOKEN' || authTokenInfo.source === 'apiKeyHelper');
   },
@@ -75,6 +77,8 @@ const apiKeyConflictNotice: StatusNoticeDefinition = {
   id: 'api-key-conflict',
   type: 'warning',
   isActive: () => {
+    if (isThirdPartyProvider()) return false
+    if (getGlobalConfig().thirdPartyProvider) return false
     const {
       source: apiKeySource
     } = getAnthropicApiKeyWithSource({
@@ -109,6 +113,7 @@ const bothAuthMethodsNotice: StatusNoticeDefinition = {
     const authTokenInfo = getAuthTokenSource();
     // 第三方 provider 时两个变量都是我们代码设置的同一个 key，不是真正的冲突
     if (isThirdPartyProvider()) return false;
+    if (getGlobalConfig().thirdPartyProvider) return false;
     return apiKeySource !== 'none' && authTokenInfo.source !== 'none' && !(apiKeySource === 'apiKeyHelper' && authTokenInfo.source === 'apiKeyHelper');
   },
   render: () => {
