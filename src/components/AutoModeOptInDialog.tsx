@@ -1,6 +1,7 @@
 import { c as _c } from "react/compiler-runtime";
 import React from 'react';
 import { logEvent } from 'src/services/analytics/index.js';
+import { isZh } from '../utils/i18n.js';
 import { Box, Link, Text } from '../ink.js';
 import { updateSettingsForSource } from '../utils/settings/settings.js';
 import { Select } from './CustomSelect/index.js';
@@ -78,7 +79,7 @@ export function AutoModeOptInDialog(t0) {
   let t4;
   if ($[5] === Symbol.for("react.memo_cache_sentinel")) {
     t4 = true ? [{
-      label: "Yes, and make it my default mode",
+      label: isZh() ? "是，并设为默认模式" : "Yes, and make it my default mode",
       value: "accept-default" as const
     }] : [];
     $[5] = t4;
@@ -88,14 +89,14 @@ export function AutoModeOptInDialog(t0) {
   let t5;
   if ($[6] === Symbol.for("react.memo_cache_sentinel")) {
     t5 = {
-      label: "Yes, enable auto mode",
+      label: isZh() ? "是，启用自动模式" : "Yes, enable auto mode",
       value: "accept" as const
     };
     $[6] = t5;
   } else {
     t5 = $[6];
   }
-  const t6 = declineExits ? "No, exit" : "No, go back";
+  const t6 = declineExits ? (isZh() ? "否，退出" : "No, exit") : (isZh() ? "否，返回" : "No, go back");
   let t7;
   if ($[7] !== t6) {
     t7 = [...t4, t5, {

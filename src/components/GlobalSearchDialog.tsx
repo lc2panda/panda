@@ -15,6 +15,7 @@ import { readFileInRange } from '../utils/readFileInRange.js';
 import { ripGrepStream } from '../utils/ripgrep.js';
 import { FuzzyPicker } from './design-system/FuzzyPicker.js';
 import { LoadingState } from './design-system/LoadingState.js';
+import { isZh } from '../utils/i18n.js';
 type Props = {
   onDone: () => void;
   onInsert: (text: string) => void;
@@ -216,7 +217,7 @@ export function GlobalSearchDialog(t0) {
   }
   let t12;
   if ($[18] !== isSearching) {
-    t12 = q_0 => isSearching ? "Searching\u2026" : q_0 ? "No matches" : "Type to search\u2026";
+    t12 = q_0 => isSearching ? (isZh() ? "搜索中\u2026" : "Searching\u2026") : q_0 ? (isZh() ? "无匹配" : "No matches") : (isZh() ? "输入搜索\u2026" : "Type to search\u2026");
     $[18] = isSearching;
     $[19] = t12;
   } else {
@@ -244,7 +245,7 @@ export function GlobalSearchDialog(t0) {
   }
   let t15;
   if ($[28] !== handleOpen || $[29] !== matchLabel || $[30] !== matches || $[31] !== onDone || $[32] !== t10 || $[33] !== t11 || $[34] !== t12 || $[35] !== t13 || $[36] !== t14 || $[37] !== t9 || $[38] !== visibleResults) {
-    t15 = <FuzzyPicker title="Global Search" placeholder={"Type to search\u2026"} items={matches} getKey={matchKey} visibleCount={visibleResults} direction="up" previewPosition={t9} onQueryChange={handleQueryChange} onFocus={setFocused} onSelect={handleOpen} onTab={t10} onShiftTab={t11} onCancel={onDone} emptyMessage={t12} matchLabel={matchLabel} selectAction="open in editor" renderItem={t13} renderPreview={t14} />;
+    t15 = <FuzzyPicker title="Global Search" placeholder={isZh() ? "输入搜索\u2026" : "Type to search\u2026"} items={matches} getKey={matchKey} visibleCount={visibleResults} direction="up" previewPosition={t9} onQueryChange={handleQueryChange} onFocus={setFocused} onSelect={handleOpen} onTab={t10} onShiftTab={t11} onCancel={onDone} emptyMessage={t12} matchLabel={matchLabel} selectAction="open in editor" renderItem={t13} renderPreview={t14} />;
     $[28] = handleOpen;
     $[29] = matchLabel;
     $[30] = matches;

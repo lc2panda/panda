@@ -4,6 +4,7 @@ import { MessageResponse } from 'src/components/MessageResponse.js';
 import { RejectedPlanMessage } from 'src/components/messages/UserToolResultMessage/RejectedPlanMessage.js';
 import { BLACK_CIRCLE } from 'src/constants/figures.js';
 import { getModeColor } from 'src/utils/permissions/PermissionMode.js';
+import { isZh } from '../../utils/i18n.js';
 import { Box, Text } from '../../ink.js';
 import type { ToolProgressData } from '../../Tool.js';
 import type { ProgressMessage } from '../../types/message.js';
@@ -47,7 +48,7 @@ export function renderToolResultMessage(output: Output, _progressMessagesForMess
         <MessageResponse>
           <Box flexDirection="column">
             {filePath && <Text dimColor>Plan file: {displayPath}</Text>}
-            <Text dimColor>Waiting for team lead to review and approve...</Text>
+            <Text dimColor>{isZh() ? "等待团队负责人审阅批准…" : "Waiting for team lead to review and approve..."}</Text>
           </Box>
         </MessageResponse>
       </Box>;

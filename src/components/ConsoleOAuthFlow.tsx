@@ -17,6 +17,7 @@ import { Select } from './CustomSelect/select.js';
 import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js';
 import { Spinner } from './Spinner.js';
 import TextInput from './TextInput.js';
+import { isZh } from '../utils/i18n.js';
 type Props = {
   onDone(): void;
   startingMessage?: string;
@@ -517,7 +518,7 @@ function OAuthStatusMessage(t0) {
         }
         let t2;
         if ($[22] !== showPastePrompt) {
-          t2 = !showPastePrompt && <Box><Spinner /><Text>Opening browser to sign in…</Text></Box>;
+          t2 = !showPastePrompt && <Box><Spinner /><Text>{isZh() ? '正在打开浏览器登录…' : 'Opening browser to sign in…'}</Text></Box>;
           $[22] = showPastePrompt;
           $[23] = t2;
         } else {
@@ -576,7 +577,7 @@ function OAuthStatusMessage(t0) {
       {
         let t1;
         if ($[39] !== mode || $[40] !== oauthStatus.token) {
-          t1 = mode === "setup-token" && oauthStatus.token ? null : <>{getOauthAccountInfo()?.emailAddress ? <Text dimColor={true}>Logged in as{" "}<Text>{getOauthAccountInfo()?.emailAddress}</Text></Text> : null}<Text color="success">Login successful. Press <Text bold={true}>Enter</Text> to continue…</Text></>;
+          t1 = mode === "setup-token" && oauthStatus.token ? null : <>{getOauthAccountInfo()?.emailAddress ? <Text dimColor={true}>Logged in as{" "}<Text>{getOauthAccountInfo()?.emailAddress}</Text></Text> : null}<Text color="success">{isZh() ? <>登录成功，按 <Text bold={true}>Enter</Text> 继续…</> : <>Login successful. Press <Text bold={true}>Enter</Text> to continue…</>}</Text></>;
           $[39] = mode;
           $[40] = oauthStatus.token;
           $[41] = t1;

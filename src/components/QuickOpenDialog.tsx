@@ -14,6 +14,7 @@ import { highlightMatch } from '../utils/highlightMatch.js';
 import { readFileInRange } from '../utils/readFileInRange.js';
 import { FuzzyPicker } from './design-system/FuzzyPicker.js';
 import { LoadingState } from './design-system/LoadingState.js';
+import { isZh } from '../utils/i18n.js';
 type Props = {
   onDone: () => void;
   onInsert: (text: string) => void;
@@ -197,7 +198,7 @@ export function QuickOpenDialog(t0) {
   }
   let t13;
   if ($[21] !== preview || $[22] !== previewWidth || $[23] !== query) {
-    t13 = p_7 => preview ? <><Text dimColor={true}>{truncatePathMiddle(p_7, previewWidth)}{preview.path !== p_7 ? " \xB7 loading\u2026" : ""}</Text>{preview.content.split("\n").map((line, i_1) => <Text key={i_1}>{highlightMatch(truncateToWidth(line, previewWidth), query)}</Text>)}</> : <LoadingState message={"Loading preview\u2026"} dimColor={true} />;
+    t13 = p_7 => preview ? <><Text dimColor={true}>{truncatePathMiddle(p_7, previewWidth)}{preview.path !== p_7 ? (isZh() ? " \xB7 加载中\u2026" : " \xB7 loading\u2026") : ""}</Text>{preview.content.split("\n").map((line, i_1) => <Text key={i_1}>{highlightMatch(truncateToWidth(line, previewWidth), query)}</Text>)}</> : <LoadingState message={isZh() ? "加载中\u2026" : "Loading preview\u2026"} dimColor={true} />;
     $[21] = preview;
     $[22] = previewWidth;
     $[23] = query;
@@ -207,7 +208,7 @@ export function QuickOpenDialog(t0) {
   }
   let t14;
   if ($[25] !== handleOpen || $[26] !== onDone || $[27] !== results || $[28] !== t10 || $[29] !== t11 || $[30] !== t12 || $[31] !== t13 || $[32] !== t9 || $[33] !== visibleResults) {
-    t14 = <FuzzyPicker title="Quick Open" placeholder={"Type to search files\u2026"} items={results} getKey={_temp5} visibleCount={visibleResults} direction="up" previewPosition={t9} onQueryChange={handleQueryChange} onFocus={setFocusedPath} onSelect={handleOpen} onTab={t10} onShiftTab={t11} onCancel={onDone} emptyMessage={_temp6} selectAction="open in editor" renderItem={t12} renderPreview={t13} />;
+    t14 = <FuzzyPicker title="Quick Open" placeholder={isZh() ? "输入搜索文件\u2026" : "Type to search files\u2026"} items={results} getKey={_temp5} visibleCount={visibleResults} direction="up" previewPosition={t9} onQueryChange={handleQueryChange} onFocus={setFocusedPath} onSelect={handleOpen} onTab={t10} onShiftTab={t11} onCancel={onDone} emptyMessage={q_0 => q_0 ? (isZh() ? "无匹配文件" : "No matching files") : (isZh() ? "输入开始搜索\u2026" : "Start typing to search\u2026")} selectAction="open in editor" renderItem={t12} renderPreview={t13} />;
     $[25] = handleOpen;
     $[26] = onDone;
     $[27] = results;

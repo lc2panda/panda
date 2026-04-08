@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Box, Text } from '../../ink.js';
 import { getAgentName, getTeammateColor, getTeamName } from '../../utils/teammate.js';
 import { Spinner } from '../Spinner.js';
+import { isZh } from '../../utils/i18n.js';
 import { WorkerBadge } from './WorkerBadge.js';
 type Props = {
   toolName: string;
@@ -46,7 +47,7 @@ export function WorkerPendingPermission(t0) {
   let t4;
   let t5;
   if ($[3] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = <Box marginBottom={1}><Spinner /><Text color="warning" bold={true}>{" "}Waiting for team lead approval</Text></Box>;
+    t4 = <Box marginBottom={1}><Spinner /><Text color="warning" bold={true}>{" "}{isZh() ? "等待团队负责人审批" : "Waiting for team lead approval"}</Text></Box>;
     t5 = agentName && agentColor && <Box marginBottom={1}><WorkerBadge name={agentName} color={agentColor} /></Box>;
     $[3] = t4;
     $[4] = t5;

@@ -6,6 +6,7 @@ import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEve
 import { useAppState } from '../../../state/AppState.js';
 import { isPlanModeInterviewPhaseEnabled } from '../../../utils/planModeV2.js';
 import { Select } from '../../CustomSelect/index.js';
+import { isZh } from '../../../utils/i18n.js';
 import { PermissionDialog } from '../PermissionDialog.js';
 import type { PermissionRequestProps } from '../PermissionRequest.js';
 export function EnterPlanModePermissionRequest(t0) {
@@ -63,7 +64,7 @@ export function EnterPlanModePermissionRequest(t0) {
   }
   let t4;
   if ($[7] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = <Box marginTop={1}><Text dimColor={true}>No code changes will be made until you approve the plan.</Text></Box>;
+    t4 = <Box marginTop={1}><Text dimColor={true}>{isZh() ? "在你批准计划之前不会进行任何代码更改。" : "No code changes will be made until you approve the plan."}</Text></Box>;
     $[7] = t4;
   } else {
     t4 = $[7];
@@ -71,7 +72,7 @@ export function EnterPlanModePermissionRequest(t0) {
   let t5;
   if ($[8] === Symbol.for("react.memo_cache_sentinel")) {
     t5 = {
-      label: "Yes, enter plan mode",
+      label: isZh() ? "是，进入计划模式" : "Yes, enter plan mode",
       value: "yes" as const
     };
     $[8] = t5;
@@ -81,7 +82,7 @@ export function EnterPlanModePermissionRequest(t0) {
   let t6;
   if ($[9] === Symbol.for("react.memo_cache_sentinel")) {
     t6 = [t5, {
-      label: "No, start implementing now",
+      label: isZh() ? "否，立即开始实现" : "No, start implementing now",
       value: "no" as const
     }];
     $[9] = t6;
@@ -107,7 +108,7 @@ export function EnterPlanModePermissionRequest(t0) {
   }
   let t9;
   if ($[15] !== t8 || $[16] !== workerBadge) {
-    t9 = <PermissionDialog color="planMode" title="Enter plan mode?" workerBadge={workerBadge}>{t8}</PermissionDialog>;
+    t9 = <PermissionDialog color="planMode" title={isZh() ? "进入计划模式？" : "Enter plan mode?"} workerBadge={workerBadge}>{t8}</PermissionDialog>;
     $[15] = t8;
     $[16] = workerBadge;
     $[17] = t9;

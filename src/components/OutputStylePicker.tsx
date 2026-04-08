@@ -8,6 +8,7 @@ import { getCwd } from '../utils/cwd.js';
 import type { OptionWithDescription } from './CustomSelect/select.js';
 import { Select } from './CustomSelect/select.js';
 import { Dialog } from './design-system/Dialog.js';
+import { isZh } from '../utils/i18n.js';
 const DEFAULT_OUTPUT_STYLE_LABEL = 'Default';
 const DEFAULT_OUTPUT_STYLE_DESCRIPTION = 'Claude completes coding tasks efficiently and provides concise responses';
 function mapConfigsToOptions(styles: {
@@ -87,7 +88,7 @@ export function OutputStylePicker(t0) {
   }
   let t8;
   if ($[6] !== handleStyleSelect || $[7] !== initialStyle || $[8] !== isLoading || $[9] !== styleOptions) {
-    t8 = <Box flexDirection="column" gap={1}>{t7}{isLoading ? <Text dimColor={true}>Loading output styles…</Text> : <Select options={styleOptions} onChange={handleStyleSelect} visibleOptionCount={10} defaultValue={initialStyle} />}</Box>;
+    t8 = <Box flexDirection="column" gap={1}>{t7}{isLoading ? <Text dimColor={true}>{isZh() ? '加载输出样式…' : 'Loading output styles…'}</Text> : <Select options={styleOptions} onChange={handleStyleSelect} visibleOptionCount={10} defaultValue={initialStyle} />}</Box>;
     $[6] = handleStyleSelect;
     $[7] = initialStyle;
     $[8] = isLoading;

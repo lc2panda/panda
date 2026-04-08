@@ -24,6 +24,7 @@ import { getTheme, themeColorToAnsi } from '../utils/theme.js';
 import { Pane } from './design-system/Pane.js';
 import { Tab, Tabs, useTabHeaderFocus } from './design-system/Tabs.js';
 import { Spinner } from './Spinner.js';
+import { isZh } from '../utils/i18n.js';
 function formatPeakDay(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleDateString('en-US', {
@@ -94,7 +95,7 @@ export function Stats(t0) {
   const allTimePromise = t1;
   let t2;
   if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
-    t2 = <Box marginTop={1}><Spinner /><Text> Loading your Panda Code stats…</Text></Box>;
+    t2 = <Box marginTop={1}><Spinner /><Text> {isZh() ? '加载统计信息…' : 'Loading your Panda Code stats…'}</Text></Box>;
     $[1] = t2;
   } else {
     t2 = $[1];
@@ -252,7 +253,7 @@ function StatsContent(t0) {
   if (!displayStats || !allTimeStats) {
     let t7;
     if ($[16] === Symbol.for("react.memo_cache_sentinel")) {
-      t7 = <Box marginTop={1}><Spinner /><Text> Loading stats…</Text></Box>;
+      t7 = <Box marginTop={1}><Spinner /><Text> {isZh() ? '加载统计…' : 'Loading stats…'}</Text></Box>;
       $[16] = t7;
     } else {
       t7 = $[16];

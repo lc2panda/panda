@@ -2,6 +2,7 @@ import { c as _c } from "react/compiler-runtime";
 import { homedir } from 'os';
 import React from 'react';
 import { logEvent } from 'src/services/analytics/index.js';
+import { isZh } from '../../utils/i18n.js';
 import { setSessionTrustAccepted } from '../../bootstrap/state.js';
 import type { Command } from '../../commands.js';
 import { useExitOnCtrlCDWithKeybindings } from '../../hooks/useExitOnCtrlCDWithKeybindings.js';
@@ -225,10 +226,10 @@ export function TrustDialog(t0) {
   let t20;
   if ($[24] === Symbol.for("react.memo_cache_sentinel")) {
     t20 = [{
-      label: "Yes, I trust this folder",
+      label: isZh() ? "是，我信任此文件夹" : "Yes, I trust this folder",
       value: "enable_all"
     }, {
-      label: "No, exit",
+      label: isZh() ? "否，退出" : "No, exit",
       value: "exit"
     }];
     $[24] = t20;

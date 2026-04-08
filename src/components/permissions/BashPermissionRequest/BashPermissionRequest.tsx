@@ -30,6 +30,7 @@ import { PermissionRuleExplanation } from '../PermissionRuleExplanation.js';
 import { SedEditPermissionRequest } from '../SedEditPermissionRequest/SedEditPermissionRequest.js';
 import { useShellPermissionFeedback } from '../useShellPermissionFeedback.js';
 import { logUnaryPermissionEvent } from '../utils.js';
+import { isZh } from '../../../utils/i18n.js';
 import { bashToolUseOptions } from './bashToolUseOptions.js';
 const CHECKING_TEXT = 'Attempting to auto-approve\u2026';
 
@@ -432,7 +433,7 @@ function BashPermissionRequestInner({
             {'"'}
           </Text>}
       </Text> : toolUseConfirm.classifierCheckInProgress ? <ClassifierCheckingSubtitle /> : classifierWasChecking ? <Text dimColor>Requires manual approval</Text> : undefined : undefined;
-  return <PermissionDialog workerBadge={workerBadge} title={sandboxingEnabled_0 && !isSandboxed_0 ? 'Bash command (unsandboxed)' : 'Bash command'} subtitle={classifierSubtitle}>
+  return <PermissionDialog workerBadge={workerBadge} title={sandboxingEnabled_0 && !isSandboxed_0 ? (isZh() ? 'Bash 命令（无沙盒）' : 'Bash command (unsandboxed)') : (isZh() ? 'Bash 命令' : 'Bash command')} subtitle={classifierSubtitle}>
       <Box flexDirection="column" paddingX={2} paddingY={1}>
         <Text dimColor={explainerState.visible}>
           {BashTool.renderToolUseMessage({
@@ -461,7 +462,7 @@ function BashPermissionRequestInner({
                 </Text>
               </Box>}
             <Text dimColor={feature('BASH_CLASSIFIER') ? toolUseConfirm.classifierAutoApproved : false}>
-              Do you want to proceed?
+              {isZh() ? '是否继续？' : 'Do you want to proceed?'}
             </Text>
             <Select options={feature('BASH_CLASSIFIER') ? toolUseConfirm.classifierAutoApproved ? options.map(o => ({
           ...o,

@@ -10,6 +10,7 @@ import { logEvent } from '../services/analytics/index.js';
 import type { HistoryEntry } from '../utils/config.js';
 import { formatRelativeTimeAgo, truncateToWidth } from '../utils/format.js';
 import { FuzzyPicker } from './design-system/FuzzyPicker.js';
+import { isZh } from '../utils/i18n.js';
 type Props = {
   initialQuery?: string;
   onSelect: (entry: HistoryEntry) => void;
@@ -87,7 +88,7 @@ export function HistorySearchDialog({
       query_length: query.length
     });
     void item_1.entry.resolve().then(onSelect);
-  }} onCancel={onCancel} emptyMessage={q_0 => items === null ? 'Loading…' : q_0 ? 'No matching prompts' : 'No history yet'} selectAction="use" direction="up" previewPosition={previewOnRight ? 'right' : 'bottom'} renderItem={(item_2, isFocused) => <Text>
+  }} onCancel={onCancel} emptyMessage={q_0 => items === null ? (isZh() ? '加载中…' : 'Loading…') : q_0 ? 'No matching prompts' : 'No history yet'} selectAction="use" direction="up" previewPosition={previewOnRight ? 'right' : 'bottom'} renderItem={(item_2, isFocused) => <Text>
           <Text dimColor>{item_2.age}</Text>
           <Text color={isFocused ? 'suggestion' : undefined}>
             {' '}

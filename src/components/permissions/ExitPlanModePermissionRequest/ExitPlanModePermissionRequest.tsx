@@ -3,6 +3,7 @@ import type { UUID } from 'crypto';
 import figures from 'figures';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from 'src/context/notifications.js';
+import { isZh } from '../../../utils/i18n.js';
 import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from 'src/services/analytics/index.js';
 import { useAppState, useAppStateStore, useSetAppState } from 'src/state/AppState.js';
 import { getSdkBetas, getSessionId, isSessionPersistenceDisabled, setHasExitedPlanMode, setNeedsAutoModeExitAttachment, setNeedsPlanModeExitAttachment } from '../../../bootstrap/state.js';
@@ -545,7 +546,7 @@ export function ExitPlanModePermissionRequest({
             {isV2 && planFilePath && <Text dimColor> · {getDisplayPath(planFilePath)}</Text>}
             {showSaveMessage && <>
                 <Text dimColor>{' · '}</Text>
-                <Text color="success">{figures.tick}Plan saved!</Text>
+                <Text color="success">{figures.tick}{isZh() ? "计划已保存！" : "Plan saved!"}</Text>
               </>}
           </Box>}
       </Box>);
@@ -598,7 +599,7 @@ export function ExitPlanModePermissionRequest({
         toolUseConfirm.onReject();
       }
     }
-    return <PermissionDialog color="planMode" title="Exit plan mode?" workerBadge={workerBadge}>
+    return <PermissionDialog color="planMode" title={isZh() ? "退出计划模式？" : "Exit plan mode?"} workerBadge={workerBadge}>
         <Box flexDirection="column" paddingX={1} marginTop={1}>
           <Text>Claude wants to exit plan mode</Text>
           <Box marginTop={1}>
@@ -624,7 +625,7 @@ export function ExitPlanModePermissionRequest({
       </PermissionDialog>;
   }
   return <Box flexDirection="column" tabIndex={0} autoFocus onKeyDown={handleKeyDown}>
-      <PermissionDialog color="planMode" title="Ready to code?" innerPaddingX={0} workerBadge={workerBadge}>
+      <PermissionDialog color="planMode" title={isZh() ? "准备开始编码？" : "Ready to code?"} innerPaddingX={0} workerBadge={workerBadge}>
         <Box flexDirection="column" marginTop={1}>
           <Box paddingX={1} flexDirection="column">
             <Text>Here is Claude&apos;s plan:</Text>
@@ -664,7 +665,7 @@ export function ExitPlanModePermissionRequest({
           </Box>
           {showSaveMessage && <Box>
               <Text dimColor>{' · '}</Text>
-              <Text color="success">{figures.tick}Plan saved!</Text>
+              <Text color="success">{figures.tick}{isZh() ? "计划已保存！" : "Plan saved!"}</Text>
             </Box>}
         </Box>}
     </Box>;
@@ -691,17 +692,17 @@ export function buildPlanApprovalOptions({
   if (showClearContext) {
     if (feature('TRANSCRIPT_CLASSIFIER') && isAutoModeAvailable) {
       options.push({
-        label: `Yes, clear context${usedLabel} and use auto mode`,
+        label: isZh() ? `是，清除上下文${usedLabel}并使用自动模式` : `Yes, clear context${usedLabel} and use auto mode`,
         value: 'yes-auto-clear-context'
       });
     } else if (isBypassPermissionsModeAvailable) {
       options.push({
-        label: `Yes, clear context${usedLabel} and bypass permissions`,
+        label: isZh() ? `是，清除上下文${usedLabel}并跳过权限` : `Yes, clear context${usedLabel} and bypass permissions`,
         value: 'yes-bypass-permissions'
       });
     } else {
       options.push({
-        label: `Yes, clear context${usedLabel} and auto-accept edits`,
+        label: isZh() ? `是，清除上下文${usedLabel}并自动接受编辑` : `Yes, clear context${usedLabel} and auto-accept edits`,
         value: 'yes-accept-edits'
       });
     }
@@ -710,33 +711,33 @@ export function buildPlanApprovalOptions({
   // Slot 2: keep-context with elevated mode (same priority: auto > bypass > edits).
   if (feature('TRANSCRIPT_CLASSIFIER') && isAutoModeAvailable) {
     options.push({
-      label: 'Yes, and use auto mode',
+      label: isZh() ? '是，使用自动模式' : 'Yes, and use auto mode',
       value: 'yes-resume-auto-mode'
     });
   } else if (isBypassPermissionsModeAvailable) {
     options.push({
-      label: 'Yes, and bypass permissions',
+      label: isZh() ? '是，跳过权限' : 'Yes, and bypass permissions',
       value: 'yes-accept-edits-keep-context'
     });
   } else {
     options.push({
-      label: 'Yes, auto-accept edits',
+      label: isZh() ? '是，自动接受编辑' : 'Yes, auto-accept edits',
       value: 'yes-accept-edits-keep-context'
     });
   }
   options.push({
-    label: 'Yes, manually approve edits',
+    label: isZh() ? '是，手动审批编辑' : 'Yes, manually approve edits',
     value: 'yes-default-keep-context'
   });
   if (showUltraplan) {
     options.push({
-      label: 'No, refine with Ultraplan on Panda Code on the web',
+      label: isZh() ? '否，用 Ultraplan 继续优化' : 'No, refine with Ultraplan on Panda Code on the web',
       value: 'ultraplan'
     });
   }
   options.push({
     type: 'input',
-    label: 'No, keep planning',
+    label: isZh() ? '否，继续规划' : 'No, keep planning',
     value: 'no',
     placeholder: 'Tell Claude what to change',
     description: 'shift+tab to approve with this feedback',

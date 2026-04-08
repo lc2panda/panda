@@ -11,6 +11,7 @@ import { count } from '../../utils/array.js';
 import { Dialog } from '../design-system/Dialog.js';
 import { Divider } from '../design-system/Divider.js';
 import { getAgentSourceDisplayName } from './utils.js';
+import { isZh } from '../../utils/i18n.js';
 type Props = {
   source: SettingSource | 'all' | 'built-in' | 'plugin';
   agents: ResolvedAgent[];
@@ -242,7 +243,7 @@ export function AgentsList(t0) {
         let t25;
         let t26;
         if ($[58] === Symbol.for("react.memo_cache_sentinel")) {
-          t24 = <Text dimColor={true}>No agents found. Create specialized subagents that Claude can delegate to.</Text>;
+          t24 = <Text dimColor={true}>{isZh() ? "未找到 Agent。创建可供委派的专用子 Agent。" : "No agents found. Create specialized subagents that Claude can delegate to."}</Text>;
           t25 = <Text dimColor={true}>Each subagent has its own context window, custom system prompt, and specific tools.</Text>;
           t26 = <Text dimColor={true}>Try creating: Code Reviewer, Code Simplifier, Security Reviewer, Tech Lead, or UX Reviewer.</Text>;
           $[58] = t24;

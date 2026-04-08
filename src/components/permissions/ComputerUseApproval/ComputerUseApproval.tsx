@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import { Box, Text } from '../../../ink.js';
 import { execFileNoThrow } from '../../../utils/execFileNoThrow.js';
 import { plural } from '../../../utils/stringUtils.js';
+import { isZh } from '../../../utils/i18n.js';
 import type { OptionWithDescription } from '../../CustomSelect/select.js';
 import { Select } from '../../CustomSelect/select.js';
 import { Dialog } from '../../design-system/Dialog.js';
@@ -61,7 +62,7 @@ function ComputerUseTccPanel(t0) {
       let t1;
       if ($[3] === Symbol.for("react.memo_cache_sentinel")) {
         t1 = {
-          label: "Open System Settings \u2192 Accessibility",
+          label: isZh() ? "打开系统设置 → 辅助功能" : "Open System Settings \u2192 Accessibility",
           value: "open_accessibility"
         };
         $[3] = t1;
@@ -74,7 +75,7 @@ function ComputerUseTccPanel(t0) {
       let t1;
       if ($[4] === Symbol.for("react.memo_cache_sentinel")) {
         t1 = {
-          label: "Open System Settings \u2192 Screen Recording",
+          label: isZh() ? "打开系统设置 → 屏幕录制" : "Open System Settings \u2192 Screen Recording",
           value: "open_screen_recording"
         };
         $[4] = t1;
@@ -86,7 +87,7 @@ function ComputerUseTccPanel(t0) {
     let t1;
     if ($[5] === Symbol.for("react.memo_cache_sentinel")) {
       t1 = {
-        label: "Try again",
+        label: isZh() ? "重试" : "Try again",
         value: "retry"
       };
       $[5] = t1;
@@ -187,7 +188,7 @@ function ComputerUseTccPanel(t0) {
   }
   let t10;
   if ($[23] !== onDone || $[24] !== t9) {
-    t10 = <Dialog title="Computer Use needs macOS permissions" onCancel={onDone}>{t9}</Dialog>;
+    t10 = <Dialog title={isZh() ? "Computer Use 需要 macOS 权限" : "Computer Use needs macOS permissions"} onCancel={onDone}>{t9}</Dialog>;
     $[23] = onDone;
     $[24] = t9;
     $[25] = t10;
@@ -414,7 +415,7 @@ function ComputerUseAppListPanel(t0) {
   }
   let t21;
   if ($[45] !== t11 || $[46] !== t20) {
-    t21 = <Dialog title="Computer Use wants to control these apps" onCancel={t11}>{t20}</Dialog>;
+    t21 = <Dialog title={isZh() ? "Computer Use 需要控制以下应用" : "Computer Use wants to control these apps"} onCancel={t11}>{t20}</Dialog>;
     $[45] = t11;
     $[46] = t20;
     $[47] = t21;
