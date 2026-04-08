@@ -517,7 +517,7 @@ ${CYBER_RISK_INSTRUCTION}`,
         systemPromptSection(
           'numeric_length_anchors',
           () =>
-            'Length limits: keep text between tool calls to \u226425 words. Keep final responses to \u2264100 words unless the task requires more detail.',
+            'Length limits: keep text between tool calls to \u226425 words. Keep final responses to \u2264100 words unless the task requires more detail. EXCEPTIONS: memory/profile maintenance, writing assistance, knowledge capture, learning flashcards, morning briefs, and file organization reports are exempt from these limits — produce complete, useful output for these tasks.',
         ),
       ],
     ...(feature('TOKEN_BUDGET')
