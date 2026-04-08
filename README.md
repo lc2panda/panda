@@ -453,15 +453,58 @@ EOF
 | **Webhook** | 全平台（WeChat/Telegram/Slack Bot 等） | `~/.pandacc/config/proactive.json` 中设置 `webhookUrl` |
 | **Channel 队列** | 全平台 | `~/.pandacc/channels/outbox/notifications.jsonl` |
 
-**配置 Webhook 推送到微信/Telegram**：
+#### 隐私敏感场景管理
+
+以下场景涉及个人隐私数据，**默认全部关闭**，需用户在配置文件中**显式开启**才会运行：
+
+| 分类 | 场景 ID | 读取的数据 | 开启方式 |
+|------|---------|-----------|---------|
+| **邮件** | `email-flagged-reminder` | 邮件标记/星标状态 | `"enabledScenarios": {"email-flagged-reminder": true}` |
+| | `email-unread-important` | 未读邮件数量 | 同上 |
+| | `email-unreplied` | 未回复邮件状态 | 同上 |
+| | `email-daily-digest` | 邮件统计摘要 | 同上 |
+| **通讯录** | `contact-birthday` | 联系人姓名和生日 | 同上 |
+| **即时消息** | `slack-unread` | Slack 未读消息数 | 同上（需配置 SLACK_TOKEN） |
+| **浏览器** | `browser-knowledge-cards` | 浏览历史 URL 和访问频率 | 同上 |
+| | `bookmark-cleanup` | Chrome 书签列表 | 同上 |
+| | `reading-list-overflow` | 阅读列表条目数 | 同上 |
+| **笔记** | `notes-digest` | Apple Notes 标题和摘要 | 同上 |
+| **屏幕** | `screen-time-stats` | 应用使用时长 | 同上 |
+| **安全** | `sensitive-file-scan` | 文件内容敏感词扫描 | 同上 |
+| | `duplicate-file-scan` | 文件哈希比对 | 同上 |
+| **财务** | `cloud-billing-alert` | 云服务账单 | 同上 |
+| **IM 平台** | `wechat-messages` | 微信消息 | 同上（预留） |
+| | `feishu-messages` | 飞书消息 | 同上（预留） |
+| | `dingtalk-messages` | 钉钉消息 | 同上（预留） |
+
+**配置文件**：`~/.pandacc/config/proactive.json`
+
 ```json
-// ~/.pandacc/config/proactive.json
 {
+  // 通知渠道
   "webhookUrl": "https://your-bot-webhook.example.com/notify",
+
+  // 阈值自定义（可选，不设则用默认值）
   "diskFreePercent": 10,
-  "noBreakMinutes": 90
+  "noBreakMinutes": 90,
+  "gitBranchStaleDays": 7,
+
+  // 敏感场景开关（默认全部关闭，显式设为 true 才开启）
+  "enabledScenarios": {
+    "email-flagged-reminder": true,
+    "email-unread-important": true,
+    "contact-birthday": true,
+    "browser-knowledge-cards": true,
+    "notes-digest": true,
+    "screen-time-stats": true
+  }
 }
 ```
+
+**原则**：
+- 非敏感场景（磁盘/内存/Git/天气等）**默认开启**，用户可设为 `false` 关闭
+- 敏感场景**默认关闭**，用户必须显式设为 `true` 才激活
+- 所有数据仅在用户本机处理，不上传任何服务器
 
 #### 基础设施
 
@@ -469,7 +512,7 @@ EOF
 - **记忆搜索**：SQLite FTS5 全文索引，支持中英文混合查询
 - **隐私守护**：`~/.pandacc/config/privacy.json` 排除列表，所有连接器自动过滤
 - **跨平台抽象层**：`src/proactive/platform.ts` 统一封装磁盘/内存/网络/电池/空闲时间获取
-- **可配置阈值**：`~/.pandacc/config/proactive.json` 覆盖所有默认阈值，高敏场景默认 opt-in
+- **可配置阈值**：`~/.pandacc/config/proactive.json` 覆盖所有默认阈值
 
 ### 数据连接器
 
