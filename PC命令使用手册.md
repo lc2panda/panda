@@ -1,8 +1,8 @@
-# Panda Code / 命令使用手册 (v2.1.92 极限版)
+# Panda Code / 命令使用手册 (v2.5.1 极限版)
 
-> 本手册基于 v2.1.92 实机 PTY 验证，覆盖 **80+ 个命令** + Phase 1-5 全部新增能力。
+> 本手册基于 v2.5.1 实机 PTY 验证，覆盖 **85+ 个命令** + Phase 1-5 全部新增能力 + v2.5 超级助手/IM Connector/主动推送 71 场景。
 >
-> 最后更新: 2026-04-06 · 显示版本: v2.1.92 · 基线: Claude Code v2.1.92
+> 最后更新: 2026-04-08 · 显示版本: v2.5.1 · 基线: Claude Code v2.1.92
 
 ---
 
@@ -11,7 +11,7 @@
 | 标记 | 含义 |
 |------|------|
 | ✅ | 已验证正常工作 |
-| 🆕 | v2.1.92 新增/增强 |
+| 🆕 | v2.5.1 新增/增强 |
 | 🔒 | 需要特定认证（Claude.ai 订阅/消费者账户） |
 | ⚠️ | 功能受限或有已知问题 |
 | 🔧 | 需要特定环境（Feature Flag / 硬件 / 平台） |
@@ -46,6 +46,14 @@
 | `/assistant` | | 启用 KAIROS 助手 + 主动引擎 | 🆕✅ |
 | `/proactive` | | 切换主动自主模式 | 🆕✅ |
 | `/context` | | 可视化上下文使用情况 | ✅ |
+
+### v2.5 新增
+
+| 命令 | 别名 | 一句话说明 | 状态 |
+|------|------|-----------|------|
+| `/write` | | 写作助理 — 大纲生成/文稿编译 | 🆕✅ |
+| `/capture` | | 快速捕获想法到工作目录 | 🆕✅ |
+| `/learn` | | 学习助理 — 闪卡/复习/学习路径 | 🆕✅ |
 
 ---
 
@@ -253,7 +261,7 @@
 
 ---
 
-## 七、🆕 私人助手系统（v2.1.92 核心新增）
+## 七、🆕 超级助手系统（v2.5 数字生命体）
 
 ### `/dream` 🆕
 - **用法**: `/dream`
@@ -276,12 +284,13 @@
 
 ### `/proactive` 🆕
 - **用法**: `/proactive [on|off]`
-- **说明**: 切换主动自主模式
-- **内置任务**:
+- **说明**: 切换主动自主模式 — v2.5 扩展为 **71 个主动推送场景**
+- **核心内置任务**:
   - `dream-consolidate` — 22:00 自动记忆整合（调用 autoDream）
   - `morning-briefing` — 07:00 设置晨间简报 pending flag
   - `code-health` — 23:00 设置健康检查 pending flag
-- **技巧**: 配合 `/night-mode` 实现全天候自主工作
+- **v2.5 场景覆盖**: 系统健康(3) + 开发者(10) + 文件管理(6) + 个人生活(3) + 效率(4) + 高级系统(5) + 扩展(8) + 知识(8) + 生活(8) = **55 个非敏感场景**（默认开启）+ **16 个敏感场景**（需 `proactive.json` 显式开启）
+- **技巧**: 配合 `/night-mode` 实现全天候自主工作；敏感场景配置详见本手册"七、主动推送系统"章节
 
 ### `/night-mode` 🆕
 - **用法**: `/night-mode`
@@ -296,6 +305,80 @@
 ### `/brief`
 - **用法**: `/brief [on|off]`
 - **说明**: 简报模式 — AI 只输出简洁摘要
+
+### `/write` 🆕
+- **用法**: `/write outline <topic>` / `/write compile <dir>`
+- **说明**: 写作助理 — 生成大纲或编译 Markdown 写作项目
+- **示例**:
+  - `/write outline "AI个人助理的未来"` — 生成结构化大纲
+  - `/write compile ~/manuscript/` — 编译目录下所有 Markdown 为统一文稿
+
+### `/capture` 🆕
+- **用法**: `/capture <text>`
+- **说明**: 快速捕获想法到 `working/inbox/` 目录，自动按 PARA 方法论分类
+- **示例**: `/capture "想到一个架构思路：用事件驱动替代轮询"`
+
+### `/learn` 🆕
+- **用法**: `/learn from <file>` / `/learn review` / `/learn plan <topic>`
+- **说明**: 学习助理 — 从文件生成闪卡、间隔重复复习（FSRS 算法）、学习路径规划
+- **示例**:
+  - `/learn from paper.pdf` — 从 PDF 提取知识点生成闪卡
+  - `/learn review` — 开始间隔重复复习
+  - `/learn plan "学习 Rust"` — 生成学习路径
+
+### 🆕 主动推送系统（v2.5 新增 — 71 场景）
+
+v2.5 将主动推送从 3 个内置任务扩展为 **71 个场景**，分为非敏感（默认开启）和敏感（默认关闭）两类。
+
+#### 非敏感场景（默认开启）
+
+| 分类 | 场景数 | 示例 |
+|------|--------|------|
+| 系统健康 | 3 | 磁盘告警、内存压力、网络异常 |
+| 开发者 | 10 | Git 分支过期、远程变更、CI 失败、依赖漏洞、TODO 趋势、日历提醒 |
+| 文件管理 | 6 | 下载堆积、桌面过多、大文件、重复文件、截屏清理、回收站 |
+| 个人生活 | 3 | 天气提醒、节日提醒、深夜关怀 |
+| 效率 | 4 | 无休息提醒、周报、水分提醒、专注模式 |
+| 高级系统 | 5 | 电池、CPU、僵尸进程、Docker、依赖过期 |
+| 扩展 | 8 | 系统更新、包管理、云同步、习惯打卡、签名证书、API 限速 |
+| 知识 | 8 | 浏览器知识卡、书签整理、闪卡复习、RSS、笔记汇总 |
+| 生活 | 8 | 倒计时、备份、屏幕时间、会议占比 |
+
+#### 敏感场景（默认关闭，需 proactive.json 开启）
+
+| 分类 | 场景数 | 需要的授权 |
+|------|--------|-----------|
+| 通知中心 | 3 | macOS 需 FDA（完全磁盘访问权限） |
+| 邮件 | 4 | macOS 需 FDA / Windows Outlook |
+| 通讯录 | 1 | macOS AppleScript 授权 |
+| IM 聚合 | 6 | 需配置 `connectors.json` |
+| 浏览器/笔记/屏幕 | 6 | 部分需 FDA |
+
+#### 激活方式
+
+```
+/proactive        # 激活主动推送
+/assistant        # 激活完整助手模式（含主动+KAIROS）
+/night-mode       # 夜间自主模式（22:00-06:00）
+```
+
+- **技巧**: 配置文件 `~/.pandacc/config/proactive.json` 可自定义所有阈值和敏感场景开关，详见 README 配置参考章节。
+
+### 🆕 IM Connector 系统（v2.5 新增 — 6 平台）
+
+v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
+
+| 平台 | 模式 | 说明 |
+|------|------|------|
+| 飞书 | MCP / API | 需 App ID/Secret，推荐 MCP 模式 |
+| 钉钉 | MCP / API | 需 App Key/Secret，支持日历/任务/通知模块 |
+| Slack | API | 需 Bot Token（`xoxb-xxx`）或 `SLACK_TOKEN` 环境变量 |
+| 微信 | 企业微信 API / 本地 DB | 企微需 Corp ID；本地 DB 需 SQLCipher 解密密钥 |
+| Telegram | API | 需 @BotFather 获取的 Bot Token |
+| Teams | API | 需 Azure AD Tenant ID + Client ID/Secret |
+
+- **配置**: 编辑 `~/.pandacc/config/connectors.json`，详见 README [connectors.json 章节](README.md)
+- **关联场景**: 配置连接器后可启用 `im-unread-digest`、`im-daily-brief`、`im-calendar-sync`、`im-approval-alert`、`im-document-update`、`im-reverse-push` 等 6 个 IM 聚合场景
 
 ### 🆕 Mood 检测（自动）
 - **无需命令** — 每条用户消息自动分析情绪
@@ -542,6 +625,12 @@
 | `FORK_SUBAGENT` | `/fork` | ✅ 已启用 |
 | `BUDDY` | `/buddy` | ✅ 已启用 |
 | `COORDINATOR_MODE` | Coordinator 模式 | ✅ 已启用 |
+| `KAIROS_WRITE` | `/write` 写作助理 | ✅ 已启用 |
+| `KAIROS_CAPTURE` | `/capture` 快速捕获 | ✅ 已启用 |
+| `KAIROS_LEARN` | `/learn` 学习助理 | ✅ 已启用 |
+| `IM_CONNECTOR` | IM 平台连接器（6 平台） | ✅ 已启用 |
+| `PROACTIVE_SCENARIOS` | 主动推送 71 场景 | ✅ 已启用 |
+| `NOTIFICATION_CENTER` | 系统通知中心感知 | ✅ 已启用 |
 
 ---
 
