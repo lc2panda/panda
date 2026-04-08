@@ -84,13 +84,49 @@ export function getProactiveConfig(): ProactiveThresholds {
   return _cached
 }
 
+/**
+ * 高敏场景列表 — 涉及通讯录、邮件内容、即时消息、健康、财务等个人隐私数据。
+ * 这些场景**默认关闭**，用户必须在 ~/.pandacc/config/proactive.json 中显式开启：
+ *   { "enabledScenarios": { "email-flagged-reminder": true, ... } }
+ */
+const HIGH_PRIVACY_SCENARIOS = new Set([
+  // 邮件（读取邮件内容/标记/回复状态）
+  'email-flagged-reminder',
+  'email-unread-important',
+  'email-unreplied',
+  'email-daily-digest',
+  // 通讯录（读取联系人信息/生日）
+  'contact-birthday',
+  // 即时消息（读取聊天记录/未读数）
+  'slack-unread',
+  'imessage-unread',
+  // 浏览器（读取浏览历史/书签）
+  'browser-knowledge-cards',
+  'bookmark-cleanup',
+  'reading-list-overflow',
+  // 笔记（读取 Apple Notes 内容）
+  'notes-digest',
+  // 屏幕时间（读取应用使用数据）
+  'screen-time-stats',
+  // 健康与财务
+  'health-trend',
+  'finance-anomaly',
+  'cloud-billing-alert',
+  // 微信/IM 平台数据
+  'wechat-messages',
+  'feishu-messages',
+  'dingtalk-messages',
+  // 敏感文件扫描（读取文件内容）
+  'sensitive-file-scan',
+  'duplicate-file-scan',
+])
+
 export function isScenarioEnabled(scenarioId: string): boolean {
   const config = getProactiveConfig()
-  // 高敏场景默认关闭（用户需在 proactive.json 中显式开启）
-  const HIGH_PRIVACY = ['imessage-unread', 'health-trend', 'finance-anomaly']
-  if (HIGH_PRIVACY.includes(scenarioId)) {
+  if (HIGH_PRIVACY_SCENARIOS.has(scenarioId)) {
+    // 高敏场景：必须用户在 proactive.json 中显式设为 true 才启用
     return config.enabledScenarios[scenarioId] === true
   }
-  // 其他场景默认开启
+  // 其他场景：默认开启，用户可设为 false 关闭
   return config.enabledScenarios[scenarioId] !== false
 }
