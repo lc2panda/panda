@@ -168,6 +168,26 @@ export async function ensureMemoryDirExists(memoryDir: string): Promise<void> {
       { level: 'debug' },
     )
   }
+
+  // ── Patterns & Scars subdirectories (Meta_Kim P1-5) ──────────
+  // Create subdirectories for structured memory:
+  //   patterns/ — successful approaches worth repeating
+  //   scars/    — failures and lessons learned to avoid
+  // fs.mkdir is recursive and swallows EEXIST, so these are idempotent.
+  for (const subdir of ['patterns', 'scars']) {
+    try {
+      await fs.mkdir(join(memoryDir, subdir))
+    } catch (e) {
+      const code =
+        e instanceof Error && 'code' in e && typeof e.code === 'string'
+          ? e.code
+          : undefined
+      logForDebugging(
+        `ensureMemoryDirExists failed for ${join(memoryDir, subdir)}: ${code ?? String(e)}`,
+        { level: 'debug' },
+      )
+    }
+  }
 }
 
 /**
@@ -282,6 +302,15 @@ export function buildMemoryLines(
     '',
     ...(extraGuidelines ?? []),
     '',
+    '## Patterns & Scars',
+    '',
+    `Two special subdirectories exist under \`${memoryDir}\` for structured learning:`,
+    '',
+    `- **\`patterns/\`** — Successful approaches worth repeating. When a strategy, workflow, or solution works well, save a concise \`.md\` file here describing the pattern, when to apply it, and why it works.`,
+    `- **\`scars/\`** — Failures and lessons learned. When something goes wrong (a debugging dead-end, a broken assumption, a regressed approach), save a concise \`.md\` file here describing what happened, the root cause, and how to avoid it.`,
+    '',
+    'Each file should be a short, focused note (under 50 lines). Use descriptive filenames like `patterns/bun-test-watch.md` or `scars/recursive-import-loop.md`. These directories already exist — write directly.',
+    '',
   ]
 
   lines.push(...buildSearchingPastContextSection(memoryDir))
@@ -334,6 +363,41 @@ export function buildMemoryPrompt(params: {
       '',
       `Your ${ENTRYPOINT_NAME} is currently empty. When you save new memories, they will appear here.`,
     )
+  }
+
+  // ── Patterns & Scars content injection (Meta_Kim P1-5) ───────
+  // Scan patterns/ and scars/ subdirectories for .md files and append
+  // their content to the prompt so the model has access to accumulated
+  // lessons. Sync reads match the rest of buildMemoryPrompt.
+  for (const [subdir, heading] of [
+    ['patterns', 'Patterns (成功模式)'],
+    ['scars', 'Scars (失败教训)'],
+  ] as const) {
+    const subdirPath = join(memoryDir, subdir)
+    try {
+      // eslint-disable-next-line custom-rules/no-sync-fs
+      const dirents = fs.readdirSync(subdirPath)
+      const mdFiles = dirents
+        .filter(d => d.isFile() && d.name.endsWith('.md'))
+        .map(d => d.name)
+        .sort()
+      if (mdFiles.length > 0) {
+        lines.push('', `## ${heading}`, '')
+        for (const fileName of mdFiles) {
+          try {
+            // eslint-disable-next-line custom-rules/no-sync-fs
+            const content = fs.readFileSync(join(subdirPath, fileName), {
+              encoding: 'utf-8',
+            })
+            lines.push(`### ${fileName}`, content.trim(), '')
+          } catch {
+            // Individual file unreadable — skip silently
+          }
+        }
+      }
+    } catch {
+      // Subdirectory doesn't exist or unreadable — skip silently
+    }
   }
 
   return lines.join('\n')

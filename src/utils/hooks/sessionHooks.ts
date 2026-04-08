@@ -430,6 +430,37 @@ export function getSessionHookCallback(
 }
 
 /**
+ * Register Panda Code built-in default hooks.
+ *
+ * Provides an entry point for session-scoped safety and quality hooks
+ * that ship with the binary (no user config needed).
+ *
+ * Current P0 functionality (dangerous-command interception, completion guard,
+ * sub-agent context injection) is implemented directly in code paths rather
+ * than the hook mechanism. This function serves as the registration entry
+ * point for future built-in hooks (post-format checks, post-typecheck
+ * validation, file-size guards, etc.).
+ *
+ * Called once per session during initialization.
+ * Design ref: Meta_Kim Hook 脚本体系
+ */
+export function registerDefaultHooks(
+  _setAppState: (updater: (prev: AppState) => AppState) => void,
+  _sessionId: string,
+): void {
+  // ── Built-in hook registration entry point ──────────────────
+  // Future hooks to be registered here:
+  //   - PostToolUse: file-size guard (warn if edit creates file > threshold)
+  //   - PostToolUse: format/lint reminder (suggest after multi-file edits)
+  //   - PostToolUse: type-check reminder (suggest after .ts/.tsx edits)
+  //   - PreToolUse: large-diff confirmation (confirm before edits > N lines)
+  //
+  // P0 guards (dangerous cmd, completion, sub-agent context) are direct
+  // code-path implementations and do not flow through this mechanism.
+  logForDebugging('[registerDefaultHooks] built-in hook entry point initialized')
+}
+
+/**
  * Clear all session hooks for a specific session
  * @param setAppState The function to update the app state
  * @param sessionId The session ID

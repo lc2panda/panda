@@ -110,6 +110,7 @@ import {
 } from './bootstrap/state.js'
 import { createBudgetTracker, checkTokenBudget } from './query/tokenBudget.js'
 import { count } from './utils/array.js'
+import { classifyTask } from './routing/taskClassifier.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const snipModule = feature('HISTORY_SNIP')
@@ -333,6 +334,34 @@ async function* queryLoop(
       messages,
       toolUseContext,
     )
+
+    // ── Task classification (Meta_Kim P1-6) ──────────────────
+    // On the first iteration, classify the latest user message to log
+    // complexity/domain. Future versions can use this for model routing,
+    // plan-mode suggestions, etc. No user-visible side effects.
+    if (turnCount === 1) {
+      const lastUserMsg = messages.filter(m => m.type === 'user').at(-1)
+      if (lastUserMsg) {
+        const textParts: string[] = []
+        const content = lastUserMsg.message?.content
+        if (typeof content === 'string') {
+          textParts.push(content)
+        } else if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'text' && typeof block.text === 'string') {
+              textParts.push(block.text)
+            }
+          }
+        }
+        const textContent = textParts.join(' ')
+        if (textContent.length > 0) {
+          const taskProfile = classifyTask(textContent)
+          logForDebugging(
+            `[TaskClassifier] complexity=${taskProfile.complexity} domain=${taskProfile.domain} tokens=${taskProfile.estimatedTokens} caps=[${taskProfile.requiredCapabilities.join(',')}]`,
+          )
+        }
+      }
+    }
 
     yield { type: 'stream_request_start' }
 
