@@ -421,10 +421,11 @@ export function LogoV2() {
   }
   const t25 = layoutMode === "horizontal" && <FeedColumn feeds={showOnboarding ? [createProjectOnboardingFeed(getSteps()), createRecentActivityFeed(activities)] : showGuestPassesUpsell ? [createRecentActivityFeed(activities), createGuestPassesFeed()] : showOverageCreditUpsell ? [createRecentActivityFeed(activities), createOverageCreditFeed()] : [createRecentActivityFeed(activities), createWhatsNewFeed(changelog)]} maxWidth={rightWidth} />;
   let t26;
-  if ($[62] !== T2 || $[63] !== t15 || $[64] !== t23 || $[65] !== t24 || $[66] !== t25) {
-    t26 = <T2 flexDirection={t15} paddingX={t16} gap={t17}>{t23}{t24}{t25}</T2>;
+  if ($[62] !== T2 || $[63] !== t15 || $[64] !== t23 || $[65] !== t24 || $[66] !== t25 || $['tw'] !== totalWidth) {
+    t26 = <T2 flexDirection={t15} paddingX={t16} gap={t17} width={totalWidth}>{t23}{t24}{t25}</T2>;
     $[62] = T2;
     $[63] = t15;
+    $['tw'] = totalWidth;
     $[64] = t23;
     $[65] = t24;
     $[66] = t25;

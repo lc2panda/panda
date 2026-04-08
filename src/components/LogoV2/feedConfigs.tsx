@@ -1,7 +1,29 @@
 import figures from 'figures';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+
+// Scan ~/.pandacc/projects/*/memory/ and return the most recently modified project path
+function findLatestProjectMemoryFile(...segments: string[]): string | null {
+  try {
+    const projectsDir = join(homedir(), '.pandacc', 'projects')
+    if (!existsSync(projectsDir)) return null
+    const slugs = readdirSync(projectsDir).filter(d =>
+      existsSync(join(projectsDir, d, 'memory', ...segments))
+    )
+    if (slugs.length === 0) return null
+    // 选最近修改的项目
+    let best = slugs[0]!
+    let bestMtime = 0
+    for (const s of slugs) {
+      try {
+        const st = require('fs').statSync(join(projectsDir, s, 'memory', ...segments))
+        if (st.mtimeMs > bestMtime) { bestMtime = st.mtimeMs; best = s }
+      } catch {}
+    }
+    return join(projectsDir, best, 'memory', ...segments)
+  } catch { return null }
+}
 import * as React from 'react';
 import { Box, Text } from '../../ink.js';
 import type { Step } from '../../projectOnboardingState.js';
@@ -23,13 +45,13 @@ export function createRecentActivityFeed(activities: LogOption[]): FeedConfig {
   // 如果没有最近活动，尝试展示超级助手习惯记忆
   if (lines.length === 0) {
     try {
-      const habitsPath = join(homedir(), '.pandacc', 'memory', 'procedural', 'habits.md')
-      if (existsSync(habitsPath)) {
+      const habitsPath = findLatestProjectMemoryFile('procedural', 'habits.md')
+      if (habitsPath && existsSync(habitsPath)) {
         const content = readFileSync(habitsPath, 'utf-8')
         const recentLines = content.split('\n')
-          .filter(l => l.trim() && !l.startsWith('#'))
+          .filter(l => l.trim() && !l.startsWith('#') && !l.startsWith('---'))
           .slice(-3)
-          .map(l => ({ text: l.trim().slice(0, 50) }))
+          .map(l => ({ text: l.trim().slice(0, 60) }))
         if (recentLines.length > 0) lines.push(...recentLines)
       }
     } catch {}
@@ -59,22 +81,14 @@ export function createWhatsNewFeed(releaseNotes: string[]): FeedConfig {
   // 如果没有 release notes，尝试展示超级助手画像摘要
   if (lines.length === 0) {
     try {
-      const pandaccDir = join(homedir(), '.pandacc')
-      const profilePaths = [
-        join(pandaccDir, 'memory', 'semantic', 'profile.md'),
-      ]
-      for (const p of profilePaths) {
-        if (existsSync(p)) {
-          const content = readFileSync(p, 'utf-8')
-          const profileLines = content.split('\n')
-            .filter(l => l.trim() && !l.startsWith('---') && !l.startsWith('#'))
-            .slice(0, 3)
-            .map(l => ({ text: l.trim().slice(0, 60) }))
-          if (profileLines.length > 0) {
-            lines.push(...profileLines)
-            break
-          }
-        }
+      const profilePath = findLatestProjectMemoryFile('semantic', 'profile.md')
+      if (profilePath && existsSync(profilePath)) {
+        const content = readFileSync(profilePath, 'utf-8')
+        const profileLines = content.split('\n')
+          .filter(l => l.trim() && !l.startsWith('---') && !l.startsWith('#') && !l.startsWith('name:') && !l.startsWith('description:') && !l.startsWith('type:'))
+          .slice(0, 3)
+          .map(l => ({ text: l.trim().slice(0, 60) }))
+        if (profileLines.length > 0) lines.push(...profileLines)
       }
     } catch {}
   }
