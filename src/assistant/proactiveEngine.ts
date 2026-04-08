@@ -1,6 +1,7 @@
 // Input: 对话上下文（消息列表、回合数、会话开始时间）
 // Output: 主动建议列表 ProactiveSuggestion[]，格式化为系统消息
-// Pos: assistant/ 主动交互引擎，由 stopHooks 在每轮结束后调用
+// Pos: assistant/ 主动交互引擎（被动层），由 stopHooks 在每轮结束后调用
+//      主动层（时间驱动）在 proactive/builtinTasks.ts 中：日历提醒、Git 提醒、画像过期
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
 
 import { join } from 'path'
