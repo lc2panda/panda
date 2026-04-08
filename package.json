@@ -38,8 +38,7 @@
   ],
   "files": [
     "dist",
-    "README.md",
-    "PC命令使用手册.md"
+    "README.md"
   ],
   "scripts": {
     "build": "bun run build.ts",
