@@ -1321,6 +1321,30 @@ async function* queryLoop(
         }
       }
 
+      // Anti-Slop 审查：检测 AI 输出中的废话/重复
+      const slopResult = checkAntiSlop(assistantMessages)
+      if (slopResult) {
+        logForDebugging('Anti-Slop triggered — requesting concise response')
+        state = {
+          messages: [...messagesForQuery, ...assistantMessages, slopResult],
+          toolUseContext,
+          autoCompactTracking: tracking,
+          maxOutputTokensRecoveryCount: 0,
+          hasAttemptedReactiveCompact,
+          maxOutputTokensOverride: undefined,
+          pendingToolUseSummary: undefined,
+          stopHookActive: undefined,
+          turnCount,
+          transition: { reason: 'anti_slop' as any },
+        }
+        continue
+      }
+
+      // 进化写回：成功的 turn 结束后，提示经验沉淀
+      if (hasSuccessfulToolCalls(assistantMessages) && turnCount > 3) {
+        logForDebugging('[EvolutionWriteback] Successful tools in turn — consider patterns/scars writeback')
+      }
+
       const stopHookResult = yield* handleStopHooks(
         messagesForQuery,
         assistantMessages,
@@ -1832,6 +1856,15 @@ function checkCompletionGuard(
   const hasCompletionClaim = completionPatterns.some(p => p.test(textContent))
   if (!hasCompletionClaim) return null
 
+  // Finding Closure 检查：是否有未关闭的发现
+  const hasOpenFindings = /\b(TODO|FIXME|HACK|BUG|ISSUE|待修复|未完成|需要|还需)\b/i.test(textContent)
+  if (hasCompletionClaim && hasOpenFindings) {
+    return createUserMessage({
+      content: '[Finding Closure] You claimed completion but there are open findings (TODO/FIXME/未完成). Please close all findings before claiming completion.',
+      isMeta: true,
+    })
+  }
+
   // 检查文本中是否已包含验证证据
   const evidencePatterns = [
     /tests?\s+pass/i,
@@ -1864,4 +1897,89 @@ function checkCompletionGuard(
       '[Completion Guard] You claimed the task is complete, but no verification evidence was found in your response or recent tool calls. Please provide concrete evidence: run tests, verify the build, or show the actual output before claiming completion.',
     isMeta: true,
   })
+}
+
+/**
+ * Anti-Slop 审查 — 检测 AI 输出中的低质量模式。
+ * 参考 Meta_Kim 的 meta-prism agent 概念。
+ * 纯本地正则+启发式，零 API 调用。
+ *
+ * 检测模式：
+ * 1. 过度使用 emoji（≥8 个不同 emoji）
+ * 2. 重复段落（连续段 Jaccard 相似度 >70%，≥2 对）
+ * 3. 空洞长文本（>2000 字符但无代码块、无文件引用）
+ */
+function checkAntiSlop(assistantMessages: AssistantMessage[]): UserMessage | null {
+  if (assistantMessages.length === 0) return null
+
+  const lastMsg = assistantMessages[assistantMessages.length - 1]
+  if (!lastMsg?.message?.content) return null
+
+  const contentBlocks = Array.isArray(lastMsg.message.content)
+    ? lastMsg.message.content
+    : []
+
+  // 有工具调用的消息跳过（说明在做实事）
+  const hasToolUse = contentBlocks.some((b: any) => b.type === 'tool_use')
+  if (hasToolUse) return null
+
+  const textBlocks = contentBlocks
+    .filter((b: any) => b.type === 'text')
+    .map((b: any) => b.text)
+  const fullText = textBlocks.join('\n')
+
+  if (!fullText || fullText.length < 200) return null
+
+  const issues: string[] = []
+
+  // 1. 过度 emoji
+  const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu
+  const emojis = new Set(fullText.match(emojiRegex) || [])
+  if (emojis.size >= 8) {
+    issues.push('excessive emojis')
+  }
+
+  // 2. 重复段落检测
+  const paragraphs = fullText.split(/\n{2,}/).filter(p => p.trim().length > 50)
+  if (paragraphs.length >= 3) {
+    let repeatCount = 0
+    for (let i = 1; i < paragraphs.length; i++) {
+      const words1 = new Set(paragraphs[i - 1].toLowerCase().split(/\s+/))
+      const words2 = new Set(paragraphs[i].toLowerCase().split(/\s+/))
+      const intersection = new Set([...words1].filter(w => words2.has(w)))
+      const union = new Set([...words1, ...words2])
+      if (union.size > 0 && intersection.size / union.size > 0.7) {
+        repeatCount++
+      }
+    }
+    if (repeatCount >= 2) {
+      issues.push('repetitive paragraphs')
+    }
+  }
+
+  // 3. 空洞长文本（无代码块无文件引用）
+  const hasCodeBlock = /```[\s\S]*?```/.test(fullText)
+  const hasFileRef = /[a-zA-Z_\/]+\.[a-zA-Z]{1,5}(:\d+)?/.test(fullText)
+  if (fullText.length > 2000 && !hasCodeBlock && !hasFileRef) {
+    issues.push('long response without code or file references')
+  }
+
+  if (issues.length === 0) return null
+
+  return createUserMessage({
+    content: `[Anti-Slop] Your response shows quality issues: ${issues.join(', ')}. Please be more concise and substantive. Show code, file paths, or concrete actions instead of prose.`,
+    isMeta: true,
+  })
+}
+
+/**
+ * 检查 assistant 消息中是否包含成功的工具调用。
+ * 用于进化写回（Evolution Writeback）判断。
+ */
+function hasSuccessfulToolCalls(assistantMessages: AssistantMessage[]): boolean {
+  return assistantMessages.some(
+    m =>
+      Array.isArray(m.message?.content) &&
+      (m.message.content as any[]).some((b: any) => b.type === 'tool_use'),
+  )
 }

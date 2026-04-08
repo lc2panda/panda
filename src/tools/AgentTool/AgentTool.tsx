@@ -315,11 +315,14 @@ export const AgentTool = buildTool({
       };
     }
 
+    // 能力优先调度：如果未指定 subagent_type，根据 prompt 内容自动推荐
+    const resolvedSubagentType = subagent_type ?? (prompt ? inferAgentTypeFromPrompt(prompt) : undefined)
+
     // Fork subagent experiment routing:
     // - subagent_type set: use it (explicit wins)
     // - subagent_type omitted, gate on: fork path (undefined)
     // - subagent_type omitted, gate off: default general-purpose
-    const effectiveType = subagent_type ?? (isForkSubagentEnabled() ? undefined : GENERAL_PURPOSE_AGENT.agentType);
+    const effectiveType = resolvedSubagentType ?? (isForkSubagentEnabled() ? undefined : GENERAL_PURPOSE_AGENT.agentType);
     const isForkPath = effectiveType === undefined;
     let selectedAgent: AgentDefinition;
     if (isForkPath) {
@@ -1394,4 +1397,26 @@ function resolveTeamName(input: {
 }): string | undefined {
   if (!isAgentSwarmsEnabled()) return undefined;
   return input.team_name || appState.teamContext?.teamName;
+}
+
+/**
+ * 能力优先调度 — 根据 prompt 内容推断最佳 agent 类型。
+ * 参考 Meta_Kim 的 Capability-First Rule。
+ * 纯本地关键词匹配，零 API 调用。
+ */
+function inferAgentTypeFromPrompt(prompt: string): string | undefined {
+  const lower = prompt.toLowerCase()
+
+  // 搜索/探索类 → Explore agent
+  if (/\b(search|find|grep|locate|探索|搜索|查找|哪个文件|在哪)\b/.test(lower)) {
+    return 'Explore'
+  }
+
+  // 规划/设计类 → Plan agent
+  if (/\b(plan|design|architect|策划|设计|方案|规划|how should)\b/.test(lower)) {
+    return 'Plan'
+  }
+
+  // 不确定时不推荐，保持 general-purpose 默认行为
+  return undefined
 }
