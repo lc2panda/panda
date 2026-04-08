@@ -12,6 +12,7 @@ import TextInput from '../../../TextInput.js';
 import { useWizard } from '../../../wizard/index.js';
 import { WizardDialogLayout } from '../../../wizard/WizardDialogLayout.js';
 import { generateAgent } from '../../generateAgent.js';
+import { isZh } from '../../../../utils/i18n.js';
 import type { AgentWizardData } from '../types.js';
 export function GenerateStep(): ReactNode {
   const {
@@ -123,7 +124,7 @@ export function GenerateStep(): ReactNode {
     return <WizardDialogLayout subtitle={subtitle} footerText={<ConfigurableShortcutHint action="confirm:no" context="Settings" fallback="Esc" description="cancel" />}>
         <Box flexDirection="row" alignItems="center">
           <Spinner />
-          <Text color="suggestion"> Generating agent from description...</Text>
+          <Text color="suggestion"> {isZh() ? '从描述生成 Agent...' : 'Generating agent from description...'}</Text>
         </Box>
       </WizardDialogLayout>;
   }

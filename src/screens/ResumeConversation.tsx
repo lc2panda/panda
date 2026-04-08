@@ -33,6 +33,7 @@ import { adoptResumedSessionFile, enrichLogs, isCustomTitleEnabled, loadAllProje
 import type { ThinkingConfig } from '../utils/thinking.js';
 import type { ContentReplacementRecord } from '../utils/toolResultStorage.js';
 import { REPL } from './REPL.js';
+import { isZh } from '../utils/i18n.js';
 function parsePrIdentifier(value: string): number | null {
   const directNumber = parseInt(value, 10);
   if (!isNaN(directNumber) && directNumber > 0) {
@@ -299,7 +300,7 @@ export function ResumeConversation({
   if (loading) {
     return <Box>
         <Spinner />
-        <Text> Loading conversations…</Text>
+        <Text> {isZh() ? '加载对话中…' : 'Loading conversations…'}</Text>
       </Box>;
   }
   if (resuming) {
@@ -327,7 +328,7 @@ function NoConversationsMessage() {
   useKeybinding("app:interrupt", _temp, t0);
   let t1;
   if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
-    t1 = <Box flexDirection="column"><Text>No conversations found to resume.</Text><Text dimColor={true}>Press Ctrl+C to exit and start a new conversation.</Text></Box>;
+    t1 = <Box flexDirection="column"><Text>No conversations found to resume.</Text><Text dimColor={true}>{isZh() ? '按 Ctrl+C 退出并开始新对话' : 'Press Ctrl+C to exit and start a new conversation.'}</Text></Box>;
     $[1] = t1;
   } else {
     t1 = $[1];

@@ -7,6 +7,7 @@ import { getFileStatus, stashToCleanState } from '../utils/git.js';
 import { Select } from './CustomSelect/index.js';
 import { Dialog } from './design-system/Dialog.js';
 import { Spinner } from './Spinner.js';
+import { isZh } from '../utils/i18n.js';
 type TeleportStashProps = {
   onStashAndContinue: () => void;
   onCancel: () => void;
@@ -71,7 +72,7 @@ export function TeleportStash({
     return <Box flexDirection="column" padding={1}>
         <Box marginBottom={1}>
           <Spinner />
-          <Text> Checking git status{figures.ellipsis}</Text>
+          <Text> {isZh() ? '检查 git 状态…' : `Checking git status${figures.ellipsis}`}</Text>
         </Box>
       </Box>;
   }
@@ -94,7 +95,7 @@ export function TeleportStash({
       </Text>
 
       <Box flexDirection="column" paddingLeft={2}>
-        {changedFiles.length > 0 ? showFileCount ? <Text>{changedFiles.length} files changed</Text> : changedFiles.map((file: string, index: number) => <Text key={index}>{file}</Text>) : <Text dimColor>No changes detected</Text>}
+        {changedFiles.length > 0 ? showFileCount ? <Text>{changedFiles.length} {isZh() ? '个文件变更' : 'files changed'}</Text> : changedFiles.map((file: string, index: number) => <Text key={index}>{file}</Text>) : <Text dimColor>{isZh() ? '无变更' : 'No changes detected'}</Text>}
       </Box>
 
       <Text>

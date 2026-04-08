@@ -14,6 +14,7 @@ import { jsonStringify } from '../../utils/slowOperations.js';
 import { ConfigurableShortcutHint } from '../ConfigurableShortcutHint.js';
 import { Byline } from '../design-system/Byline.js';
 import { ProgressBar } from '../design-system/ProgressBar.js';
+import { isZh } from '../../utils/i18n.js';
 import { isEligibleForOverageCreditGrant, OverageCreditUpsell } from '../LogoV2/OverageCreditUpsell.js';
 type LimitBarProps = {
   title: string;
@@ -221,7 +222,7 @@ export function Usage(): React.ReactNode {
   }
   if (!utilization) {
     return <Box flexDirection="column" gap={1}>
-        <Text dimColor>Loading usage data…</Text>
+        <Text dimColor>{isZh() ? '加载用量数据…' : 'Loading usage data…'}</Text>
         <Text dimColor>
           <ConfigurableShortcutHint action="confirm:no" context="Settings" fallback="Esc" description="cancel" />
         </Text>

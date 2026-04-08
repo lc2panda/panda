@@ -14,6 +14,7 @@ import { Byline } from '../design-system/Byline.js';
 import { Dialog } from '../design-system/Dialog.js';
 import { DiffDetailView } from './DiffDetailView.js';
 import { DiffFileList } from './DiffFileList.js';
+import { isZh } from '../../utils/i18n.js';
 type Props = {
   messages: Message[];
   onDone: (result?: string, options?: {
@@ -249,14 +250,14 @@ export function DiffDialog(t0) {
   useKeybindings(t15, t16);
   let t17;
   if ($[38] !== diffData.stats) {
-    t17 = diffData.stats ? <Text dimColor={true}>{diffData.stats.filesCount} {plural(diffData.stats.filesCount, "file")}{" "}changed{diffData.stats.linesAdded > 0 && <Text color="diffAddedWord"> +{diffData.stats.linesAdded}</Text>}{diffData.stats.linesRemoved > 0 && <Text color="diffRemovedWord"> -{diffData.stats.linesRemoved}</Text>}</Text> : null;
+    t17 = diffData.stats ? <Text dimColor={true}>{diffData.stats.filesCount} {isZh() ? "个文件变更" : `${plural(diffData.stats.filesCount, "file")} changed`}{diffData.stats.linesAdded > 0 && <Text color="diffAddedWord"> +{diffData.stats.linesAdded}</Text>}{diffData.stats.linesRemoved > 0 && <Text color="diffRemovedWord"> -{diffData.stats.linesRemoved}</Text>}</Text> : null;
     $[38] = diffData.stats;
     $[39] = t17;
   } else {
     t17 = $[39];
   }
   const subtitle = t17;
-  const headerTitle = currentTurn ? `Turn ${currentTurn.turnIndex}` : "Uncommitted changes";
+  const headerTitle = currentTurn ? (isZh() ? `轮次 ${currentTurn.turnIndex}` : `Turn ${currentTurn.turnIndex}`) : (isZh() ? "未提交的变更" : "Uncommitted changes");
   const headerSubtitle = currentTurn ? currentTurn.userPromptPreview ? `"${currentTurn.userPromptPreview}"` : "" : "(git diff HEAD)";
   let t18;
   if ($[40] !== sourceIndex || $[41] !== sources) {
@@ -276,7 +277,7 @@ export function DiffDialog(t0) {
   let t19;
   bb0: {
     if (diffData.loading) {
-      t19 = "Loading diff\u2026";
+      t19 = isZh() ? "加载差异\u2026" : "Loading diff\u2026";
       break bb0;
     }
     if (currentTurn) {

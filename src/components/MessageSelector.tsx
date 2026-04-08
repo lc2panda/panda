@@ -16,6 +16,7 @@ import { stripDisplayTags } from '../utils/displayTags.js';
 import { createUserMessage, extractTag, isEmptyMessageText, isSyntheticMessage, isToolUseResultMessage } from '../utils/messages.js';
 import { type OptionWithDescription, Select } from './CustomSelect/select.js';
 import { Spinner } from './Spinner.js';
+import { isZh } from '../utils/i18n.js';
 function isTextBlock(block: ContentBlockParam): block is TextBlockParam {
   return block.type === 'text';
 }
@@ -316,14 +317,14 @@ export function MessageSelector({
       <Divider color="suggestion" />
       <Box flexDirection="column" marginX={1} gap={1}>
         <Text bold color="suggestion">
-          Rewind
+          {isZh() ? '回退' : 'Rewind'}
         </Text>
 
         {error && <>
             <Text color="error">Error: {error}</Text>
           </>}
         {!hasMessagesToSelect && <>
-            <Text>Nothing to rewind to yet.</Text>
+            <Text>{isZh() ? '暂无可回退的节点' : 'Nothing to rewind to yet.'}</Text>
           </>}
         {!error && messageToRestore && hasMessagesToSelect && <>
             <Text>

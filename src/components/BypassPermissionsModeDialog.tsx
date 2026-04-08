@@ -1,6 +1,7 @@
 import { c as _c } from "react/compiler-runtime";
 import React, { useCallback } from 'react';
 import { logEvent } from 'src/services/analytics/index.js';
+import { isZh } from '../utils/i18n.js';
 import { Box, Link, Newline, Text } from '../ink.js';
 import { gracefulShutdownSync } from '../utils/gracefulShutdown.js';
 import { updateSettingsForSource } from '../utils/settings/settings.js';
@@ -50,7 +51,7 @@ export function BypassPermissionsModeDialog(t0) {
   const handleEscape = _temp2;
   let t3;
   if ($[3] === Symbol.for("react.memo_cache_sentinel")) {
-    t3 = <Box flexDirection="column" gap={1}><Text>In Bypass Permissions mode, Panda Code will not ask for your approval before running potentially dangerous commands.<Newline />This mode should only be used in a sandboxed container/VM that has restricted internet access and can easily be restored if damaged.</Text><Text>By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.</Text><Link url="https://code.claude.com/docs/en/security" /></Box>;
+    t3 = <Box flexDirection="column" gap={1}><Text>{isZh() ? "在跳过权限模式下，Panda Code 不会在运行潜在危险命令前征求你的同意。" : "In Bypass Permissions mode, Panda Code will not ask for your approval before running potentially dangerous commands."}<Newline />This mode should only be used in a sandboxed container/VM that has restricted internet access and can easily be restored if damaged.</Text><Text>By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.</Text><Link url="https://code.claude.com/docs/en/security" /></Box>;
     $[3] = t3;
   } else {
     t3 = $[3];
@@ -58,10 +59,10 @@ export function BypassPermissionsModeDialog(t0) {
   let t4;
   if ($[4] === Symbol.for("react.memo_cache_sentinel")) {
     t4 = [{
-      label: "No, exit",
+      label: isZh() ? "否，退出" : "No, exit",
       value: "decline"
     }, {
-      label: "Yes, I accept",
+      label: isZh() ? "是，我接受" : "Yes, I accept",
       value: "accept"
     }];
     $[4] = t4;

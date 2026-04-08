@@ -13,6 +13,7 @@ import { Byline } from './design-system/Byline.js';
 import { Dialog } from './design-system/Dialog.js';
 import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js';
 import TextInput from './TextInput.js';
+import { isZh } from '../utils/i18n.js';
 type ExportDialogProps = {
   content: string;
   defaultFilename: string;
@@ -105,7 +106,7 @@ export function ExportDialog({
         </Byline>;
     }
     if (exitState.pending) {
-      return <Text>Press {exitState.keyName} again to exit</Text>;
+      return <Text>{isZh() ? `再按一次 ${exitState.keyName} 退出` : `Press ${exitState.keyName} again to exit`}</Text>;
     }
     return <ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="cancel" />;
   }
@@ -115,9 +116,9 @@ export function ExportDialog({
     context: 'Settings',
     isActive: showFilenameInput
   });
-  return <Dialog title="Export Conversation" subtitle="Select export method:" color="permission" onCancel={handleCancel} inputGuide={renderInputGuide} isCancelActive={!showFilenameInput}>
+  return <Dialog title={isZh() ? "导出对话" : "Export Conversation"} subtitle="Select export method:" color="permission" onCancel={handleCancel} inputGuide={renderInputGuide} isCancelActive={!showFilenameInput}>
       {!showFilenameInput ? <Select options={options} onChange={handleSelectOption} onCancel={handleCancel} /> : <Box flexDirection="column">
-          <Text>Enter filename:</Text>
+          <Text>{isZh() ? '输入文件名:' : 'Enter filename:'}</Text>
           <Box flexDirection="row" gap={1} marginTop={1}>
             <Text>&gt;</Text>
             <TextInput value={filename} onChange={setFilename} onSubmit={handleFilenameSubmit} focus={true} showCursor={true} columns={columns} cursorOffset={cursorOffset} onChangeCursorOffset={setCursorOffset} />

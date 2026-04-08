@@ -7,6 +7,7 @@ import type { z } from 'zod/v4';
 import { Text } from '../../../ink.js';
 import { FileEditTool } from '../../../tools/FileEditTool/FileEditTool.js';
 import { FilePermissionDialog } from '../FilePermissionDialog/FilePermissionDialog.js';
+import { isZh } from '../../../utils/i18n.js';
 import { createSingleEditDiffConfig, type FileEdit, type IDEDiffSupport } from '../FilePermissionDialog/ideDiffConfig.js';
 import type { PermissionRequestProps } from '../PermissionRequest.js';
 type FileEditInput = z.infer<typeof FileEditTool.inputSchema>;
@@ -60,7 +61,7 @@ export function FileEditPermissionRequest(props) {
     t6 = props.onDone;
     t7 = props.onReject;
     t8 = props.workerBadge;
-    t9 = "Edit file";
+    t9 = isZh() ? "编辑文件" : "Edit file";
     t10 = relative(getCwd(), file_path);
     T1 = Text;
     t2 = "Do you want to make this edit to";
