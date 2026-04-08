@@ -450,61 +450,15 @@ EOF
 |------|------|--------|
 | **系统通知** | macOS: osascript / Windows: BurntToast / Linux: notify-send | 默认开启 |
 | **对话内注入** | 全平台 | 被动层自动注入 |
-| **Webhook** | 全平台（WeChat/Telegram/Slack Bot 等） | `~/.pandacc/config/proactive.json` 中设置 `webhookUrl` |
+| **Webhook** | 全平台（微信/Telegram/飞书 Bot 等） | 见 [配置参考 → proactive.json](#proactivejson--主动推送配置) |
 | **Channel 队列** | 全平台 | `~/.pandacc/channels/outbox/notifications.jsonl` |
 
-#### 隐私敏感场景管理
+#### ⚠️ 隐私敏感场景
 
-以下场景涉及个人隐私数据，**默认全部关闭**，需用户在配置文件中**显式开启**才会运行：
+涉及邮件、通讯录、浏览历史、即时消息、屏幕时间等 20 个敏感场景**默认全部关闭**。
+需用户在 `~/.pandacc/config/proactive.json` 中显式开启。
 
-| 分类 | 场景 ID | 读取的数据 | 开启方式 |
-|------|---------|-----------|---------|
-| **邮件** | `email-flagged-reminder` | 邮件标记/星标状态 | `"enabledScenarios": {"email-flagged-reminder": true}` |
-| | `email-unread-important` | 未读邮件数量 | 同上 |
-| | `email-unreplied` | 未回复邮件状态 | 同上 |
-| | `email-daily-digest` | 邮件统计摘要 | 同上 |
-| **通讯录** | `contact-birthday` | 联系人姓名和生日 | 同上 |
-| **即时消息** | `slack-unread` | Slack 未读消息数 | 同上（需配置 SLACK_TOKEN） |
-| **浏览器** | `browser-knowledge-cards` | 浏览历史 URL 和访问频率 | 同上 |
-| | `bookmark-cleanup` | Chrome 书签列表 | 同上 |
-| | `reading-list-overflow` | 阅读列表条目数 | 同上 |
-| **笔记** | `notes-digest` | Apple Notes 标题和摘要 | 同上 |
-| **屏幕** | `screen-time-stats` | 应用使用时长 | 同上 |
-| **安全** | `sensitive-file-scan` | 文件内容敏感词扫描 | 同上 |
-| | `duplicate-file-scan` | 文件哈希比对 | 同上 |
-| **财务** | `cloud-billing-alert` | 云服务账单 | 同上 |
-| **IM 平台** | `wechat-messages` | 微信消息 | 同上（预留） |
-| | `feishu-messages` | 飞书消息 | 同上（预留） |
-| | `dingtalk-messages` | 钉钉消息 | 同上（预留） |
-
-**配置文件**：`~/.pandacc/config/proactive.json`
-
-```json
-{
-  // 通知渠道
-  "webhookUrl": "https://your-bot-webhook.example.com/notify",
-
-  // 阈值自定义（可选，不设则用默认值）
-  "diskFreePercent": 10,
-  "noBreakMinutes": 90,
-  "gitBranchStaleDays": 7,
-
-  // 敏感场景开关（默认全部关闭，显式设为 true 才开启）
-  "enabledScenarios": {
-    "email-flagged-reminder": true,
-    "email-unread-important": true,
-    "contact-birthday": true,
-    "browser-knowledge-cards": true,
-    "notes-digest": true,
-    "screen-time-stats": true
-  }
-}
-```
-
-**原则**：
-- 非敏感场景（磁盘/内存/Git/天气等）**默认开启**，用户可设为 `false` 关闭
-- 敏感场景**默认关闭**，用户必须显式设为 `true` 才激活
-- 所有数据仅在用户本机处理，不上传任何服务器
+> 详见下方 **[配置参考 → proactive.json](#proactivejson--主动推送配置)** 的 `enabledScenarios` 字段。
 
 #### 基础设施
 
@@ -615,6 +569,141 @@ query() 执行顺序：
   ② autocompact()                               ← 只在折叠不够时触发
   ③ API 调用
   ④ 若 413 → contextCollapse.recoverFromOverflow() → 重试
+```
+
+---
+
+## 配置参考
+
+所有配置文件位于 `~/.pandacc/config/` 目录，JSON 格式，不存在时使用默认值。
+
+### settings.json — 全局设置
+
+```json
+// ~/.pandacc/settings.json
+{
+  "enableModelRouting": true,          // Multi-Model Agent Routing
+  "routingPresets": {                   // 路由预设
+    "cost-saving": { "agentModelMap": { "Explore": "haiku", "Plan": "sonnet" } }
+  },
+  "privacyEnhanced": true,             // 隐私增强模式（非 Anthropic 渠道自动启用）
+  "autoMemoryEnabled": true             // 自动记忆系统
+}
+```
+
+### proactive.json — 主动推送配置
+
+```json
+// ~/.pandacc/config/proactive.json
+{
+  // ── 通知渠道 ──
+  "webhookUrl": "https://your-bot.example.com/notify",  // Webhook 推送（微信/Telegram Bot 等）
+
+  // ── 阈值自定义（可选，不设则用默认值） ──
+  "diskFreePercent": 10,        // 磁盘可用百分比告警线
+  "diskFreeGB": 20,             // 磁盘可用 GB 告警线
+  "memoryUsedPercent": 85,      // 内存使用百分比告警线
+  "batteryLowPercent": 20,      // 低电量告警线
+  "networkLatencyMs": 500,      // 网络延迟告警线 (ms)
+  "networkLossPercent": 30,     // 网络丢包告警线
+  "downloadsFileCount": 50,     // 下载目录文件数告警线
+  "desktopFileCount": 30,       // 桌面文件数告警线
+  "gitUncommittedHours": 3,     // Git 未提交告警 (小时)
+  "gitBranchStaleDays": 7,     // Git 分支过期 (天)
+  "noBreakMinutes": 90,         // 持续工作无休息告警 (分钟)
+  "lateNightStartHour": 23,    // 深夜关怀起始时
+  "lateNightEndHour": 5,       // 深夜关怀结束时
+  "sshKeyMaxDays": 365,        // SSH key 轮换告警 (天)
+  "sslCertWarnDays": 30,       // SSL 证书到期告警 (天)
+
+  // ── ⚠️ 敏感场景开关（默认全部关闭，必须显式设为 true 才启用） ──
+  "enabledScenarios": {
+    // 邮件（读取 Mail.app/Outlook 邮件数据库）
+    "email-flagged-reminder": false,
+    "email-unread-important": false,
+    "email-unreplied": false,
+    "email-daily-digest": false,
+    // 通讯录（读取 Contacts.app 联系人姓名和生日）
+    "contact-birthday": false,
+    // 即时消息（读取 Slack/iMessage 未读数）
+    "slack-unread": false,
+    // 浏览器（读取 Chrome 浏览历史和书签）
+    "browser-knowledge-cards": false,
+    "bookmark-cleanup": false,
+    "reading-list-overflow": false,
+    // 笔记（读取 Apple Notes 标题和摘要）
+    "notes-digest": false,
+    // 屏幕时间（读取应用使用时长数据）
+    "screen-time-stats": false,
+    // 安全（读取文件内容做敏感词扫描）
+    "sensitive-file-scan": false,
+    "duplicate-file-scan": false,
+    // 财务
+    "cloud-billing-alert": false,
+    // IM 平台（预留，需配置 Connector）
+    "wechat-messages": false,
+    "feishu-messages": false,
+    "dingtalk-messages": false
+  }
+}
+```
+
+> **⚠️ 重要隐私说明**：上述 `enabledScenarios` 中的场景涉及读取邮件、通讯录、浏览历史、即时消息等**高度敏感的个人数据**。这些场景**默认全部关闭**，Panda Code 不会在未经授权的情况下读取任何个人隐私数据。用户必须**手动编辑配置文件并显式设为 `true`** 才会启用对应的数据采集。所有数据仅在用户本机处理，永不上传。
+
+### privacy.json — 隐私排除规则
+
+```json
+// ~/.pandacc/config/privacy.json
+{
+  "excludePaths": ["~/.ssh/**", "~/.gnupg/**", "~/.aws/**", "**/node_modules/**"],
+  "excludeApps": ["1Password", "Keychain Access"],
+  "excludeBrowserDomains": ["*.bank.*", "*.gov"],
+  "sensitivePatterns": ["password", "secret", "api[._-]?key", "token", "sk-"],
+  "dataRetentionDays": 90
+}
+```
+
+### connectors.json — IM 平台连接器（预留）
+
+```json
+// ~/.pandacc/config/connectors.json
+{
+  "feishu": {
+    "enabled": false,
+    "mode": "mcp",
+    "appId": "cli_xxx",
+    "appSecret": "keychain:feishu-secret"
+  },
+  "dingtalk": {
+    "enabled": false,
+    "mode": "mcp",
+    "appKey": "xxx"
+  },
+  "slack": {
+    "enabled": false,
+    "token": "xoxb-xxx"
+  }
+}
+```
+
+### dates.json — 自定义纪念日
+
+```json
+// ~/.pandacc/config/dates.json
+[
+  { "name": "结婚纪念日", "date": "06-15" },
+  { "name": "妈妈生日", "date": "09-22" }
+]
+```
+
+### habits.json — 习惯打卡
+
+```json
+// ~/.pandacc/config/habits.json
+[
+  { "name": "运动", "frequency": "daily" },
+  { "name": "阅读", "frequency": "daily", "target": "30min" }
+]
 ```
 
 ---
