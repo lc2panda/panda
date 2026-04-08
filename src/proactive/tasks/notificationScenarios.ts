@@ -77,16 +77,18 @@ function readMacNotifications(sinceMs: number): NotificationRecord[] {
         let body = ''
 
         if (row.data && Buffer.isBuffer(row.data) && row.data.length > 0) {
-          // 尝试用 plutil 将 binary plist 转 JSON
+          // 用 plutil 将 binary plist 转 xml1（json 格式不支持 plist 某些类型）
           try {
-            const jsonStr = execSync('plutil -convert json -o - -', {
+            const xmlStr = execSync('plutil -convert xml1 -o - -', {
               input: row.data,
               encoding: 'utf-8',
               timeout: 3000,
             })
-            const obj = JSON.parse(jsonStr)
-            title = obj.titl || obj.title || ''
-            body = obj.body || obj.subt || ''
+            // 从 XML 中提取 req 字典下的 titl/body
+            const titlMatch = xmlStr.match(/<key>titl<\/key>\s*<string>([^<]*)<\/string>/)
+            const bodyMatch = xmlStr.match(/<key>body<\/key>\s*<string>([^<]*)<\/string>/)
+            title = titlMatch?.[1] || ''
+            body = bodyMatch?.[1] || ''
           } catch {
             // 降级：正则提取 UTF-8 明文
             const text = row.data.toString('utf-8')
