@@ -88,11 +88,13 @@ export function pushNotification(notification: PandaNotification): void {
   notificationQueue.push(notification)
   if (notificationQueue.length > MAX_QUEUE) notificationQueue.shift()
 
-  // macOS 系统通知
+  // macOS 系统通知（使用 execFileSync 避免 shell 注入）
   if (notification.channel === 'system') {
     try {
-      const { execSync } = require('child_process')
-      execSync(`osascript -e 'display notification "${notification.body.replace(/"/g, '\\"')}" with title "Panda Code" subtitle "${notification.title.replace(/"/g, '\\"')}"'`, { timeout: 3000 })
+      const { execFileSync } = require('child_process')
+      execFileSync('osascript', ['-e',
+        `display notification ${JSON.stringify(notification.body)} with title "Panda Code" subtitle ${JSON.stringify(notification.title)}`
+      ], { timeout: 3000 })
     } catch {}
   }
 }
