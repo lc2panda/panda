@@ -885,6 +885,8 @@ export function classifyFile(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase() || ''
   const name = filePath.split('/').pop()?.toLowerCase() || ''
 
+  // 截图检测优先（在扩展名匹配之前）
+  if (name.includes('screenshot') || name.includes('截屏') || name.includes('screen shot')) return 'screenshots'
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'heic', 'heif'].includes(ext)) return 'images'
   if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pages', 'numbers', 'key'].includes(ext)) return 'documents'
   if (['ts', 'tsx', 'js', 'jsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h', 'swift', 'kt'].includes(ext)) return 'code'
@@ -893,7 +895,6 @@ export function classifyFile(filePath: string): string {
   if (['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg'].includes(ext)) return 'audio'
   if (['json', 'csv', 'xml', 'yaml', 'yml', 'toml', 'sql', 'db', 'sqlite'].includes(ext)) return 'data'
   if (['md', 'txt', 'rtf', 'log'].includes(ext)) return 'text'
-  if (name.includes('screenshot') || name.includes('截屏') || name.includes('screen shot')) return 'screenshots'
 
   return 'other'
 }
