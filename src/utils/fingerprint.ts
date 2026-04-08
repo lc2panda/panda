@@ -8,10 +8,26 @@ import type { AssistantMessage, UserMessage } from '../types/message.js'
 export const FINGERPRINT_SALT = '59cf53e54c78'
 
 /**
- * Extracts text content from the first user message.
+ * Returns true if a text string is a system-reminder injection (e.g. hooks,
+ * skills, deferred-tools, MCP instructions). These blocks are volatile across
+ * resume and must be excluded from fingerprint computation to keep the
+ * server-side cache key stable.
+ */
+function isSystemReminderText(text: string): boolean {
+  const trimmed = text.trimStart()
+  return (
+    trimmed.startsWith('<system-reminder>') ||
+    trimmed.startsWith('<system-reminder\n')
+  )
+}
+
+/**
+ * Extracts text content from the first user message, skipping
+ * system-reminder blocks that can drift on resume and destabilise
+ * the fingerprint (→ cache bust).
  *
  * @param messages - Array of internal message types
- * @returns First text content, or empty string if not found
+ * @returns First real user text content, or empty string if not found
  */
 export function extractFirstMessageText(
   messages: (UserMessage | AssistantMessage)[],
@@ -24,11 +40,17 @@ export function extractFirstMessageText(
   const content = firstUserMessage.message.content
 
   if (typeof content === 'string') {
-    return content
+    return isSystemReminderText(content) ? '' : content
   }
 
   if (Array.isArray(content)) {
-    const textBlock = content.find(block => block.type === 'text')
+    // Find the first real text block (skip system-reminder injections)
+    const textBlock = content.find(
+      block =>
+        block.type === 'text' &&
+        'text' in block &&
+        !isSystemReminderText(block.text),
+    )
     if (textBlock && textBlock.type === 'text') {
       return textBlock.text
     }
