@@ -15,7 +15,10 @@ import { registerSimplifySkill } from './simplify.js'
 import { registerSkillifySkill } from './skillify.js'
 import { registerStuckSkill } from './stuck.js'
 import { registerUpdateConfigSkill } from './updateConfig.js'
+import { registerCaptureSkill } from './capture.js'
+import { registerLearnSkill } from './learn.js'
 import { registerVerifySkill } from './verify.js'
+import { registerWriteSkill } from './write.js'
 
 /**
  * Initialize all bundled skills.
@@ -42,6 +45,9 @@ export function initBundledSkills(): void {
   registerCleanupSkill()
   registerHealthCheckSkill()
   registerRemindSkill()
+  registerWriteSkill()
+  registerCaptureSkill()
+  registerLearnSkill()
   // Panda Code: /dream skill available unconditionally — memory consolidation
   // should be accessible to all users, not just KAIROS mode.
   {

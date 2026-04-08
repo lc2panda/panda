@@ -157,10 +157,7 @@ After writing, tell the user:
 `
 
 export function registerSkillifySkill(): void {
-  if (process.env.USER_TYPE !== 'ant') {
-    return
-  }
-
+  // Panda Code: /skillify available to all users (removed ant-only gate)
   registerBundledSkill({
     name: 'skillify',
     description:
