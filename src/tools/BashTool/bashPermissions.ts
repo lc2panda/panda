@@ -1658,6 +1658,66 @@ export async function executeAsyncClassifierCheck(
 }
 
 /**
+ * 危险命令模式硬拦截。
+ * 匹配到的命令直接返回 'ask'（要求用户确认），无法被 allow 规则绕过。
+ */
+function checkDangerousCommandPatterns(
+  command: string,
+): PermissionResult | null {
+  const trimmed = command.trim()
+
+  const patterns: Array<{ regex: RegExp; message: string }> = [
+    // 1. 递归删除根目录或用户主目录
+    {
+      regex: /\brm\s+(-[a-zA-Z]*[rf][a-zA-Z]*\s+)*\s*(\/|~\/?\s*$|\$HOME\s*$)/,
+      message: 'Dangerous: rm targeting root or home directory',
+    },
+    // 2. Git 硬重置（丢弃所有未提交更改）
+    {
+      regex: /\bgit\s+reset\s+--hard\b/,
+      message: 'Dangerous: git reset --hard discards all uncommitted changes',
+    },
+    // 3. Git 强制推送（可能覆盖远程历史）
+    {
+      regex: /\bgit\s+push\s+.*(-f|--force)\b/,
+      message: 'Dangerous: git push --force may overwrite remote history',
+    },
+    // 4. 递归修改权限为 777（安全风险）
+    {
+      regex: /\bchmod\s+(-[a-zA-Z]*R[a-zA-Z]*\s+)*.*\b777\b/,
+      message:
+        'Dangerous: chmod 777 recursively removes all permission restrictions',
+    },
+    // 5. Fork bomb 和类似的资源耗尽攻击
+    {
+      regex: /:\(\)\s*\{.*:\|:.*&.*\}\s*;?\s*:/,
+      message: 'Dangerous: fork bomb detected',
+    },
+    // 6. 覆盖磁盘设备（数据毁灭）
+    {
+      regex: /\b(dd|mkfs)\s+.*\b(\/dev\/[a-z])/,
+      message: 'Dangerous: direct disk device operation',
+    },
+    // 7. 清空 Git 历史
+    {
+      regex: /\bgit\s+reflog\s+expire\s+--expire=now\s+--all\b/,
+      message: 'Dangerous: git reflog expire destroys recovery points',
+    },
+  ]
+
+  for (const { regex, message } of patterns) {
+    if (regex.test(trimmed)) {
+      return {
+        behavior: 'ask' as const,
+        message: `⚠️ ${message}. Proceed?`,
+      }
+    }
+  }
+
+  return null
+}
+
+/**
  * The main implementation to check if we need to ask for user permission to call BashTool with a given input
  */
 export async function bashToolHasPermission(
@@ -1665,6 +1725,10 @@ export async function bashToolHasPermission(
   context: ToolUseContext,
   getCommandSubcommandPrefixFn = getCommandSubcommandPrefix,
 ): Promise<PermissionResult> {
+  // 危险命令硬拦截 — 在所有其他权限检查之前
+  const dangerousResult = checkDangerousCommandPatterns(input.command)
+  if (dangerousResult) return dangerousResult
+
   let appState = context.getAppState()
 
   // 0. AST-based security parse. This replaces both tryParseShellCommand

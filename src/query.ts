@@ -1267,6 +1267,31 @@ async function* queryLoop(
         return { reason: 'completed' }
       }
 
+      // Completion Guard: detect premature completion claims without evidence
+      if (
+        !stopHookActive &&
+        querySource.startsWith('repl_main_thread')
+      ) {
+        const guardMessage = checkCompletionGuard(assistantMessages, messagesForQuery)
+        if (guardMessage) {
+          logForDebugging('Completion Guard triggered — requesting verification evidence')
+          const next: State = {
+            messages: [...messagesForQuery, ...assistantMessages, guardMessage],
+            toolUseContext,
+            autoCompactTracking: tracking,
+            maxOutputTokensRecoveryCount: 0,
+            hasAttemptedReactiveCompact,
+            maxOutputTokensOverride: undefined,
+            pendingToolUseSummary: undefined,
+            stopHookActive: undefined,
+            turnCount,
+            transition: { reason: 'completion_guard' },
+          }
+          state = next
+          continue
+        }
+      }
+
       const stopHookResult = yield* handleStopHooks(
         messagesForQuery,
         assistantMessages,
@@ -1729,4 +1754,85 @@ async function* queryLoop(
     }
     state = next
   } // while (true)
+}
+
+/**
+ * Completion Guard — 检测 AI 是否声称完成但缺少验证证据。
+ * 仅在以下条件同时满足时触发：
+ * 1. AI 最后一条消息包含"完成"类关键词
+ * 2. 本轮没有工具调用（纯文本回复就声称完成）
+ * 3. 最近消息中也没有工具调用结果作为证据
+ * 返回 null 表示通过，返回 UserMessage 表示需要补充证据。
+ */
+function checkCompletionGuard(
+  assistantMessages: AssistantMessage[],
+  allMessages: Message[],
+): UserMessage | null {
+  if (assistantMessages.length === 0) return null
+
+  const lastMsg = assistantMessages[assistantMessages.length - 1]
+  if (!lastMsg?.message?.content) return null
+
+  const contentBlocks = Array.isArray(lastMsg.message.content)
+    ? lastMsg.message.content
+    : []
+
+  // 有工具调用说明确实做了事情，放行
+  const hasToolUse = contentBlocks.some((b: any) => b.type === 'tool_use')
+  if (hasToolUse) return null
+
+  // 提取文本内容
+  const textContent = contentBlocks
+    .filter((b: any) => b.type === 'text')
+    .map((b: any) => b.text)
+    .join('\n')
+
+  if (!textContent) return null
+
+  // 检查是否包含完成声明关键词
+  const completionPatterns = [
+    /已[全部]*完成/,
+    /任务完成/,
+    /全部.*完成/,
+    /all.*(?:done|completed|finished)/i,
+    /task.*(?:completed|finished|done)/i,
+    /successfully completed/i,
+    /工作.*完毕/,
+  ]
+
+  const hasCompletionClaim = completionPatterns.some(p => p.test(textContent))
+  if (!hasCompletionClaim) return null
+
+  // 检查文本中是否已包含验证证据
+  const evidencePatterns = [
+    /tests?\s+pass/i,
+    /build\s+success/i,
+    /构建.*成功/,
+    /测试.*通过/,
+    /验证.*通过/,
+    /EXIT_CODE[:\s]*0/i,
+    /\$\s+\S/,
+  ]
+
+  const hasEvidence = evidencePatterns.some(p => p.test(textContent))
+  if (hasEvidence) return null
+
+  // 检查最近几条消息是否有工具调用结果作为证据
+  const recentMessages = allMessages.slice(-6)
+  const hasRecentToolResults = recentMessages.some(
+    m =>
+      m.type === 'assistant' &&
+      Array.isArray((m as AssistantMessage).message?.content) &&
+      ((m as AssistantMessage).message.content as any[]).some(
+        (b: any) => b.type === 'tool_use',
+      ),
+  )
+  if (hasRecentToolResults) return null
+
+  // 触发 guard：要求补充证据
+  return createUserMessage({
+    content:
+      '[Completion Guard] You claimed the task is complete, but no verification evidence was found in your response or recent tool calls. Please provide concrete evidence: run tests, verify the build, or show the actual output before claiming completion.',
+    isMeta: true,
+  })
 }
