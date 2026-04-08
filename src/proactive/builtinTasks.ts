@@ -243,6 +243,145 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
       }
     },
   },
+  // ─── 日历事件主动提醒 ───
+  {
+    id: 'calendar-reminder',
+    description: '日历事件提醒 · Calendar event reminder',
+    cron: '*/30 * * * *', // 每 30 分钟扫描一次
+    priority: 'critical',
+    enabled: true,
+    condition: () => true, // 始终启用，不依赖 proactive 模式
+    action: async () => {
+      logForDebugging('[builtinTasks] calendar-reminder: scanning upcoming events')
+      try {
+        const { readCalendarEvents } = await import('../memdir/memdir.js')
+        const events = await readCalendarEvents(1) // 未来 1 天
+        if (events.length === 0) return
+
+        const now = Date.now()
+        for (const evt of events) {
+          // 解析事件开始时间
+          let evtTime: number | null = null
+          try {
+            evtTime = new Date(evt.startDate).getTime()
+          } catch {
+            // AppleScript 返回的日期格式可能不标准，尝试其他解析
+            try {
+              const { execSync } = require('child_process')
+              const parsed = execSync(
+                `date -j -f "%A, %B %e, %Y at %I:%M:%S %p" "${evt.startDate}" "+%s" 2>/dev/null || date -j -f "%Y年%m月%d日 %A %H:%M:%S" "${evt.startDate}" "+%s" 2>/dev/null`,
+                { encoding: 'utf-8', timeout: 3000 },
+              ).trim()
+              if (parsed) evtTime = parseInt(parsed, 10) * 1000
+            } catch {}
+          }
+          if (!evtTime || isNaN(evtTime)) continue
+
+          const minutesBefore = (evtTime - now) / 60000
+
+          // 提前 30 分钟和 10 分钟各提醒一次
+          if ((minutesBefore > 8 && minutesBefore <= 30) ||
+              (minutesBefore > 0 && minutesBefore <= 10)) {
+            const { pushNotification } = await import('../assistant/sense.js')
+            const timeLabel = minutesBefore <= 10
+              ? `${Math.round(minutesBefore)} 分钟后`
+              : `${Math.round(minutesBefore)} 分钟后`
+            const body = `${timeLabel}：${evt.title}${evt.location ? ` @ ${evt.location}` : ''}`
+
+            // 系统通知（macOS）
+            pushNotification({
+              type: 'action',
+              title: '📅 日历提醒',
+              body,
+              channel: 'system',
+            })
+
+            // 同时记录到工作记忆，下次对话时模型可见
+            try {
+              const { setWorkingMemory } = await import('../assistant/workingMemory.js')
+              setWorkingMemory(`calendar-upcoming-${evt.title.slice(0, 20)}`, {
+                title: evt.title,
+                startDate: evt.startDate,
+                location: evt.location,
+                minutesBefore: Math.round(minutesBefore),
+              })
+            } catch {}
+
+            logForDebugging(`[builtinTasks] calendar-reminder: notified "${evt.title}" in ${Math.round(minutesBefore)}min`)
+          }
+        }
+      } catch (e) {
+        logForDebugging(`[builtinTasks] calendar-reminder failed: ${(e as Error).message}`)
+      }
+    },
+  },
+  // ─── Git 长时间未提交提醒 ───
+  {
+    id: 'git-uncommitted-reminder',
+    description: 'Git 未提交提醒 · Uncommitted changes reminder',
+    cron: '0 */1 * * *', // 每小时检查一次
+    priority: 'normal',
+    enabled: true,
+    condition: () => true,
+    action: async () => {
+      logForDebugging('[builtinTasks] git-uncommitted-reminder: checking')
+      try {
+        const { execSync } = require('child_process')
+        const status = execSync('git status --porcelain', { encoding: 'utf-8', timeout: 3000 })
+        const changedFiles = status.split('\n').filter(Boolean).length
+        if (changedFiles === 0) return
+
+        const lastCommitTime = execSync('git log -1 --format=%ct', { encoding: 'utf-8', timeout: 3000 }).trim()
+        const elapsed = Date.now() - parseInt(lastCommitTime, 10) * 1000
+        const threeHours = 3 * 60 * 60 * 1000
+
+        if (elapsed > threeHours) {
+          const { pushNotification } = await import('../assistant/sense.js')
+          pushNotification({
+            type: 'warning',
+            title: '⚠️ Git 提醒',
+            body: `${changedFiles} 个文件未提交，距上次 commit 已 ${Math.round(elapsed / 3600000)} 小时`,
+            channel: 'system',
+          })
+        }
+      } catch (e) {
+        logForDebugging(`[builtinTasks] git-uncommitted-reminder failed: ${(e as Error).message}`)
+      }
+    },
+  },
+  // ─── 记忆画像过期提醒 ───
+  {
+    id: 'profile-stale-reminder',
+    description: '画像过期提醒 · Profile staleness reminder',
+    cron: '0 9 * * *', // 每天早上 9 点检查一次
+    priority: 'low',
+    enabled: true,
+    condition: canRun,
+    action: async () => {
+      logForDebugging('[builtinTasks] profile-stale-reminder: checking')
+      try {
+        const { getAutoMemPath } = await import('../memdir/paths.js')
+        const { statSync: statSyncFs } = require('fs')
+        const { join } = require('path')
+        const memDir = getAutoMemPath()
+        const profilePath = join(memDir, 'semantic', 'profile.md')
+        const stat = statSyncFs(profilePath)
+        const daysSince = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24)
+
+        if (daysSince > 14) {
+          const { pushNotification } = await import('../assistant/sense.js')
+          pushNotification({
+            type: 'info',
+            title: '🧠 记忆提醒',
+            body: `用户画像已 ${Math.round(daysSince)} 天未更新，建议在下次会话中运行 /dream`,
+            channel: 'system',
+          })
+        }
+      } catch (e) {
+        logForDebugging(`[builtinTasks] profile-stale-reminder failed: ${(e as Error).message}`)
+      }
+    },
+  },
 ]
 
 // 导出兼容 ProactiveTask[] 接口（skipIf 在 action 中内部处理）
