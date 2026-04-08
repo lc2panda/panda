@@ -123,6 +123,13 @@ const HIGH_PRIVACY_SCENARIOS = new Set([
   'notification-digest',
   'notification-urgent',
   'notification-stats',
+  // IM 聚合（跨平台即时消息/日历/审批/文档数据）
+  'im-unread-digest',
+  'im-daily-brief',
+  'im-calendar-sync',
+  'im-approval-alert',
+  'im-document-update',
+  'im-reverse-push',
 ])
 
 export function isScenarioEnabled(scenarioId: string): boolean {
