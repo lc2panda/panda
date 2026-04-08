@@ -455,7 +455,7 @@ EOF
 
 #### ⚠️ 隐私敏感场景
 
-涉及邮件、通讯录、浏览历史、即时消息、屏幕时间等 20 个敏感场景**默认全部关闭**。
+涉及邮件、通讯录、浏览历史、即时消息、通知中心、屏幕时间、IM 平台等 **29 个**敏感场景**默认全部关闭**。
 需用户在 `~/.pandacc/config/proactive.json` 中显式开启。
 
 > 详见下方 **[配置参考 → proactive.json](#proactivejson--主动推送配置)** 的 `enabledScenarios` 字段。
@@ -618,32 +618,43 @@ query() 执行顺序：
 
   // ── ⚠️ 敏感场景开关（默认全部关闭，必须显式设为 true 才启用） ──
   "enabledScenarios": {
-    // 邮件（读取 Mail.app/Outlook 邮件数据库）
-    "email-flagged-reminder": false,
-    "email-unread-important": false,
-    "email-unreplied": false,
-    "email-daily-digest": false,
-    // 通讯录（读取 Contacts.app 联系人姓名和生日）
-    "contact-birthday": false,
-    // 即时消息（读取 Slack/iMessage 未读数）
-    "slack-unread": false,
-    // 浏览器（读取 Chrome 浏览历史和书签）
-    "browser-knowledge-cards": false,
-    "bookmark-cleanup": false,
-    "reading-list-overflow": false,
-    // 笔记（读取 Apple Notes 标题和摘要）
-    "notes-digest": false,
-    // 屏幕时间（读取应用使用时长数据）
-    "screen-time-stats": false,
-    // 安全（读取文件内容做敏感词扫描）
-    "sensitive-file-scan": false,
-    "duplicate-file-scan": false,
+    // 邮件（读取 Mail.app/Outlook 邮件数据库，macOS 需 FDA）
+    "email-flagged-reminder": false,   // 星标/待办邮件提醒
+    "email-unread-important": false,   // 重要未读邮件
+    "email-unreplied": false,          // 48h 未回复邮件
+    "email-daily-digest": false,       // 邮件每日摘要
+    // 通讯录（读取 Contacts.app，macOS AppleScript 首次弹窗授权）
+    "contact-birthday": false,         // 联系人生日提醒
+    // 即时消息
+    "slack-unread": false,             // Slack 未读（需 SLACK_TOKEN）
+    // 浏览器（读取 Chrome SQLite）
+    "browser-knowledge-cards": false,  // 高频页面知识卡片
+    "bookmark-cleanup": false,         // 书签整理建议
+    "reading-list-overflow": false,    // 阅读列表过长
+    // 笔记（读取 Apple Notes SQLite，macOS 需 FDA）
+    "notes-digest": false,             // 笔记汇总
+    // 屏幕时间（macOS 读取 knowledgeC.db 需 FDA）
+    "screen-time-stats": false,        // 屏幕时间统计
+    // 安全（读取文件内容做扫描）
+    "sensitive-file-scan": false,      // 敏感文件暴露扫描
+    "duplicate-file-scan": false,      // 重复文件检测
     // 财务
-    "cloud-billing-alert": false,
-    // IM 平台（预留，需配置 Connector）
-    "wechat-messages": false,
-    "feishu-messages": false,
-    "dingtalk-messages": false
+    "cloud-billing-alert": false,      // 云服务账单（需 AWS/GCP 凭据）
+    // 系统通知中心（macOS 需 FDA，Windows 无需额外权限）
+    "notification-digest": false,      // 通知日频简报
+    "notification-urgent": false,      // 紧急通知实时转发
+    "notification-stats": false,       // 通知统计趋势
+    // IM 平台（需配置 connectors.json）
+    "wechat-messages": false,          // 微信消息（企微API或本地DB解密）
+    "feishu-messages": false,          // 飞书消息（需 App ID/Secret）
+    "dingtalk-messages": false,        // 钉钉消息（需 App Key/Secret）
+    // IM 聚合场景
+    "im-unread-digest": false,         // 跨平台未读汇总
+    "im-daily-brief": false,           // 每日 IM 简报
+    "im-calendar-sync": false,         // 跨平台日历冲突
+    "im-approval-alert": false,        // 待审批催办
+    "im-document-update": false,       // 关注文档更新
+    "im-reverse-push": false           // 反向推送到 IM 平台
   }
 }
 ```
@@ -663,25 +674,48 @@ query() 执行顺序：
 }
 ```
 
-### connectors.json — IM 平台连接器（预留）
+### connectors.json — IM 平台连接器
 
 ```json
 // ~/.pandacc/config/connectors.json
 {
   "feishu": {
     "enabled": false,
-    "mode": "mcp",
-    "appId": "cli_xxx",
-    "appSecret": "keychain:feishu-secret"
+    "mode": "mcp",                          // mcp（推荐）| api
+    "appId": "cli_xxx",                     // 飞书开放平台 App ID
+    "appSecret": "keychain:feishu-secret",  // 建议存 Keychain
+    "mcpCommand": "npx @anthropic-ai/mcp feishu-mcp"  // MCP 模式启动命令
   },
   "dingtalk": {
     "enabled": false,
-    "mode": "mcp",
-    "appKey": "xxx"
+    "mode": "mcp",                          // mcp（推荐）| api
+    "appKey": "xxx",                        // 钉钉开放平台 App Key
+    "appSecret": "keychain:dingtalk-secret",
+    "mcpProfiles": "calendar,department,tasks,notice"  // 启用的 MCP 功能模块
   },
   "slack": {
     "enabled": false,
-    "token": "xoxb-xxx"
+    "token": "xoxb-xxx"                     // Slack Bot Token（或设 SLACK_TOKEN 环境变量）
+  },
+  "telegram": {
+    "enabled": false,
+    "botToken": "123456:ABC-DEF..."         // @BotFather 获取的 Bot Token
+  },
+  "wechat": {
+    "enabled": false,
+    "mode": "wecom",                        // wecom（企业微信API）| local-db（本地解密）
+    // ── 企业微信模式 ──
+    "corpId": "ww_xxx",                     // 企业 ID
+    "agentId": "1000002",                   // 应用 Agent ID
+    "secret": "keychain:wecom-secret",      // 应用 Secret
+    // ── 本地 DB 模式（需解密密钥，见"系统授权与数据解密指南"） ──
+    "dbKey": ""                             // 32 字节 hex 解密密钥
+  },
+  "teams": {
+    "enabled": false,
+    "tenantId": "Azure AD 租户 ID",
+    "clientId": "应用客户端 ID",
+    "clientSecret": "keychain:teams-secret"
   }
 }
 ```
@@ -705,6 +739,194 @@ query() 执行顺序：
   { "name": "阅读", "frequency": "daily", "target": "30min" }
 ]
 ```
+
+---
+
+## ⚠️ 系统授权与数据解密指南
+
+超级助手的部分高级感知能力需要**系统级权限授权**或**数据解密操作**。以下按平台分别说明。所有操作均为**一次性**，授权后永久生效。
+
+### macOS 系统授权
+
+#### 1. 通知中心感知（Full Disk Access）
+
+通知中心数据库受 macOS TCC 保护（macOS Sequoia 15+ / Tahoe 26+），需要授予终端 **完全磁盘访问权限**。
+
+**授权步骤**：
+```
+系统设置 → 隐私与安全性 → 完全磁盘访问权限 → 点击 + → 选择你的终端应用
+```
+
+- **iTerm2**：添加 `/Applications/iTerm.app`
+- **Terminal.app**：添加 `/System/Applications/Utilities/Terminal.app`
+- **VS Code 终端**：添加 `/Applications/Visual Studio Code.app`
+- **Ghostty**：添加 `/Applications/Ghostty.app`
+
+授权后重启终端生效。影响的场景：`notification-digest`、`notification-urgent`、`notification-stats`。
+
+**验证命令**：
+```bash
+sqlite3 ~/Library/Group\ Containers/group.com.apple.usernoted/db2/db "SELECT COUNT(*) FROM record"
+# 正常返回数字 = 授权成功
+# "operation not permitted" = 未授权
+```
+
+**通知数据库路径**：
+| macOS 版本 | 路径 |
+|-----------|------|
+| Sequoia (15) ~ Tahoe (26) | `~/Library/Group Containers/group.com.apple.usernoted/db2/db` |
+| High Sierra ~ Ventura (10.13~13) | `$(getconf DARWIN_USER_DIR)/com.apple.notificationcenter/db2/db` |
+
+#### 2. 日历/通讯录/邮件读取
+
+首次读取时 macOS 会弹出系统授权对话框，点击"允许"即可：
+
+| 数据 | 触发场景 | 授权方式 |
+|------|---------|---------|
+| 日历 | `calendar-reminder`、会议提醒 | AppleScript 首次调用时系统弹窗授权 |
+| 通讯录 | `contact-birthday` | AppleScript 首次调用时系统弹窗授权 |
+| 邮件 | `email-*` 系列场景 | Mail.app SQLite 需 FDA（同上第 1 步） |
+| Apple Notes | `notes-digest` | Apple Notes SQLite 需 FDA |
+
+#### 3. 微信本地数据库解密（可选，高级）
+
+微信 4.x 的本地数据库使用 **SQLCipher 4** 加密。如需读取聊天记录、通讯录等数据，需要提取解密密钥。
+
+**⚠️ 风险说明**：此操作涉及从微信进程内存中提取加密密钥，属于灰色地带。仅限用户本机使用，数据不出设备。
+
+**微信 4.x 数据库结构**（macOS 路径）：
+```
+~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/{用户名}_{hash}/db_storage/
+├── message/          # 聊天记录（message_0~9.db，分片，最大 ~800MB）
+├── contact/          # 通讯录（contact.db ~20MB）
+├── session/          # 会话列表（session.db ~2MB）
+├── sns/              # 朋友圈（sns.db ~11MB）
+├── favorite/         # 收藏（favorite.db ~3MB）
+├── emoticon/         # 表情（emoticon.db ~1MB）
+└── head_image/       # 头像（head_image.db ~25MB）
+```
+
+**解密步骤**：
+
+1. **安装解密工具**（二选一）：
+   ```bash
+   # 方案 A：使用 wechat-db-decrypt-macos（推荐）
+   git clone https://github.com/Thearas/wechat-db-decrypt-macos.git
+   cd wechat-db-decrypt-macos
+   pip3 install -r requirements.txt
+   python3 decrypt.py
+   
+   # 方案 B：使用 wechat-decrypt
+   git clone https://github.com/ylytdeng/wechat-decrypt.git
+   cd wechat-decrypt
+   pip3 install -r requirements.txt
+   python3 main.py
+   ```
+
+2. **提取密钥**：工具会自动扫描微信进程内存，输出 32 字节十六进制密钥。需要微信保持运行状态。
+
+3. **配置到 Panda Code**：
+   ```json
+   // ~/.pandacc/config/connectors.json
+   {
+     "wechat": {
+       "enabled": true,
+       "mode": "local-db",
+       "dbKey": "提取到的32字节hex密钥",
+       "dbPath": "自动检测，通常无需手动填写"
+     }
+   }
+   ```
+
+4. **启用场景**：
+   ```json
+   // ~/.pandacc/config/proactive.json
+   { "enabledScenarios": { "wechat-messages": true } }
+   ```
+
+5. **验证**：
+   ```bash
+   panda  # 启动后在对话中询问"检查微信数据连接"
+   ```
+
+### Windows 系统授权
+
+#### 1. 通知中心感知
+
+Windows 通知数据库无需特殊权限，位于当前用户目录下可直接读取：
+
+```
+%LOCALAPPDATA%\Microsoft\Windows\Notifications\wpndatabase.db
+```
+
+**注意**：Windows 的通知在用户清除后**立即从数据库删除**。Panda Code 会每 5 分钟轮询捕获新通知并本地持久化，但无法恢复已清除的历史通知。
+
+#### 2. 邮件/日历/通讯录
+
+Windows 平台通过 **Outlook COM 接口** 或 **Microsoft Graph API** 读取：
+
+| 方案 | 适用场景 | 配置 |
+|------|---------|------|
+| Outlook COM | 已安装 Outlook 桌面版 | 无需额外配置，首次调用时 Outlook 弹窗授权 |
+| Graph API | Microsoft 365 / Teams | 需在 Azure AD 注册应用，配置 connectors.json |
+
+**Graph API 配置**：
+```json
+// ~/.pandacc/config/connectors.json
+{
+  "teams": {
+    "enabled": true,
+    "tenantId": "Azure AD 租户 ID",
+    "clientId": "应用客户端 ID",
+    "clientSecret": "keychain:teams-secret"
+  }
+}
+```
+
+#### 3. 微信本地数据库解密（Windows）
+
+Windows 微信数据库路径：
+```
+%APPDATA%\Tencent\WeChat\xwechat_files\{用户名}_{hash}\db_storage\
+```
+
+**解密步骤**（与 macOS 类似）：
+
+1. **安装解密工具**：
+   ```powershell
+   git clone https://github.com/ylytdeng/wechat-decrypt.git
+   cd wechat-decrypt
+   pip install -r requirements.txt
+   python main.py
+   ```
+
+2. **提取密钥**：工具扫描微信进程内存提取密钥。
+
+3. **配置**：同 macOS，写入 `connectors.json` 的 `wechat.dbKey` 字段。
+
+### Linux 说明
+
+- **通知**：通过 D-Bus 实时监听（`org.freedesktop.Notifications`），无需特殊权限
+- **微信**：Linux 版微信功能有限，建议使用企业微信 API 或 Webhook 方案
+- **邮件**：通过 IMAP 协议配置（写入 connectors.json）
+
+### IM 平台连接器授权
+
+| 平台 | 授权方式 | 配置位置 |
+|------|---------|---------|
+| **飞书/Lark** | 飞书开放平台创建企业应用 → 获取 App ID/Secret | `connectors.json → feishu` |
+| **钉钉** | 钉钉开放平台创建应用 → 获取 App Key/Secret | `connectors.json → dingtalk` |
+| **Slack** | Slack API 创建 Bot → 获取 Bot Token | `connectors.json → slack` 或 `SLACK_TOKEN` 环境变量 |
+| **Telegram** | @BotFather 创建 Bot → 获取 Bot Token | `connectors.json → telegram` |
+| **企业微信** | 企业微信管理后台 → 应用管理 → 创建应用 | `connectors.json → wechat` (mode: wecom) |
+| **Teams** | Azure AD → 应用注册 → 获取 Tenant/Client ID | `connectors.json → teams` |
+
+所有 Token/Secret 建议使用系统 Keychain 存储（配置值前缀 `keychain:`）：
+```json
+{ "appSecret": "keychain:feishu-app-secret" }
+```
+
+Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Service 读取。
 
 ---
 
