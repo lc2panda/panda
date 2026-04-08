@@ -62,7 +62,7 @@
 ### `/help`
 - **用法**: `/help`
 - **说明**: 显示交互式帮助界面，包含所有可用命令和快捷键
-- **实测**: ✅ 显示 Panda Code v2.1.92 帮助信息
+- **实测**: ✅ 显示 Panda Code v2.5.1 帮助信息
 
 ### `/exit` (别名: `/quit`)
 - **用法**: `/exit`
@@ -76,7 +76,7 @@
 ### `/version`
 - **用法**: `/version`
 - **说明**: 显示当前版本和构建时间
-- **实测**: ✅ 输出 `2.1.92 (Panda Code)`
+- **实测**: ✅ 输出 `2.5.1 (Panda Code)`
 
 ### `/status`
 - **用法**: `/status`
@@ -686,7 +686,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 ---
 
-## 十九、🆕 v2.1.92 新增能力总览
+## 十九、🆕 v2.5.1 新增能力总览
 
 | 能力 | 来源 | 说明 |
 |------|------|------|
@@ -703,6 +703,13 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | ToolSearch 全 Provider | Phase 4B | ENABLE_TOOL_SEARCH=true |
 | MCP 500K 结果 | Phase 5 | maxResultSizeChars 提升 |
 | UX 双开关 | Phase 4B | 隐藏 context 警告 + 禁止折叠 |
+| `/write` 写作助理 | v2.5 | 大纲生成 + Markdown 文稿编译 |
+| `/capture` 快速捕获 | v2.5 | 想法捕获到 working/inbox/，PARA 自动分类 |
+| `/learn` 学习助理 | v2.5 | 闪卡生成 + FSRS 间隔重复 + 学习路径 |
+| 主动推送 71 场景 | v2.5 | 8 大维度，55 非敏感 + 16 敏感场景 |
+| IM Connector 6 平台 | v2.5 | 飞书/钉钉/Slack/微信/Telegram/Teams |
+| 系统通知中心感知 | v2.5 | macOS SQLite + Windows wpndb，3 场景 |
+| IM 主动推送 6 场景 | v2.5 | 未读汇总/日报/日历同步/审批/文档/反向推送 |
 
 ---
 
