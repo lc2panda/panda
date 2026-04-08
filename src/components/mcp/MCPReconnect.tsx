@@ -1,6 +1,7 @@
 import { c as _c } from "react/compiler-runtime";
 import figures from 'figures';
 import React, { useEffect, useState } from 'react';
+import { isZh } from '../../utils/i18n.js';
 import type { CommandResultDisplay } from '../../commands.js';
 import { Box, color, Text, useTheme } from '../../ink.js';
 import { useMcpReconnect } from '../../services/mcp/MCPConnectionManager.js';
@@ -86,7 +87,7 @@ export function MCPReconnect(t0) {
   if (isReconnecting) {
     let t3;
     if ($[6] !== serverName) {
-      t3 = <Text color="text">Reconnecting to <Text bold={true}>{serverName}</Text></Text>;
+      t3 = <Text color="text">{isZh() ? '正在重连' : 'Reconnecting to'} <Text bold={true}>{serverName}</Text></Text>;
       $[6] = serverName;
       $[7] = t3;
     } else {

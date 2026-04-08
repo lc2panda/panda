@@ -74,7 +74,7 @@ export function registerDreamSkill(): void {
   registerBundledSkill({
     name: 'dream',
     description:
-      'Run a memory consolidation pass — synthesize recent learnings into durable, well-organized memories.',
+      'Run a memory consolidation pass — synthesize recent learnings into durable memories · 运行记忆整合 — 将近期学习沉淀为持久记忆',
     userInvocable: true,
     async getPromptForCommand(args) {
       // Stamp the consolidation lock so the 24h background gate resets

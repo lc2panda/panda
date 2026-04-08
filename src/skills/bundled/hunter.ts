@@ -69,7 +69,7 @@ export function registerHunterSkill(): void {
   registerBundledSkill({
     name: 'hunter',
     description:
-      'Hunt for real bugs in your code changes using parallel analysis agents.',
+      'Hunt for real bugs in your code changes using parallel analysis agents · 使用并行分析 Agent 在代码变更中寻找真实 Bug',
     userInvocable: true,
     async getPromptForCommand(args) {
       let prompt = HUNTER_PROMPT

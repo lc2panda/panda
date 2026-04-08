@@ -7,7 +7,7 @@ export function registerOrganizeSkill(): void {
   registerBundledSkill({
     name: 'organize',
     description:
-      'Analyze a directory structure and suggest cleanup — redundant files, reorganization ideas, large file warnings.',
+      'Analyze a directory structure and suggest cleanup · 分析目录结构并建议整理',
     argumentHint: '[path]',
     userInvocable: true,
     async getPromptForCommand(args) {

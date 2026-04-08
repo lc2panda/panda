@@ -5,7 +5,7 @@ export function registerHealthCheckSkill(): void {
   registerBundledSkill({
     name: 'health-check',
     description:
-      'Quick project health diagnosis — git status, dependency freshness, security hints, lint status.',
+      'Quick project health diagnosis — git status, dependency freshness, security hints, lint status · 快速项目健康诊断 — git 状态、依赖版本、安全提示、lint 状态',
     userInvocable: true,
     async getPromptForCommand(args) {
       const cwd = getOriginalCwd()
