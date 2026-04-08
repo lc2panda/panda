@@ -1,4 +1,6 @@
 import { feature } from 'bun:bundle'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { UUID } from 'crypto'
 import { randomUUID } from 'crypto'
 import uniqBy from 'lodash-es/uniqBy.js'
@@ -901,6 +903,50 @@ export function filterIncompleteToolCalls(messages: Message[]): Message[] {
   })
 }
 
+/**
+ * Input: project root path (from getProjectRoot)
+ * Output: formatted project context string or null
+ * Pos: helper for getAgentSystemPrompt — injects CLAUDE.md summary into sub-agent
+ */
+function getSubagentProjectContext(): string | null {
+  try {
+    const projectRoot = getProjectRoot()
+    const candidates = [
+      join(projectRoot, 'CLAUDE.md'),
+      join(projectRoot, '.claude', 'CLAUDE.md'),
+      join(projectRoot, '.pandacc', 'CLAUDE.md'),
+    ]
+
+    let claudeMdContent = ''
+    for (const p of candidates) {
+      try {
+        claudeMdContent = readFileSync(p, 'utf-8')
+        break
+      } catch {
+        // file not found, try next
+      }
+    }
+
+    if (!claudeMdContent) return null
+
+    // 截取前 800 字符作为核心规范摘要，控制 token 消耗
+    const summary =
+      claudeMdContent.length > 800
+        ? claudeMdContent.slice(0, 800) + '\n... (truncated)'
+        : claudeMdContent
+
+    return `<subagent-project-context>
+You are a sub-agent working within a larger project. Follow these project rules:
+
+${summary}
+
+Working directory: ${projectRoot}
+</subagent-project-context>`
+  } catch {
+    return null
+  }
+}
+
 async function getAgentSystemPrompt(
   agentDefinition: AgentDefinition,
   toolUseContext: Pick<ToolUseContext, 'options'>,
@@ -909,24 +955,33 @@ async function getAgentSystemPrompt(
   resolvedTools: readonly Tool[],
 ): Promise<string[]> {
   const enabledToolNames = new Set(resolvedTools.map(t => t.name))
+  let enhanced: string[]
   try {
     const agentPrompt = agentDefinition.getSystemPrompt({ toolUseContext })
     const prompts = [agentPrompt]
 
-    return await enhanceSystemPromptWithEnvDetails(
+    enhanced = await enhanceSystemPromptWithEnvDetails(
       prompts,
       resolvedAgentModel,
       additionalWorkingDirectories,
       enabledToolNames,
     )
   } catch (_error) {
-    return enhanceSystemPromptWithEnvDetails(
+    enhanced = await enhanceSystemPromptWithEnvDetails(
       [DEFAULT_AGENT_PROMPT],
       resolvedAgentModel,
       additionalWorkingDirectories,
       enabledToolNames,
     )
   }
+
+  // 子 Agent 上下文注入：注入 CLAUDE.md 核心规范摘要
+  const projectContext = getSubagentProjectContext()
+  if (projectContext) {
+    enhanced.push(projectContext)
+  }
+
+  return enhanced
 }
 
 /**
