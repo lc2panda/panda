@@ -1,5 +1,5 @@
-import { c as _c } from "react/compiler-runtime";
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
+import { c as _c } from "react/compiler-runtime";
 import { feature } from 'bun:bundle';
 import { Box, Text, useTheme, useThemeSetting, useTerminalFocus } from '../../ink.js';
 import type { KeyboardEvent } from '../../ink/events/keyboard-event.js';
