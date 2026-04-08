@@ -18,7 +18,7 @@
 ```
 
 **项目代号**：Panda Code
-**版本**：v2.1.92（基线 Claude Code v2.1.92）
+**版本**：v2.1.942（基线 Claude Code v2.1.92）
 **技术栈**：Bun + TypeScript + React/Ink + Commander.js
 **运行时**：Bun >= 1.2.0 / Node.js >= 18.0.0
 
@@ -161,6 +161,86 @@ panda auth login
 | `CLAUDE_CODE_COORDINATOR_MODE=1` | 启用 Coordinator 多 Agent |
 | `PANDA_MODEL_ROUTING=1` | 启用 Multi-Model Agent Routing |
 | `ENABLE_TOOL_SEARCH=true` | ToolSearch（默认已启用） |
+| `DEBUG_CACHE=1` | 输出第三方 API Cache Token 原始数据到 stderr |
+| `PANDA_DEBUG=1` | 输出任务分类、进化写回等调试日志 |
+
+---
+
+## 🆕 治理能力（Meta_Kim 吸收）
+
+参考 [Meta_Kim](https://github.com/KimYx0207/Meta_Kim) 多 Agent 治理框架，Panda Code 内置了 11 项治理能力。
+
+### 自动生效（零配置）
+
+| 能力 | 触发时机 | 用户感知 |
+|------|---------|---------|
+| **危险命令拦截** | AI 执行 `rm -rf /`、`git reset --hard`、`git push --force`、`chmod -R 777`、fork bomb 等 7 种危险模式 | 自动拦截，弹出 `⚠️ Dangerous: ...` 确认提示 |
+| **Completion Guard** | AI 纯文本声称"任务已完成"但无工具调用或测试证据 | 自动要求补充验证证据（最多 2 次） |
+| **Finding Closure** | AI 声称完成但回复中含未关闭的 TODO/FIXME/HACK | 自动要求先关闭所有 findings |
+| **Anti-Slop 审查** | AI 回复过度 emoji（≥8种）、重复段落、或超长空洞文本 | 自动要求精简，给出代码/路径 |
+| **子 Agent 上下文注入** | 每次 Agent 工具 spawn 子 agent | 子 agent 自动获得 CLAUDE.md 核心规范（前 2500 字符） |
+| **能力优先调度** | 未指定 `subagent_type` 的 Agent 调用 | 搜索类→Explore agent，规划类→Plan agent |
+| **任务分类引擎** | 每轮对话首条用户消息 | 后台分类（`PANDA_DEBUG=1` 可见），为后续扩展预留 |
+| **进化写回** | turnCount > 3 且有成功工具调用 | 调试日志记录工具名列表，预留经验沉淀入口 |
+
+### 手动使用：Patterns/Scars 经验记忆
+
+在项目 memory 目录下创建 `.md` 文件，下次对话自动加载到上下文：
+
+```bash
+# 记录成功模式
+cat > ~/.claude/projects/<项目slug>/memory/patterns/api-error-handling.md << 'EOF'
+---
+name: API 错误处理模式
+description: 第三方 API 返回 404 时优先检查请求 body 兼容性
+type: pattern
+---
+第三方 API 返回 404 时，优先检查请求 body 中是否包含
+Anthropic 专有参数（如 metadata），而不是先怀疑认证问题。
+EOF
+
+# 记录失败教训
+cat > ~/.claude/projects/<项目slug>/memory/scars/blind-debugging.md << 'EOF'
+---
+name: 盲目追症状的教训
+description: 排查问题应先审查 git diff 而不是加调试日志
+type: scar
+---
+遇到"之前能用现在不能用"的问题，第一步 git diff 审查近期变更。
+EOF
+```
+
+### 治理能力执行流
+
+```
+用户输入 → 任务分类 → AI 响应
+                        │
+                        ├─ BashTool → 危险命令拦截 → ⚠️ 确认
+                        ├─ AgentTool → 能力优先调度 → 自动选型
+                        │              └─ 子Agent上下文注入 → CLAUDE.md
+                        └─ 纯文本回复
+                              ├─ Completion Guard → 无证据？→ 要求补充
+                              │   └─ Finding Closure → 有TODO？→ 要求关闭
+                              ├─ Anti-Slop → 废话？→ 要求精简
+                              └─ 进化写回 → 日志记录
+```
+
+---
+
+## 🆕 Cache Token 显示
+
+支持所有主流第三方 API 的 prompt cache 命中显示：
+
+| Provider | Cache 字段 | 自动/手动 |
+|----------|-----------|----------|
+| Anthropic | `cache_read_input_tokens` | 自动 |
+| OpenAI / Mistral / 火山引擎 | `prompt_tokens_details.cached_tokens` | 自动 |
+| DeepSeek | `prompt_cache_hit_tokens` | 自动 |
+| Groq | `input_tokens_details.cached_tokens` | 自动 |
+| Kimi / GLM / MiniMax | `usage.cached_tokens` | 自动 |
+| OpenRouter | 透传 + `cache_write_tokens` | 自动 |
+
+查看 cache 命中：`/stats` 命令中 `Cache: N` 字段。调试：`DEBUG_CACHE=1 panda`。
 
 ---
 
@@ -171,11 +251,14 @@ panda auth login
 | 防护层 | 内容 | 状态 |
 |--------|------|------|
 | 遥测拦截 | 1104 个 logEvent 调用点全部拦截 | 自动 |
-| 分析禁用 | GrowthBook / Datadog / BigQuery / 1P 事件 | 自动 |
+| API Body 脱敏 | `metadata` 中 device_id/session_id/account_uuid 替换为合规格式固定值；第三方完全不发送 | 自动 |
+| HTTP Header 脱敏 | X-Claude-Code-Session-Id 替换为固定 UUID；第三方不发送 x-app/session-id | 自动 |
+| Datadog 禁用 | `trackDatadogEvent` + `initializeDatadog` 完全禁用 | 自动 |
+| BigQuery ���用 | `doExport` 完全禁用，不向 `api.anthropic.com/api/claude_code/metrics` 发送数据 | 自动 |
+| 1P Event Logger 脱敏 | userId/email/org 替换为固定脱敏值（`cc4all@gmail.com`） | 自动 |
+| GrowthBook 脱敏 | 用户属性 id/deviceID/sessionId 替换为固定值，移除 org/account/email | 自动 |
 | UA 规范化 | 精简为 `PandaCode/{version}`，不泄露设备信息 | 自动 |
-| Header 清理 | 移除 x-app、session-id 等跟踪头 | 自动 |
 | 独立存储 | `~/.pandacc/` 独立空间，不与原版 claude 混用 | 自动 |
-| 进程指标 | BigQuery Metrics 导出拦截 | 自动 |
 | OAuth | 隐私模式下不额外请求 Profile | 自动 |
 
 查看当前隐私状态：`/privacy`
