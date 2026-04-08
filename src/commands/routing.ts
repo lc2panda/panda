@@ -46,6 +46,21 @@ const routing = {
                   ? 'Routing active. Agents with modelPreferences will be routed.'
                   : 'Enable: PANDA_MODEL_ROUTING=1 or enableModelRouting: true in settings.json',
               )
+
+              // Show recent routing decisions
+              try {
+                const { getRoutingHistory } = await import('../routing/index.js')
+                const history = getRoutingHistory()
+                if (history.length > 0) {
+                  lines.push('')
+                  lines.push('Recent routing decisions:')
+                  for (const d of history.slice(-5)) {
+                    const time = new Date(d.timestamp).toLocaleTimeString()
+                    lines.push(`  ${time} ${d.agentType}: ${d.parentModel} → ${d.targetModel} (${d.reason})`)
+                  }
+                }
+              } catch {}
+
               return { type: 'text' as const, value: lines.join('\n') }
             }
 

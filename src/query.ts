@@ -927,8 +927,26 @@ async function* queryLoop(
           }
         } catch (innerError) {
           if (innerError instanceof FallbackTriggeredError && fallbackModel) {
+            // If routing is enabled and there's a fallback chain, try the next model in chain
+            let effectiveFallback = fallbackModel
+            try {
+              const { isRoutingEnabled, getNextFallback } = require('./routing/index.js') as typeof import('./routing/index.js')
+              const { getLastRoutingTarget } = require('./utils/model/agent.js') as typeof import('./utils/model/agent.js')
+              if (isRoutingEnabled()) {
+                const target = getLastRoutingTarget()
+                if (target?.fallbackChain && target.fallbackChain.length > 0) {
+                  const nextModel = getNextFallback(innerError.fallbackModel, target.fallbackChain)
+                  if (nextModel && nextModel !== innerError.fallbackModel) {
+                    const { logForDebugging } = require('./utils/debug.js') as typeof import('./utils/debug.js')
+                    logForDebugging(`[routing] Fallback chain: ${innerError.originalModel} → ${innerError.fallbackModel} → ${nextModel}`)
+                    effectiveFallback = nextModel
+                  }
+                }
+              }
+            } catch {}
+
             // Fallback was triggered - switch model and retry
-            currentModel = fallbackModel
+            currentModel = effectiveFallback
             attemptWithFallback = true
 
             // Clear assistant messages since we'll retry the entire request
@@ -954,7 +972,7 @@ async function* queryLoop(
             }
 
             // Update tool use context with new model
-            toolUseContext.options.mainLoopModel = fallbackModel
+            toolUseContext.options.mainLoopModel = effectiveFallback
 
             // Thinking signatures are model-bound: replaying a protected-thinking
             // block (e.g. capybara) to an unprotected fallback (e.g. opus) 400s.
@@ -968,7 +986,7 @@ async function* queryLoop(
               original_model:
                 innerError.originalModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
               fallback_model:
-                fallbackModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                effectiveFallback as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
               entrypoint:
                 'cli' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
               queryChainId: queryChainIdForAnalytics,
@@ -978,7 +996,7 @@ async function* queryLoop(
             // Yield system message about fallback — use 'warning' level so
             // users see the notification without needing verbose mode
             yield createSystemMessage(
-              `Switched to ${renderModelName(innerError.fallbackModel)} due to high demand for ${renderModelName(innerError.originalModel)}`,
+              `Switched to ${renderModelName(effectiveFallback)} due to high demand for ${renderModelName(innerError.originalModel)}`,
               'warning',
             )
 

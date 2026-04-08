@@ -14,6 +14,56 @@ import { capabilityRegistry } from './capabilityRegistry.js'
 import { logForDebugging } from '../utils/debug.js'
 
 // ─────────────────────────────────────────────────────────────
+// Routing Decision History (in-memory, session-scoped)
+// ─────────────────────────────────────────────────────────────
+
+export interface RoutingDecisionRecord {
+  timestamp: number
+  agentType: string
+  parentModel: string
+  targetModel: string
+  provider: string
+  reason: string
+}
+
+const routingHistory: RoutingDecisionRecord[] = []
+const MAX_HISTORY = 50
+
+export function getRoutingHistory(): readonly RoutingDecisionRecord[] {
+  return routingHistory
+}
+
+function recordDecision(decision: RoutingDecisionRecord) {
+  routingHistory.push(decision)
+  if (routingHistory.length > MAX_HISTORY) {
+    routingHistory.shift()
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Fallback Chain Helper
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Get the next model from a fallback chain.
+ * Called when the primary/current model is unavailable (503/529).
+ */
+export function getNextFallback(
+  currentModel: string,
+  fallbackChain: string[],
+): string | null {
+  const idx = fallbackChain.indexOf(currentModel)
+  if (idx >= 0 && idx < fallbackChain.length - 1) {
+    return fallbackChain[idx + 1]
+  }
+  // currentModel not in chain (is primary), return first in chain
+  if (idx === -1 && fallbackChain.length > 0) {
+    return fallbackChain[0]
+  }
+  return null
+}
+
+// ─────────────────────────────────────────────────────────────
 // Output types
 // ─────────────────────────────────────────────────────────────
 
@@ -76,10 +126,12 @@ export function resolveModelTarget(
   // ── Priority 1: Explicit full model ID pin ────────────
   if (agent.model && isExplicitModelId(agent.model)) {
     logForDebugging(`[routing] ${agentLabel}: explicit pin → ${agent.model}`)
+    const reason = `explicit-pin: ${agent.model}`
+    recordDecision({ timestamp: Date.now(), agentType: agentLabel, parentModel, targetModel: agent.model, provider: 'firstParty', reason })
     return {
       modelId: agent.model,
-      provider: 'firstParty', // Explicit pins assume the user knows their provider
-      reason: `explicit-pin: ${agent.model}`,
+      provider: 'firstParty',
+      reason,
       fallbackChain: [parentModel],
     }
   }
@@ -92,10 +144,12 @@ export function resolveModelTarget(
     )
     if (match) {
       logForDebugging(`[routing] ${agentLabel}: capability-match → ${match.alias}`)
+      const reason = `capability-match: ${match.alias} meets minimum requirements`
+      recordDecision({ timestamp: Date.now(), agentType: agentLabel, parentModel, targetModel: match.resolveModelId(), provider: match.provider as string, reason })
       return {
         modelId: match.resolveModelId(),
         provider: match.provider as string,
-        reason: `capability-match: ${match.alias} meets minimum requirements`,
+        reason,
         fallbackChain: [parentModel],
       }
     }
@@ -116,10 +170,12 @@ export function resolveModelTarget(
       const resolved = capabilityRegistry.resolveAlias(mappedAlias)
       if (resolved) {
         logForDebugging(`[routing] ${agentLabel}: preset "${effectivePreset.name}" → ${resolved.alias}`)
+        const reason = `preset: ${effectivePreset.name} → ${mappedAlias}`
+        recordDecision({ timestamp: Date.now(), agentType: agentLabel, parentModel, targetModel: resolved.resolveModelId(), provider: resolved.provider as string, reason })
         return {
           modelId: resolved.resolveModelId(),
           provider: resolved.provider as string,
-          reason: `preset: ${effectivePreset.name} → ${mappedAlias}`,
+          reason,
           fallbackChain: [parentModel],
         }
       }
@@ -131,10 +187,12 @@ export function resolveModelTarget(
     const resolved = capabilityRegistry.resolveAlias(agent.modelPreferences.preferred)
     if (resolved) {
       logForDebugging(`[routing] ${agentLabel}: preferred → ${resolved.alias}`)
+      const reason = `preferred: ${agent.modelPreferences.preferred} → ${resolved.alias}`
+      recordDecision({ timestamp: Date.now(), agentType: agentLabel, parentModel, targetModel: resolved.resolveModelId(), provider: resolved.provider as string, reason })
       return {
         modelId: resolved.resolveModelId(),
         provider: resolved.provider as string,
-        reason: `preferred: ${agent.modelPreferences.preferred} → ${resolved.alias}`,
+        reason,
         fallbackChain: agent.modelPreferences.fallbacks?.map(f => {
           const r = capabilityRegistry.resolveAlias(f)
           return r?.resolveModelId() ?? f
@@ -148,10 +206,12 @@ export function resolveModelTarget(
         const resolved = capabilityRegistry.resolveAlias(fallback)
         if (resolved) {
           logForDebugging(`[routing] ${agentLabel}: fallback → ${resolved.alias}`)
+          const reason = `fallback: preferred "${agent.modelPreferences.preferred}" unavailable, using ${resolved.alias}`
+          recordDecision({ timestamp: Date.now(), agentType: agentLabel, parentModel, targetModel: resolved.resolveModelId(), provider: resolved.provider as string, reason })
           return {
             modelId: resolved.resolveModelId(),
             provider: resolved.provider as string,
-            reason: `fallback: preferred "${agent.modelPreferences.preferred}" unavailable, using ${resolved.alias}`,
+            reason,
             fallbackChain: [parentModel],
           }
         }
@@ -164,10 +224,12 @@ export function resolveModelTarget(
     const resolved = capabilityRegistry.resolveAlias(agent.model)
     if (resolved) {
       logForDebugging(`[routing] ${agentLabel}: alias "${agent.model}" → ${resolved.alias}`)
+      const reason = `alias: ${agent.model} → ${resolved.alias}`
+      recordDecision({ timestamp: Date.now(), agentType: agentLabel, parentModel, targetModel: resolved.resolveModelId(), provider: resolved.provider as string, reason })
       return {
         modelId: resolved.resolveModelId(),
         provider: resolved.provider as string,
-        reason: `alias: ${agent.model} → ${resolved.alias}`,
+        reason,
         fallbackChain: [parentModel],
       }
     }
@@ -177,15 +239,18 @@ export function resolveModelTarget(
   const taskTarget = routeByTask(taskProfile)
   if (taskTarget) {
     logForDebugging(`[routing] ${agentLabel}: task-based → ${taskTarget.modelId}`)
+    recordDecision({ timestamp: Date.now(), agentType: agentLabel, parentModel, targetModel: taskTarget.modelId, provider: taskTarget.provider, reason: taskTarget.reason })
     return taskTarget
   }
 
   // ── Priority 8: Default — inherit parent model ────────
   logForDebugging(`[routing] ${agentLabel}: default → inherit parent (${parentModel})`)
+  const reason = 'default: inherit from parent'
+  recordDecision({ timestamp: Date.now(), agentType: agentLabel, parentModel, targetModel: parentModel, provider: 'firstParty', reason })
   return {
     modelId: parentModel,
     provider: 'firstParty',
-    reason: 'default: inherit from parent',
+    reason,
     fallbackChain: [],
   }
 }
@@ -265,4 +330,42 @@ function routeByTask(profile: TaskProfile): ModelTarget | null {
     reason: `task-route: ${profile.complexity}/${profile.domain} → ${targetAlias} → ${resolved.alias}`,
     fallbackChain: [],
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Capability Preflight Check
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Preflight check: verify that a target model meets capability requirements
+ * and is registered. Called before agent spawn to surface mismatches early.
+ *
+ * Unregistered models pass by default (third-party custom models).
+ */
+export function preflightModelCheck(
+  modelId: string,
+  minimumCapabilities?: Partial<ModelCapabilities>,
+): { ok: boolean; reason?: string } {
+  const allModels = capabilityRegistry.getAllModels()
+  const model = allModels.find(
+    m => m.resolveModelId() === modelId || m.alias === modelId,
+  )
+
+  if (!model) {
+    return { ok: true, reason: 'unregistered model — skipping capability check' }
+  }
+
+  if (minimumCapabilities) {
+    for (const [key, minValue] of Object.entries(minimumCapabilities)) {
+      const actual = (model.capabilities as Record<string, unknown>)[key]
+      if (typeof actual === 'number' && typeof minValue === 'number' && actual < minValue) {
+        return { ok: false, reason: `${key}: required ${minValue}, got ${actual}` }
+      }
+      if (typeof actual === 'boolean' && minValue === true && !actual) {
+        return { ok: false, reason: `${key}: required true, got false` }
+      }
+    }
+  }
+
+  return { ok: true }
 }
