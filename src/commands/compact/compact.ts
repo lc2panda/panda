@@ -30,6 +30,7 @@ import {
   buildEffectiveSystemPrompt,
   type SystemPrompt,
 } from '../../utils/systemPrompt.js'
+import { isZh } from '../../utils/i18n.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const reactiveCompact = feature('REACTIVE_COMPACT')
@@ -244,7 +245,7 @@ function buildDisplayText(
     ...(userDisplayMessage ? [userDisplayMessage] : []),
     ...(upgradeMessage ? [upgradeMessage] : []),
   ]
-  return chalk.dim('Compacted ' + dimmed.join('\n'))
+  return chalk.dim((isZh() ? '已压缩 ' : 'Compacted ') + dimmed.join('\n'))
 }
 
 async function getCacheSharingParams(

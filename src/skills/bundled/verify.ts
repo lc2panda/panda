@@ -7,7 +7,7 @@ const { frontmatter, content: SKILL_BODY } = parseFrontmatter(SKILL_MD)
 const DESCRIPTION =
   typeof frontmatter.description === 'string'
     ? frontmatter.description
-    : 'Verify a code change does what it should by running the app.'
+    : 'Verify a code change does what it should by running the app · 运行应用验证代码变更是否符合预期'
 
 export function registerVerifySkill(): void {
   if (process.env.USER_TYPE !== 'ant') {

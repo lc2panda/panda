@@ -12,6 +12,7 @@ import type { ProgressMessage } from '../../types/message.js';
 import type { PowerShellProgress } from '../../types/tools.js';
 import type { ThemeName } from '../../utils/theme.js';
 import type { Out, PowerShellToolInput } from './PowerShellTool.js';
+import { isZh } from '../../utils/i18n.js';
 
 // Constants for command display
 const MAX_COMMAND_DISPLAY_LINES = 2;
@@ -72,7 +73,7 @@ export function renderToolUseProgressMessage(progressMessagesForMessage: Progres
 }
 export function renderToolUseQueuedMessage(): React.ReactNode {
   return <MessageResponse height={1}>
-      <Text dimColor>Waiting…</Text>
+      <Text dimColor>{isZh() ? '等待中…' : 'Waiting…'}</Text>
     </MessageResponse>;
 }
 export function renderToolResultMessage(content: Out, progressMessagesForMessage: ProgressMessage<PowerShellProgress>[], {

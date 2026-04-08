@@ -1,4 +1,5 @@
 import { checkOpus1mAccess, checkSonnet1mAccess } from './check1mAccess.js'
+import { isZh } from '../i18n.js'
 import { getUserSpecifiedModelSetting } from './model.js'
 
 // @[MODEL LAUNCH]: Add a branch for the new model if it supports a 1M context upgrade path.
@@ -40,7 +41,9 @@ export function getUpgradeMessage(context: 'warning' | 'tip'): string | null {
     case 'warning':
       return `/model ${upgrade.alias}`
     case 'tip':
-      return `Tip: You have access to ${upgrade.name} with ${upgrade.multiplier}x more context`
+      return isZh()
+        ? `提示: 你可以使用 ${upgrade.name}，上下文容量提升 ${upgrade.multiplier} 倍`
+        : `Tip: You have access to ${upgrade.name} with ${upgrade.multiplier}x more context`
     default:
       return null
   }

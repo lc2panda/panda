@@ -14,7 +14,8 @@ import { openPath } from '../../utils/browser.js';
 /* eslint-disable @typescript-eslint/no-require-imports */
 const teamMemSaved = feature('TEAMMEM') ? require('./teamMemSaved.js') as typeof import('./teamMemSaved.js') : null;
 /* eslint-enable @typescript-eslint/no-require-imports */
-import { TURN_COMPLETION_VERBS } from '../../constants/turnCompletionVerbs.js';
+import { getTurnCompletionVerbs, TURN_COMPLETION_VERBS } from '../../constants/turnCompletionVerbs.js';
+import { isZh } from '../../utils/i18n.js';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import type { SystemMessage, SystemStopHookSummaryMessage, SystemBridgeStatusMessage, SystemTurnDurationMessage, SystemThinkingMessage, SystemMemorySavedMessage } from '../../types/message.js';
 import { SystemAPIErrorMessage } from './SystemAPIErrorMessage.js';
@@ -564,8 +565,8 @@ function TurnDurationMessage(t0) {
   } else {
     t6 = $[8];
   }
-  const t7 = showTurnDuration && `${verb} for ${duration}`;
-  const t8 = backgroundTaskSummary && ` \u00B7 ${backgroundTaskSummary} still running`;
+  const t7 = showTurnDuration && (isZh() ? `${verb}（${duration}）` : `${verb} for ${duration}`);
+  const t8 = backgroundTaskSummary && ` \u00B7 ${backgroundTaskSummary} ${isZh() ? '仍在运行' : 'still running'}`;
   let t9;
   if ($[9] !== budgetSuffix || $[10] !== t7 || $[11] !== t8) {
     t9 = <Text dimColor={true}>{t7}{budgetSuffix}{t8}</Text>;
@@ -589,7 +590,7 @@ function TurnDurationMessage(t0) {
   return t10;
 }
 function _temp4() {
-  return sample(TURN_COMPLETION_VERBS) ?? "Worked";
+  return sample(getTurnCompletionVerbs()) ?? (isZh() ? "搞定了" : "Worked");
 }
 function MemorySavedMessage(t0) {
   const $ = _c(16);

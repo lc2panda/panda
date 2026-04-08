@@ -36,6 +36,7 @@ import {
   PDF_TARGET_RAW_SIZE,
 } from '../../constants/apiLimits.js'
 import { isEnvTruthy } from '../../utils/envUtils.js'
+import { isZh } from '../../utils/i18n.js'
 import { formatFileSize } from '../../utils/format.js'
 import { ImageResizeError } from '../../utils/imageResizer.js'
 import { ImageSizeError } from '../../utils/imageValidation.js'
@@ -703,7 +704,7 @@ export function getAssistantMessageFromError(
       const baseMessage = `API Error: 400 ${error.message}\n\nRun /share and post the JSON file to ${MACRO.FEEDBACK_CHANNEL}.`
       const rewindInstruction = getIsNonInteractiveSession()
         ? ''
-        : ' Then, use /rewind to recover the conversation.'
+        : isZh() ? ' 然后，使用 /rewind 恢复对话。' : ' Then, use /rewind to recover the conversation.'
       return createAssistantAPIErrorMessage({
         content: baseMessage + rewindInstruction,
         error: 'invalid_request',
@@ -712,7 +713,7 @@ export function getAssistantMessageFromError(
       const baseMessage = 'API Error: 400 due to tool use concurrency issues.'
       const rewindInstruction = getIsNonInteractiveSession()
         ? ''
-        : ' Run /rewind to recover the conversation.'
+        : isZh() ? ' 运行 /rewind 恢复对话。' : ' Run /rewind to recover the conversation.'
       return createAssistantAPIErrorMessage({
         content: baseMessage + rewindInstruction,
         error: 'invalid_request',
@@ -739,7 +740,7 @@ export function getAssistantMessageFromError(
     logEvent('tengu_duplicate_tool_use_id', {})
     const rewindInstruction = getIsNonInteractiveSession()
       ? ''
-      : ' Run /rewind to recover the conversation.'
+      : isZh() ? ' 运行 /rewind 恢复对话。' : ' Run /rewind to recover the conversation.'
     return createAssistantAPIErrorMessage({
       content: `API Error: 400 duplicate tool_use ID in conversation history.${rewindInstruction}`,
       error: 'invalid_request',

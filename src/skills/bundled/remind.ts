@@ -4,7 +4,7 @@ export function registerRemindSkill(): void {
   registerBundledSkill({
     name: 'remind',
     description:
-      'Set a reminder using natural language time — delegates to ScheduleCronTool.',
+      'Set a reminder using natural language time · 用自然语言设置提醒',
     argumentHint: '<message> <time>',
     userInvocable: true,
     async getPromptForCommand(args) {

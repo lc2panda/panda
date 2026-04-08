@@ -16,6 +16,7 @@ import type {
   SystemMessage,
 } from '../types/message.js'
 import { logForDebugging } from '../utils/debug.js'
+import { isZh } from '../utils/i18n.js'
 import { fromSDKCompactMetadata } from '../utils/messages/mappers.js'
 import { createUserMessage } from '../utils/messages.js'
 
@@ -96,7 +97,7 @@ function convertStatusMessage(msg: SDKStatusMessage): SystemMessage | null {
     subtype: 'informational',
     content:
       msg.status === 'compacting'
-        ? 'Compacting conversation…'
+        ? (isZh() ? '压缩对话中…' : 'Compacting conversation…')
         : `Status: ${msg.status}`,
     level: 'info',
     uuid: msg.uuid,
@@ -132,7 +133,7 @@ function convertCompactBoundaryMessage(
   return {
     type: 'system',
     subtype: 'compact_boundary',
-    content: 'Conversation compacted',
+    content: isZh() ? '对话已压缩' : 'Conversation compacted',
     level: 'info',
     uuid: msg.uuid,
     timestamp: new Date().toISOString(),

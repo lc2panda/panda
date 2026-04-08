@@ -1,5 +1,6 @@
 import figures from 'figures';
 import React, { useState } from 'react';
+import { isZh } from '../../utils/i18n.js';
 import type { CommandResultDisplay } from '../../commands.js';
 import { useExitOnCtrlCDWithKeybindings } from '../../hooks/useExitOnCtrlCDWithKeybindings.js';
 import { Box, color, Text, useTheme } from '../../ink.js';
@@ -88,7 +89,7 @@ export function MCPStdioServerMenu({
   if (isReconnecting) {
     return <Box flexDirection="column" gap={1} padding={1}>
         <Text color="text">
-          Reconnecting to <Text bold>{server.name}</Text>
+          {isZh() ? '正在重连' : 'Reconnecting to'} <Text bold>{server.name}</Text>
         </Text>
         <Box>
           <Spinner />
