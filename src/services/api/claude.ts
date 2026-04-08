@@ -257,6 +257,11 @@ import {
   type RetryContext,
   withRetry,
 } from './withRetry.js'
+import {
+  normalizeResumeMessages,
+  stabilizeToolOrder,
+  stripOldToolResultImages,
+} from './cacheStabilize.js'
 import type { FormatAdapter } from '../../routing/formatAlignment.js'
 
 // Define a type that represents valid JSON values
@@ -1298,6 +1303,16 @@ async function* queryModel(
 
   queryCheckpoint('query_message_normalization_start')
   let messagesForAPI = normalizeMessagesForAPI(messages, filteredTools)
+
+  // ── Cache stabilization: fix resume block scatter (Bug 3) ──────────
+  normalizeResumeMessages(messagesForAPI)
+
+  // ── Cache stabilization: strip old base64 images from tool_results ─
+  const imageKeepLast = parseInt(process.env.CACHE_FIX_IMAGE_KEEP_LAST || '', 10) || 0
+  if (imageKeepLast > 0) {
+    stripOldToolResultImages(messagesForAPI, imageKeepLast)
+  }
+
   queryCheckpoint('query_message_normalization_end')
 
   // Model-specific post-processing: strip tool-search-specific fields if the
@@ -1427,7 +1442,8 @@ async function* queryModel(
       model: advisorModel,
     } as unknown as BetaToolUnion)
   }
-  const allTools = [...toolSchemas, ...extraToolSchemas]
+  // ── Cache stabilization: deterministic tool ordering (Bug 5) ──────
+  const allTools = stabilizeToolOrder([...toolSchemas, ...extraToolSchemas])
 
   const isFastMode =
     isFastModeEnabled() &&
