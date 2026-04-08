@@ -1,5 +1,7 @@
 import figures from 'figures';
+import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
+import { join } from 'path';
 import * as React from 'react';
 import { Box, Text } from '../../ink.js';
 import type { Step } from '../../projectOnboardingState.js';
@@ -18,6 +20,20 @@ export function createRecentActivityFeed(activities: LogOption[]): FeedConfig {
       timestamp: time
     };
   });
+  // 如果没有最近活动，尝试展示超级助手习惯记忆
+  if (lines.length === 0) {
+    try {
+      const habitsPath = join(homedir(), '.pandacc', 'memory', 'procedural', 'habits.md')
+      if (existsSync(habitsPath)) {
+        const content = readFileSync(habitsPath, 'utf-8')
+        const recentLines = content.split('\n')
+          .filter(l => l.trim() && !l.startsWith('#'))
+          .slice(-3)
+          .map(l => ({ text: l.trim().slice(0, 50) }))
+        if (recentLines.length > 0) lines.push(...recentLines)
+      }
+    } catch {}
+  }
   return {
     title: t('Recent activity', '最近活动'),
     lines,
@@ -40,7 +56,29 @@ export function createWhatsNewFeed(releaseNotes: string[]): FeedConfig {
       text: note
     };
   });
-  const emptyMessage = ("external" as string) === 'ant' ? t('Unable to fetch latest commits', '无法获取最新提交') : t('Check the Panda Code changelog for updates', '查看 Panda Code 更新日志');
+  // 如果没有 release notes，尝试展示超级助手画像摘要
+  if (lines.length === 0) {
+    try {
+      const pandaccDir = join(homedir(), '.pandacc')
+      const profilePaths = [
+        join(pandaccDir, 'memory', 'semantic', 'profile.md'),
+      ]
+      for (const p of profilePaths) {
+        if (existsSync(p)) {
+          const content = readFileSync(p, 'utf-8')
+          const profileLines = content.split('\n')
+            .filter(l => l.trim() && !l.startsWith('---') && !l.startsWith('#'))
+            .slice(0, 3)
+            .map(l => ({ text: l.trim().slice(0, 60) }))
+          if (profileLines.length > 0) {
+            lines.push(...profileLines)
+            break
+          }
+        }
+      }
+    } catch {}
+  }
+  const emptyMessage = ("external" as string) === 'ant' ? t('Unable to fetch latest commits', '无法获取最新提交') : t('Enable super assistant to show profile here', '启用超级助手后将在此展示个人画像');
   return {
     title: ("external" as string) === 'ant' ? t("What's new [Latest commits]", '最新动态 [最新提交]') : t("What's new", '最新动态'),
     lines,
