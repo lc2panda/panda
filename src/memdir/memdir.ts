@@ -1,7 +1,8 @@
 import { feature } from 'bun:bundle'
 import { join, relative } from 'path'
-import { readFileSync, readdirSync, unlinkSync, writeFileSync, mkdirSync, renameSync } from 'fs'
+import { readFileSync, readdirSync, unlinkSync, writeFileSync, mkdirSync, renameSync, copyFileSync } from 'fs'
 import { access, writeFile, readFile, appendFile, mkdir } from 'fs/promises'
+import { homedir, tmpdir } from 'os'
 import { getFsImplementation } from '../utils/fsOperations.js'
 import { getAutoMemPath, isAutoMemoryEnabled } from './paths.js'
 
@@ -928,4 +929,306 @@ export function organizeDirectory(srcDir: string, dryRun: boolean = true): Array
   } catch {}
 
   return moves
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SA-P2: 数据连接器
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * 读取 Chrome 浏览器历史记录。
+ * 数据库路径：~/Library/Application Support/Google/Chrome/Default/History
+ * Chrome 运行时锁定数据库，需要先复制。
+ */
+export async function readBrowserHistory(
+  since: Date = new Date(Date.now() - 7 * 86400000),
+  limit: number = 100,
+): Promise<Array<{ url: string; title: string; visitTime: Date; visitCount: number }>> {
+  const results: Array<{ url: string; title: string; visitTime: Date; visitCount: number }> = []
+
+  const chromePath = join(homedir(), 'Library/Application Support/Google/Chrome/Default/History')
+  const tmpPath = join(tmpdir(), `panda_chrome_history_${Date.now()}.db`)
+
+  try {
+    // 复制数据库避免锁定问题
+    copyFileSync(chromePath, tmpPath)
+
+    // 使用 bun:sqlite 读取
+    const { Database } = require('bun:sqlite')
+    const db = new Database(tmpPath, { readonly: true })
+
+    const sinceChrome = (since.getTime() * 1000) + 11644473600000000 // Chrome epoch offset
+    const rows = db.query(`
+      SELECT url, title, last_visit_time, visit_count
+      FROM urls
+      WHERE last_visit_time > ?
+      ORDER BY last_visit_time DESC
+      LIMIT ?
+    `).all(sinceChrome, limit)
+
+    for (const row of rows as any[]) {
+      results.push({
+        url: row.url,
+        title: row.title || '',
+        visitTime: new Date((row.last_visit_time - 11644473600000000) / 1000),
+        visitCount: row.visit_count,
+      })
+    }
+
+    db.close()
+  } catch {} finally {
+    try { unlinkSync(tmpPath) } catch {}
+  }
+
+  return results
+}
+
+/**
+ * 读取 macOS 日历事件。通过 osascript/AppleScript。
+ */
+export async function readCalendarEvents(
+  daysAhead: number = 1,
+): Promise<Array<{ title: string; startDate: string; endDate: string; location: string }>> {
+  const events: Array<{ title: string; startDate: string; endDate: string; location: string }> = []
+
+  try {
+    const { execSync } = require('child_process')
+    const script = `
+      tell application "Calendar"
+        set today to current date
+        set endDay to today + (${daysAhead} * days)
+        set eventList to ""
+        repeat with cal in calendars
+          repeat with evt in (every event of cal whose start date >= today and start date <= endDay)
+            set eventList to eventList & summary of evt & "|||" & (start date of evt as string) & "|||" & (end date of evt as string) & "|||" & (location of evt as string) & "\\n"
+          end repeat
+        end repeat
+        return eventList
+      end tell
+    `
+    const output = execSync(`osascript -e '${script.replace(/'/g, "'\\''")}'`, { timeout: 10000, encoding: 'utf-8' })
+
+    for (const line of output.split('\n').filter(Boolean)) {
+      const [title, startDate, endDate, location] = line.split('|||')
+      if (title) events.push({ title: title.trim(), startDate: startDate?.trim() || '', endDate: endDate?.trim() || '', location: location?.trim() || '' })
+    }
+  } catch {}
+
+  return events
+}
+
+/**
+ * 读取 Apple Notes。
+ * 路径：~/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite
+ */
+export async function readAppleNotes(
+  limit: number = 50,
+): Promise<Array<{ title: string; snippet: string; modDate: Date }>> {
+  const notes: Array<{ title: string; snippet: string; modDate: Date }> = []
+
+  const notesPath = join(homedir(), 'Library/Group Containers/group.com.apple.notes/NoteStore.sqlite')
+  const tmpPath = join(tmpdir(), `panda_notes_${Date.now()}.db`)
+
+  try {
+    copyFileSync(notesPath, tmpPath)
+    const { Database } = require('bun:sqlite')
+    const db = new Database(tmpPath, { readonly: true })
+
+    const rows = db.query(`
+      SELECT ZTITLE2 as title, ZSNIPPET as snippet, ZMODIFICATIONDATE1 as modDate
+      FROM ZICCLOUDSYNCINGOBJECT
+      WHERE ZTITLE2 IS NOT NULL AND ZMARKEDFORDELETION = 0
+      ORDER BY ZMODIFICATIONDATE1 DESC
+      LIMIT ?
+    `).all(limit)
+
+    for (const row of rows as any[]) {
+      notes.push({
+        title: row.title || '',
+        snippet: (row.snippet || '').slice(0, 200),
+        modDate: new Date((row.modDate || 0) * 1000 + 978307200000), // Apple epoch
+      })
+    }
+
+    db.close()
+  } catch {} finally {
+    try { unlinkSync(tmpPath) } catch {}
+  }
+
+  return notes
+}
+
+/**
+ * 读取当前剪贴板内容并追加到历史。
+ * 历史存储：~/.pandacc/data/clipboard/YYYY-MM-DD.jsonl
+ */
+export async function captureClipboard(): Promise<string | null> {
+  try {
+    const { execSync } = require('child_process')
+    const content = execSync('pbpaste', { encoding: 'utf-8', timeout: 3000 })
+    if (!content || content.length > 10000) return null // 忽略空和超大内容
+
+    // 过滤敏感内容
+    if (/password|api.key|secret|token|sk-/i.test(content)) return null
+
+    const dataDir = join(homedir(), '.pandacc', 'data', 'clipboard')
+    await mkdir(dataDir, { recursive: true })
+
+    const dateStr = new Date().toISOString().split('T')[0]
+    const logPath = join(dataDir, `${dateStr}.jsonl`)
+    const entry = JSON.stringify({ time: new Date().toISOString(), content: content.slice(0, 500) })
+    await appendFile(logPath, entry + '\n')
+
+    return content
+  } catch { return null }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SA-P3: 非编码场景
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * 写作工具——生成大纲。
+ */
+export function generateWritingOutline(topic: string): string {
+  return `# ${topic}\n\n## 大纲（AI 将在对话中扩展）\n\n1. 引言\n2. 核心论点\n3. 支撑论据\n4. 反面观点\n5. 结论\n\n> 请在 panda 对话中说："扩展第 2 节"来生成完整内容。`
+}
+
+/**
+ * 编译写作项目——合并目录下所有 .md 文件为单文档。
+ */
+export function compileWritingProject(dir: string): string {
+  const files = scanMdFiles(dir).sort()
+  const sections: string[] = ['# 编译输出\n']
+  for (const f of files) {
+    try {
+      const content = readFileSync(f, 'utf-8')
+      const name = f.split('/').pop()?.replace('.md', '') || ''
+      sections.push(`\n## ${name}\n\n${content}`)
+    } catch {}
+  }
+  return sections.join('\n')
+}
+
+/**
+ * 快速捕获想法到 inbox。
+ */
+export async function captureNote(content: string, source: string = 'manual'): Promise<string> {
+  const memoryDir = getAutoMemPath()
+  if (!memoryDir) return 'memory dir not available'
+
+  const inboxDir = join(memoryDir, 'working')
+  await mkdir(inboxDir, { recursive: true })
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const fileName = `capture-${timestamp}.md`
+  const filePath = join(inboxDir, fileName)
+
+  const note = `---
+name: 快速捕获
+description: ${content.slice(0, 80)}
+type: capture
+source: ${source}
+created: ${new Date().toISOString()}
+---
+
+${content}
+`
+  await writeFile(filePath, note, 'utf-8')
+  return filePath
+}
+
+/**
+ * PARA 分类建议。
+ */
+export function suggestPARACategory(content: string): 'projects' | 'areas' | 'resources' | 'archives' {
+  const lower = content.toLowerCase()
+  if (/deadline|sprint|release|发布|交付|版本/.test(lower)) return 'projects'
+  if (/habit|routine|health|学习|锻炼|日常/.test(lower)) return 'areas'
+  if (/reference|tutorial|documentation|参考|教程|文档/.test(lower)) return 'resources'
+  return 'archives'
+}
+
+/**
+ * 从文本生成闪卡（问答对）。
+ * 返回 Markdown 格式的卡片列表。
+ */
+export function generateFlashcards(content: string, maxCards: number = 10): string {
+  const sentences = content.split(/[。.!！?\n]+/).filter(s => s.trim().length > 20)
+  const cards: string[] = ['# 闪卡\n']
+
+  for (let i = 0; i < Math.min(sentences.length, maxCards); i++) {
+    const s = sentences[i].trim()
+    cards.push(`### 卡片 ${i + 1}`)
+    cards.push(`**Q:** ${s.slice(0, 50)}...的关键要点是什么？`)
+    cards.push(`**A:** ${s}\n`)
+  }
+
+  return cards.join('\n')
+}
+
+/**
+ * FSRS 间隔重复计算。
+ * 返回下次复习的天数间隔。
+ */
+export function fsrsNextInterval(
+  difficulty: number,      // 0-1，越高越难
+  stability: number,       // 记忆稳定度（天）
+  _retrievability: number, // 当前可提取性（0-1）
+  grade: 'again' | 'hard' | 'good' | 'easy',
+): { interval: number; newStability: number } {
+  const gradeMultiplier = { again: 0.2, hard: 0.6, good: 1.0, easy: 1.5 }
+  const m = gradeMultiplier[grade]
+
+  const newStability = stability * (1 + m * (1 - difficulty))
+  const interval = Math.max(1, Math.round(newStability * -Math.log(0.9) / Math.log(Math.E)))
+
+  return { interval, newStability: Math.max(0.1, newStability) }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SA-P4: 行为模式学习
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * 记录用户行为到 procedural/habits.md。
+ * 追踪：活跃时段分布、常用工具、项目切换模式。
+ */
+export async function recordBehavior(
+  action: string,
+  context: Record<string, string>,
+): Promise<void> {
+  const memoryDir = getAutoMemPath()
+  if (!memoryDir) return
+
+  const entry = `- ${new Date().toISOString()}: ${action} (${Object.entries(context).map(([k, v]) => `${k}=${v}`).join(', ')})\n`
+
+  try {
+    await mkdir(join(memoryDir, 'procedural'), { recursive: true })
+    await appendFile(join(memoryDir, 'procedural', 'habits.md'), entry)
+  } catch {}
+}
+
+/**
+ * 分析行为模式——返回用户的活跃时段分布。
+ */
+export function analyzeHabits(memoryDir: string): { peakHours: number[]; avgSessionLength: number } {
+  const habitsPath = join(memoryDir, 'procedural', 'habits.md')
+  const hourCounts = new Array(24).fill(0)
+
+  try {
+    const content = readFileSync(habitsPath, 'utf-8')
+    const timeMatches = content.match(/\d{4}-\d{2}-\d{2}T(\d{2}):/g) || []
+    for (const m of timeMatches) {
+      const hour = parseInt(m.match(/T(\d{2})/)?.[1] || '0', 10)
+      hourCounts[hour]++
+    }
+  } catch {}
+
+  // 找出活跃高峰时段（前 5 名）
+  const indexed = hourCounts.map((count: number, hour: number) => ({ hour, count }))
+  indexed.sort((a: { count: number }, b: { count: number }) => b.count - a.count)
+  const peakHours = indexed.slice(0, 5).filter((h: { count: number }) => h.count > 0).map((h: { hour: number }) => h.hour)
+
+  return { peakHours, avgSessionLength: 0 }
 }
