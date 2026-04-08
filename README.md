@@ -18,7 +18,7 @@
 ```
 
 **项目代号**：Panda Code
-**版本**：v2.1.943（基线 Claude Code v2.1.92）
+**版本**：v2.1.944（基线 Claude Code v2.1.92）
 **技术栈**：Bun + TypeScript + React/Ink + Commander.js
 **运行时**：Bun >= 1.2.0 / Node.js >= 18.0.0
 
@@ -333,6 +333,58 @@ EOF
 ╔═════════════════════════════════════════════════════════════════╗
 ║      Feature Flag 系 统 (92 个全开 + 31 GrowthBook tengu flags)  ║
 ╚═════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+## 🆕 contextCollapse — 零 API 调用的上下文折叠
+
+长对话场景下，消息膨胀逼近上下文窗口上限。contextCollapse 在 autocompact **之前**运行，通过纯本地操作增量折叠旧消息，零额外 token 消耗。
+
+| 指标 | 传统 autocompact | contextCollapse |
+|------|-----------------|----------------|
+| 触发阈值 | ~80% 上下文窗口 | **60%** 上下文窗口 |
+| API 调用 | 1 次（摘要生成） | **0 次** |
+| 信息损失 | 全量压缩，不可逆 | 按 span 折叠，可恢复 |
+| 粒度 | 全部消息 | 按 4-15 条消息的 span |
+
+### 启用方式
+
+```bash
+# 环境变量
+PANDA_CONTEXT_COLLAPSE=1 panda
+
+# 或 settings.json（feature flag CONTEXT_COLLAPSE 已启用）
+```
+
+### 工作原理
+
+1. **每次查询前**自动检查 token 使用量
+2. 超过 60% 阈值时扫描**最旧的消息**，识别可安全折叠的 span
+3. 生成**本地模板化摘要**（保留工具名+参数+结果骨架），压缩比 20:1~40:1
+4. 用摘要占位符替代原始消息，原始消息归档在内存中
+5. API 413 时触发**紧急排水**，放宽折叠条件
+
+### 折叠策略
+
+**安全折叠（低风险）**：已完成的工具调用对、短对话、距当前 ≥10 轮的历史
+
+**不折叠（高风险）**：最近 5 轮、系统消息、文件编辑操作（Edit/Write）、未完成工具调用
+
+### 查看状态
+
+```
+/context    — 显示折叠统计（collapsedSpans, stagedSpans）
+```
+
+### 与 autocompact 的关系
+
+```
+query() 执行顺序：
+  ① contextCollapse.applyCollapsesIfNeeded()   ← 先折叠
+  ② autocompact()                               ← 只在折叠不够时触发
+  ③ API 调用
+  ④ 若 413 → contextCollapse.recoverFromOverflow() → 重试
 ```
 
 ---
