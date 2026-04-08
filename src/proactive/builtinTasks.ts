@@ -1,5 +1,5 @@
 // Input: SmartCronTask definitions for scheduled autonomous work.
-// Output: 8 builtin tasks with priority, skip conditions, and real actions.
+// Output: 核心内置任务 + Phase 1 场景模块（系统健康/开发/文件/个人生活）
 // Pos: Registered by proactive/index.ts on activateProactive(); executed by night orchestrator.
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
@@ -293,7 +293,7 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
               type: 'action',
               title: '📅 日历提醒',
               body,
-              channel: 'system',
+              channel: 'all',
             })
 
             // 同时记录到工作记忆，下次对话时模型可见
@@ -341,7 +341,7 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
             type: 'warning',
             title: '⚠️ Git 提醒',
             body: `${changedFiles} 个文件未提交，距上次 commit 已 ${Math.round(elapsed / 3600000)} 小时`,
-            channel: 'system',
+            channel: 'all',
           })
         }
       } catch (e) {
@@ -374,7 +374,7 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
             type: 'info',
             title: '🧠 记忆提醒',
             body: `用户画像已 ${Math.round(daysSince)} 天未更新，建议在下次会话中运行 /dream`,
-            channel: 'system',
+            channel: 'all',
           })
         }
       } catch (e) {
@@ -384,8 +384,36 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
   },
 ]
 
+// ═══════════════════════════════════════════════════════════════════
+// Phase 1 场景模块：动态加载扩展场景
+// 新增场景请在 src/proactive/tasks/ 下创建模块，在此处导入
+// ═══════════════════════════════════════════════════════════════════
+
+function loadScenarioModules(): SmartCronTask[] {
+  const extra: SmartCronTask[] = []
+  // 每个模块独立 try/catch，单个模块加载失败不影响其他
+  const modules = [
+    { path: './tasks/systemHealth.js', getter: 'getSystemHealthTasks' },
+    { path: './tasks/personalLife.js', getter: 'getPersonalLifeTasks' },
+    { path: './tasks/devScenarios.js', getter: 'getDevTasks' },
+    { path: './tasks/fileScenarios.js', getter: 'getFileTasks' },
+  ]
+  for (const { path, getter } of modules) {
+    try {
+      const mod = require(path) as Record<string, () => SmartCronTask[]>
+      if (mod[getter]) extra.push(...mod[getter]())
+    } catch (e) {
+      logForDebugging(`[builtinTasks] 场景模块 ${path} 加载失败: ${(e as Error).message}`)
+    }
+  }
+  return extra
+}
+
+// 合并核心任务 + 场景模块
+const ALL_TASKS: SmartCronTask[] = [...SMART_CRON_TASKS, ...loadScenarioModules()]
+
 // 导出兼容 ProactiveTask[] 接口（skipIf 在 action 中内部处理）
-export const BUILTIN_TASKS: ProactiveTask[] = SMART_CRON_TASKS.map(task => ({
+export const BUILTIN_TASKS: ProactiveTask[] = ALL_TASKS.map(task => ({
   id: task.id,
   description: task.description,
   cron: task.cron,

@@ -1,0 +1,170 @@
+// Input: 跨平台数据获取请求
+// Output: 统一格式的系统数据（磁盘/内存/进程/空闲时间等）
+// Pos: proactive/ 平台抽象层，所有场景任务通过此模块获取系统数据
+
+import { execSync } from 'child_process'
+import { homedir, platform, totalmem, freemem } from 'os'
+import { join } from 'path'
+import { readdirSync, statSync } from 'fs'
+
+const IS_MAC = platform() === 'darwin'
+const IS_WIN = platform() === 'win32'
+
+// ─── 磁盘空间 ───
+
+export interface DiskInfo {
+  total: number    // bytes
+  free: number     // bytes
+  usedPercent: number
+  mount: string
+}
+
+export function getDiskInfo(mount: string = '/'): DiskInfo | null {
+  try {
+    if (IS_WIN) {
+      const drive = mount || 'C:'
+      const out = execSync(`wmic logicaldisk where "DeviceID='${drive}'" get Size,FreeSpace /format:csv`, { encoding: 'utf-8', timeout: 5000 })
+      const lines = out.trim().split('\n').filter(Boolean)
+      const last = lines[lines.length - 1].split(',')
+      const free = parseInt(last[1], 10)
+      const total = parseInt(last[2], 10)
+      return { total, free, usedPercent: Math.round((1 - free / total) * 100), mount: drive }
+    }
+    // macOS / Linux
+    const out = execSync(`df -k "${mount}"`, { encoding: 'utf-8', timeout: 5000 })
+    const line = out.trim().split('\n')[1]
+    if (!line) return null
+    const parts = line.split(/\s+/)
+    const total = parseInt(parts[1], 10) * 1024
+    const free = parseInt(parts[3], 10) * 1024
+    return { total, free, usedPercent: Math.round((1 - free / total) * 100), mount }
+  } catch { return null }
+}
+
+// ─── 内存 ───
+
+export interface MemoryInfo {
+  total: number
+  free: number
+  usedPercent: number
+}
+
+export function getMemoryInfo(): MemoryInfo {
+  const total = totalmem()
+  const free = freemem()
+  return { total, free, usedPercent: Math.round((1 - free / total) * 100) }
+}
+
+// ─── 用户空闲时间（秒） ───
+
+export function getUserIdleSeconds(): number {
+  try {
+    if (IS_MAC) {
+      const out = execSync('ioreg -c IOHIDSystem | grep HIDIdleTime', { encoding: 'utf-8', timeout: 3000 })
+      const match = out.match(/HIDIdleTime.*?=\s*(\d+)/)
+      if (match) return Math.floor(parseInt(match[1], 10) / 1000000000)
+    }
+    if (IS_WIN) {
+      // PowerShell: 获取上次输入时间
+      const out = execSync('powershell -c "[System.Environment]::TickCount - [int](Add-Type -MemberDefinition \'[DllImport(\\"user32.dll\\")]public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);[StructLayout(LayoutKind.Sequential)]public struct LASTINPUTINFO{public uint cbSize;public uint dwTime;}\' -Name U32 -Namespace W -PassThru)::GetLastInputInfo([ref]($l = New-Object W.U32+LASTINPUTINFO; $l.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($l); $l)); $l.dwTime"', { encoding: 'utf-8', timeout: 5000 }).trim()
+      return Math.floor(parseInt(out, 10) / 1000)
+    }
+    // Linux: xprintidle
+    const out = execSync('xprintidle 2>/dev/null || echo 0', { encoding: 'utf-8', timeout: 3000 })
+    return Math.floor(parseInt(out.trim(), 10) / 1000)
+  } catch { return 0 }
+}
+
+// ─── 目录文件统计 ───
+
+export interface DirStats {
+  fileCount: number
+  totalSize: number  // bytes
+  oldestFile: string | null
+  oldestAge: number  // days
+}
+
+export function getDirStats(dir: string): DirStats | null {
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true })
+    let fileCount = 0, totalSize = 0, oldestMs = Date.now(), oldestFile: string | null = null
+    for (const e of entries) {
+      if (!e.isFile() || e.name.startsWith('.')) continue
+      fileCount++
+      try {
+        const st = statSync(join(dir, e.name))
+        totalSize += st.size
+        if (st.mtimeMs < oldestMs) { oldestMs = st.mtimeMs; oldestFile = e.name }
+      } catch {}
+    }
+    return { fileCount, totalSize, oldestFile, oldestAge: Math.round((Date.now() - oldestMs) / 86400000) }
+  } catch { return null }
+}
+
+// ─── 电池信息 ───
+
+export interface BatteryInfo {
+  percent: number
+  charging: boolean
+  cycleCount: number
+  health: number  // 0-100
+}
+
+export function getBatteryInfo(): BatteryInfo | null {
+  try {
+    if (IS_MAC) {
+      const batt = execSync('pmset -g batt', { encoding: 'utf-8', timeout: 3000 })
+      const pctMatch = batt.match(/(\d+)%/)
+      const charging = /AC Power/.test(batt)
+      let cycleCount = 0, health = 100
+      try {
+        const sp = execSync('system_profiler SPPowerDataType 2>/dev/null', { encoding: 'utf-8', timeout: 10000 })
+        const cycleMatch = sp.match(/Cycle Count:\s*(\d+)/)
+        const healthMatch = sp.match(/Maximum Capacity:\s*(\d+)/)
+        if (cycleMatch) cycleCount = parseInt(cycleMatch[1], 10)
+        if (healthMatch) health = parseInt(healthMatch[1], 10)
+      } catch {}
+      return { percent: pctMatch ? parseInt(pctMatch[1], 10) : 100, charging, cycleCount, health }
+    }
+    if (IS_WIN) {
+      const out = execSync('wmic path Win32_Battery get EstimatedChargeRemaining,BatteryStatus /format:csv', { encoding: 'utf-8', timeout: 5000 })
+      const lines = out.trim().split('\n').filter(Boolean)
+      const last = lines[lines.length - 1].split(',')
+      return { percent: parseInt(last[2], 10) || 100, charging: last[1] === '2', cycleCount: 0, health: 100 }
+    }
+  } catch {}
+  return null
+}
+
+// ─── 网络连通性 ───
+
+export interface NetworkStatus {
+  connected: boolean
+  latencyMs: number
+  packetLoss: number  // 0-100
+}
+
+export function checkNetwork(host: string = '8.8.8.8'): NetworkStatus {
+  try {
+    const cmd = IS_WIN
+      ? `ping -n 3 -w 2000 ${host}`
+      : `ping -c 3 -W 2 ${host}`
+    const out = execSync(cmd, { encoding: 'utf-8', timeout: 15000 })
+    const lossMatch = out.match(/(\d+)%\s*(?:packet\s*)?loss/i)
+    const latencyMatch = out.match(/(?:avg|Average)\s*[=:]\s*([\d.]+)/i)
+      || out.match(/time[=<]([\d.]+)/i)
+    return {
+      connected: true,
+      latencyMs: latencyMatch ? parseFloat(latencyMatch[1]) : 0,
+      packetLoss: lossMatch ? parseInt(lossMatch[1], 10) : 0,
+    }
+  } catch {
+    return { connected: false, latencyMs: 0, packetLoss: 100 }
+  }
+}
+
+// ─── 导出平台标识 ───
+export { IS_MAC, IS_WIN }
+export const HOME = homedir()
+export const DOWNLOADS = join(HOME, 'Downloads')
+export const DESKTOP = join(HOME, 'Desktop')
