@@ -165,7 +165,8 @@ const zombieProcessAlert: SmartCronTask = {
 
         // 单进程内存 > 4GB
         try {
-          const out = execSync('ps aux --sort=-rss | head -5', {
+          const psCmd = IS_MAC ? 'ps -Arx -o pid,rss,comm | head -6' : 'ps aux --sort=-rss | head -5'
+          const out = execSync(psCmd, {
             encoding: 'utf-8',
             timeout: 5000,
           })
