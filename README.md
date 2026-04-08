@@ -18,7 +18,7 @@
 ```
 
 **项目代号**：Panda Code
-**版本**：v2.1.944（基线 Claude Code v2.1.92）
+**版本**：v2.2.0（基线 Claude Code v2.1.92）
 **技术栈**：Bun + TypeScript + React/Ink + Commander.js
 **运行时**：Bun >= 1.2.0 / Node.js >= 18.0.0
 
@@ -333,6 +333,71 @@ EOF
 ╔═════════════════════════════════════════════════════════════════╗
 ║      Feature Flag 系 统 (92 个全开 + 31 GrowthBook tengu flags)  ║
 ╚═════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+## 🆕 超级助手 — 数字生命体
+
+> "越用越了解你的贴身助理。白天人来接管，夜间 AI 自主整理所有数据资产。"
+
+### 五层记忆系统
+
+| 层 | 功能 | 自动维护 |
+|----|------|---------|
+| **工作记忆** | 当前会话上下文 | ✅ |
+| **情景记忆** | 每日会话摘要 | ✅ DeepDream |
+| **语义记忆** | 用户画像 + 知识图谱 | ✅ 自动进化 |
+| **程序记忆** | 行为模式 + 工作流 | ✅ 行为学习 |
+| **前瞻记忆** | 预测 + 建议 | ✅ 感知引擎 |
+
+### 夜间自主能力
+
+- **DeepDream v2**：每晚 22:00，四阶段整合（收割→理解→整合→前瞻）
+- **晨间简报**：每晨 07:00，自动生成日程 + 待办 + 建议
+- **文件自动分类**：每 4 小时扫描 Downloads/Desktop，9 种文件类型分类
+- **记忆衰减**：Ebbinghaus 遗忘曲线，自动清理低强度记忆
+- **Smart Cron**：11 个智能任务 + 用户活跃感知（活跃时不打扰）
+
+### 数据连接器
+
+| 连接器 | 命令 | 数据源 |
+|--------|------|--------|
+| 浏览器历史 | `panda history digest` | Chrome/Safari SQLite |
+| 日历 | `panda calendar today` | macOS Calendar (AppleScript) |
+| 笔记 | `panda notes search` | Apple Notes + Obsidian |
+| 剪贴板 | 自动捕获 | pbpaste + 敏感过滤 |
+
+### 非编码场景
+
+```bash
+# 写作助理
+panda write outline "AI个人助理的未来"
+panda write compile ~/manuscript/
+
+# 知识管理（PARA 方法论）
+panda capture "想到一个架构思路..."
+panda notes search "上周关于项目X的讨论"
+
+# 学习助理（FSRS 间隔重复）
+panda learn from paper.pdf
+panda learn review
+```
+
+### 感知与通知
+
+- **Git 感知**：分支状态、未提交变更、远程偏离
+- **项目感知**：TODO/FIXME 计数、构建状态
+- **行为学习**：活跃时段分布、常用工具、项目切换模式
+- **macOS 通知**：重要事件通过系统通知中心推送
+
+### 隐私铁律
+
+```
+1. 全本地采集和索引 — 数据永不离开设备
+2. 敏感数据自动过滤 — 密码/token/API key 不入索引
+3. privacy.json 排除列表 — 用户自定义不采集的路径
+4. 随时可删 — panda memory forget "关于X的一切"
 ```
 
 ---
