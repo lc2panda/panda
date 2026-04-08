@@ -15,7 +15,7 @@ import { loadMessageLogs } from './sessionStorage.js'
 import { getInitialSettings } from './settings/settings.js'
 
 // Layout constants
-const MAX_LEFT_WIDTH = 40
+const MAX_LEFT_WIDTH = 56
 const MAX_USERNAME_LENGTH = 20
 const BORDER_PADDING = 4
 const DIVIDER_WIDTH = 1
@@ -66,7 +66,7 @@ export function calculateLayoutDimensions(
   }
 
   // Vertical mode
-  const totalWidth = Math.min(columns - BORDER_PADDING, MAX_LEFT_WIDTH + 20)
+  const totalWidth = Math.min(columns - BORDER_PADDING, MAX_LEFT_WIDTH + 30)
   return {
     leftWidth: totalWidth,
     rightWidth: totalWidth,
@@ -86,9 +86,9 @@ export function calculateOptimalLeftWidth(
     stringWidth(welcomeMessage),
     stringWidth(truncatedCwd),
     stringWidth(modelLine),
-    30, // Minimum for clawd art + model info
+    38, // Minimum for clawd art + model info + breathing room
   )
-  return Math.min(contentWidth + 4, MAX_LEFT_WIDTH) // +4 for padding
+  return Math.min(contentWidth + 6, MAX_LEFT_WIDTH) // +6 for comfortable padding
 }
 
 /**
