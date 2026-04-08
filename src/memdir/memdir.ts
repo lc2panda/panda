@@ -371,6 +371,7 @@ export function buildMemoryLines(
   lines.push('Also append raw observations to the monthly log: `semantic/profile-logs/YYYY-MM.md`')
   lines.push('Do NOT wait until the end of the conversation — update as soon as you observe something noteworthy.')
   lines.push('The longer the user uses you, the more accurate and detailed this profile should become.')
+  lines.push('**IMPORTANT**: Profile updates are EXEMPT from output length limits — this is a background maintenance task, not user-facing output.')
   lines.push('')
 
   // 非编码能力指引
