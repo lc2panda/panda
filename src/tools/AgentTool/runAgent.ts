@@ -929,11 +929,16 @@ function getSubagentProjectContext(): string | null {
 
     if (!claudeMdContent) return null
 
-    // 截取前 800 字符作为核心规范摘要，控制 token 消耗
-    const summary =
-      claudeMdContent.length > 800
-        ? claudeMdContent.slice(0, 800) + '\n... (truncated)'
-        : claudeMdContent
+    // 按行截断，保留完整行，避免在多字节字符中间断开
+    const lines = claudeMdContent.split('\n')
+    let summary = ''
+    for (const line of lines) {
+      if (summary.length + line.length + 1 > 2500) {
+        summary += '\n... (truncated)'
+        break
+      }
+      summary += (summary ? '\n' : '') + line
+    }
 
     return `<subagent-project-context>
 You are a sub-agent working within a larger project. Follow these project rules:

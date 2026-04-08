@@ -215,6 +215,7 @@ type State = {
   // Why the previous iteration continued. Undefined on first iteration.
   // Lets tests assert recovery paths fired without inspecting message contents.
   transition: Continue | undefined
+  completionGuardCount: number
 }
 
 export async function* query(
@@ -277,6 +278,7 @@ async function* queryLoop(
     turnCount: 1,
     pendingToolUseSummary: undefined,
     transition: undefined,
+    completionGuardCount: 0,
   }
   const budgetTracker = feature('TOKEN_BUDGET') ? createBudgetTracker() : null
 
@@ -319,6 +321,7 @@ async function* queryLoop(
       pendingToolUseSummary,
       stopHookActive,
       turnCount,
+      completionGuardCount,
     } = state
 
     // Skill discovery prefetch — per-iteration (uses findWritePivot guard
@@ -1138,6 +1141,7 @@ async function* queryLoop(
               pendingToolUseSummary: undefined,
               stopHookActive: undefined,
               turnCount,
+              completionGuardCount,
               transition: {
                 reason: 'collapse_drain_retry',
                 committed: drained.committed,
@@ -1191,6 +1195,7 @@ async function* queryLoop(
             pendingToolUseSummary: undefined,
             stopHookActive: undefined,
             turnCount,
+            completionGuardCount,
             transition: { reason: 'reactive_compact_retry' },
           }
           state = next
@@ -1246,6 +1251,7 @@ async function* queryLoop(
             pendingToolUseSummary: undefined,
             stopHookActive: undefined,
             turnCount,
+            completionGuardCount,
             transition: { reason: 'max_output_tokens_escalate' },
           }
           state = next
@@ -1274,6 +1280,7 @@ async function* queryLoop(
             pendingToolUseSummary: undefined,
             stopHookActive: undefined,
             turnCount,
+            completionGuardCount,
             transition: {
               reason: 'max_output_tokens_recovery',
               attempt: maxOutputTokensRecoveryCount + 1,
@@ -1297,13 +1304,15 @@ async function* queryLoop(
       }
 
       // Completion Guard: detect premature completion claims without evidence
+      // P0-2: limit to 2 triggers to prevent infinite loops
       if (
         !stopHookActive &&
-        querySource.startsWith('repl_main_thread')
+        querySource.startsWith('repl_main_thread') &&
+        completionGuardCount < 2
       ) {
         const guardMessage = checkCompletionGuard(assistantMessages, messagesForQuery)
         if (guardMessage) {
-          logForDebugging('Completion Guard triggered — requesting verification evidence')
+          logForDebugging(`Completion Guard triggered (${completionGuardCount + 1}/2) — requesting verification evidence`)
           const next: State = {
             messages: [...messagesForQuery, ...assistantMessages, guardMessage],
             toolUseContext,
@@ -1314,6 +1323,7 @@ async function* queryLoop(
             pendingToolUseSummary: undefined,
             stopHookActive: undefined,
             turnCount,
+            completionGuardCount: completionGuardCount + 1,
             transition: { reason: 'completion_guard' },
           }
           state = next
@@ -1335,14 +1345,19 @@ async function* queryLoop(
           pendingToolUseSummary: undefined,
           stopHookActive: undefined,
           turnCount,
+          completionGuardCount,
           transition: { reason: 'anti_slop' as any },
         }
         continue
       }
 
-      // 进化写回：成功的 turn 结束后，提示经验沉淀
+      // 进化写回：成功的 turn 结束后，记录工具调用摘要用于经验沉淀
       if (hasSuccessfulToolCalls(assistantMessages) && turnCount > 3) {
-        logForDebugging('[EvolutionWriteback] Successful tools in turn — consider patterns/scars writeback')
+        const toolNames = assistantMessages
+          .flatMap(m => (m.message?.content ?? [])
+            .filter((b: any) => b.type === 'tool_use')
+            .map((b: any) => b.name))
+        logForDebugging(`[EvolutionWriteback] Turn ${turnCount}: successful tools [${toolNames.join(', ')}] — candidate for patterns/scars`)
       }
 
       const stopHookResult = yield* handleStopHooks(
@@ -1380,6 +1395,7 @@ async function* queryLoop(
           pendingToolUseSummary: undefined,
           stopHookActive: true,
           turnCount,
+          completionGuardCount,
           transition: { reason: 'stop_hook_blocking' },
         }
         state = next
@@ -1416,6 +1432,7 @@ async function* queryLoop(
             pendingToolUseSummary: undefined,
             stopHookActive: undefined,
             turnCount,
+            completionGuardCount,
             transition: { reason: 'token_budget_continuation' },
           }
           continue
@@ -1803,6 +1820,7 @@ async function* queryLoop(
       pendingToolUseSummary: nextPendingToolUseSummary,
       maxOutputTokensOverride: undefined,
       stopHookActive,
+      completionGuardCount,
       transition: { reason: 'next_turn' },
     }
     state = next
@@ -1857,7 +1875,17 @@ function checkCompletionGuard(
   if (!hasCompletionClaim) return null
 
   // Finding Closure 检查：是否有未关闭的发现
-  const hasOpenFindings = /\b(TODO|FIXME|HACK|BUG|ISSUE|待修复|未完成|需要|还需)\b/i.test(textContent)
+  // P3-2: 按句子粒度检测，排除 "TODO 已完成/已修复" 等否定上下文
+  // 同时移除过于宽泛的 "需要"/"还需"（中文中太常见，误触发率高）
+  const sentences = textContent.split(/[。.!！\n]/)
+  const hasOpenTodoFindings = sentences.some((s: string) => {
+    const hasTodo = /\b(TODO|FIXME|HACK)\b/i.test(s)
+    if (!hasTodo) return false
+    const isResolved = /已[全部全]*[完成修复解决处理清理]|fixed|resolved|completed|done/i.test(s)
+    return !isResolved
+  })
+  const hasChineseOpenFindings = /待修复|待处理|待完成/.test(textContent)
+  const hasOpenFindings = hasOpenTodoFindings || hasChineseOpenFindings
   if (hasCompletionClaim && hasOpenFindings) {
     return createUserMessage({
       content: '[Finding Closure] You claimed completion but there are open findings (TODO/FIXME/未完成). Please close all findings before claiming completion.',
@@ -1959,7 +1987,8 @@ function checkAntiSlop(assistantMessages: AssistantMessage[]): UserMessage | nul
 
   // 3. 空洞长文本（无代码块无文件引用）
   const hasCodeBlock = /```[\s\S]*?```/.test(fullText)
-  const hasFileRef = /[a-zA-Z_\/]+\.[a-zA-Z]{1,5}(:\d+)?/.test(fullText)
+  const hasFileRef = /[a-zA-Z_\-]+\/[a-zA-Z_\-]+\.[a-zA-Z]{1,5}/.test(fullText) ||
+    /\b\w+\.(ts|tsx|js|jsx|py|rs|go|java|c|cpp|h|css|html|json|yaml|yml|toml|md|sh|sql)\b/.test(fullText)
   if (fullText.length > 2000 && !hasCodeBlock && !hasFileRef) {
     issues.push('long response without code or file references')
   }

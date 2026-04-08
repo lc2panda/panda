@@ -1669,7 +1669,7 @@ function checkDangerousCommandPatterns(
   const patterns: Array<{ regex: RegExp; message: string }> = [
     // 1. 递归删除根目录或用户主目录
     {
-      regex: /\brm\s+(-[a-zA-Z]*[rf][a-zA-Z]*\s+)*\s*(\/|~\/?\s*$|\$HOME\s*$)/,
+      regex: /\brm\s+(-[a-zA-Z]*[rf][a-zA-Z]*\s+)+(\/|~|\$HOME)\s*$/,
       message: 'Dangerous: rm targeting root or home directory',
     },
     // 2. Git 硬重置（丢弃所有未提交更改）
@@ -1679,12 +1679,12 @@ function checkDangerousCommandPatterns(
     },
     // 3. Git 强制推送（可能覆盖远程历史）
     {
-      regex: /\bgit\s+push\s+.*(-f|--force)\b/,
+      regex: /\bgit\s+push\s+.*(-f\b|--force(?!-with-lease|-if-includes)\b)/,
       message: 'Dangerous: git push --force may overwrite remote history',
     },
     // 4. 递归修改权限为 777（安全风险）
     {
-      regex: /\bchmod\s+(-[a-zA-Z]*R[a-zA-Z]*\s+)*.*\b777\b/,
+      regex: /\bchmod\s+(-[a-zA-Z]*R[a-zA-Z]*\s+)+.*\b777\b/,
       message:
         'Dangerous: chmod 777 recursively removes all permission restrictions',
     },

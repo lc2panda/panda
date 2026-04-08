@@ -1407,13 +1407,13 @@ function resolveTeamName(input: {
 function inferAgentTypeFromPrompt(prompt: string): string | undefined {
   const lower = prompt.toLowerCase()
 
-  // 搜索/探索类 → Explore agent
-  if (/\b(search|find|grep|locate|探索|搜索|查找|哪个文件|在哪)\b/.test(lower)) {
+  // Explore: 明确的搜索/查找意图（排除 "search and replace" 等）
+  if (/\b(search\s+for|find\s+(?:the|all|where|which)|grep\s+|locate\s+|探索|搜索.*文件|查找.*代码|哪个文件|在哪里?定义)\b/.test(lower)) {
     return 'Explore'
   }
 
-  // 规划/设计类 → Plan agent
-  if (/\b(plan|design|architect|策划|设计|方案|规划|how should)\b/.test(lower)) {
+  // Plan: 明确的规划/设计意图（排除 "I plan to" 等）
+  if (/\b(create\s+a\s+plan|design\s+(?:a|the)|architect|制定.*方案|设计.*架构|how\s+should\s+(?:we|I)\s+(?:implement|build|structure))\b/.test(lower)) {
     return 'Plan'
   }
 
