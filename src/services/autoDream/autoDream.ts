@@ -11,6 +11,8 @@
 // (tests call initAutoDream() in beforeEach for a fresh closure).
 
 import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
+import { join } from 'path'
+import { writeFile, mkdir } from 'fs/promises'
 import type { REPLHookContext } from '../../utils/hooks/postSamplingHooks.js'
 import {
   createCacheSafeParams,
@@ -62,8 +64,8 @@ type AutoDreamConfig = {
 }
 
 const DEFAULTS: AutoDreamConfig = {
-  minHours: 24,
-  minSessions: 5,
+  minHours: 1,        // SA-P1-01: 用户离开 1 小时即可触发
+  minSessions: 2,     // SA-P1-01: 2 个会话就够
 }
 
 /**
@@ -238,6 +240,20 @@ ${sessionIds.map(id => `- ${id}`).join('\n')}`
       })
 
       completeDreamTask(taskId, setAppState)
+
+      // DeepDream v2: 全量数据整合（在现有记忆整合之后执行）
+      try {
+        const dreamReport = await generateDeepDreamReport(memoryRoot)
+        if (dreamReport) {
+          const dreamsDir = join(memoryRoot, 'dreams')
+          await mkdir(dreamsDir, { recursive: true })
+          const dateStr = new Date().toISOString().split('T')[0]
+          await writeFile(join(dreamsDir, `${dateStr}.md`), dreamReport, 'utf-8')
+        }
+      } catch (e) {
+        logForDebugging(`[autoDream] DeepDream v2 report failed: ${(e as Error).message}`)
+      }
+
       // Inline completion summary in the main transcript (same surface as
       // extractMemories's "Saved N memories" message).
       const dreamState = context.toolUseContext.getAppState().tasks?.[taskId]
@@ -316,6 +332,47 @@ function makeDreamProgressWatcher(
       setAppState,
     )
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SA-P1-01: DeepDream v2 四阶段报告生成
+// ═══════════════════════════════════════════════════════════════════
+
+async function generateDeepDreamReport(memoryDir: string): Promise<string | null> {
+  const { scanMdFiles, decayAndPruneMemories } = await import('../../memdir/memdir.js')
+
+  const dateStr = new Date().toISOString().split('T')[0]
+  const sections: string[] = [`# DeepDream Report — ${dateStr}\n`]
+
+  // Phase 1: Harvest — 扫描当日数据
+  const episodes = join(memoryDir, 'episodes')
+  const todayEpisodes = scanMdFiles(episodes).filter((f: string) => f.includes(dateStr))
+  if (todayEpisodes.length === 0 && scanMdFiles(memoryDir).length < 3) return null
+
+  sections.push('## Harvest')
+  sections.push(`- 会话记录: ${todayEpisodes.length} 个`)
+  sections.push(`- 记忆文件总数: ${scanMdFiles(memoryDir).length}`)
+
+  // Phase 2: Understand — 统计和分析
+  const allFiles = scanMdFiles(memoryDir)
+  const patterns = allFiles.filter((f: string) => f.includes('/patterns/'))
+  const scars = allFiles.filter((f: string) => f.includes('/scars/'))
+
+  sections.push('\n## Understand')
+  sections.push(`- 成功模式: ${patterns.length} 条`)
+  sections.push(`- 失败教训: ${scars.length} 条`)
+
+  // Phase 3: Consolidate — 调用衰减清理
+  const { decayed, pruned } = await decayAndPruneMemories(memoryDir)
+  sections.push('\n## Consolidate')
+  sections.push(`- 衰减更新: ${decayed} 条`)
+  sections.push(`- 清理删除: ${pruned} 条`)
+
+  // Phase 4: Anticipate — 简要前瞻
+  sections.push('\n## Anticipate')
+  sections.push('- 晨间简报将基于本次整合结果生成')
+
+  return sections.join('\n')
 }
 
 /**

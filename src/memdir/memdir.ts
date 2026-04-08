@@ -1,5 +1,7 @@
 import { feature } from 'bun:bundle'
-import { join } from 'path'
+import { join, relative } from 'path'
+import { readFileSync, readdirSync, unlinkSync, writeFileSync, mkdirSync, renameSync } from 'fs'
+import { access, writeFile, readFile, appendFile, mkdir } from 'fs/promises'
 import { getFsImplementation } from '../utils/fsOperations.js'
 import { getAutoMemPath, isAutoMemoryEnabled } from './paths.js'
 
@@ -187,6 +189,39 @@ export async function ensureMemoryDirExists(memoryDir: string): Promise<void> {
         { level: 'debug' },
       )
     }
+  }
+
+  // ── 五层记忆目录 (SA-P0-01) ──────────
+  const memorySubdirs = ['working', 'episodes', 'semantic', 'procedural', 'dreams']
+  for (const sub of memorySubdirs) {
+    try {
+      await mkdir(join(memoryDir, sub), { recursive: true })
+    } catch {}
+  }
+
+  // 初始化 semantic/profile.md（仅首次）
+  const profilePath = join(memoryDir, 'semantic', 'profile.md')
+  try {
+    await access(profilePath)
+  } catch {
+    const template = `---
+name: 用户画像
+description: 自动维护的用户特征档案
+type: user
+---
+
+## 基础信息
+（自动填充）
+
+## 工作模式
+（自动填充）
+
+## 偏好
+（自动填充）
+
+## 进化日志
+`
+    await writeFile(profilePath, template, 'utf-8')
   }
 }
 
@@ -592,4 +627,305 @@ export async function loadMemoryPrompt(): Promise<string | null> {
     logEvent('tengu_team_memdir_disabled', {})
   }
   return null
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SA-P0-02: 用户画像自动维护
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * 从对话中提取用户特征，增量更新 semantic/profile.md。
+ * 异步执行，不阻塞主循环。仅提取非敏感的行为模式。
+ */
+export async function updateUserProfile(messages: readonly any[]): Promise<void> {
+  if (!isAutoMemoryEnabled()) return
+
+  const memoryDir = getAutoMemPath()
+  if (!memoryDir) return
+
+  const profilePath = join(memoryDir, 'semantic', 'profile.md')
+
+  // 提取用户消息的语言、长度、风格特征
+  const userMessages = messages.filter((m: any) => m.type === 'user')
+  if (userMessages.length === 0) return
+
+  // 简单特征提取（纯本地，不调 API）
+  const traits: string[] = []
+  const now = new Date().toISOString().split('T')[0]
+
+  // 检测语言偏好
+  const allText = userMessages.map((m: any) => {
+    const content = m.message?.content
+    if (typeof content === 'string') return content
+    if (Array.isArray(content)) return content.filter((b: any) => b.type === 'text').map((b: any) => b.text || '').join(' ')
+    return ''
+  }).join(' ')
+
+  const chineseRatio = (allText.match(/[\u4e00-\u9fff]/g) || []).length / Math.max(allText.length, 1)
+  if (chineseRatio > 0.3) traits.push(`${now}: 本次会话使用中文为主`)
+  else if (chineseRatio < 0.05 && allText.length > 50) traits.push(`${now}: 本次会话使用英文为主`)
+
+  // 检测消息风格
+  const avgLength = allText.length / Math.max(userMessages.length, 1)
+  if (avgLength < 30) traits.push(`${now}: 沟通风格简洁直接`)
+  else if (avgLength > 200) traits.push(`${now}: 沟通风格详细完整`)
+
+  // 检测活跃时段
+  const hour = new Date().getHours()
+  if (hour >= 22 || hour < 6) traits.push(`${now}: 深夜活跃 (${hour}:00)`)
+  else if (hour >= 6 && hour < 9) traits.push(`${now}: 早起工作 (${hour}:00)`)
+
+  if (traits.length === 0) return
+
+  // 增量追加到进化日志
+  try {
+    const existing = await readFile(profilePath, 'utf-8').catch(() => '')
+    const logEntry = traits.map(t => `- ${t}`).join('\n')
+    if (!existing.includes(logEntry.split('\n')[0])) {
+      await appendFile(profilePath, '\n' + logEntry + '\n')
+    }
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SA-P0-03: 本地全文索引
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * 本地全文索引——基于文件系统的简易语义搜索。
+ * 扫描 memory/ 下所有 .md 文件，建立倒排索引。
+ * 零外部依赖，纯文本匹配 + 文件内容相关性排序。
+ */
+export function searchMemory(query: string, memoryDir: string, topK: number = 5): Array<{ file: string; score: number; excerpt: string }> {
+  const results: Array<{ file: string; score: number; excerpt: string }> = []
+
+  const files = scanMdFiles(memoryDir)
+
+  // 分词（中英文混合）
+  const queryTerms = tokenize(query)
+  if (queryTerms.length === 0) return results
+
+  for (const filePath of files) {
+    try {
+      const content = readFileSync(filePath, 'utf-8')
+      const terms = tokenize(content)
+
+      // TF-IDF 简易评分
+      let score = 0
+      for (const qt of queryTerms) {
+        const tf = terms.filter(t => t === qt).length / Math.max(terms.length, 1)
+        score += tf
+      }
+
+      if (score > 0) {
+        const excerpt = extractExcerpt(content, queryTerms)
+        results.push({
+          file: relative(memoryDir, filePath),
+          score,
+          excerpt,
+        })
+      }
+    } catch {}
+  }
+
+  return results.sort((a, b) => b.score - a.score).slice(0, topK)
+}
+
+function tokenize(text: string): string[] {
+  return text.toLowerCase()
+    .replace(/[^\w\u4e00-\u9fff]+/g, ' ')
+    .split(/\s+/)
+    .filter(t => t.length > 1)
+}
+
+function extractExcerpt(content: string, queryTerms: string[], maxLen: number = 150): string {
+  const lower = content.toLowerCase()
+  for (const term of queryTerms) {
+    const idx = lower.indexOf(term)
+    if (idx >= 0) {
+      const start = Math.max(0, idx - 50)
+      const end = Math.min(content.length, idx + maxLen)
+      return content.slice(start, end).replace(/\n+/g, ' ').trim()
+    }
+  }
+  return content.slice(0, maxLen).replace(/\n+/g, ' ').trim()
+}
+
+export function scanMdFiles(dir: string): string[] {
+  const results: string[] = []
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name)
+      if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        results.push(...scanMdFiles(fullPath))
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        results.push(fullPath)
+      }
+    }
+  } catch {}
+  return results
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SA-P0-04: 记忆遗忘/衰减机制
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * 记忆衰减——基于 Ebbinghaus 遗忘曲线。
+ * 定期（每日 DeepDream 时）调用，衰减未访问记忆的强度。
+ */
+export async function decayAndPruneMemories(memoryDir: string): Promise<{ decayed: number; pruned: number }> {
+  let decayed = 0, pruned = 0
+  const now = Date.now()
+  const files = scanMdFiles(memoryDir)
+
+  for (const filePath of files) {
+    try {
+      let content = readFileSync(filePath, 'utf-8')
+
+      // 解析 frontmatter 中的元数据
+      const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/)
+      if (!frontmatterMatch) continue
+
+      const fm = frontmatterMatch[1]
+      const lastAccessedMatch = fm.match(/lastAccessed:\s*(\d+)/)
+      const strengthMatch = fm.match(/strength:\s*([\d.]+)/)
+      const importantMatch = fm.match(/important:\s*true/)
+
+      // 重要记忆不衰减
+      if (importantMatch) continue
+
+      const lastAccessed = lastAccessedMatch ? parseInt(lastAccessedMatch[1]) : now
+      const currentStrength = strengthMatch ? parseFloat(strengthMatch[1]) : 1.0
+
+      // Ebbinghaus 衰减：R = e^(-t/S)
+      const daysSinceAccess = (now - lastAccessed) / (24 * 60 * 60 * 1000)
+      const stability = Math.max(1, currentStrength * 30)
+      const newStrength = Math.exp(-daysSinceAccess / stability)
+
+      if (newStrength < 0.1) {
+        unlinkSync(filePath)
+        pruned++
+      } else if (Math.abs(newStrength - currentStrength) > 0.05) {
+        if (strengthMatch) {
+          content = content.replace(/strength:\s*[\d.]+/, `strength: ${newStrength.toFixed(2)}`)
+        } else {
+          content = content.replace(/^---\n/, `---\nstrength: ${newStrength.toFixed(2)}\n`)
+        }
+        writeFileSync(filePath, content, 'utf-8')
+        decayed++
+      }
+    } catch {}
+  }
+
+  return { decayed, pruned }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SA-P1-02: 晨间简报引擎
+// ═══════════════════════════════════════════════════════════════════
+
+export async function generateMorningBrief(): Promise<void> {
+  const memoryDir = getAutoMemPath()
+  if (!memoryDir) return
+
+  const dateStr = new Date().toISOString().split('T')[0]
+  const briefPath = join(memoryDir, 'working', `morning_brief_${dateStr}.md`)
+
+  // 避免重复生成
+  try { await access(briefPath); return } catch {}
+
+  const sections: string[] = [`# 晨间简报 — ${dateStr}\n`]
+
+  // 昨日 dream 报告
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  const dreamPath = join(memoryDir, 'dreams', `${yesterday}.md`)
+  try {
+    const dream = await readFile(dreamPath, 'utf-8')
+    sections.push('## 昨夜整合摘要')
+    sections.push(dream.split('\n').slice(0, 10).join('\n'))
+  } catch {
+    sections.push('## 昨夜整合\n（无记录）')
+  }
+
+  // 待处理事项（扫描 memory 中的 TODO）
+  const allFiles = scanMdFiles(memoryDir)
+  const todos: string[] = []
+  for (const f of allFiles.slice(0, 50)) {
+    try {
+      const content = readFileSync(f, 'utf-8')
+      const todoLines = content.split('\n').filter(l => /TODO|待办|待处理|FIXME/.test(l))
+      todos.push(...todoLines.slice(0, 3))
+    } catch {}
+  }
+  if (todos.length > 0) {
+    sections.push('\n## 待处理')
+    sections.push(todos.slice(0, 10).join('\n'))
+  }
+
+  // 记忆状态
+  sections.push('\n## 记忆状态')
+  sections.push(`- 记忆文件总数: ${allFiles.length}`)
+
+  await mkdir(join(memoryDir, 'working'), { recursive: true })
+  await writeFile(briefPath, sections.join('\n'), 'utf-8')
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SA-P1-03: 文件分类器
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * 文件分类器——根据文件扩展名和名称模式分类。
+ * 纯本地规则，零 API 调用。
+ */
+export function classifyFile(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase() || ''
+  const name = filePath.split('/').pop()?.toLowerCase() || ''
+
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'heic', 'heif'].includes(ext)) return 'images'
+  if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pages', 'numbers', 'key'].includes(ext)) return 'documents'
+  if (['ts', 'tsx', 'js', 'jsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h', 'swift', 'kt'].includes(ext)) return 'code'
+  if (['zip', 'tar', 'gz', 'bz2', 'rar', '7z', 'dmg', 'pkg'].includes(ext)) return 'archives'
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv'].includes(ext)) return 'videos'
+  if (['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg'].includes(ext)) return 'audio'
+  if (['json', 'csv', 'xml', 'yaml', 'yml', 'toml', 'sql', 'db', 'sqlite'].includes(ext)) return 'data'
+  if (['md', 'txt', 'rtf', 'log'].includes(ext)) return 'text'
+  if (name.includes('screenshot') || name.includes('截屏') || name.includes('screen shot')) return 'screenshots'
+
+  return 'other'
+}
+
+/**
+ * 扫描目录并生成分类建议。
+ */
+export function organizeDirectory(srcDir: string, dryRun: boolean = true): Array<{ src: string; dest: string; category: string }> {
+  const moves: Array<{ src: string; dest: string; category: string }> = []
+
+  try {
+    const entries = readdirSync(srcDir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (!entry.isFile()) continue
+      if (entry.name.startsWith('.')) continue
+
+      const srcPath = join(srcDir, entry.name)
+      const category = classifyFile(srcPath)
+      if (category === 'other') continue
+
+      const destDir = join(srcDir, category)
+      const destPath = join(destDir, entry.name)
+
+      moves.push({ src: srcPath, dest: destPath, category })
+
+      if (!dryRun) {
+        try {
+          mkdirSync(destDir, { recursive: true })
+          renameSync(srcPath, destPath)
+        } catch {}
+      }
+    }
+  } catch {}
+
+  return moves
 }

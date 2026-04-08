@@ -153,6 +153,12 @@ export async function* handleStopHooks(
     }
     if (!toolUseContext.agentId) {
       void executeAutoDream(stopHookContext, toolUseContext.appendSystemMessage)
+
+      // SA-P0-02: 用户画像自动维护（异步，不阻塞）
+      try {
+        const { updateUserProfile } = require('../memdir/memdir.js') as typeof import('../memdir/memdir.js')
+        void updateUserProfile(stopHookContext.messages)
+      } catch {}
     }
   }
 
