@@ -351,6 +351,20 @@ export function buildMemoryLines(
 
   lines.push(...buildSearchingPastContextSection(memoryDir))
 
+  // 搜索指引
+  lines.push('## Memory search')
+  lines.push('If the user asks to search memories, use the Read tool to scan files in the memory directory.')
+  lines.push('')
+
+  // 非编码能力指引
+  lines.push('## Non-coding capabilities')
+  lines.push('The assistant has these built-in functions available through natural language:')
+  lines.push('- **Writing**: Ask to "generate outline for [topic]" or "compile writings in [dir]"')
+  lines.push('- **Knowledge capture**: Ask to "capture this idea: [text]" or "search my notes for [query]"')
+  lines.push('- **Learning**: Ask to "generate flashcards from [content]" or "plan learning path for [topic]"')
+  lines.push('- **File organization**: Ask to "organize my Downloads folder" or "classify files in [dir]"')
+  lines.push('')
+
   return lines
 }
 
@@ -435,6 +449,16 @@ export function buildMemoryPrompt(params: {
       // Subdirectory doesn't exist or unreadable — skip silently
     }
   }
+
+  // SA-P4: 感知上下文注入
+  try {
+    const { getGitSense, getProjectSense } = require('../assistant/sense.js') as typeof import('../assistant/sense.js')
+    const git = getGitSense()
+    const project = getProjectSense()
+    lines.push('', '## Current Context')
+    lines.push(`- Git: branch=${git.branch}, uncommitted=${git.uncommitted}`)
+    if (project.todoCount > 0) lines.push(`- Project: ${project.todoCount} TODOs`)
+  } catch {}
 
   return lines.join('\n')
 }
@@ -678,12 +702,21 @@ export async function updateUserProfile(messages: readonly any[]): Promise<void>
 
   if (traits.length === 0) return
 
-  // 增量追加到进化日志
+  // 增量追加到进化日志 + 膨胀控制
   try {
     const existing = await readFile(profilePath, 'utf-8').catch(() => '')
     const logEntry = traits.map(t => `- ${t}`).join('\n')
     if (!existing.includes(logEntry.split('\n')[0])) {
       await appendFile(profilePath, '\n' + logEntry + '\n')
+
+      // 控制 profile.md 大小：超过 200 行时截断旧日志
+      const updated = await readFile(profilePath, 'utf-8')
+      const allLines = updated.split('\n')
+      if (allLines.length > 200) {
+        // 保留前 50 行（结构化部分）+ 最后 100 行（最新日志）
+        const trimmed = [...allLines.slice(0, 50), '... (older entries trimmed)', ...allLines.slice(-100)]
+        await writeFile(profilePath, trimmed.join('\n'), 'utf-8')
+      }
     }
   } catch {}
 }
@@ -706,27 +739,40 @@ export function searchMemory(query: string, memoryDir: string, topK: number = 5)
   const queryTerms = tokenize(query)
   if (queryTerms.length === 0) return results
 
+  // 预计算 IDF：扫描每个文件的词集
+  const docCount = files.length
+  const termDocFreq = new Map<string, number>()
+  const fileContents = new Map<string, { content: string; terms: string[] }>()
+
   for (const filePath of files) {
     try {
       const content = readFileSync(filePath, 'utf-8')
       const terms = tokenize(content)
-
-      // TF-IDF 简易评分
-      let score = 0
-      for (const qt of queryTerms) {
-        const tf = terms.filter(t => t === qt).length / Math.max(terms.length, 1)
-        score += tf
-      }
-
-      if (score > 0) {
-        const excerpt = extractExcerpt(content, queryTerms)
-        results.push({
-          file: relative(memoryDir, filePath),
-          score,
-          excerpt,
-        })
+      const termSet = new Set(terms)
+      fileContents.set(filePath, { content, terms })
+      for (const t of termSet) {
+        termDocFreq.set(t, (termDocFreq.get(t) || 0) + 1)
       }
     } catch {}
+  }
+
+  // TF-IDF 评分
+  for (const [filePath, { content, terms }] of fileContents) {
+    let score = 0
+    for (const qt of queryTerms) {
+      const tf = terms.filter(t => t === qt).length / Math.max(terms.length, 1)
+      const idf = Math.log((docCount + 1) / ((termDocFreq.get(qt) || 0) + 1))
+      score += tf * idf
+    }
+
+    if (score > 0) {
+      const excerpt = extractExcerpt(content, queryTerms)
+      results.push({
+        file: relative(memoryDir, filePath),
+        score,
+        excerpt,
+      })
+    }
   }
 
   return results.sort((a, b) => b.score - a.score).slice(0, topK)
@@ -776,12 +822,18 @@ export function scanMdFiles(dir: string): string[] {
  * 记忆衰减——基于 Ebbinghaus 遗忘曲线。
  * 定期（每日 DeepDream 时）调用，衰减未访问记忆的强度。
  */
+const PROTECTED_FILES = ['MEMORY.md', 'profile.md', 'preferences.md', 'habits.md']
+
 export async function decayAndPruneMemories(memoryDir: string): Promise<{ decayed: number; pruned: number }> {
   let decayed = 0, pruned = 0
   const now = Date.now()
   const files = scanMdFiles(memoryDir)
 
   for (const filePath of files) {
+    // 系统文件不衰减不删除
+    const fileName = filePath.split('/').pop() || ''
+    if (PROTECTED_FILES.includes(fileName)) continue
+
     try {
       let content = readFileSync(filePath, 'utf-8')
 
@@ -839,6 +891,29 @@ export async function generateMorningBrief(): Promise<void> {
 
   const sections: string[] = [`# 晨间简报 — ${dateStr}\n`]
 
+  // 今日日历事件
+  try {
+    const events = await readCalendarEvents(1)
+    if (events.length > 0) {
+      sections.push('## 今日日程')
+      for (const evt of events.slice(0, 10)) {
+        sections.push(`- ${evt.startDate} ${evt.title}${evt.location ? ` @ ${evt.location}` : ''}`)
+      }
+      sections.push('')
+    }
+  } catch {}
+
+  // Git 状态
+  try {
+    const { getGitSense } = require('../assistant/sense.js') as typeof import('../assistant/sense.js')
+    const git = getGitSense()
+    sections.push('## Git 状态')
+    sections.push(`- 分支: ${git.branch}`)
+    sections.push(`- 未提交变更: ${git.uncommitted}`)
+    if (git.behindRemote) sections.push('- ⚠ 落后于远程分支')
+    sections.push('')
+  } catch {}
+
   // 昨日 dream 报告
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
   const dreamPath = join(memoryDir, 'dreams', `${yesterday}.md`)
@@ -864,6 +939,23 @@ export async function generateMorningBrief(): Promise<void> {
     sections.push('\n## 待处理')
     sections.push(todos.slice(0, 10).join('\n'))
   }
+
+  // 工作模式推断（从 habits.md）
+  try {
+    const habitsContent = readFileSync(join(memoryDir, 'procedural', 'habits.md'), 'utf-8')
+    const recentLines = habitsContent.split('\n').filter(Boolean).slice(-20)
+    const toolMentions = recentLines.join(' ').match(/tools?=([^\s,)]+)/g) || []
+    if (toolMentions.length > 0) {
+      sections.push('\n## 近期工作模式')
+      const toolFreq = new Map<string, number>()
+      for (const m of toolMentions) {
+        const tools = m.replace(/tools?=/, '').split(',')
+        for (const t of tools) { toolFreq.set(t, (toolFreq.get(t) || 0) + 1) }
+      }
+      const topTools = [...toolFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+      sections.push(`- 常用工具: ${topTools.map(([t, c]) => `${t}(${c})`).join(', ')}`)
+    }
+  } catch {}
 
   // 记忆状态
   sections.push('\n## 记忆状态')
@@ -1069,8 +1161,8 @@ export async function captureClipboard(): Promise<string | null> {
     const content = execSync('pbpaste', { encoding: 'utf-8', timeout: 3000 })
     if (!content || content.length > 10000) return null // 忽略空和超大内容
 
-    // 过滤敏感内容
-    if (/password|api.key|secret|token|sk-/i.test(content)) return null
+    // 过滤敏感内容（扩展规则覆盖密钥、证书、信用卡号等）
+    if (/password|api[._-]?key|secret|token|sk-|private[._-]?key|credential|auth|bearer|ssh-rsa|BEGIN.*PRIVATE|BEGIN.*KEY|\b\d{13,19}\b/i.test(content)) return null
 
     const dataDir = join(homedir(), '.pandacc', 'data', 'clipboard')
     await mkdir(dataDir, { recursive: true })
@@ -1092,7 +1184,25 @@ export async function captureClipboard(): Promise<string | null> {
  * 写作工具——生成大纲。
  */
 export function generateWritingOutline(topic: string): string {
-  return `# ${topic}\n\n## 大纲（AI 将在对话中扩展）\n\n1. 引言\n2. 核心论点\n3. 支撑论据\n4. 反面观点\n5. 结论\n\n> 请在 panda 对话中说："扩展第 2 节"来生成完整内容。`
+  const sections: string[] = [`# ${topic}\n`]
+  sections.push('## 1. 引言')
+  sections.push(`  - 为什么${topic}值得讨论`)
+  sections.push(`  - 当前背景和趋势\n`)
+  sections.push('## 2. 核心概念')
+  sections.push(`  - ${topic}的定义和范围`)
+  sections.push(`  - 关键组成要素\n`)
+  sections.push('## 3. 深度分析')
+  sections.push(`  - ${topic}的机遇`)
+  sections.push(`  - ${topic}的挑战`)
+  sections.push(`  - 案例研究\n`)
+  sections.push('## 4. 实践指南')
+  sections.push(`  - 如何应用${topic}`)
+  sections.push(`  - 最佳实践和工具\n`)
+  sections.push('## 5. 未来展望')
+  sections.push(`  - ${topic}的发展趋势`)
+  sections.push('  - 总结和建议\n')
+  sections.push('> 在 panda 对话中说："扩展第 N 节"来生成完整内容。')
+  return sections.join('\n')
 }
 
 /**

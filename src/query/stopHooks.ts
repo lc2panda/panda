@@ -159,6 +159,19 @@ export async function* handleStopHooks(
         const { updateUserProfile } = require('../memdir/memdir.js') as typeof import('../memdir/memdir.js')
         void updateUserProfile(stopHookContext.messages)
       } catch {}
+
+      // SA-P4: 行为模式记录（异步，不阻塞）
+      try {
+        const { recordBehavior } = require('../memdir/memdir.js') as typeof import('../memdir/memdir.js')
+        const toolNames = stopHookContext.messages
+          .filter((m: any) => m.type === 'assistant')
+          .flatMap((m: any) => ((m.message?.content || []) as any[])
+            .filter((b: any) => b.type === 'tool_use')
+            .map((b: any) => b.name))
+        if (toolNames.length > 0) {
+          void recordBehavior('tool_use', { tools: toolNames.join(',') })
+        }
+      } catch {}
     }
   }
 

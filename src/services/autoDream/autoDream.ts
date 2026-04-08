@@ -339,12 +339,12 @@ function makeDreamProgressWatcher(
 // ═══════════════════════════════════════════════════════════════════
 
 async function generateDeepDreamReport(memoryDir: string): Promise<string | null> {
-  const { scanMdFiles, decayAndPruneMemories } = await import('../../memdir/memdir.js')
+  const { scanMdFiles, decayAndPruneMemories, readBrowserHistory, readAppleNotes, captureClipboard } = await import('../../memdir/memdir.js')
 
   const dateStr = new Date().toISOString().split('T')[0]
   const sections: string[] = [`# DeepDream Report — ${dateStr}\n`]
 
-  // Phase 1: Harvest — 扫描当日数据
+  // Phase 1: Harvest — 扫描当日数据 + 数据连接器
   const episodes = join(memoryDir, 'episodes')
   const todayEpisodes = scanMdFiles(episodes).filter((f: string) => f.includes(dateStr))
   if (todayEpisodes.length === 0 && scanMdFiles(memoryDir).length < 3) return null
@@ -353,7 +353,31 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
   sections.push(`- 会话记录: ${todayEpisodes.length} 个`)
   sections.push(`- 记忆文件总数: ${scanMdFiles(memoryDir).length}`)
 
-  // Phase 2: Understand — 统计和分析
+  // 数据连接器：浏览记录
+  try {
+    const browserHistory = await readBrowserHistory(new Date(Date.now() - 86400000), 20)
+    sections.push(`- 浏览记录: ${browserHistory.length} 个页面`)
+    if (browserHistory.length > 0) {
+      sections.push('  Top 5:')
+      for (const h of browserHistory.slice(0, 5)) {
+        sections.push(`  - ${h.title} (${h.url.slice(0, 60)})`)
+      }
+    }
+  } catch {}
+
+  // 数据连接器：Apple Notes
+  try {
+    const notes = await readAppleNotes(10)
+    sections.push(`- Apple Notes: ${notes.length} 条近期笔记`)
+  } catch {}
+
+  // 数据连接器：剪贴板
+  try {
+    const clipboard = await captureClipboard()
+    if (clipboard) sections.push(`- 剪贴板最近内容: ${clipboard.slice(0, 50)}...`)
+  } catch {}
+
+  // Phase 2: Understand — 统计、分析和模式识别
   const allFiles = scanMdFiles(memoryDir)
   const patterns = allFiles.filter((f: string) => f.includes('/patterns/'))
   const scars = allFiles.filter((f: string) => f.includes('/scars/'))
@@ -362,14 +386,41 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
   sections.push(`- 成功模式: ${patterns.length} 条`)
   sections.push(`- 失败教训: ${scars.length} 条`)
 
+  // 重复主题检测
+  const { readFileSync } = require('fs')
+  const titleFreq = new Map<string, number>()
+  for (const f of allFiles.slice(0, 100)) {
+    try {
+      const content = readFileSync(f, 'utf-8') as string
+      const nameMatch = content.match(/^name:\s*(.+)$/m)
+      if (nameMatch) {
+        const key = nameMatch[1].trim().toLowerCase()
+        titleFreq.set(key, (titleFreq.get(key) || 0) + 1)
+      }
+    } catch {}
+  }
+  const duplicateThemes = [...titleFreq.entries()].filter(([, c]) => c > 1)
+  if (duplicateThemes.length > 0) {
+    sections.push(`- 重复主题: ${duplicateThemes.map(([t, c]) => `${t}(${c})`).join(', ')}`)
+  }
+
   // Phase 3: Consolidate — 调用衰减清理
   const { decayed, pruned } = await decayAndPruneMemories(memoryDir)
   sections.push('\n## Consolidate')
   sections.push(`- 衰减更新: ${decayed} 条`)
   sections.push(`- 清理删除: ${pruned} 条`)
 
-  // Phase 4: Anticipate — 简要前瞻
+  // Phase 4: Anticipate — 基于今日数据生成明日建议
   sections.push('\n## Anticipate')
+  if (todayEpisodes.length > 3) {
+    sections.push('- 建议: 今日会话较多，考虑在晨间简报中回顾重点')
+  }
+  if (scars.length > patterns.length) {
+    sections.push('- 建议: 失败教训多于成功模式，建议关注近期问题根因')
+  }
+  if (decayed > 5) {
+    sections.push('- 建议: 大量记忆衰减，考虑复习核心知识')
+  }
   sections.push('- 晨间简报将基于本次整合结果生成')
 
   return sections.join('\n')
