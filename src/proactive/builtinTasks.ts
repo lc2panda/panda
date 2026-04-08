@@ -385,18 +385,25 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
 ]
 
 // ═══════════════════════════════════════════════════════════════════
-// Phase 1 场景模块：动态加载扩展场景
-// 新增场景请在 src/proactive/tasks/ 下创建模块，在此处导入
+// 场景模块：动态加载扩展场景（Phase 1 / 2 / 3）
+// 新增场景请在 src/proactive/tasks/ 下创建模块，在此处注册
 // ═══════════════════════════════════════════════════════════════════
 
 function loadScenarioModules(): SmartCronTask[] {
   const extra: SmartCronTask[] = []
   // 每个模块独立 try/catch，单个模块加载失败不影响其他
   const modules = [
+    // Phase 1
     { path: './tasks/systemHealth.js', getter: 'getSystemHealthTasks' },
     { path: './tasks/personalLife.js', getter: 'getPersonalLifeTasks' },
     { path: './tasks/devScenarios.js', getter: 'getDevTasks' },
     { path: './tasks/fileScenarios.js', getter: 'getFileTasks' },
+    // Phase 2
+    { path: './tasks/securityScenarios.js', getter: 'getSecurityTasks' },
+    { path: './tasks/efficiencyScenarios.js', getter: 'getEfficiencyTasks' },
+    // Phase 3
+    { path: './tasks/advancedSystem.js', getter: 'getAdvancedSystemTasks' },
+    { path: './tasks/advancedFiles.js', getter: 'getAdvancedFileTasks' },
   ]
   for (const { path, getter } of modules) {
     try {
