@@ -9,6 +9,16 @@ import {
 } from './model.js'
 import { getAPIProvider } from './providers.js'
 
+// ── Panda Code: Multi-Model Routing target cache ──────────────
+// Stores the last routing decision so downstream consumers (claude.ts,
+// runAgent.ts) can access provider/fallback info without changing
+// getAgentModel's return type — zero impact when routing is disabled.
+let lastRoutingTarget: { modelId: string; provider: string; fallbackChain: string[] } | null = null
+
+export function getLastRoutingTarget() {
+  return lastRoutingTarget
+}
+
 export const AGENT_MODEL_OPTIONS = [...MODEL_ALIASES, 'inherit'] as const
 export type AgentModelAlias = (typeof AGENT_MODEL_OPTIONS)[number]
 
@@ -62,6 +72,8 @@ export function getAgentModel(
         if (target && target.reason !== 'default: inherit from parent') {
           const { logForDebugging } = require('../debug.js')
           logForDebugging(`[routing] getAgentModel: ${agentDefinition.name ?? agentDefinition.agentType} → ${target.modelId} (${target.reason})`)
+          // Cache routing target for downstream consumers (claude.ts, runAgent.ts)
+          lastRoutingTarget = { modelId: target.modelId, provider: target.provider, fallbackChain: target.fallbackChain }
           return target.modelId
         }
       }
@@ -69,6 +81,8 @@ export function getAgentModel(
       // Routing module not available or error — fall through to default logic
     }
   }
+  // No routing decision — clear cache
+  lastRoutingTarget = null
 
   // Extract Bedrock region prefix from parent model to inherit for subagents.
   // This ensures subagents use the same cross-region inference profile (e.g., "eu.", "us.")

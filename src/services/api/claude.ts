@@ -257,6 +257,7 @@ import {
   type RetryContext,
   withRetry,
 } from './withRetry.js'
+import type { FormatAdapter } from '../../routing/formatAlignment.js'
 
 // Define a type that represents valid JSON values
 type JsonValue = string | number | boolean | null | JsonObject | JsonArray
@@ -1061,6 +1062,31 @@ async function* queryModel(
   // so concurrent agents don't clobber each other's request chain tracking.
   // Also naturally handles rollback/undo since removed messages won't be in the array.
   const previousRequestId = getPreviousRequestIdFromMessages(messages)
+
+  // ── Panda Code: Format Adapter integration point ──────────────
+  // Acquire the format adapter for the current provider. When routing is
+  // enabled and a third-party provider is active, this may return an
+  // openai-compat adapter. Currently all third-party providers go through
+  // the Anthropic SDK compatibility layer, so the default anthropicAdapter
+  // (identity pass-through) is used — zero overhead. The adapter variable
+  // is plumbed to the stream processing loop below for future use when
+  // routing sends requests directly to non-Anthropic endpoints.
+  let formatAdapter: FormatAdapter | null = null
+  try {
+    const { isRoutingEnabled } = require('../../routing/index.js') as typeof import('../../routing/index.js')
+    if (isRoutingEnabled() && isThirdPartyProvider()) {
+      const { getAdapter } = require('../../routing/formatAlignment.js') as typeof import('../../routing/formatAlignment.js')
+      const { getLastRoutingTarget } = require('../../utils/model/agent.js') as typeof import('../../utils/model/agent.js')
+      const routingTarget = getLastRoutingTarget()
+      // Only activate non-identity adapter when routing explicitly chose a third-party provider
+      if (routingTarget && routingTarget.provider !== 'firstParty') {
+        formatAdapter = getAdapter(routingTarget.provider)
+        logForDebugging(`[routing] claude.ts: format adapter activated → ${formatAdapter.name} (provider: ${routingTarget.provider})`)
+      }
+    }
+  } catch {
+    // Routing module not available — no adapter, no impact
+  }
 
   const resolvedModel =
     getAPIProvider() === 'bedrock' &&
@@ -1945,7 +1971,7 @@ async function* queryModel(
       let totalStallTime = 0
       let stallCount = 0
 
-      for await (const part of stream) {
+      for await (let part of stream) {
         resetStreamIdleTimer()
         const now = Date.now()
 
@@ -1982,6 +2008,15 @@ async function* queryModel(
           }
           endQueryProfile()
           isFirstChunk = false
+        }
+
+        // ── Panda Code: Format Adapter stream normalization ──────
+        // When a non-identity adapter is active (routing to third-party
+        // endpoint with non-Anthropic format), normalize each stream
+        // event to Anthropic's BetaRawMessageStreamEvent shape.
+        // Currently no-op: all providers use Anthropic SDK compat layer.
+        if (formatAdapter && formatAdapter.name !== 'anthropic') {
+          part = formatAdapter.normalizeStreamEvent(part) as typeof part
         }
 
         switch (part.type) {

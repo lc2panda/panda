@@ -344,7 +344,36 @@ export async function* runAgent({
     toolUseContext.options.mainLoopModel,
     model,
     permissionMode,
+    // Panda Code: pass agent definition for Multi-Model Routing
+    {
+      modelPreferences: agentDefinition.modelPreferences as Record<string, unknown> | undefined,
+      modelPreset: agentDefinition.modelPreset,
+      agentType: agentDefinition.agentType,
+      name: agentDefinition.name,
+    },
   )
+
+  // ── Panda Code: Capability preflight check ──────────────
+  // When routing is enabled, verify the resolved model meets minimum
+  // capability requirements before spawning the agent. Logs a warning
+  // if the check fails — does not block execution (graceful degradation).
+  try {
+    const { isRoutingEnabled, preflightModelCheck } = require('../../routing/index.js')
+    if (isRoutingEnabled() && agentDefinition.modelPreferences?.minimumCapabilities) {
+      const check = preflightModelCheck(
+        resolvedAgentModel,
+        agentDefinition.modelPreferences.minimumCapabilities,
+      )
+      if (!check.ok) {
+        logForDebugging(
+          `[routing] Preflight warning for ${resolvedAgentModel}: ${check.reason}`,
+          { level: 'warn' },
+        )
+      }
+    }
+  } catch {
+    // Routing module not available — skip preflight
+  }
 
   const agentId = override?.agentId ? override.agentId : createAgentId()
 
