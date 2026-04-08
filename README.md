@@ -89,7 +89,7 @@ panda auth login
 
 ## 命令参考
 
-> 完整手册请查看 [CC命令使用手册.md](CC命令使用手册.md)
+> 完整手册请查看 [PC命令使用手册.md](PC命令使用手册.md)
 
 ### 核心命令速查
 
@@ -172,7 +172,7 @@ panda auth login
 
 **环境变量启用**：`PANDA_MODEL_ROUTING=1 panda`
 
-> 详见 [CC命令使用手册.md](CC命令使用手册.md) Multi-Model Routing 章节
+> 详见 [PC命令使用手册.md](PC命令使用手册.md) Multi-Model Routing 章节
 
 ### 快捷键
 

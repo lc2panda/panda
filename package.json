@@ -37,7 +37,9 @@
     "packages/@ant/*"
   ],
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "PC命令使用手册.md"
   ],
   "scripts": {
     "build": "bun run build.ts",
