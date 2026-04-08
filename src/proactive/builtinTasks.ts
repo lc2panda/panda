@@ -407,6 +407,8 @@ function loadScenarioModules(): SmartCronTask[] {
     // Phase 4
     { path: './tasks/communicationScenarios.js', getter: 'getCommunicationTasks' },
     { path: './tasks/extendedScenarios.js', getter: 'getExtendedTasks' },
+    { path: './tasks/knowledgeScenarios.js', getter: 'getKnowledgeTasks' },
+    { path: './tasks/lifestyleScenarios.js', getter: 'getLifestyleTasks' },
   ]
   for (const { path, getter } of modules) {
     try {
