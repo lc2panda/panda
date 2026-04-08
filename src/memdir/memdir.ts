@@ -700,6 +700,234 @@ export async function updateUserProfile(messages: readonly any[]): Promise<void>
       .reduce((sum: number, m: any) => sum + ((m.message?.content || []).filter((b: any) => b.type === 'tool_use').length), 0)
     await appendFile(monthLogPath, `- ${timestamp}: session (${userMsgCount} user msgs, ${toolCount} tool calls)\n`)
   } catch {}
+
+  // ─── SA-P0-02 增强：纯本地用户特征提取 ───
+  try {
+    await _extractUserFeatures(messages, memoryDir)
+  } catch {
+    // 特征提取失败静默跳过，不影响主流程
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SA-P0-02 增强：用户特征提取（纯本地，零 API 调用）
+// ═══════════════════════════════════════════════════════════════════
+
+// 技术关键词词典——用于从用户消息中识别技术偏好
+const TECH_KEYWORDS: Record<string, string[]> = {
+  语言: ['typescript', 'javascript', 'python', 'rust', 'go', 'java', 'c\\+\\+', 'c#', 'ruby', 'php', 'swift', 'kotlin', 'scala', 'elixir', 'lua', 'zig', 'haskell', 'ocaml', 'dart', 'sql', 'bash', 'shell', 'zsh'],
+  框架: ['react', 'vue', 'angular', 'next\\.?js', 'nuxt', 'svelte', 'express', 'fastapi', 'django', 'flask', 'spring', 'nestjs', 'astro', 'remix', 'solid'],
+  工具: ['bun', 'node', 'npm', 'yarn', 'pnpm', 'docker', 'kubernetes', 'k8s', 'git', 'terraform', 'ansible', 'webpack', 'vite', 'esbuild', 'turbo', 'nx', 'redis', 'postgres', 'mysql', 'mongo', 'sqlite'],
+}
+
+/**
+ * 从用户消息中提取文本内容
+ */
+function _extractUserText(messages: readonly any[]): string {
+  return messages
+    .filter((m: any) => m.type === 'user')
+    .map((m: any) => {
+      if (typeof m.message === 'string') return m.message
+      if (m.message?.content) {
+        if (typeof m.message.content === 'string') return m.message.content
+        if (Array.isArray(m.message.content)) {
+          return m.message.content
+            .filter((b: any) => b.type === 'text')
+            .map((b: any) => b.text || '')
+            .join(' ')
+        }
+      }
+      return ''
+    })
+    .join('\n')
+}
+
+/**
+ * 检测语言偏好：中文 / 英文 / 混合
+ */
+function _detectLanguagePreference(text: string): string {
+  const cnChars = (text.match(/[\u4e00-\u9fff]/g) || []).length
+  const enWords = (text.match(/[a-zA-Z]{2,}/g) || []).length
+  const total = cnChars + enWords
+  if (total === 0) return '未知'
+  const cnRatio = cnChars / total
+  if (cnRatio > 0.6) return '中文为主'
+  if (cnRatio < 0.2) return '英文为主'
+  return '中英混合'
+}
+
+/**
+ * 提取技术关键词
+ */
+function _extractTechKeywords(text: string): Record<string, string[]> {
+  const lower = text.toLowerCase()
+  const result: Record<string, string[]> = {}
+  for (const [category, patterns] of Object.entries(TECH_KEYWORDS)) {
+    const found = new Set<string>()
+    for (const pattern of patterns) {
+      const re = new RegExp(`\\b${pattern}\\b`, 'i')
+      if (re.test(lower)) {
+        // 用原始关键词名（去掉正则转义）
+        found.add(pattern.replace(/\\[.?+]/g, m => m[1]))
+      }
+    }
+    if (found.size > 0) result[category] = [...found]
+  }
+  return result
+}
+
+/**
+ * 识别工作模式：根据当前时间判断活跃时段
+ */
+function _detectWorkPattern(): { hour: number; dateStr: string } {
+  const now = new Date()
+  return {
+    hour: now.getHours(),
+    dateStr: now.toISOString().slice(0, 10),
+  }
+}
+
+/**
+ * 检测沟通风格
+ */
+function _detectCommunicationStyle(text: string): string {
+  const lines = text.split('\n').filter(Boolean)
+  const avgLen = lines.reduce((s, l) => s + l.length, 0) / Math.max(lines.length, 1)
+  // 命令式语气特征：短句、祈使句、感叹号
+  const imperativeMarkers = (text.match(/[！!。\n]/g) || []).length
+  const questionMarkers = (text.match(/[？?]/g) || []).length
+  if (avgLen < 30 && imperativeMarkers > questionMarkers) return '指令式，直接高效'
+  if (questionMarkers > imperativeMarkers) return '探索式，提问导向'
+  if (avgLen > 100) return '详细描述式'
+  return '简洁对话式'
+}
+
+/**
+ * 将提取的特征写入 profile.md
+ * 使用区段匹配——读取现有内容，更新对应区段
+ */
+async function _extractUserFeatures(messages: readonly any[], memoryDir: string): Promise<void> {
+  const userText = _extractUserText(messages)
+  if (userText.trim().length < 10) return // 消息太短，跳过
+
+  const profileDir = join(memoryDir, 'semantic')
+  await mkdir(profileDir, { recursive: true })
+  const profilePath = join(profileDir, 'profile.md')
+
+  // 提取各维度特征
+  const langPref = _detectLanguagePreference(userText)
+  const techKw = _extractTechKeywords(userText)
+  const workPattern = _detectWorkPattern()
+  const commStyle = _detectCommunicationStyle(userText)
+  const dateStr = workPattern.dateStr
+  const hourStr = String(workPattern.hour).padStart(2, '0') + ':00'
+
+  // 读取现有 profile.md（如果存在）
+  let existingContent = ''
+  try {
+    existingContent = readFileSync(profilePath, 'utf-8')
+  } catch {
+    // 文件不存在，使用初始模板
+  }
+
+  if (!existingContent.trim()) {
+    // 初始化 profile.md
+    existingContent = [
+      '---',
+      'name: 用户画像',
+      'description: 自动维护的用户特征档案',
+      'type: user',
+      '---',
+      '',
+      '## 基础信息',
+      `- 语言偏好: ${langPref}`,
+      '- 时区: Asia/Singapore (+08:00)',
+      '',
+      '## 工作模式',
+      `- 活跃时段: ${hourStr}-${hourStr}`,
+      `- 近期活跃: ${dateStr} ${hourStr}`,
+      '',
+      '## 技术偏好',
+      ...Object.entries(techKw).map(([cat, kws]) => `- ${cat}: ${kws.join(', ')}`),
+      ...(Object.keys(techKw).length === 0 ? ['- (待检测)'] : []),
+      '',
+      '## 沟通风格',
+      `- 风格: ${commStyle}`,
+      '',
+      '## 进化日志',
+      `- ${dateStr}: 初始画像生成`,
+    ].join('\n') + '\n'
+    await writeFile(profilePath, existingContent, 'utf-8')
+    return
+  }
+
+  // 已有 profile.md——增量更新各区段
+  let updated = existingContent
+
+  // 更新语言偏好
+  updated = updated.replace(
+    /- 语言偏好: .*/,
+    `- 语言偏好: ${langPref}`,
+  )
+
+  // 更新近期活跃时间
+  updated = updated.replace(
+    /- 近期活跃: .*/,
+    `- 近期活跃: ${dateStr} ${hourStr}`,
+  )
+
+  // 更新活跃时段范围（扩展已有范围）
+  const activeMatch = updated.match(/- 活跃时段: (\d{2}):00-(\d{2}):00/)
+  if (activeMatch) {
+    const existMin = parseInt(activeMatch[1], 10)
+    const existMax = parseInt(activeMatch[2], 10)
+    const newMin = Math.min(existMin, workPattern.hour)
+    const newMax = Math.max(existMax, workPattern.hour)
+    updated = updated.replace(
+      /- 活跃时段: .*/,
+      `- 活跃时段: ${String(newMin).padStart(2, '0')}:00-${String(newMax).padStart(2, '0')}:00`,
+    )
+  }
+
+  // 合并技术关键词
+  for (const [cat, newKws] of Object.entries(techKw)) {
+    const catRegex = new RegExp(`- ${cat}: (.*)`)
+    const catMatch = updated.match(catRegex)
+    if (catMatch) {
+      const existing = catMatch[1].split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+      const merged = [...new Set([...existing, ...newKws.map(k => k.toLowerCase())])]
+      updated = updated.replace(catRegex, `- ${cat}: ${merged.join(', ')}`)
+    } else {
+      // 在技术偏好区段末尾追加
+      const techSectionEnd = updated.indexOf('\n## 沟通风格')
+      if (techSectionEnd > 0) {
+        updated = updated.slice(0, techSectionEnd) + `\n- ${cat}: ${newKws.join(', ')}` + updated.slice(techSectionEnd)
+      }
+    }
+  }
+
+  // 更新沟通风格
+  updated = updated.replace(
+    /- 风格: .*/,
+    `- 风格: ${commStyle}`,
+  )
+
+  // 追加进化日志（同一天不重复）
+  if (!updated.includes(`- ${dateStr}:`)) {
+    const logEntries: string[] = []
+    if (langPref !== '未知') logEntries.push(`检测到偏好${langPref}输出`)
+    if (Object.keys(techKw).length > 0) {
+      const allKws = Object.values(techKw).flat()
+      logEntries.push(`使用技术: ${allKws.join(', ')}`)
+    }
+    if (logEntries.length > 0) {
+      updated = updated.trimEnd() + `\n- ${dateStr}: ${logEntries.join('；')}\n`
+    }
+  }
+
+  if (updated !== existingContent) {
+    await writeFile(profilePath, updated, 'utf-8')
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -707,20 +935,70 @@ export async function updateUserProfile(messages: readonly any[]): Promise<void>
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * 本地全文索引——基于文件系统的简易语义搜索。
- * 扫描 memory/ 下所有 .md 文件，建立倒排索引。
- * 零外部依赖，纯文本匹配 + 文件内容相关性排序。
+ * 本地全文索引——SQLite FTS5 全文搜索，fallback 到 TF-IDF。
+ * 扫描 memory/ 下所有 .md 文件，使用 Bun 内置 SQLite FTS5 进行排序。
+ * 零外部依赖，支持中英文混合查询。
  */
 export function searchMemory(query: string, memoryDir: string, topK: number = 5): Array<{ file: string; score: number; excerpt: string }> {
+  const files = scanMdFiles(memoryDir)
+  if (files.length === 0) return []
+
+  // 优先 FTS5，不可用时 fallback 到 TF-IDF
+  try {
+    return _searchMemoryFTS5(query, memoryDir, files, topK)
+  } catch {
+    return _searchMemoryTFIDF(query, memoryDir, files, topK)
+  }
+}
+
+/** SQLite FTS5 全文搜索实现 */
+function _searchMemoryFTS5(query: string, memoryDir: string, files: string[], topK: number): Array<{ file: string; score: number; excerpt: string }> {
+  const { Database } = require('bun:sqlite')
+  const db = new Database(':memory:')
+
+  // 创建 FTS5 虚拟表，unicode61 分词器支持中英文
+  db.run("CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(path, content, tokenize='unicode61')")
+
+  const insert = db.prepare('INSERT INTO memory_fts (path, content) VALUES (?, ?)')
+  for (const filePath of files) {
+    try {
+      const content = readFileSync(filePath, 'utf-8')
+      insert.run(relative(memoryDir, filePath), content)
+    } catch {}
+  }
+
+  // 对查询词做处理以兼容 FTS5 MATCH 语法
+  const queryTerms = tokenize(query)
+  if (queryTerms.length === 0) { db.close(); return [] }
+
+  // 用 OR 连接各词项，提高召回率
+  const ftsQuery = queryTerms.join(' OR ')
+
+  const rows = db.query(`
+    SELECT path, snippet(memory_fts, 1, '', '', '...', 30) as excerpt, rank
+    FROM memory_fts
+    WHERE content MATCH ?
+    ORDER BY rank
+    LIMIT ?
+  `).all(ftsQuery, topK) as Array<{ path: string; excerpt: string; rank: number }>
+
+  db.close()
+
+  // rank 是负数（越小越好），转为正分数
+  return rows.map(row => ({
+    file: row.path,
+    score: -row.rank,
+    excerpt: row.excerpt.replace(/\n+/g, ' ').trim(),
+  }))
+}
+
+/** TF-IDF fallback 实现（当 FTS5 不可用时） */
+function _searchMemoryTFIDF(query: string, memoryDir: string, files: string[], topK: number): Array<{ file: string; score: number; excerpt: string }> {
   const results: Array<{ file: string; score: number; excerpt: string }> = []
 
-  const files = scanMdFiles(memoryDir)
-
-  // 分词（中英文混合）
   const queryTerms = tokenize(query)
   if (queryTerms.length === 0) return results
 
-  // 预计算 IDF：扫描每个文件的词集
   const docCount = files.length
   const termDocFreq = new Map<string, number>()
   const fileContents = new Map<string, { content: string; terms: string[] }>()
@@ -737,7 +1015,6 @@ export function searchMemory(query: string, memoryDir: string, topK: number = 5)
     } catch {}
   }
 
-  // TF-IDF 评分
   for (const [filePath, { content, terms }] of fileContents) {
     let score = 0
     for (const qt of queryTerms) {
@@ -830,7 +1107,7 @@ export async function decayAndPruneMemories(memoryDir: string): Promise<{ decaye
       // 重要记忆不衰减
       if (importantMatch) continue
 
-      const lastAccessed = lastAccessedMatch ? parseInt(lastAccessedMatch[1]) : now
+      const lastAccessed = lastAccessedMatch ? parseInt(lastAccessedMatch[1], 10) : now
       const currentStrength = strengthMatch ? parseFloat(strengthMatch[1]) : 1.0
 
       // Ebbinghaus 衰减：R = e^(-t/S)
@@ -978,6 +1255,15 @@ export function classifyFile(filePath: string): string {
 export function organizeDirectory(srcDir: string, dryRun: boolean = true): Array<{ src: string; dest: string; category: string }> {
   const moves: Array<{ src: string; dest: string; category: string }> = []
 
+  // 隐私配置：跳过排除路径
+  let privacyConfig: import('../assistant/privacyConfig.js').PrivacyConfig | null = null
+  let isPathExcluded: ((p: string, c: any) => boolean) | null = null
+  try {
+    const pc = require('../assistant/privacyConfig.js') as typeof import('../assistant/privacyConfig.js')
+    privacyConfig = pc.loadPrivacyConfig()
+    isPathExcluded = pc.isPathExcluded
+  } catch {}
+
   try {
     const entries = readdirSync(srcDir, { withFileTypes: true })
     for (const entry of entries) {
@@ -985,6 +1271,10 @@ export function organizeDirectory(srcDir: string, dryRun: boolean = true): Array
       if (entry.name.startsWith('.')) continue
 
       const srcPath = join(srcDir, entry.name)
+
+      // 隐私过滤：跳过 excludePaths 匹配的文件
+      if (privacyConfig && isPathExcluded && isPathExcluded(srcPath, privacyConfig)) continue
+
       const category = classifyFile(srcPath)
       if (category === 'other') continue
 
@@ -1040,7 +1330,24 @@ export async function readBrowserHistory(
       LIMIT ?
     `).all(sinceChrome, limit)
 
+    // 隐私配置：过滤排除域名
+    let isDomainExcludedFn: ((d: string, c: any) => boolean) | null = null
+    let privacyConfig: any = null
+    try {
+      const pc = require('../assistant/privacyConfig.js') as typeof import('../assistant/privacyConfig.js')
+      privacyConfig = pc.loadPrivacyConfig()
+      isDomainExcludedFn = pc.isDomainExcluded
+    } catch {}
+
     for (const row of rows as any[]) {
+      // 隐私过滤：跳过排除域名
+      if (privacyConfig && isDomainExcludedFn) {
+        try {
+          const domain = new URL(row.url).hostname
+          if (isDomainExcludedFn(domain, privacyConfig)) continue
+        } catch {}
+      }
+
       results.push({
         url: row.url,
         title: row.title || '',
@@ -1142,8 +1449,17 @@ export async function captureClipboard(): Promise<string | null> {
     const content = execSync('pbpaste', { encoding: 'utf-8', timeout: 3000 })
     if (!content || content.length > 10000) return null // 忽略空和超大内容
 
-    // 过滤敏感内容（扩展规则覆盖密钥、证书、信用卡号等）
-    if (/password|api[._-]?key|secret|token|sk-|private[._-]?key|credential|auth|bearer|ssh-rsa|BEGIN.*PRIVATE|BEGIN.*KEY|\b\d{13,19}\b/i.test(content)) return null
+    // 隐私配置驱动的敏感内容检测（替代硬编码正则）
+    let isSensitive = false
+    try {
+      const pc = require('../assistant/privacyConfig.js') as typeof import('../assistant/privacyConfig.js')
+      const privacyConfig = pc.loadPrivacyConfig()
+      isSensitive = pc.containsSensitiveContent(content, privacyConfig)
+    } catch {
+      // fallback: 原始硬编码检测
+      isSensitive = /password|api[._-]?key|secret|token|sk-|private[._-]?key|credential|auth|bearer|ssh-rsa|BEGIN.*PRIVATE|BEGIN.*KEY|\b\d{13,19}\b/i.test(content)
+    }
+    if (isSensitive) return null
 
     const dataDir = join(homedir(), '.pandacc', 'data', 'clipboard')
     await mkdir(dataDir, { recursive: true })

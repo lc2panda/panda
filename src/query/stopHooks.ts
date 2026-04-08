@@ -172,6 +172,20 @@ export async function* handleStopHooks(
           void recordBehavior('tool_use', { tools: toolNames.join(',') })
         }
       } catch {}
+
+      // SA-P4: 主动交互引擎（异步，不阻塞）
+      try {
+        const { checkProactiveSuggestions, formatSuggestionsAsSystemMessage } = require('../assistant/proactiveEngine.js') as typeof import('../assistant/proactiveEngine.js')
+        void checkProactiveSuggestions({
+          messages: stopHookContext.messages,
+          turnCount: stopHookContext.messages.filter((m: any) => m.type === 'user').length,
+          sessionStartTime: Date.now(),
+        }).then(suggestions => {
+          if (suggestions.length > 0 && toolUseContext.appendSystemMessage) {
+            toolUseContext.appendSystemMessage(formatSuggestionsAsSystemMessage(suggestions))
+          }
+        }).catch(() => {})
+      } catch {}
     }
   }
 
