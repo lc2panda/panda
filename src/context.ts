@@ -362,11 +362,32 @@ export const getUserContext = memoize(
       }
     } catch {}
 
+    // Panda: inject morning brief for first conversation of the day (07:00-10:00)
+    let morningBriefContext: string | null = null
+    try {
+      const hour = new Date().getHours()
+      if (hour >= 7 && hour < 10) {
+        const { join } = require('path')
+        const { readFileSync, existsSync } = require('fs')
+        const { getAutoMemPath } = require('./memdir/paths.js')
+        const memDir = getAutoMemPath()
+        if (memDir) {
+          const today = new Date().toISOString().split('T')[0]
+          const briefPath = join(memDir, 'working', `morning_brief_${today}.md`)
+          if (existsSync(briefPath)) {
+            const brief = readFileSync(briefPath, 'utf-8').slice(0, 1000)
+            morningBriefContext = `[今日晨报]\n${brief}`
+          }
+        }
+      }
+    } catch {}
+
     return {
       ...(claudeMd && { claudeMd }),
       currentDate: `Today's date is ${getLocalISODate()}. ${timeAwareness}`,
       ...(personaContext && { personaContext }),
       ...(workingMemoryContext && { workingMemoryContext }),
+      ...(morningBriefContext && { morningBriefContext }),
       ...(thirdPartyGuidance && { thirdPartyGuidance }),
     }
   },

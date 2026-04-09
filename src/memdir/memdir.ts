@@ -1,6 +1,6 @@
 import { feature } from 'bun:bundle'
 import { join, relative } from 'path'
-import { readFileSync, readdirSync, unlinkSync, writeFileSync, mkdirSync, renameSync, copyFileSync } from 'fs'
+import { readFileSync, readdirSync, unlinkSync, writeFileSync, mkdirSync, renameSync, copyFileSync, existsSync } from 'fs'
 import { access, writeFile, readFile, appendFile, mkdir } from 'fs/promises'
 import { homedir, tmpdir } from 'os'
 import { getFsImplementation } from '../utils/fsOperations.js'
@@ -1379,6 +1379,39 @@ export async function generateMorningBrief(): Promise<void> {
       }
       const topTools = [...toolFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
       sections.push(`- 常用工具: ${topTools.map(([t, c]) => `${t}(${c})`).join(', ')}`)
+    }
+  } catch {}
+
+  // 前瞻记忆
+  try {
+    const prospDir = join(memoryDir, 'dreams', 'prospective')
+    const prospFiles = readdirSync(prospDir).filter(f => f.endsWith('.md')).sort().reverse()
+    if (prospFiles.length > 0) {
+      const content = readFileSync(join(prospDir, prospFiles[0]), 'utf-8').slice(0, 500)
+      sections.push('## 前瞻预览\n' + content)
+    }
+  } catch {}
+
+  // 情感趋势
+  try {
+    const { getRecentEmotionalEvents } = require('../assistant/emotionalMemory.js')
+    const events = getRecentEmotionalEvents()
+    if (events && events.length > 0) {
+      const frustrated = events.filter((e: any) => e.emotion === 'frustration').length
+      const satisfied = events.filter((e: any) => e.emotion === 'satisfaction').length
+      sections.push(`## 情绪趋势\n- 满意事件: ${satisfied} 次\n- 受挫事件: ${frustrated} 次`)
+    }
+  } catch {}
+
+  // 通知摘要
+  try {
+    const statsDir = join(homedir(), '.pandacc', 'data', 'notification-stats')
+    if (existsSync(statsDir)) {
+      const statsFiles = readdirSync(statsDir).filter(f => f.endsWith('.json')).sort().reverse()
+      if (statsFiles.length > 0) {
+        const stats = JSON.parse(readFileSync(join(statsDir, statsFiles[0]), 'utf-8'))
+        sections.push(`## 通知摘要\n- 昨日通知: ${stats.total || 0} 条`)
+      }
     }
   } catch {}
 
