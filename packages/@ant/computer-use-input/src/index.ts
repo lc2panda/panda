@@ -8,7 +8,22 @@
  * 仅 macOS 支持。其他平台返回 { isSupported: false }
  */
 
-import { $ } from 'bun'
+// Bun shell API — Node.js 下用 child_process fallback
+const $ = typeof globalThis.Bun !== 'undefined'
+  ? globalThis.Bun.$
+  : null
+
+// Node.js fallback：模拟 Bun $ tagged template
+function _execFallback(cmd: string): { quiet: () => any; nothrow: () => any; text: () => Promise<string> } {
+  const run = async () => {
+    try {
+      const { execSync } = require('child_process')
+      return execSync(cmd, { encoding: 'utf-8', timeout: 10000 })
+    } catch { return '' }
+  }
+  const obj: any = { quiet: () => obj, nothrow: () => obj, text: () => run() }
+  return obj
+}
 
 interface FrontmostAppInfo {
   bundleId: string
@@ -33,13 +48,19 @@ const MODIFIER_MAP: Record<string, string> = {
 }
 
 async function osascript(script: string): Promise<string> {
-  const result = await $`osascript -e ${script}`.quiet().nothrow().text()
-  return result.trim()
+  if ($) {
+    const result = await $`osascript -e ${script}`.quiet().nothrow().text()
+    return result.trim()
+  }
+  return _execFallback(`osascript -e '${script.replace(/'/g, "'\\''")}'`).text().then((r: string) => r.trim())
 }
 
 async function jxa(script: string): Promise<string> {
-  const result = await $`osascript -l JavaScript -e ${script}`.quiet().nothrow().text()
-  return result.trim()
+  if ($) {
+    const result = await $`osascript -l JavaScript -e ${script}`.quiet().nothrow().text()
+    return result.trim()
+  }
+  return _execFallback(`osascript -l JavaScript -e '${script.replace(/'/g, "'\\''")}'`).text().then((r: string) => r.trim())
 }
 
 function jxaSync(script: string): string {
