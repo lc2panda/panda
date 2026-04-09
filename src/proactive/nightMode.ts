@@ -29,6 +29,18 @@ const TASK_INTERVAL_MS = 5 * 60 * 1000 // 5 min between tasks
 let _lastOrchestratorRun = 0
 // 记录每个任务的最后执行时间，避免同一 cron 窗口内重复执行
 const _taskLastExecMap = new Map<string, number>()
+const EXEC_MAP_MAX = 256
+const _tasksExecuting = new Set<string>()
+
+function _pruneExecMap(): void {
+  if (_taskLastExecMap.size <= EXEC_MAP_MAX) return
+  // 清理最旧的条目到 80% 容量
+  const sorted = [..._taskLastExecMap.entries()].sort((a, b) => a[1] - b[1])
+  while (sorted.length > EXEC_MAP_MAX * 0.8) {
+    const oldest = sorted.shift()
+    if (oldest) _taskLastExecMap.delete(oldest[0])
+  }
+}
 
 export function isNightTime(): boolean {
   const hour = new Date().getHours()
@@ -53,6 +65,7 @@ export function isNightModeActive(): boolean {
  * isolation. Each task failure is logged but does not block subsequent tasks.
  */
 export async function runNightTasks(): Promise<void> {
+  _pruneExecMap()
   const now = Date.now()
   if (now - _lastOrchestratorRun < TASK_INTERVAL_MS) {
     logForDebugging('[nightMode] orchestrator throttled — too soon since last run')
@@ -69,10 +82,13 @@ export async function runNightTasks(): Promise<void> {
   logForDebugging(`[nightMode] orchestrator starting — ${tasks.length} enabled task(s)`)
 
   for (const task of tasks) {
+    // 防止并发执行同一任务
+    if (_tasksExecuting.has(task.id)) continue
+
     // cron 时间匹配：只执行 cron 表达式匹配当前时间窗口的任务
     if (task.cron) {
       if (!matchesCronNow(task.cron, 6)) {
-        continue // cron 不匹配，静默跳过（不 log，避免刷屏）
+        continue // cron 不匹配，静默跳过
       }
       // 去重：同一任务在同一 cron 窗口内不重复执行
       const lastExec = _taskLastExecMap.get(task.id) || 0
@@ -86,6 +102,7 @@ export async function runNightTasks(): Promise<void> {
       continue
     }
 
+    _tasksExecuting.add(task.id)
     logForDebugging(`[proactive] executing ${task.id}: ${task.description}`)
     const result = await safeExecute(
       task.id,
@@ -96,11 +113,11 @@ export async function runNightTasks(): Promise<void> {
       'execute',
     )
 
+    _tasksExecuting.delete(task.id)
     if (result.success) {
       _taskLastExecMap.set(task.id, now)
       logForDebugging(`[proactive] ${task.id} succeeded: ${result.output}`)
     } else if (result.output?.includes('__SKIPPED__')) {
-      // skipIf 跳过的任务不更新 _taskLastExecMap，下次仍可执行
       logForDebugging(`[proactive] ${task.id} skipped (skipIf)`)
     } else {
       logForDebugging(`[proactive] ${task.id} failed: ${result.output}`)
