@@ -825,70 +825,91 @@ sqlite3 ~/Library/Group\ Containers/group.com.apple.usernoted/db2/db "SELECT COU
 └── head_image/       # 头像（head_image.db ~25MB）
 ```
 
+**前置条件**：
+- macOS arm64 + 微信 4.x
+- 需要**禁用 SIP**（System Integrity Protection）：重启 → 恢复模式 → `csrutil disable`
+
 **解密步骤**：
 
-1. **安装 sqlcipher**（读取加密数据库必需）：
+1. **安装依赖**：
    ```bash
-   # macOS
-   brew install sqlcipher
-   
-   # Linux
-   sudo apt install sqlcipher
+   brew install llvm sqlcipher
    ```
 
-2. **安装解密工具并提取密钥**：
+2. **克隆解密工具**：
    ```bash
-   # 推荐：wechat-db-decrypt-macos
    git clone https://github.com/Thearas/wechat-db-decrypt-macos.git
    cd wechat-db-decrypt-macos
-   pip3 install -r requirements.txt
-   python3 decrypt.py
    ```
-   
-   > 需要**微信保持运行**状态。工具会自动扫描微信进程内存，提取每个数据库的独立解密密钥，输出到 `wechat_keys.json`。
 
-3. **确认 `wechat_keys.json` 生成**（格式如下）：
-   ```json
-   {
-     "__salts__": ["..."],
-     "message/message_0.db": "32字节hex密钥",
-     "message/message_1.db": "32字节hex密钥",
-     "contact/contact.db": "32字节hex密钥",
-     "session/session.db": "32字节hex密钥",
-     "..."
-   }
+3. **提取密钥**（微信需保持登录运行）：
+   ```bash
+   PYTHONPATH=$(lldb -P) python3 find_key_memscan.py
    ```
-   > 微信 4.x 每个数据库使用**独立密钥**，Panda Code 已支持这种 per-db 密钥格式。
+   > 通过 lldb 扫描微信进程内存，输出 `wechat_keys.json`（每个 db 独立密钥）。
 
-4. **配置到 Panda Code**：
+4. **解密数据库**：
+   ```bash
+   python3 decrypt_db.py
+   ```
+
+5. **导出聊天记录**（可选，验证解密成功）：
+   ```bash
+   # 列出所有会话
+   python3 export_messages.py
+
+   # 导出指定联系人聊天（支持模糊匹配）
+   python3 export_messages.py -c "联系人名"
+
+   # 搜索关键词
+   python3 export_messages.py -s "关键词"
+
+   # 导出最近 N 条
+   python3 export_messages.py -c "联系人名" -n 50
+
+   # 导出全部
+   python3 export_messages.py --all
+   ```
+
+6. **集成到 Panda Code**（两种方式，任选其一）：
+
+   **方式 A：MCP Server 集成（推荐，无需 Panda Code 配置）**：
+   ```bash
+   pip3 install fastmcp
+   panda mcp add wechat -- python3 $(pwd)/mcp_server.py
+   ```
+   > 该工具自带 MCP Server，添加后 Panda Code 可直接通过 AI 对话查询微信数据：
+   > - `get_recent_sessions` — 最近会话列表
+   > - `get_chat_history` — 聊天记录（模糊匹配联系人）
+   > - `search_messages` — 跨会话关键词搜索
+   > - `get_contacts` — 联系人搜索
+
+   **方式 B：Panda Code Connector 配置**：
    ```json
    // ~/.pandacc/config/connectors.json
    {
      "wechat": {
        "enabled": true,
        "mode": "local-db",
-       "keysFile": "/绝对路径/wechat_keys.json"
+       "keysFile": "/绝对路径/wechat-db-decrypt-macos/wechat_keys.json"
      }
    }
    ```
-   > `keysFile` 指向第 3 步生成的密钥文件的**绝对路径**。数据库路径会自动检测（`~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/`），无需手动配置。
-
-5. **启用场景**：
    ```json
    // ~/.pandacc/config/proactive.json
    { "enabledScenarios": { "wechat-messages": true } }
    ```
 
-6. **验证**：
+7. **验证**：
    ```bash
-   # 验证 sqlcipher 已安装
-   sqlcipher --version
-   
-   # 启动 panda 测试
-   panda  # 在对话中询问"检查微信数据连接"
+   sqlcipher --version    # 确认 sqlcipher 已安装
+   panda                  # 启动后询问"查看最近微信消息"
    ```
 
-> **⚠️ 安全提醒**：`wechat_keys.json` 包含数据库解密密钥，请妥善保管，不要上传到 Git 或公共位置。建议存放在 `~/.pandacc/config/` 目录下并设置 `chmod 600` 权限。
+> **⚠️ 安全提醒**：
+> - 禁用 SIP 会降低系统安全性，提取密钥后建议重新启用：`csrutil enable`
+> - `wechat_keys.json` 包含解密密钥，请 `chmod 600` 并勿上传到 Git
+> - 所有数据仅在本机处理，不上传任何服务器
 
 #### Windows 系统授权
 
