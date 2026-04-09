@@ -221,7 +221,7 @@ panda auth login
     "agentId": "1000002",                   // 应用 Agent ID
     "secret": "keychain:wecom-secret",      // 应用 Secret
     // ── 本地 DB 模式（需解密密钥，见"系统授权与数据解密指南"） ──
-    "dbKey": ""                             // 32 字节 hex 解密密钥
+    "keysFile": "/path/to/wechat_keys.json" // wechat-db-decrypt-macos 导出的密钥文件
   },
   "teams": {
     "enabled": false,
