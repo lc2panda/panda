@@ -7,6 +7,7 @@ import { getGlobalConfig } from '../utils/config.js'
 import { getEnabledTasks } from './taskRegistry.js'
 import { safeExecute } from './safeExecutor.js'
 import { logForDebugging } from '../utils/debug.js'
+import { matchesCronNow } from '../utils/cron.js'
 
 export interface NightModeConfig {
   enabled: boolean
@@ -26,6 +27,8 @@ const NIGHT_END_HOUR = 6
 const TASK_INTERVAL_MS = 5 * 60 * 1000 // 5 min between tasks
 
 let _lastOrchestratorRun = 0
+// 记录每个任务的最后执行时间，避免同一 cron 窗口内重复执行
+const _taskLastExecMap = new Map<string, number>()
 
 export function isNightTime(): boolean {
   const hour = new Date().getHours()
@@ -66,12 +69,24 @@ export async function runNightTasks(): Promise<void> {
   logForDebugging(`[nightMode] orchestrator starting — ${tasks.length} enabled task(s)`)
 
   for (const task of tasks) {
+    // cron 时间匹配：只执行 cron 表达式匹配当前时间窗口的任务
+    if (task.cron) {
+      if (!matchesCronNow(task.cron, 6)) {
+        continue // cron 不匹配，静默跳过（不 log，避免刷屏）
+      }
+      // 去重：同一任务在同一 cron 窗口内不重复执行
+      const lastExec = _taskLastExecMap.get(task.id) || 0
+      if (now - lastExec < 5 * 60 * 1000) {
+        continue // 5 分钟内已执行过
+      }
+    }
+
     if (task.condition && !task.condition()) {
-      logForDebugging(`[nightMode] skipping ${task.id} — condition not met`)
+      logForDebugging(`[proactive] skipping ${task.id} — condition not met`)
       continue
     }
 
-    logForDebugging(`[nightMode] executing ${task.id}: ${task.description}`)
+    logForDebugging(`[proactive] executing ${task.id}: ${task.description}`)
     const result = await safeExecute(
       task.id,
       async () => {
@@ -82,13 +97,14 @@ export async function runNightTasks(): Promise<void> {
     )
 
     if (result.success) {
-      logForDebugging(`[nightMode] ${task.id} succeeded: ${result.output}`)
+      _taskLastExecMap.set(task.id, now)
+      logForDebugging(`[proactive] ${task.id} succeeded: ${result.output}`)
     } else {
-      logForDebugging(`[nightMode] ${task.id} failed: ${result.output}`)
+      logForDebugging(`[proactive] ${task.id} failed: ${result.output}`)
     }
   }
 
-  logForDebugging('[nightMode] orchestrator complete')
+  logForDebugging('[proactive] orchestrator complete')
 }
 
 /**
