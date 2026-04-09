@@ -657,7 +657,7 @@ export function ManageMarketplaces({
         {/* Show explanatory text at the bottom when auto-update is enabled */}
         {!isUpdating && !shouldSkipPluginAutoupdate() && selectedMarketplace.autoUpdate && <Box marginTop={1}>
               <Text dimColor>
-                Auto-update enabled. Panda Code will automatically update this
+                Auto-update enabled. Panda will automatically update this
                 marketplace and its installed plugins.
               </Text>
             </Box>}

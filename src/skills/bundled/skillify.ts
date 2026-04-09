@@ -157,7 +157,7 @@ After writing, tell the user:
 `
 
 export function registerSkillifySkill(): void {
-  // Panda Code: /skillify available to all users (removed ant-only gate)
+  // Panda: /skillify available to all users (removed ant-only gate)
   registerBundledSkill({
     name: 'skillify',
     description:

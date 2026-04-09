@@ -1,7 +1,7 @@
-// Panda Code: assistant install wizard stub.
+// Panda: assistant install wizard stub.
 // The original upstream install wizard sets up the Anthropic KAIROS daemon
-// (`~/.config/claude/daemon.json`) via a multi-step Ink wizard. Panda Code
-// does not ship that wizard — `/assistant` in Panda Code only toggles the
+// (`~/.config/claude/daemon.json`) via a multi-step Ink wizard. Panda
+// does not ship that wizard — `/assistant` in Panda only toggles the
 // in-process assistant mode via `src/commands/assistant/index.ts`.
 //
 // This file remains as the import target for `dialogLaunchers.tsx`
@@ -21,7 +21,7 @@ export const NewInstallWizard: React.FC<{
 
 export const computeDefaultInstallDir: () => Promise<string> = () => {
   throw new Error(
-    'Panda Code does not ship the KAIROS install wizard. Use `/assistant` ' +
+    'Panda does not ship the KAIROS install wizard. Use `/assistant` ' +
       'inside the REPL to toggle assistant mode instead.',
   )
 }

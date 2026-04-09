@@ -131,7 +131,7 @@ export const SUPPORTED_SETTINGS: Record<string, SettingConfig> = {
       'How to spawn teammates: "tmux" for traditional tmux, "in-process" for same process, "auto" to choose automatically',
     options: TEAMMATE_MODES,
   },
-  // Panda Code: unlocked — classifier permissions config for all users
+  // Panda: unlocked — classifier permissions config for all users
   classifierPermissionsEnabled: {
     source: 'settings' as const,
     type: 'boolean' as const,

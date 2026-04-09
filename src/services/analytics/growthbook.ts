@@ -161,7 +161,7 @@ export function onGrowthBookRefresh(
  * Set CLAUDE_INTERNAL_FC_OVERRIDES to a JSON object mapping feature keys to values
  * to bypass remote eval and disk cache. Useful for eval harnesses that need to
  * test specific feature flag configurations.
- * Panda Code: ant-only guard removed — all users can use env var overrides.
+ * Panda: ant-only guard removed — all users can use env var overrides.
  *
  * Example: CLAUDE_INTERNAL_FC_OVERRIDES='{"my_feature": true, "my_config": {"key": "val"}}'
  */
@@ -206,7 +206,7 @@ export function hasGrowthBookEnvOverride(feature: string): boolean {
  * getEnvOverrides this is not memoized: the user can change overrides at
  * runtime, and getGlobalConfig() is already memory-cached (pointer-chase)
  * until the next saveGlobalConfig() invalidates it.
- * Panda Code: ant-only guard removed — all users can use config overrides.
+ * Panda: ant-only guard removed — all users can use config overrides.
  */
 function getConfigOverrides(): Record<string, unknown> | undefined {
   try {

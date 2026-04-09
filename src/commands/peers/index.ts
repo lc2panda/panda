@@ -31,7 +31,7 @@ const peers = {
 
         if (peers.length === 0) {
           onDone(
-            'No connected peer sessions found.\n\nPeers are other Panda Code sessions on this machine that can exchange messages via the UDS inbox.\nStart another session to see it listed here.',
+            'No connected peer sessions found.\n\nPeers are other Panda sessions on this machine that can exchange messages via the UDS inbox.\nStart another session to see it listed here.',
             { display: 'system' },
           )
           return null

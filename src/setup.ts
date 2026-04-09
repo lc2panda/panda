@@ -72,7 +72,7 @@ export async function setup(
     // biome-ignore lint/suspicious/noConsole:: intentional console output
     console.error(
       chalk.bold.red(
-        'Error: Panda Code requires Node.js version 18 or higher.',
+        'Error: Panda requires Node.js version 18 or higher.',
       ),
     )
     process.exit(1)
@@ -334,7 +334,7 @@ export async function setup(
   // overhead. NOT an early-return: the --dangerously-skip-permissions safety
   // gate, tengu_started beacon, and apiKeyHelper prefetch below must still run.
   if (!isBareMode()) {
-    // Panda Code: auto-undercover mode detection for all users
+    // Panda: auto-undercover mode detection for all users
     {
       // Prime repo classification cache for auto-undercover mode. Default is
       // undercover ON until proven internal; if this resolves to internal, clear
@@ -414,7 +414,7 @@ export async function setup(
       process.exit(1)
     }
 
-    // Panda Code: sandbox restriction removed — allow --dangerously-skip-permissions
+    // Panda: sandbox restriction removed — allow --dangerously-skip-permissions
     // for all users regardless of Docker/sandbox/internet status.
     // Original check required Docker/sandbox + no internet access.
     // Removed per Comdr directive to unlock full functionality.

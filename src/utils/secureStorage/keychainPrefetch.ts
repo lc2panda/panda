@@ -4,8 +4,8 @@
  *
  * isRemoteManagedSettingsEligible() reads two separate keychain entries
  * SEQUENTIALLY via sync execSync during applySafeConfigEnvironmentVariables():
- *   1. "Panda Code-credentials" (OAuth tokens)  — ~32ms
- *   2. "Panda Code" (legacy API key)            — ~33ms
+ *   1. "Panda-credentials" (OAuth tokens)  — ~32ms
+ *   2. "Panda" (legacy API key)            — ~33ms
  * Sequential cost: ~65ms on every macOS startup.
  *
  * Firing both here lets the subprocesses run in parallel with the ~65ms of

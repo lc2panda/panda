@@ -126,7 +126,7 @@ export function createProjectOnboardingFeed(steps: Step[]): FeedConfig {
 }
 export function createGuestPassesFeed(): FeedConfig {
   const reward = getCachedReferrerReward();
-  const subtitle = reward ? `Share Panda Code and earn ${formatCreditAmount(reward)} of extra usage` : 'Share Panda Code with friends';
+  const subtitle = reward ? `Share Panda and earn ${formatCreditAmount(reward)} of extra usage` : 'Share Panda with friends';
   return {
     title: '3 guest passes',
     lines: [],

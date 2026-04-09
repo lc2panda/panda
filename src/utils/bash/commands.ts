@@ -436,9 +436,9 @@ export function isHelpCommand(command: string): boolean {
 }
 
 const BASH_POLICY_SPEC = `<policy_spec>
-# Panda Code Code Bash command prefix detection
+# Panda Bash command prefix detection
 
-This document defines risk levels for actions that the Panda Code agent may take. This classification system is part of a broader safety framework and is used to determine when additional user confirmation or oversight may be needed.
+This document defines risk levels for actions that the Panda agent may take. This classification system is part of a broader safety framework and is used to determine when additional user confirmation or oversight may be needed.
 
 ## Definitions
 

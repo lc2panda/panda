@@ -95,7 +95,7 @@ export function Stats(t0) {
   const allTimePromise = t1;
   let t2;
   if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
-    t2 = <Box marginTop={1}><Spinner /><Text> {isZh() ? '加载统计信息…' : 'Loading your Panda Code stats…'}</Text></Box>;
+    t2 = <Box marginTop={1}><Spinner /><Text> {isZh() ? '加载统计信息…' : 'Loading your Panda stats…'}</Text></Box>;
     $[1] = t2;
   } else {
     t2 = $[1];
@@ -243,7 +243,7 @@ function StatsContent(t0) {
   if (allTimeResult.type === "empty") {
     let t7;
     if ($[15] === Symbol.for("react.memo_cache_sentinel")) {
-      t7 = <Box marginTop={1}><Text color="warning">No stats available yet. Start using Panda Code!</Text></Box>;
+      t7 = <Box marginTop={1}><Text color="warning">No stats available yet. Start using Panda!</Text></Box>;
       $[15] = t7;
     } else {
       t7 = $[15];

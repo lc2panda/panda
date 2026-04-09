@@ -84,7 +84,7 @@ export function registerDreamSkill(): void {
       } catch {}
       const memoryDir = getAutoMemPath()
       const transcriptDir = getProjectDir(getOriginalCwd())
-      // Panda Code: inject working/emotional memory summary for dream consolidation
+      // Panda: inject working/emotional memory summary for dream consolidation
       let extraContext = args.trim() || undefined
       try {
         const summary = getMemorySummary()

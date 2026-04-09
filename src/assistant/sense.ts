@@ -98,7 +98,7 @@ export function pushNotification(notification: PandaNotification): void {
       if (platform === 'darwin') {
         // macOS: osascript（使用 execFileSync 避免 shell 注入）
         execFileSync('osascript', ['-e',
-          `display notification ${JSON.stringify(notification.body)} with title "Panda Code" subtitle ${JSON.stringify(notification.title)}`
+          `display notification ${JSON.stringify(notification.body)} with title "Panda" subtitle ${JSON.stringify(notification.title)}`
         ], { timeout: 3000 })
       } else if (platform === 'win32') {
         // Windows: PowerShell BurntToast（使用 execFileSync 避免命令注入）
@@ -106,15 +106,15 @@ export function pushNotification(notification: PandaNotification): void {
           const safeTitle = notification.title.replace(/"/g, '\\"')
           const safeBody = notification.body.replace(/"/g, '\\"')
           execFileSync('powershell', ['-c',
-            `New-BurntToastNotification -Text "Panda Code: ${safeTitle}","${safeBody}"`
+            `New-BurntToastNotification -Text "Panda: ${safeTitle}","${safeBody}"`
           ], { timeout: 5000 })
         } catch {
           // fallback: msg（同样用 execFileSync）
-          try { execFileSync('msg', ['*', `Panda Code: ${notification.title} - ${notification.body}`], { timeout: 3000 }) } catch {}
+          try { execFileSync('msg', ['*', `Panda: ${notification.title} - ${notification.body}`], { timeout: 3000 }) } catch {}
         }
       } else {
         // Linux: notify-send
-        try { execFileSync('notify-send', ['Panda Code', `${notification.title}: ${notification.body}`], { timeout: 3000 }) } catch {}
+        try { execFileSync('notify-send', ['Panda', `${notification.title}: ${notification.body}`], { timeout: 3000 }) } catch {}
       }
     } catch {}
   }

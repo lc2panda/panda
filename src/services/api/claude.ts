@@ -1068,7 +1068,7 @@ async function* queryModel(
   // Also naturally handles rollback/undo since removed messages won't be in the array.
   const previousRequestId = getPreviousRequestIdFromMessages(messages)
 
-  // ── Panda Code: Format Adapter integration point ──────────────
+  // ── Panda: Format Adapter integration point ──────────────
   // Acquire the format adapter for the current provider. When routing is
   // enabled and a third-party provider is active, this may return an
   // openai-compat adapter. Currently all third-party providers go through
@@ -2026,7 +2026,7 @@ async function* queryModel(
           isFirstChunk = false
         }
 
-        // ── Panda Code: Format Adapter stream normalization ──────
+        // ── Panda: Format Adapter stream normalization ──────
         // When a non-identity adapter is active (routing to third-party
         // endpoint with non-Anthropic format), normalize each stream
         // event to Anthropic's BetaRawMessageStreamEvent shape.
@@ -3409,7 +3409,7 @@ export async function queryHaiku({
 type QueryWithModelOptions = Omit<Options, 'getToolPermissionContext'>
 
 /**
- * Query a specific model through the Panda Code infrastructure.
+ * Query a specific model through the Panda infrastructure.
  * This goes through the full query pipeline including proper authentication,
  * betas, and headers - unlike direct API calls.
  */

@@ -1,5 +1,5 @@
 /**
- * MDM (Mobile Device Management) profile enforcement for Panda Code managed settings.
+ * MDM (Mobile Device Management) profile enforcement for Panda managed settings.
  *
  * Reads enterprise settings from OS-level MDM configuration:
  * - macOS: `com.anthropic.claudecode` preference domain

@@ -9,7 +9,7 @@ import {
 } from './model.js'
 import { getAPIProvider } from './providers.js'
 
-// ── Panda Code: Multi-Model Routing target cache ──────────────
+// ── Panda: Multi-Model Routing target cache ──────────────
 // Stores the last routing decision so downstream consumers (claude.ts,
 // runAgent.ts) can access provider/fallback info without changing
 // getAgentModel's return type — zero impact when routing is disabled.
@@ -49,14 +49,14 @@ export function getAgentModel(
   parentModel: string,
   toolSpecifiedModel?: ModelAlias,
   permissionMode?: PermissionMode,
-  /** Panda Code: agent definition for Multi-Model Routing (optional, no-op when routing disabled) */
+  /** Panda: agent definition for Multi-Model Routing (optional, no-op when routing disabled) */
   agentDefinition?: { modelPreferences?: Record<string, unknown>; modelPreset?: string; agentType?: string; name?: string },
 ): string {
   if (process.env.CLAUDE_CODE_SUBAGENT_MODEL) {
     return parseUserSpecifiedModel(process.env.CLAUDE_CODE_SUBAGENT_MODEL)
   }
 
-  // ── Panda Code: Multi-Model Agent Routing ──────────────
+  // ── Panda: Multi-Model Agent Routing ──────────────
   // When enabled, try routing-based model selection before falling through
   // to the default logic. The routing layer respects all existing overrides
   // (env var, tool-specified model) — it only activates when:

@@ -96,7 +96,7 @@ function getConfig(): AutoDreamConfig {
 }
 
 function isGateOpen(): boolean {
-  // Panda Code: KAIROS gate removed — background autoDream safe because we
+  // Panda: KAIROS gate removed — background autoDream safe because we
   // have isolated memory dir (~/.pandacc/projects/*/memory/), our own lock
   // files, and fork processes (not shared Anthropic infrastructure).
   // This makes autoDream MORE proactive: it runs in both normal and
@@ -443,7 +443,7 @@ export async function executeAutoDream(
  * state and runs the dream pipeline without an appendSystemMessage callback
  * (the forked agent handles its own output).
  *
- * Panda Code: this bridges the gap between the cron scheduler
+ * Panda: this bridges the gap between the cron scheduler
  * (builtinTasks.ts) and the autoDream pipeline which was designed for
  * per-turn invocation via stopHooks.
  */

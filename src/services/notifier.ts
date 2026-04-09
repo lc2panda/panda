@@ -35,7 +35,7 @@ export async function sendNotification(
   })
 }
 
-const DEFAULT_TITLE = 'Panda Code'
+const DEFAULT_TITLE = 'Panda'
 
 async function sendToChannel(
   channel: string,

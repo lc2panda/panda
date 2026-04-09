@@ -147,7 +147,7 @@ const externalTips: Tip[] = [
   {
     id: 'git-worktrees',
     content: async () => isZh()
-      ? '使用 git worktree 可并行运行多个 Panda Code 会话'
+      ? '使用 git worktree 可并行运行多个 Panda 会话'
       : 'Use git worktrees to run multiple Claude sessions in parallel.',
     cooldownSessions: 10,
     isRelevant: async () => {
@@ -291,7 +291,7 @@ const externalTips: Tip[] = [
   {
     id: 'enter-to-steer-in-relatime',
     content: async () => isZh()
-      ? '工作时发送消息可实时引导 Panda Code 的方向'
+      ? '工作时发送消息可实时引导 Panda 的方向'
       : 'Send messages to Claude while it works to steer Claude in real-time',
     cooldownSessions: 20,
     isRelevant: async () => true,
@@ -299,7 +299,7 @@ const externalTips: Tip[] = [
   {
     id: 'todo-list',
     content: async () => isZh()
-      ? '处理复杂任务时让 Panda Code 创建待办列表，跟踪进度不跑偏'
+      ? '处理复杂任务时让 Panda 创建待办列表，跟踪进度不跑偏'
       : 'Ask Claude to create a todo list when working on complex tasks to track progress and remain on track',
     cooldownSessions: 20,
     isRelevant: async () => true,
@@ -335,7 +335,7 @@ const externalTips: Tip[] = [
   {
     id: 'ide-upsell-external-terminal',
     content: async () => isZh()
-      ? '将 Panda Code 连接到你的 IDE · /ide'
+      ? '将 Panda 连接到你的 IDE · /ide'
       : 'Connect Claude to your IDE · /ide',
     cooldownSessions: 4,
     async isRelevant() {
@@ -364,7 +364,7 @@ const externalTips: Tip[] = [
   {
     id: 'install-slack-app',
     content: async () => isZh()
-      ? '运行 /install-slack-app 在 Slack 中使用 Panda Code'
+      ? '运行 /install-slack-app 在 Slack 中使用 Panda'
       : 'Run /install-slack-app to use Claude in Slack',
     cooldownSessions: 10,
     isRelevant: async () => !getGlobalConfig().slackAppInstallCount,
@@ -391,8 +391,8 @@ const externalTips: Tip[] = [
   {
     id: 'paste-images-mac',
     content: async () => isZh()
-      ? '使用 control+v 粘贴图片到 Panda Code（不是 cmd+v！）'
-      : 'Paste images into Panda Code using control+v (not cmd+v!)',
+      ? '使用 control+v 粘贴图片到 Panda（不是 cmd+v！）'
+      : 'Paste images into Panda using control+v (not cmd+v!)',
     cooldownSessions: 10,
     isRelevant: async () => getPlatform() === 'macos',
   },
@@ -416,7 +416,7 @@ const externalTips: Tip[] = [
     id: 'continue',
     content: async () => isZh()
       ? '运行 panda --continue 或 panda --resume 恢复对话'
-      : 'Run claude --continue or claude --resume to resume a conversation',
+      : 'Run panda --continue or panda --resume to resume a conversation',
     cooldownSessions: 10,
     isRelevant: async () => true,
   },
@@ -486,8 +486,8 @@ const externalTips: Tip[] = [
   {
     id: 'desktop-app',
     content: async () => isZh()
-      ? '使用桌面应用本地或远程运行 Panda Code：clau.de/desktop'
-      : 'Run Panda Code locally or remotely using the Claude desktop app: clau.de/desktop',
+      ? '使用桌面应用本地或远程运行 Panda：clau.de/desktop'
+      : 'Run Panda locally or remotely using the Claude desktop app: clau.de/desktop',
     cooldownSessions: 15,
     isRelevant: async () => getPlatform() !== 'linux',
   },
@@ -496,8 +496,8 @@ const externalTips: Tip[] = [
     content: async ctx => {
       const blue = color('suggestion', ctx.theme)
       return isZh()
-        ? `使用 ${blue('/desktop')} 在 Panda Code 桌面端继续会话`
-        : `Continue your session in Panda Code Desktop with ${blue('/desktop')}`
+        ? `使用 ${blue('/desktop')} 在 Panda 桌面端继续会话`
+        : `Continue your session in Panda Desktop with ${blue('/desktop')}`
     },
     cooldownSessions: 15,
     isRelevant: async () => {
@@ -519,8 +519,8 @@ const externalTips: Tip[] = [
   {
     id: 'mobile-app',
     content: async () => isZh()
-      ? '/mobile 在手机端使用 Panda Code'
-      : '/mobile to use Panda Code from the Claude app on your phone',
+      ? '/mobile 在手机端使用 Panda'
+      : '/mobile to use Panda from the Claude app on your phone',
     cooldownSessions: 15,
     isRelevant: async () => true,
   },
@@ -581,7 +581,7 @@ const externalTips: Tip[] = [
       >('tengu_tide_elm', 'off')
       return variant === 'copy_b'
         ? isZh()
-          ? `使用 ${cmd} 获得更好的一次性回答。Panda Code 会先深思熟虑。`
+          ? `使用 ${cmd} 获得更好的一次性回答。Panda 会先深思熟虑。`
           : `Use ${cmd} for better one-shot answers. Claude thinks it through first.`
         : isZh()
           ? `遇到棘手问题？${cmd} 让首次回答更靠谱`
@@ -614,10 +614,10 @@ const externalTips: Tip[] = [
       >('tengu_tern_alloy', 'off')
       return variant === 'copy_b'
         ? isZh()
-          ? `大型任务可以让 Panda Code ${blue('使用子代理')}。它们并行工作，保持主线程整洁。`
+          ? `大型任务可以让 Panda ${blue('使用子代理')}。它们并行工作，保持主线程整洁。`
           : `For big tasks, tell Claude to ${blue('use subagents')}. They work in parallel and keep your main thread clean.`
         : isZh()
-          ? `说 ${blue('"分发子代理"')}，Panda Code 会派出一个团队。各自深挖，确保不遗漏。`
+          ? `说 ${blue('"分发子代理"')}，Panda 会派出一个团队。各自深挖，确保不遗漏。`
           : `Say ${blue('"fan out subagents"')} and Claude sends a team. Each one digs deep so nothing gets missed.`
     },
     cooldownSessions: 3,
@@ -665,8 +665,8 @@ const externalTips: Tip[] = [
       const reward = getCachedReferrerReward()
       return reward
         ? isZh()
-          ? `分享 Panda Code 赚取 ${claude(formatCreditAmount(reward))} 额外用量 · ${claude('/passes')}`
-          : `Share Panda Code and earn ${claude(formatCreditAmount(reward))} of extra usage · ${claude('/passes')}`
+          ? `分享 Panda 赚取 ${claude(formatCreditAmount(reward))} 额外用量 · ${claude('/passes')}`
+          : `Share Panda and earn ${claude(formatCreditAmount(reward))} of extra usage · ${claude('/passes')}`
         : isZh()
           ? `你有免费体验券可以分享 · ${claude('/passes')}`
           : `You have free guest passes to share · ${claude('/passes')}`

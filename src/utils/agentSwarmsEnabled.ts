@@ -16,7 +16,7 @@ function isAgentTeamsFlagSet(): boolean {
  * This is the single gate that should be checked everywhere teammates
  * are referenced (prompts, code, tools isEnabled, UI, etc.).
  *
- * Panda Code: always enabled — all users have agent teams access.
+ * Panda: always enabled — all users have agent teams access.
  * The tengu_amber_flint killswitch is still respected via GrowthBook overrides.
  */
 export function isAgentSwarmsEnabled(): boolean {

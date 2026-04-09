@@ -340,7 +340,7 @@ export async function runBridgeLoop(
 
   // For ant users, show where session debug logs will land so they can tail them.
   // sessionRunner.ts uses the same base path. File appears once a session spawns.
-  // Panda Code: debug log path shown for all users
+  // Panda: debug log path shown for all users
   if (true) {
     let debugGlob: string
     if (config.debugFile) {
@@ -1133,7 +1133,7 @@ export async function runBridgeLoop(
             } else {
               sessionDebugFile = `${config.debugFile}-${safeId}`
             }
-          // Panda Code: auto-create debug log for all users
+          // Panda: auto-create debug log for all users
           } else if (config.verbose || true) {
             sessionDebugFile = join(
               tmpdir(),
@@ -1531,7 +1531,7 @@ export async function runBridgeLoop(
     !fatalExit
   ) {
     logger.logStatus(
-      `Resume this session by running \`claude remote-control --continue\``,
+      `Resume this session by running \`panda remote-control --continue\``,
     )
     logForDebugging(
       `[bridge:shutdown] Skipping archive+deregister to allow resume of session ${initialSessionId}`,
@@ -1822,7 +1822,7 @@ export function parseArgs(args: string[]): ParsedArgs {
       createSessionInDir = false
     } else {
       return makeError(
-        `Unknown argument: ${arg}\nRun 'claude remote-control --help' for usage.`,
+        `Unknown argument: ${arg}\nRun 'panda remote-control --help' for usage.`,
       )
     }
   }
@@ -1923,7 +1923,7 @@ async function printHelp(): Promise<void> {
 Remote Control - Connect your local environment to claude.ai/code
 
 USAGE
-  claude remote-control [options]
+  panda remote-control [options]
 OPTIONS
   --name <name>                    Name for the session (shown in claude.ai/code)
 ${
@@ -1946,7 +1946,7 @@ DESCRIPTION
 ${serverDescription}
 NOTES
   - You must be logged in with a Claude account that has a subscription
-  - Run \`claude\` first in the directory to accept the workspace trust dialog
+  - Run \`panda\` first in the directory to accept the workspace trust dialog
 ${serverNote}`
   console.log(help)
 }
@@ -2148,7 +2148,7 @@ export async function bridgeMain(args: string[]): Promise<void> {
     const found = await readBridgePointerAcrossWorktrees(dir)
     if (!found) {
       console.error(
-        `Error: No recent session found in this directory or its worktrees. Run \`claude remote-control\` to start a new one.`,
+        `Error: No recent session found in this directory or its worktrees. Run \`panda remote-control\` to start a new one.`,
       )
       // eslint-disable-next-line custom-rules/no-process-exit
       process.exit(1)
@@ -2188,7 +2188,7 @@ export async function bridgeMain(args: string[]): Promise<void> {
   // same as baseUrl (Envoy routes /v1/session_ingress/* to session-ingress).
   // Locally, session-ingress runs on a different port (9413) than the
   // contain-provide-api (8211), so CLAUDE_BRIDGE_SESSION_INGRESS_URL must be
-  // set explicitly. Panda Code: available for all users.
+  // set explicitly. Panda: available for all users.
   const sessionIngressUrl =
     process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       ? process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
@@ -2241,7 +2241,7 @@ export async function bridgeMain(args: string[]): Promise<void> {
       output: process.stdout,
     })
     console.log(
-      `\nPanda Remote Control is launching in spawn mode which lets you create new sessions in this project from Panda Code on Web or your Mobile app. Learn more here: https://code.claude.com/docs/en/remote-control\n\n` +
+      `\nPanda Remote Control is launching in spawn mode which lets you create new sessions in this project from Panda on Web or your Mobile app. Learn more here: https://code.claude.com/docs/en/remote-control\n\n` +
         `Spawn mode for this project:\n` +
         `  [1] same-dir \u2014 sessions share the current directory (default)\n` +
         `  [2] worktree \u2014 each session gets an isolated git worktree\n\n` +
@@ -2378,7 +2378,7 @@ export async function bridgeMain(args: string[]): Promise<void> {
         await clearBridgePointer(resumePointerDir)
       }
       console.error(
-        `Error: Session ${resumeSessionId} not found. It may have been archived or expired, or your login may have lapsed (run \`claude /login\`).`,
+        `Error: Session ${resumeSessionId} not found. It may have been archived or expired, or your login may have lapsed (run \`panda /login\`).`,
       )
       // eslint-disable-next-line custom-rules/no-process-exit
       process.exit(1)
@@ -2812,7 +2812,7 @@ export async function runBridgeHeadless(
 
   if (!checkHasTrustDialogAccepted()) {
     throw new BridgeHeadlessPermanentError(
-      `Workspace not trusted: ${dir}. Run \`claude\` in that directory first to accept the trust dialog.`,
+      `Workspace not trusted: ${dir}. Run \`panda\` in that directory first to accept the trust dialog.`,
     )
   }
 
@@ -2832,7 +2832,7 @@ export async function runBridgeHeadless(
       'Remote Control base URL uses HTTP. Only HTTPS or localhost HTTP is allowed.',
     )
   }
-  // Panda Code: session ingress URL override available for all users
+  // Panda: session ingress URL override available for all users
   const sessionIngressUrl =
     process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       ? process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL

@@ -89,7 +89,7 @@ export function CondensedLogo() {
   }
   let t5;
   if ($[8] === Symbol.for("react.memo_cache_sentinel")) {
-    t5 = <Text bold={true}>{t('Panda Code', '熊猫代码')}</Text>;
+    t5 = <Text bold={true}>{t('Panda', 'Panda')}</Text>;
     $[8] = t5;
   } else {
     t5 = $[8];

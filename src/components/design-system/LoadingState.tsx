@@ -42,7 +42,7 @@ type LoadingStateProps = {
  * <LoadingState
  *   message="Loading sessions"
  *   bold
- *   subtitle="Fetching your Panda Code sessions..."
+ *   subtitle="Fetching your Panda sessions..."
  * />
  */
 export function LoadingState(t0) {

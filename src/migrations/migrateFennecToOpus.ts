@@ -16,7 +16,7 @@ import {
  * settings here would cause infinite re-runs + silent global promotion.
  */
 export function migrateFennecToOpus(): void {
-  // Panda Code: fennec→opus migration runs for all users
+  // Panda: fennec→opus migration runs for all users
   const settings = getSettingsForSource('userSettings')
 
   const model = settings?.model

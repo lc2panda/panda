@@ -20,20 +20,20 @@ if (typeof globalThis.MACRO === "undefined") {
 
 process.env.DISABLE_INSTALLATION_CHECKS ??= '1';
 
-// Panda Code: UNCONDITIONALLY disable nonessential traffic to Anthropic infrastructure.
-// No Panda Code user is an Anthropic employee — none can reach internal endpoints
+// Panda: UNCONDITIONALLY disable nonessential traffic to Anthropic infrastructure.
+// No Panda user is an Anthropic employee — none can reach internal endpoints
 // (bridge, advisor, session upload, analytics, telemetry). With USER_TYPE baked to
 // "ant" at build time, these 31 guard points would attempt connections to unreachable
 // Anthropic infra → startup hang with no input bar.
 // Matches clawgod approach: wrapper sets this env var BEFORE bundle loads.
 process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC ??= '1';
 
-// Panda Code: Enable ToolSearch for all providers. Without this, ToolSearch is
+// Panda: Enable ToolSearch for all providers. Without this, ToolSearch is
 // silently disabled when ANTHROPIC_BASE_URL points to a non-Anthropic host
 // (e.g. proxy, DeepSeek, Bedrock). The user can still override with =false.
 process.env.ENABLE_TOOL_SEARCH ??= 'true';
 
-// Panda Code: Default GrowthBook feature overrides
+// Panda: Default GrowthBook feature overrides
 // Ensures all core features work regardless of GrowthBook remote availability.
 // Anthropic native users: GrowthBook remote eval takes priority over these defaults
 // because remoteEvalFeatureValues is checked before disk cache in getFeatureValue_CACHED_MAY_BE_STALE.
@@ -159,7 +159,7 @@ async function main(): Promise<void> {
     ) {
         // MACRO.VERSION is inlined at build time
         // biome-ignore lint/suspicious/noConsole:: intentional console output
-        console.log(`${MACRO.VERSION} (Panda Code)`);
+        console.log(`${MACRO.VERSION} (Panda)`);
         return;
     }
 

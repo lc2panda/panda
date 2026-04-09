@@ -344,7 +344,7 @@ export async function* runAgent({
     toolUseContext.options.mainLoopModel,
     model,
     permissionMode,
-    // Panda Code: pass agent definition for Multi-Model Routing
+    // Panda: pass agent definition for Multi-Model Routing
     {
       modelPreferences: agentDefinition.modelPreferences as Record<string, unknown> | undefined,
       modelPreset: agentDefinition.modelPreset,
@@ -353,7 +353,7 @@ export async function* runAgent({
     },
   )
 
-  // ── Panda Code: Capability preflight check ──────────────
+  // ── Panda: Capability preflight check ──────────────
   // When routing is enabled, verify the resolved model meets minimum
   // capability requirements before spawning the agent. Logs a warning
   // if the check fails — does not block execution (graceful degradation).
@@ -389,7 +389,7 @@ export async function* runAgent({
     registerPerfettoAgent(agentId, agentDefinition.agentType, parentId)
   }
 
-  // Panda Code: unlocked — debug logging for all users
+  // Panda: unlocked — debug logging for all users
   logForDebugging(
     `[Subagent ${agentDefinition.agentType}] API calls: ${getDisplayPath(getDumpPromptsPath(agentId))}`,
   )

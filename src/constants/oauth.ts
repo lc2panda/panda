@@ -4,7 +4,7 @@ import { isEnvTruthy } from 'src/utils/envUtils.js'
 type OauthConfigType = 'prod' | 'staging' | 'local'
 
 function getOauthConfigType(): OauthConfigType {
-  // Panda Code: preserve ant guard — local/staging OAuth endpoints are Anthropic
+  // Panda: preserve ant guard — local/staging OAuth endpoints are Anthropic
   // internal infrastructure (staging.ant.dev) and not useful for external users.
   if (process.env.USER_TYPE === 'ant') {
     if (isEnvTruthy(process.env.USE_LOCAL_OAUTH)) {
@@ -108,14 +108,14 @@ const PROD_OAUTH_CONFIG = {
 /**
  * Client ID Metadata Document URL for MCP OAuth (CIMD / SEP-991).
  * When an MCP auth server advertises client_id_metadata_document_supported: true,
- * Panda Code uses this URL as its client_id instead of Dynamic Client Registration.
+ * Panda uses this URL as its client_id instead of Dynamic Client Registration.
  * The URL must point to a JSON document hosted by Anthropic.
  * See: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-00
  */
 export const MCP_CLIENT_METADATA_URL =
   'https://claude.ai/oauth/claude-code-client-metadata'
 
-// Panda Code: preserve ant guard — staging OAuth config points to internal
+// Panda: preserve ant guard — staging OAuth config points to internal
 // Anthropic staging endpoints (staging.ant.dev) not accessible externally.
 // Uses literal check for dead code elimination
 const STAGING_OAUTH_CONFIG =

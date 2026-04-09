@@ -224,7 +224,7 @@ export const KeybindingsSchema = lazySchema(() =>
         .describe('Array of keybinding blocks by context'),
     })
     .describe(
-      'Panda Code keybindings configuration. Customize keyboard shortcuts by context.',
+      'Panda keybindings configuration. Customize keyboard shortcuts by context.',
     ),
 )
 

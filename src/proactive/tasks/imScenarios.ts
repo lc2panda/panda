@@ -341,7 +341,7 @@ const imDocumentUpdate: SmartCronTask = {
 
 const imReversePush: SmartCronTask = {
   id: 'im-reverse-push',
-  description: '反向推送 · Reverse push (Panda Code → IM)',
+  description: '反向推送 · Reverse push (Panda → IM)',
   cron: '*/5 * * * *',
   priority: 'low',
   enabled: true,

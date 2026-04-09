@@ -1,4 +1,4 @@
-// Panda Code: un-stubbed — real coordinator worker agent definitions.
+// Panda: un-stubbed — real coordinator worker agent definitions.
 // When COORDINATOR_MODE is active, these replace the standard built-in agents.
 // The coordinator spawns workers via AgentTool with subagent_type: "worker".
 import type {
@@ -6,7 +6,7 @@ import type {
   BuiltInAgentDefinition,
 } from '../tools/AgentTool/loadAgentsDir.js'
 
-const WORKER_SYSTEM_PROMPT = `You are a worker agent for Panda Code's coordinator mode. You execute tasks delegated by the coordinator — research, implementation, and verification.
+const WORKER_SYSTEM_PROMPT = `You are a worker agent for Panda's coordinator mode. You execute tasks delegated by the coordinator — research, implementation, and verification.
 
 Guidelines:
 - Complete the task fully — don't gold-plate, but don't leave it half-done.

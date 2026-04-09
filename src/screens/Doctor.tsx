@@ -222,7 +222,7 @@ export function Doctor(t0) {
   let t7;
   if ($[11] !== onDone) {
     t7 = () => {
-      onDone("Panda Code diagnostics dismissed", {
+      onDone("Panda diagnostics dismissed", {
         display: "system"
       });
     };
