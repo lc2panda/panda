@@ -18,13 +18,15 @@
 ```
 
 **项目代号**：Panda Code
-**版本**：v2.3.0（基线 Claude Code v2.1.92）
+**版本**：v2.5.7（基线 Claude Code v2.1.92）
 **技术栈**：Bun + TypeScript + React/Ink + Commander.js
 **运行时**：Bun >= 1.2.0 / Node.js >= 18.0.0
 
 ---
 
-## 安装
+## 1. 安装与配置
+
+### 1.1 安装
 
 **第一步：配置认证（只需一次）**
 
@@ -59,16 +61,14 @@ panda
 
 **更新**：`npm update -g @lc2panda/panda-code`
 
-### 首次使用
+### 1.2 首次使用
 
 ```bash
 panda auth login    # 交互式选择 Provider
 panda auth status   # 查看认证状态
 ```
 
----
-
-## 多 Provider 支持
+### 1.3 多 Provider 支持
 
 ```bash
 panda auth login
@@ -85,13 +85,180 @@ panda auth login
 | GLM       | open.bigmodel.cn/api/anthropic             | glm-4             | [open.bigmodel.cn](https://open.bigmodel.cn/)                                             |
 | Volcano   | ark.cn-beijing.volces.com/api/coding       | ark-code-latest   | [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey) |
 
+### 1.4 配置参考
+
+所有配置文件位于 `~/.pandacc/config/` 目录，JSON 格式，不存在时使用默认值。
+
+#### settings.json — 全局设置
+
+```json
+// ~/.pandacc/settings.json
+{
+  "enableModelRouting": true,          // Multi-Model Agent Routing
+  "routingPresets": {                   // 路由预设
+    "cost-saving": { "agentModelMap": { "Explore": "haiku", "Plan": "sonnet" } }
+  },
+  "privacyEnhanced": true,             // 隐私增强模式（非 Anthropic 渠道自动启用）
+  "autoMemoryEnabled": true             // 自动记忆系统
+}
+```
+
+#### proactive.json — 主动推送配置
+
+> ⚠️ **重要隐私说明**：下方 `enabledScenarios` 中的场景涉及读取邮件、通讯录、浏览历史、即时消息等**高度敏感的个人数据**。这些场景**默认全部关闭**，Panda Code 不会在未经授权的情况下读取任何个人隐私数据。用户必须**手动编辑配置文件并显式设为 `true`** 才会启用对应的数据采集。所有数据仅在用户本机处理，永不上传。
+
+```json
+// ~/.pandacc/config/proactive.json
+{
+  // ── 通知渠道 ──
+  "webhookUrl": "https://your-bot.example.com/notify",  // Webhook 推送（微信/Telegram Bot 等）
+
+  // ── 阈值自定义（可选，不设则用默认值） ──
+  "diskFreePercent": 10,        // 磁盘可用百分比告警线
+  "diskFreeGB": 20,             // 磁盘可用 GB 告警线
+  "memoryUsedPercent": 85,      // 内存使用百分比告警线
+  "batteryLowPercent": 20,      // 低电量告警线
+  "networkLatencyMs": 500,      // 网络延迟告警线 (ms)
+  "networkLossPercent": 30,     // 网络丢包告警线
+  "downloadsFileCount": 50,     // 下载目录文件数告警线
+  "desktopFileCount": 30,       // 桌面文件数告警线
+  "gitUncommittedHours": 3,     // Git 未提交告警 (小时)
+  "gitBranchStaleDays": 7,     // Git 分支过期 (天)
+  "noBreakMinutes": 90,         // 持续工作无休息告警 (分钟)
+  "lateNightStartHour": 23,    // 深夜关怀起始时
+  "lateNightEndHour": 5,       // 深夜关怀结束时
+  "sshKeyMaxDays": 365,        // SSH key 轮换告警 (天)
+  "sslCertWarnDays": 30,       // SSL 证书到期告警 (天)
+
+  // ── ⚠️ 敏感场景开关（默认全部关闭，必须显式设为 true 才启用） ──
+  "enabledScenarios": {
+    // 邮件（读取 Mail.app/Outlook 邮件数据库，macOS 需 FDA）
+    "email-flagged-reminder": false,   // 星标/待办邮件提醒
+    "email-unread-important": false,   // 重要未读邮件
+    "email-unreplied": false,          // 48h 未回复邮件
+    "email-daily-digest": false,       // 邮件每日摘要
+    // 通讯录（读取 Contacts.app，macOS AppleScript 首次弹窗授权）
+    "contact-birthday": false,         // 联系人生日提醒
+    // 即时消息
+    "slack-unread": false,             // Slack 未读（需 SLACK_TOKEN）
+    // 浏览器（读取 Chrome SQLite）
+    "browser-knowledge-cards": false,  // 高频页面知识卡片
+    "bookmark-cleanup": false,         // 书签整理建议
+    "reading-list-overflow": false,    // 阅读列表过长
+    // 笔记（读取 Apple Notes SQLite，macOS 需 FDA）
+    "notes-digest": false,             // 笔记汇总
+    // 屏幕时间（macOS 读取 knowledgeC.db 需 FDA）
+    "screen-time-stats": false,        // 屏幕时间统计
+    // 安全（读取文件内容做扫描）
+    "sensitive-file-scan": false,      // 敏感文件暴露扫描
+    "duplicate-file-scan": false,      // 重复文件检测
+    // 财务
+    "cloud-billing-alert": false,      // 云服务账单（需 AWS/GCP 凭据）
+    // 系统通知中心（macOS 需 FDA，Windows 无需额外权限）
+    "notification-digest": false,      // 通知日频简报
+    "notification-urgent": false,      // 紧急通知实时转发
+    "notification-stats": false,       // 通知统计趋势
+    // IM 平台（需配置 connectors.json）
+    "wechat-messages": false,          // 微信消息（企微API或本地DB解密）
+    "feishu-messages": false,          // 飞书消息（需 App ID/Secret）
+    "dingtalk-messages": false,        // 钉钉消息（需 App Key/Secret）
+    // IM 聚合场景
+    "im-unread-digest": false,         // 跨平台未读汇总
+    "im-daily-brief": false,           // 每日 IM 简报
+    "im-calendar-sync": false,         // 跨平台日历冲突
+    "im-approval-alert": false,        // 待审批催办
+    "im-document-update": false,       // 关注文档更新
+    "im-reverse-push": false           // 反向推送到 IM 平台
+  }
+}
+```
+
+#### privacy.json — 隐私排除规则
+
+```json
+// ~/.pandacc/config/privacy.json
+{
+  "excludePaths": ["~/.ssh/**", "~/.gnupg/**", "~/.aws/**", "**/node_modules/**"],
+  "excludeApps": ["1Password", "Keychain Access"],
+  "excludeBrowserDomains": ["*.bank.*", "*.gov"],
+  "sensitivePatterns": ["password", "secret", "api[._-]?key", "token", "sk-"],
+  "dataRetentionDays": 90
+}
+```
+
+#### connectors.json — IM 平台连接器
+
+```json
+// ~/.pandacc/config/connectors.json
+{
+  "feishu": {
+    "enabled": false,
+    "mode": "mcp",                          // mcp（推荐）| api
+    "appId": "cli_xxx",                     // 飞书开放平台 App ID
+    "appSecret": "keychain:feishu-secret",  // 建议存 Keychain
+    "mcpCommand": "npx @anthropic-ai/mcp feishu-mcp"  // MCP 模式启动命令
+  },
+  "dingtalk": {
+    "enabled": false,
+    "mode": "mcp",                          // mcp（推荐）| api
+    "appKey": "xxx",                        // 钉钉开放平台 App Key
+    "appSecret": "keychain:dingtalk-secret",
+    "mcpProfiles": "calendar,department,tasks,notice"  // 启用的 MCP 功能模块
+  },
+  "slack": {
+    "enabled": false,
+    "token": "xoxb-xxx"                     // Slack Bot Token（或设 SLACK_TOKEN 环境变量）
+  },
+  "telegram": {
+    "enabled": false,
+    "botToken": "123456:ABC-DEF..."         // @BotFather 获取的 Bot Token
+  },
+  "wechat": {
+    "enabled": false,
+    "mode": "wecom",                        // wecom（企业微信API）| local-db（本地解密）
+    // ── 企业微信模式 ──
+    "corpId": "ww_xxx",                     // 企业 ID
+    "agentId": "1000002",                   // 应用 Agent ID
+    "secret": "keychain:wecom-secret",      // 应用 Secret
+    // ── 本地 DB 模式（需解密密钥，见"系统授权与数据解密指南"） ──
+    "dbKey": ""                             // 32 字节 hex 解密密钥
+  },
+  "teams": {
+    "enabled": false,
+    "tenantId": "Azure AD 租户 ID",
+    "clientId": "应用客户端 ID",
+    "clientSecret": "keychain:teams-secret"
+  }
+}
+```
+
+#### dates.json — 自定义纪念日
+
+```json
+// ~/.pandacc/config/dates.json
+[
+  { "name": "结婚纪念日", "date": "06-15" },
+  { "name": "妈妈生日", "date": "09-22" }
+]
+```
+
+#### habits.json — 习惯打卡
+
+```json
+// ~/.pandacc/config/habits.json
+[
+  { "name": "运动", "frequency": "daily" },
+  { "name": "阅读", "frequency": "daily", "target": "30min" }
+]
+```
+
 ---
 
-## 命令参考
+## 2. 命令速查
 
-> 完整手册请查看 [命令使用手册](#panda-code--命令使用手册-v251-极限版)
+> 完整手册请查看 [第 8 章 命令使用手册](#8-命令使用手册)
 
-### 核心命令速查
+### 2.1 核心命令速查表
 
 | 分类        | 命令                                                            | 说明                   |
 | --------- | ------------------------------------------------------------- | -------------------- |
@@ -104,7 +271,7 @@ panda auth login
 | **Agent** | `/plan` `/fork` `/agents` `/workflows` `/skills`              | 计划、派生、Agent、工作流、技能   |
 | **查询**    | `/context` `/files` `/doctor` `/cost` `/stats` `/memory`      | 上下文、文件、诊断、费用、统计、记忆   |
 
-### 🆕 超级助手命令
+### 2.2 超级助手命令
 
 > 超级助手 = 数字生命体。以下命令是超级助手的交互入口。
 
@@ -121,7 +288,7 @@ panda auth login
 | `/capture`      | 快速捕获 — 将想法保存到工作记忆                                   |
 | `/learn`        | 学习助理 — 闪卡生成、间隔重复、学习路径规划                            |
 
-### Ant-Only 高级命令（已全部启用）
+### 2.3 Ant-Only 高级命令（已全部启用）
 
 | 命令                | 说明                   |
 | ----------------- | -------------------- |
@@ -132,7 +299,7 @@ panda auth login
 | `/subscribe-pr`   | 订阅 PR 更新通知           |
 | `/heapdump`       | JS 堆转储               |
 
-### 🆕 Multi-Model Agent Routing
+### 2.4 Multi-Model Agent Routing
 
 不同 agent 使用不同模型，按能力路由：
 
@@ -172,9 +339,9 @@ panda auth login
 
 **环境变量启用**：`PANDA_MODEL_ROUTING=1 panda`
 
-> 详见 [命令使用手册](#panda-code--命令使用手册-v251-极限版) Multi-Model Routing 章节
+> 详见 [第 8 章 命令使用手册](#8-命令使用手册) Multi-Model Routing 章节
 
-### 快捷键
+### 2.5 快捷键
 
 | 快捷键           | 功能         | 快捷键      | 功能      |
 | ------------- | ---------- | -------- | ------- |
@@ -184,7 +351,7 @@ panda auth login
 | `\` + `Enter` | 换行         | `!`      | Bash 模式 |
 | `@`           | 文件补全       | `&`      | 后台运行    |
 
-### 环境变量
+### 2.6 环境变量
 
 | 变量                               | 说明                                 |
 | -------------------------------- | ---------------------------------- |
@@ -200,163 +367,17 @@ panda auth login
 
 ---
 
-## 🆕 治理能力
-
-Panda Code 内置了 11 项治理能力。
-
-### 自动生效（零配置）
-
-| 能力                   | 触发时机                                                                                      | 用户感知                                   |
-| -------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------- |
-| **危险命令拦截**           | AI 执行 `rm -rf /`、`git reset --hard`、`git push --force`、`chmod -R 777`、fork bomb 等 7 种危险模式 | 自动拦截，弹出 `⚠️ Dangerous: ...` 确认提示       |
-| **Completion Guard** | AI 纯文本声称"任务已完成"但无工具调用或测试证据                                                                | 自动要求补充验证证据（最多 2 次）                     |
-| **Finding Closure**  | AI 声称完成但回复中含未关闭的 TODO/FIXME/HACK                                                          | 自动要求先关闭所有 findings                     |
-| **Anti-Slop 审查**     | AI 回复过度 emoji（≥8种）、重复段落、或超长空洞文本                                                           | 自动要求精简，给出代码/路径                         |
-| **子 Agent 上下文注入**    | 每次 Agent 工具 spawn 子 agent                                                                 | 子 agent 自动获得 CLAUDE.md 核心规范（前 2500 字符） |
-| **能力优先调度**           | 未指定 `subagent_type` 的 Agent 调用                                                            | 搜索类→Explore agent，规划类→Plan agent       |
-| **任务分类引擎**           | 每轮对话首条用户消息                                                                                | 后台分类（`PANDA_DEBUG=1` 可见），为后续扩展预留       |
-| **进化写回**             | turnCount > 3 且有成功工具调用                                                                    | 调试日志记录工具名列表，预留经验沉淀入口                   |
-
-### 手动使用：Patterns/Scars 经验记忆
-
-在项目 memory 目录下创建 `.md` 文件，下次对话自动加载到上下文：
-
-```bash
-# 记录成功模式
-cat > ~/.claude/projects/<项目slug>/memory/patterns/api-error-handling.md << 'EOF'
----
-name: API 错误处理模式
-description: 第三方 API 返回 404 时优先检查请求 body 兼容性
-type: pattern
----
-第三方 API 返回 404 时，优先检查请求 body 中是否包含
-Anthropic 专有参数（如 metadata），而不是先怀疑认证问题。
-EOF
-
-# 记录失败教训
-cat > ~/.claude/projects/<项目slug>/memory/scars/blind-debugging.md << 'EOF'
----
-name: 盲目追症状的教训
-description: 排查问题应先审查 git diff 而不是加调试日志
-type: scar
----
-遇到"之前能用现在不能用"的问题，第一步 git diff 审查近期变更。
-EOF
-```
-
-### 治理能力执行流
-
-```
-用户输入 → 任务分类 → AI 响应
-                        │
-                        ├─ BashTool → 危险命令拦截 → ⚠️ 确认
-                        ├─ AgentTool → 能力优先调度 → 自动选型
-                        │              └─ 子Agent上下文注入 → CLAUDE.md
-                        └─ 纯文本回复
-                              ├─ Completion Guard → 无证据？→ 要求补充
-                              │   └─ Finding Closure → 有TODO？→ 要求关闭
-                              ├─ Anti-Slop → 废话？→ 要求精简
-                              └─ 进化写回 → 日志记录
-```
-
----
-
-## 🆕 Cache Token 显示
-
-支持所有主流第三方 API 的 prompt cache 命中显示：
-
-| Provider                | Cache 字段                              | 自动/手动 |
-| ----------------------- | ------------------------------------- | ----- |
-| Anthropic               | `cache_read_input_tokens`             | 自动    |
-| OpenAI / Mistral / 火山引擎 | `prompt_tokens_details.cached_tokens` | 自动    |
-| DeepSeek                | `prompt_cache_hit_tokens`             | 自动    |
-| Groq                    | `input_tokens_details.cached_tokens`  | 自动    |
-| Kimi / GLM / MiniMax    | `usage.cached_tokens`                 | 自动    |
-| OpenRouter              | 透传 + `cache_write_tokens`             | 自动    |
-
-查看 cache 命中：`/stats` 命令中 `Cache: N` 字段。调试：`DEBUG_CACHE=1 panda`。
-
----
-
-## 隐私保护
-
-所有渠道均可启用隐私增强模式（配置 `privacyEnhanced: true` 或使用 `/privacy` 命令）。非 Anthropic 渠道自动启用。
-
-| 防护层                | 内容                                                                  | 状态  |
-| ------------------ | ------------------------------------------------------------------- | --- |
-| 遥测拦截               | 1104 个 logEvent 调用点全部拦截                                             | 自动  |
-| API Body 脱敏        | `metadata` 中 device_id/session_id/account_uuid 替换为合规格式固定值；第三方完全不发送  | 自动  |
-| HTTP Header 脱敏     | X-Claude-Code-Session-Id 替换为固定 UUID；第三方不发送 x-app/session-id         | 自动  |
-| Datadog 禁用         | `trackDatadogEvent` + `initializeDatadog` 完全禁用                      | 自动  |
-| BigQuery 禁用        | `doExport` 完全禁用，不向 `api.anthropic.com/api/claude_code/metrics` 发送数据 | 自动  |
-| 1P Event Logger 脱敏 | userId/email/org 替换为固定脱敏值（`cc4all@gmail.com`）                       | 自动  |
-| GrowthBook 脱敏      | 用户属性 id/deviceID/sessionId 替换为固定值，移除 org/account/email              | 自动  |
-| UA 规范化             | 精简为 `claude-code/{version}`，不泄露设备信息                                 | 自动  |
-| 独立存储               | `~/.pandacc/` 独立空间，不与原版 claude 混用                                   | 自动  |
-| OAuth              | 隐私模式下不额外请求 Profile                                                  | 自动  |
-
-查看当前隐私状态：`/privacy`
-
----
-
-## 跨平台支持
-
-| 平台      | 状态   | 说明                                  |
-| ------- | ---- | ----------------------------------- |
-| macOS   | 完整支持 | Keychain 存储、osascript 集成            |
-| Windows | 完整支持 | PowerShell 自动检测、git-bash Shell、路径转换 |
-| Linux   | 完整支持 | 标准 POSIX 环境                         |
-| WSL     | 完整支持 | 自动检测 WSL 环境                         |
-
----
-
-## 系统架构
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     终 端 渲 染 层 (Ink/React)                   │
-│   REPL 交互 │ 权限提示 │ 消息渲染 │ Logo │ 快捷键 │ 补全        │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-┌─────────────────────────────┴───────────────────────────────────┐
-│                     核 心 对 话 循 环                             │
-│  query.ts │ QueryEngine.ts │ 会话管理 │ 压缩/恢复               │
-└──────────────┬──────────────────────────────┬───────────────────┘
-               │                              │
-┌──────────────┴──────────────┐ ┌─────────────┴───────────────────┐
-│      工 具 系 统 (59个)      │ │       API / Provider 层          │
-│  BashTool │ AgentTool       │ │  Anthropic │ Bedrock │ Vertex   │
-│  SleepTool │ MonitorTool    │ │  Foundry │ DeepSeek │ Kimi     │
-│  SnipTool │ WorkflowTool   │ │  Qwen │ MiniMax │ GLM │ 火山   │
-└──────────────┬──────────────┘ └─────────────┬───────────────────┘
-               │                              │
-┌──────────────┴──────────────────────────────┴───────────────────┐
-│                    服 务 与 基 础 设 施 层                        │
-│  MCP │ OAuth │ Plugins │ Hooks │ SessionMemory │ Privacy       │
-│  Compact │ Skills │ LSP │ Cron │ PolicyLimits │ Persona       │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│                  私 人 助 手 系 统 (v2.1.92 新增)                 │
-│  autoDream │ KAIROS │ Proactive │ NightMode │ Mood │ Sense    │
-│  Coordinator │ Buddy │ Brief │ Persona │ Memory │ Dream     │
-└─────────────────────────────────────────────────────────────────┘
-
-╔═════════════════════════════════════════════════════════════════╗
-║      Feature Flag 系 统 (92 个全开 + 31 GrowthBook tengu flags)  ║
-╚═════════════════════════════════════════════════════════════════╝
-```
-
----
-
-## 🆕 超级助手 — 数字生命体
+## 3. 超级助手 — 数字生命体
 
 > "越用越了解你的贴身助理。白天人来接管，夜间 AI 自主整理所有数据资产。"
-> 
-> **注**：README 中"超级助手命令"章节（`/dream`, `/assistant` 等）是超级助手的交互入口，
+>
+> **注**：第 2 章"超级助手命令"（`/dream`, `/assistant` 等）是超级助手的交互入口，
 > 原 v2.1.92 "私人助手"已整合为统一体系。
 
-### 五层记忆系统
+<details>
+<summary>展开查看完整功能</summary>
+
+### 3.1 五层记忆系统
 
 | 层        | 功能          | 自动维护        | 存储             |
 | -------- | ----------- | ----------- | -------------- |
@@ -366,7 +387,7 @@ EOF
 | **程序记忆** | 行为模式 + 工作流  | ✅ 行为学习      | procedural/    |
 | **前瞻记忆** | 预测 + 建议     | ✅ 感知引擎      | working/       |
 
-### 主动交互能力（双层架构）
+### 3.2 主动交互能力（双层架构）
 
 超级助手的主动交互分为**主动层**（后台定时推送）和**被动层**（对话回合后检查）：
 
@@ -450,15 +471,15 @@ EOF
 |------|------|--------|
 | **系统通知** | macOS: osascript / Windows: BurntToast / Linux: notify-send | 默认开启 |
 | **对话内注入** | 全平台 | 被动层自动注入 |
-| **Webhook** | 全平台（微信/Telegram/飞书 Bot 等） | 见 [配置参考 → proactive.json](#proactivejson--主动推送配置) |
+| **Webhook** | 全平台（微信/Telegram/飞书 Bot 等） | 见 [1.4 配置参考 → proactive.json](#proactivejson--主动推送配置) |
 | **Channel 队列** | 全平台 | `~/.pandacc/channels/outbox/notifications.jsonl` |
 
-#### ⚠️ 隐私敏感场景
+#### 隐私敏感场景
 
 涉及邮件、通讯录、浏览历史、即时消息、通知中心、屏幕时间、IM 平台等 **29 个**敏感场景**默认全部关闭**。
 需用户在 `~/.pandacc/config/proactive.json` 中显式开启。
 
-> 详见下方 **[配置参考 → proactive.json](#proactivejson--主动推送配置)** 的 `enabledScenarios` 字段。
+> 详见上方 **[1.4 配置参考 → proactive.json](#proactivejson--主动推送配置)** 的 `enabledScenarios` 字段。
 
 #### 基础设施
 
@@ -468,7 +489,7 @@ EOF
 - **跨平台抽象层**：`src/proactive/platform.ts` 统一封装磁盘/内存/网络/电池/空闲时间获取
 - **可配置阈值**：`~/.pandacc/config/proactive.json` 覆盖所有默认阈值
 
-### 数据连接器
+### 3.3 数据连接器
 
 | 连接器   | 命令 / 触发方式             | 数据源                          | 隐私过滤   |
 | ----- | ---------------------- | ---------------------------- | ------ |
@@ -477,7 +498,7 @@ EOF
 | 笔记    | `panda notes search`   | Apple Notes SQLite           | ✅      |
 | 剪贴板   | 自动捕获                   | pbpaste + 敏感过滤               | ✅ 密钥过滤 |
 
-### 非编码场景
+### 3.4 非编码场景
 
 ```bash
 # 写作助理（/write skill）
@@ -493,7 +514,7 @@ EOF
 /learn plan "学习 Rust"
 ```
 
-### 感知引擎
+### 3.5 感知引擎
 
 | 维度       | 数据源                  | 输出                              |
 | -------- | -------------------- | ------------------------------- |
@@ -509,7 +530,23 @@ EOF
 - `inline`：对话内注入系统消息（上下文压力/重复模式）
 - `statusLine`：终端状态栏标记
 
-### 隐私铁律
+### 3.6 IM Connector 系统（6 平台）
+
+v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
+
+| 平台 | 模式 | 说明 |
+|------|------|------|
+| 飞书 | MCP / API | 需 App ID/Secret，推荐 MCP 模式 |
+| 钉钉 | MCP / API | 需 App Key/Secret，支持日历/任务/通知模块 |
+| Slack | API | 需 Bot Token（`xoxb-xxx`）或 `SLACK_TOKEN` 环境变量 |
+| 微信 | 企业微信 API / 本地 DB | 企微需 Corp ID；本地 DB 需 SQLCipher 解密密钥 |
+| Telegram | API | 需 @BotFather 获取的 Bot Token |
+| Teams | API | 需 Azure AD Tenant ID + Client ID/Secret |
+
+- **配置**: 编辑 `~/.pandacc/config/connectors.json`，详见 [1.4 配置参考 → connectors.json](#connectorsjson--im-平台连接器)
+- **关联场景**: 配置连接器后可启用 `im-unread-digest`、`im-daily-brief`、`im-calendar-sync`、`im-approval-alert`、`im-document-update`、`im-reverse-push` 等 6 个 IM 聚合场景
+
+### 3.7 隐私铁律
 
 ```
 1. 全本地采集和索引 — 数据永不离开设备（除用户主动对话）
@@ -519,9 +556,134 @@ EOF
 5. 数据可导出 — 全部 Markdown + SQLite，Git 可追踪
 ```
 
+</details>
+
 ---
 
-## 🆕 contextCollapse — 零 API 调用的上下文折叠
+## 4. 治理能力
+
+Panda Code 内置了 11 项治理能力。
+
+<details>
+<summary>展开查看 11 项治理能力</summary>
+
+### 4.1 自动生效（零配置）
+
+| 能力                   | 触发时机                                                                                      | 用户感知                                   |
+| -------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------- |
+| **危险命令拦截**           | AI 执行 `rm -rf /`、`git reset --hard`、`git push --force`、`chmod -R 777`、fork bomb 等 7 种危险模式 | 自动拦截，弹出 `⚠️ Dangerous: ...` 确认提示       |
+| **Completion Guard** | AI 纯文本声称"任务已完成"但无工具调用或测试证据                                                                | 自动要求补充验证证据（最多 2 次）                     |
+| **Finding Closure**  | AI 声称完成但回复中含未关闭的 TODO/FIXME/HACK                                                          | 自动要求先关闭所有 findings                     |
+| **Anti-Slop 审查**     | AI 回复过度 emoji（≥8种）、重复段落、或超长空洞文本                                                           | 自动要求精简，给出代码/路径                         |
+| **子 Agent 上下文注入**    | 每次 Agent 工具 spawn 子 agent                                                                 | 子 agent 自动获得 CLAUDE.md 核心规范（前 2500 字符） |
+| **能力优先调度**           | 未指定 `subagent_type` 的 Agent 调用                                                            | 搜索类→Explore agent，规划类→Plan agent       |
+| **任务分类引擎**           | 每轮对话首条用户消息                                                                                | 后台分类（`PANDA_DEBUG=1` 可见），为后续扩展预留       |
+| **进化写回**             | turnCount > 3 且有成功工具调用                                                                    | 调试日志记录工具名列表，预留经验沉淀入口                   |
+
+### 4.2 Patterns/Scars 经验记忆
+
+在项目 memory 目录下创建 `.md` 文件，下次对话自动加载到上下文：
+
+```bash
+# 记录成功模式
+cat > ~/.claude/projects/<项目slug>/memory/patterns/api-error-handling.md << 'EOF'
+---
+name: API 错误处理模式
+description: 第三方 API 返回 404 时优先检查请求 body 兼容性
+type: pattern
+---
+第三方 API 返回 404 时，优先检查请求 body 中是否包含
+Anthropic 专有参数（如 metadata），而不是先怀疑认证问题。
+EOF
+
+# 记录失败教训
+cat > ~/.claude/projects/<项目slug>/memory/scars/blind-debugging.md << 'EOF'
+---
+name: 盲目追症状的教训
+description: 排查问题应先审查 git diff 而不是加调试日志
+type: scar
+---
+遇到"之前能用现在不能用"的问题，第一步 git diff 审查近期变更。
+EOF
+```
+
+### 4.3 执行流
+
+```
+用户输入 → 任务分类 → AI 响应
+                        │
+                        ├─ BashTool → 危险命令拦截 → ⚠️ 确认
+                        ├─ AgentTool → 能力优先调度 → 自动选型
+                        │              └─ 子Agent上下文注入 → CLAUDE.md
+                        └─ 纯文本回复
+                              ├─ Completion Guard → 无证据？→ 要求补充
+                              │   └─ Finding Closure → 有TODO？→ 要求关闭
+                              ├─ Anti-Slop → 废话？→ 要求精简
+                              └─ 进化写回 → 日志记录
+```
+
+</details>
+
+---
+
+## 5. 系统架构
+
+<details>
+<summary>展开查看架构图</summary>
+
+### 系统架构图
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     终 端 渲 染 层 (Ink/React)                   │
+│   REPL 交互 │ 权限提示 │ 消息渲染 │ Logo │ 快捷键 │ 补全        │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+┌─────────────────────────────┴───────────────────────────────────┐
+│                     核 心 对 话 循 环                             │
+│  query.ts │ QueryEngine.ts │ 会话管理 │ 压缩/恢复               │
+└──────────────┬──────────────────────────────┬───────────────────┘
+               │                              │
+┌──────────────┴──────────────┐ ┌─────────────┴───────────────────┐
+│      工 具 系 统 (59个)      │ │       API / Provider 层          │
+│  BashTool │ AgentTool       │ │  Anthropic │ Bedrock │ Vertex   │
+│  SleepTool │ MonitorTool    │ │  Foundry │ DeepSeek │ Kimi     │
+│  SnipTool │ WorkflowTool   │ │  Qwen │ MiniMax │ GLM │ 火山   │
+└──────────────┬──────────────┘ └─────────────┬───────────────────┘
+               │                              │
+┌──────────────┴──────────────────────────────┴───────────────────┐
+│                    服 务 与 基 础 设 施 层                        │
+│  MCP │ OAuth │ Plugins │ Hooks │ SessionMemory │ Privacy       │
+│  Compact │ Skills │ LSP │ Cron │ PolicyLimits │ Persona       │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                  私 人 助 手 系 统 (v2.1.92 新增)                 │
+│  autoDream │ KAIROS │ Proactive │ NightMode │ Mood │ Sense    │
+│  Coordinator │ Buddy │ Brief │ Persona │ Memory │ Dream     │
+└─────────────────────────────────────────────────────────────────┘
+
+╔═════════════════════════════════════════════════════════════════╗
+║      Feature Flag 系 统 (92 个全开 + 31 GrowthBook tengu flags)  ║
+╚═════════════════════════════════════════════════════════════════╝
+```
+
+### Cache Token 显示
+
+支持所有主流第三方 API 的 prompt cache 命中显示：
+
+| Provider                | Cache 字段                              | 自动/手动 |
+| ----------------------- | ------------------------------------- | ----- |
+| Anthropic               | `cache_read_input_tokens`             | 自动    |
+| OpenAI / Mistral / 火山引擎 | `prompt_tokens_details.cached_tokens` | 自动    |
+| DeepSeek                | `prompt_cache_hit_tokens`             | 自动    |
+| Groq                    | `input_tokens_details.cached_tokens`  | 自动    |
+| Kimi / GLM / MiniMax    | `usage.cached_tokens`                 | 自动    |
+| OpenRouter              | 透传 + `cache_write_tokens`             | 自动    |
+
+查看 cache 命中：`/stats` 命令中 `Cache: N` 字段。调试：`DEBUG_CACHE=1 panda`。
+
+### contextCollapse — 零 API 调用的上下文折叠
 
 长对话场景下，消息膨胀逼近上下文窗口上限。contextCollapse 在 autocompact **之前**运行，通过纯本地操作增量折叠旧消息，零额外 token 消耗。
 
@@ -532,7 +694,7 @@ EOF
 | 信息损失   | 全量压缩，不可逆       | 按 span 折叠，可恢复    |
 | 粒度     | 全部消息           | 按 4-15 条消息的 span |
 
-### 启用方式
+**启用方式**：
 
 ```bash
 # 环境变量
@@ -541,7 +703,7 @@ PANDA_CONTEXT_COLLAPSE=1 panda
 # 或 settings.json（feature flag CONTEXT_COLLAPSE 已启用）
 ```
 
-### 工作原理
+**工作原理**：
 
 1. **每次查询前**自动检查 token 使用量
 2. 超过 60% 阈值时扫描**最旧的消息**，识别可安全折叠的 span
@@ -549,19 +711,19 @@ PANDA_CONTEXT_COLLAPSE=1 panda
 4. 用摘要占位符替代原始消息，原始消息归档在内存中
 5. API 413 时触发**紧急排水**，放宽折叠条件
 
-### 折叠策略
+**折叠策略**：
 
 **安全折叠（低风险）**：已完成的工具调用对、短对话、距当前 ≥10 轮的历史
 
 **不折叠（高风险）**：最近 5 轮、系统消息、文件编辑操（Edit/Write）、未完成工具调用
 
-### 查看状态
+**查看状态**：
 
 ```
 /context    — 显示折叠统计（collapsedSpans, stagedSpans）
 ```
 
-### 与 autocompact 的关系
+**与 autocompact 的关系**：
 
 ```
 query() 执行顺序：
@@ -571,184 +733,41 @@ query() 执行顺序：
   ④ 若 413 → contextCollapse.recoverFromOverflow() → 重试
 ```
 
----
-
-## 配置参考
-
-所有配置文件位于 `~/.pandacc/config/` 目录，JSON 格式，不存在时使用默认值。
-
-### settings.json — 全局设置
-
-```json
-// ~/.pandacc/settings.json
-{
-  "enableModelRouting": true,          // Multi-Model Agent Routing
-  "routingPresets": {                   // 路由预设
-    "cost-saving": { "agentModelMap": { "Explore": "haiku", "Plan": "sonnet" } }
-  },
-  "privacyEnhanced": true,             // 隐私增强模式（非 Anthropic 渠道自动启用）
-  "autoMemoryEnabled": true             // 自动记忆系统
-}
-```
-
-### proactive.json — 主动推送配置
-
-```json
-// ~/.pandacc/config/proactive.json
-{
-  // ── 通知渠道 ──
-  "webhookUrl": "https://your-bot.example.com/notify",  // Webhook 推送（微信/Telegram Bot 等）
-
-  // ── 阈值自定义（可选，不设则用默认值） ──
-  "diskFreePercent": 10,        // 磁盘可用百分比告警线
-  "diskFreeGB": 20,             // 磁盘可用 GB 告警线
-  "memoryUsedPercent": 85,      // 内存使用百分比告警线
-  "batteryLowPercent": 20,      // 低电量告警线
-  "networkLatencyMs": 500,      // 网络延迟告警线 (ms)
-  "networkLossPercent": 30,     // 网络丢包告警线
-  "downloadsFileCount": 50,     // 下载目录文件数告警线
-  "desktopFileCount": 30,       // 桌面文件数告警线
-  "gitUncommittedHours": 3,     // Git 未提交告警 (小时)
-  "gitBranchStaleDays": 7,     // Git 分支过期 (天)
-  "noBreakMinutes": 90,         // 持续工作无休息告警 (分钟)
-  "lateNightStartHour": 23,    // 深夜关怀起始时
-  "lateNightEndHour": 5,       // 深夜关怀结束时
-  "sshKeyMaxDays": 365,        // SSH key 轮换告警 (天)
-  "sslCertWarnDays": 30,       // SSL 证书到期告警 (天)
-
-  // ── ⚠️ 敏感场景开关（默认全部关闭，必须显式设为 true 才启用） ──
-  "enabledScenarios": {
-    // 邮件（读取 Mail.app/Outlook 邮件数据库，macOS 需 FDA）
-    "email-flagged-reminder": false,   // 星标/待办邮件提醒
-    "email-unread-important": false,   // 重要未读邮件
-    "email-unreplied": false,          // 48h 未回复邮件
-    "email-daily-digest": false,       // 邮件每日摘要
-    // 通讯录（读取 Contacts.app，macOS AppleScript 首次弹窗授权）
-    "contact-birthday": false,         // 联系人生日提醒
-    // 即时消息
-    "slack-unread": false,             // Slack 未读（需 SLACK_TOKEN）
-    // 浏览器（读取 Chrome SQLite）
-    "browser-knowledge-cards": false,  // 高频页面知识卡片
-    "bookmark-cleanup": false,         // 书签整理建议
-    "reading-list-overflow": false,    // 阅读列表过长
-    // 笔记（读取 Apple Notes SQLite，macOS 需 FDA）
-    "notes-digest": false,             // 笔记汇总
-    // 屏幕时间（macOS 读取 knowledgeC.db 需 FDA）
-    "screen-time-stats": false,        // 屏幕时间统计
-    // 安全（读取文件内容做扫描）
-    "sensitive-file-scan": false,      // 敏感文件暴露扫描
-    "duplicate-file-scan": false,      // 重复文件检测
-    // 财务
-    "cloud-billing-alert": false,      // 云服务账单（需 AWS/GCP 凭据）
-    // 系统通知中心（macOS 需 FDA，Windows 无需额外权限）
-    "notification-digest": false,      // 通知日频简报
-    "notification-urgent": false,      // 紧急通知实时转发
-    "notification-stats": false,       // 通知统计趋势
-    // IM 平台（需配置 connectors.json）
-    "wechat-messages": false,          // 微信消息（企微API或本地DB解密）
-    "feishu-messages": false,          // 飞书消息（需 App ID/Secret）
-    "dingtalk-messages": false,        // 钉钉消息（需 App Key/Secret）
-    // IM 聚合场景
-    "im-unread-digest": false,         // 跨平台未读汇总
-    "im-daily-brief": false,           // 每日 IM 简报
-    "im-calendar-sync": false,         // 跨平台日历冲突
-    "im-approval-alert": false,        // 待审批催办
-    "im-document-update": false,       // 关注文档更新
-    "im-reverse-push": false           // 反向推送到 IM 平台
-  }
-}
-```
-
-> **⚠️ 重要隐私说明**：上述 `enabledScenarios` 中的场景涉及读取邮件、通讯录、浏览历史、即时消息等**高度敏感的个人数据**。这些场景**默认全部关闭**，Panda Code 不会在未经授权的情况下读取任何个人隐私数据。用户必须**手动编辑配置文件并显式设为 `true`** 才会启用对应的数据采集。所有数据仅在用户本机处理，永不上传。
-
-### privacy.json — 隐私排除规则
-
-```json
-// ~/.pandacc/config/privacy.json
-{
-  "excludePaths": ["~/.ssh/**", "~/.gnupg/**", "~/.aws/**", "**/node_modules/**"],
-  "excludeApps": ["1Password", "Keychain Access"],
-  "excludeBrowserDomains": ["*.bank.*", "*.gov"],
-  "sensitivePatterns": ["password", "secret", "api[._-]?key", "token", "sk-"],
-  "dataRetentionDays": 90
-}
-```
-
-### connectors.json — IM 平台连接器
-
-```json
-// ~/.pandacc/config/connectors.json
-{
-  "feishu": {
-    "enabled": false,
-    "mode": "mcp",                          // mcp（推荐）| api
-    "appId": "cli_xxx",                     // 飞书开放平台 App ID
-    "appSecret": "keychain:feishu-secret",  // 建议存 Keychain
-    "mcpCommand": "npx @anthropic-ai/mcp feishu-mcp"  // MCP 模式启动命令
-  },
-  "dingtalk": {
-    "enabled": false,
-    "mode": "mcp",                          // mcp（推荐）| api
-    "appKey": "xxx",                        // 钉钉开放平台 App Key
-    "appSecret": "keychain:dingtalk-secret",
-    "mcpProfiles": "calendar,department,tasks,notice"  // 启用的 MCP 功能模块
-  },
-  "slack": {
-    "enabled": false,
-    "token": "xoxb-xxx"                     // Slack Bot Token（或设 SLACK_TOKEN 环境变量）
-  },
-  "telegram": {
-    "enabled": false,
-    "botToken": "123456:ABC-DEF..."         // @BotFather 获取的 Bot Token
-  },
-  "wechat": {
-    "enabled": false,
-    "mode": "wecom",                        // wecom（企业微信API）| local-db（本地解密）
-    // ── 企业微信模式 ──
-    "corpId": "ww_xxx",                     // 企业 ID
-    "agentId": "1000002",                   // 应用 Agent ID
-    "secret": "keychain:wecom-secret",      // 应用 Secret
-    // ── 本地 DB 模式（需解密密钥，见"系统授权与数据解密指南"） ──
-    "dbKey": ""                             // 32 字节 hex 解密密钥
-  },
-  "teams": {
-    "enabled": false,
-    "tenantId": "Azure AD 租户 ID",
-    "clientId": "应用客户端 ID",
-    "clientSecret": "keychain:teams-secret"
-  }
-}
-```
-
-### dates.json — 自定义纪念日
-
-```json
-// ~/.pandacc/config/dates.json
-[
-  { "name": "结婚纪念日", "date": "06-15" },
-  { "name": "妈妈生日", "date": "09-22" }
-]
-```
-
-### habits.json — 习惯打卡
-
-```json
-// ~/.pandacc/config/habits.json
-[
-  { "name": "运动", "frequency": "daily" },
-  { "name": "阅读", "frequency": "daily", "target": "30min" }
-]
-```
+</details>
 
 ---
 
-## ⚠️ 系统授权与数据解密指南
+## 6. 隐私与安全
+
+### 6.1 隐私保护
+
+所有渠道均可启用隐私增强模式（配置 `privacyEnhanced: true` 或使用 `/privacy` 命令）。非 Anthropic 渠道自动启用。
+
+| 防护层                | 内容                                                                  | 状态  |
+| ------------------ | ------------------------------------------------------------------- | --- |
+| 遥测拦截               | 1104 个 logEvent 调用点全部拦截                                             | 自动  |
+| API Body 脱敏        | `metadata` 中 device_id/session_id/account_uuid 替换为合规格式固定值；第三方完全不发送  | 自动  |
+| HTTP Header 脱敏     | X-Claude-Code-Session-Id 替换为固定 UUID；第三方不发送 x-app/session-id         | 自动  |
+| Datadog 禁用         | `trackDatadogEvent` + `initializeDatadog` 完全禁用                      | 自动  |
+| BigQuery 禁用        | `doExport` 完全禁用，不向 `api.anthropic.com/api/claude_code/metrics` 发送数据 | 自动  |
+| 1P Event Logger 脱敏 | userId/email/org 替换为固定脱敏值（`cc4all@gmail.com`）                       | 自动  |
+| GrowthBook 脱敏      | 用户属性 id/deviceID/sessionId 替换为固定值，移除 org/account/email              | 自动  |
+| UA 规范化             | 精简为 `claude-code/{version}`，不泄露设备信息                                 | 自动  |
+| 独立存储               | `~/.pandacc/` 独立空间，不与原版 claude 混用                                   | 自动  |
+| OAuth              | 隐私模式下不额外请求 Profile                                                  | 自动  |
+
+查看当前隐私状态：`/privacy`
+
+### 6.2 系统授权与数据解密指南
 
 超级助手的部分高级感知能力需要**系统级权限授权**或**数据解密操作**。以下按平台分别说明。所有操作均为**一次性**，授权后永久生效。
 
-### macOS 系统授权
+<details>
+<summary>展开查看各平台授权步骤</summary>
 
-#### 1. 通知中心感知（Full Disk Access）
+#### macOS 系统授权
+
+**1. 通知中心感知（Full Disk Access）**
 
 通知中心数据库受 macOS TCC 保护（macOS Sequoia 15+ / Tahoe 26+），需要授予终端 **完全磁盘访问权限**。
 
@@ -777,7 +796,7 @@ sqlite3 ~/Library/Group\ Containers/group.com.apple.usernoted/db2/db "SELECT COU
 | Sequoia (15) ~ Tahoe (26) | `~/Library/Group Containers/group.com.apple.usernoted/db2/db` |
 | High Sierra ~ Ventura (10.13~13) | `$(getconf DARWIN_USER_DIR)/com.apple.notificationcenter/db2/db` |
 
-#### 2. 日历/通讯录/邮件读取
+**2. 日历/通讯录/邮件读取**
 
 首次读取时 macOS 会弹出系统授权对话框，点击"允许"即可：
 
@@ -788,11 +807,11 @@ sqlite3 ~/Library/Group\ Containers/group.com.apple.usernoted/db2/db "SELECT COU
 | 邮件 | `email-*` 系列场景 | Mail.app SQLite 需 FDA（同上第 1 步） |
 | Apple Notes | `notes-digest` | Apple Notes SQLite 需 FDA |
 
-#### 3. 微信本地数据库解密（可选，高级）
+**3. 微信本地数据库解密（可选，高级）**
 
 微信 4.x 的本地数据库使用 **SQLCipher 4** 加密。如需读取聊天记录、通讯录等数据，需要提取解密密钥。
 
-**⚠️ 风险说明**：此操作涉及从微信进程内存中提取加密密钥，属于灰色地带。仅限用户本机使用，数据不出设备。
+> ⚠️ **风险说明**：此操作涉及从微信进程内存中提取加密密钥，属于灰色地带。仅限用户本机使用，数据不出设备。
 
 **微信 4.x 数据库结构**（macOS 路径）：
 ```
@@ -849,9 +868,9 @@ sqlite3 ~/Library/Group\ Containers/group.com.apple.usernoted/db2/db "SELECT COU
    panda  # 启动后在对话中询问"检查微信数据连接"
    ```
 
-### Windows 系统授权
+#### Windows 系统授权
 
-#### 1. 通知中心感知
+**1. 通知中心感知**
 
 Windows 通知数据库无需特殊权限，位于当前用户目录下可直接读取：
 
@@ -861,7 +880,7 @@ Windows 通知数据库无需特殊权限，位于当前用户目录下可直接
 
 **注意**：Windows 的通知在用户清除后**立即从数据库删除**。Panda Code 会每 5 分钟轮询捕获新通知并本地持久化，但无法恢复已清除的历史通知。
 
-#### 2. 邮件/日历/通讯录
+**2. 邮件/日历/通讯录**
 
 Windows 平台通过 **Outlook COM 接口** 或 **Microsoft Graph API** 读取：
 
@@ -883,7 +902,7 @@ Windows 平台通过 **Outlook COM 接口** 或 **Microsoft Graph API** 读取�
 }
 ```
 
-#### 3. 微信本地数据库解密（Windows）
+**3. 微信本地数据库解密（Windows）**
 
 Windows 微信数据库路径：
 ```
@@ -904,13 +923,13 @@ Windows 微信数据库路径：
 
 3. **配置**：同 macOS，写入 `connectors.json` 的 `wechat.dbKey` 字段。
 
-### Linux 说明
+#### Linux
 
 - **通知**：通过 D-Bus 实时监听（`org.freedesktop.Notifications`），无需特殊权限
 - **微信**：Linux 版微信功能有限，建议使用企业微信 API 或 Webhook 方案
 - **邮件**：通过 IMAP 协议配置（写入 connectors.json）
 
-### IM 平台连接器授权
+#### IM 平台授权
 
 | 平台 | 授权方式 | 配置位置 |
 |------|---------|---------|
@@ -928,32 +947,42 @@ Windows 微信数据库路径：
 
 Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Service 读取。
 
+</details>
 
 ---
 
+## 7. 跨平台支持
 
-> 本手册基于 v2.5.1 实机 PTY 验证，覆盖 **85+ 个命令** + Phase 1-5 全部新增能力 + v2.5 超级助手/IM Connector/主动推送 71 场景。
->
-> 最后更新: 2026-04-08 · 显示版本: v2.5.1 · 基线: Claude Code v2.1.92
+| 平台      | 状态   | 说明                                  |
+| ------- | ---- | ----------------------------------- |
+| macOS   | 完整支持 | Keychain 存储、osascript 集成            |
+| Windows | 完整支持 | PowerShell 自动检测、git-bash Shell、路径转换 |
+| Linux   | 完整支持 | 标准 POSIX 环境                         |
+| WSL     | 完整支持 | 自动检测 WSL 环境                         |
 
 ---
 
-## 命令状态图例
+## 8. 命令使用手册
+
+> 本手册基于 v2.5.7 实机 PTY 验证，覆盖 **85+ 个命令** + Phase 1-5 全部新增能力 + v2.5 超级助手/IM Connector/主动推送 71 场景。
+
+<details>
+<summary>展开查看完整手册（85+ 命令）</summary>
+
+### 命令状态图例
 
 | 标记 | 含义 |
 |------|------|
 | ✅ | 已验证正常工作 |
-| 🆕 | v2.5.1 新增/增强 |
+| 🆕 | v2.5 新增/增强 |
 | 🔒 | 需要特定认证（Claude.ai 订阅/消费者账户） |
 | ⚠️ | 功能受限或有已知问题 |
 | 🔧 | 需要特定环境（Feature Flag / 硬件 / 平台） |
 | 🚫 | 存根/内部命令，不可用 |
 
----
+### 速查表（按使用频率排列）
 
-## 速查表（按使用频率排列）
-
-### 每日必用
+#### 每日必用
 
 | 命令 | 别名 | 一句话说明 | 状态 |
 |------|------|-----------|------|
@@ -966,7 +995,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
 | `/dream` | | 记忆整合 — 四阶段巩固 | 🆕✅ |
 | `/exit` | `/quit` | 退出 REPL | ✅ |
 
-### 高频使用
+#### 高频使用
 
 | 命令 | 别名 | 一句话说明 | 状态 |
 |------|------|-----------|------|
@@ -979,7 +1008,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
 | `/proactive` | | 切换主动自主模式 | 🆕✅ |
 | `/context` | | 可视化上下文使用情况 | ✅ |
 
-### v2.5 新增
+#### v2.5 新增
 
 | 命令 | 别名 | 一句话说明 | 状态 |
 |------|------|-----------|------|
@@ -987,215 +1016,201 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
 | `/capture` | | 快速捕获想法到工作目录 | 🆕✅ |
 | `/learn` | | 学习助理 — 闪卡/复习/学习路径 | 🆕✅ |
 
----
+### 一、基础控制命令
 
-## 一、基础控制命令
-
-### `/help`
+#### `/help`
 - **用法**: `/help`
 - **说明**: 显示交互式帮助界面，包含所有可用命令和快捷键
-- **实测**: ✅ 显示 Panda Code v2.5.1 帮助信息
+- **实测**: ✅ 显示 Panda Code v2.5.7 帮助信息
 
-### `/exit` (别名: `/quit`)
+#### `/exit` (别名: `/quit`)
 - **用法**: `/exit`
 - **说明**: 退出 REPL，等同于按 `Ctrl+D`
 
-### `/clear` (别名: `/reset`, `/new`)
+#### `/clear` (别名: `/reset`, `/new`)
 - **用法**: `/clear`
 - **说明**: 清除对话历史并释放上下文，相当于开始新对话
 - **技巧**: 对话过长导致回复质量下降时使用
 
-### `/version`
+#### `/version`
 - **用法**: `/version`
 - **说明**: 显示当前版本和构建时间
-- **实测**: ✅ 输出 `2.5.1 (Panda Code)`
+- **实测**: ✅ 输出 `2.5.7 (Panda Code)`
 
-### `/status`
+#### `/status`
 - **用法**: `/status`
 - **说明**: 显示完整状态信息（版本、Session ID、工作目录、模型、认证方式、API URL）
 - **技巧**: 排查问题时首先运行此命令
 
----
+### 二、对话管理命令
 
-## 二、对话管理命令
-
-### `/compact`
+#### `/compact`
 - **用法**: `/compact [自定义摘要指令]`
 - **说明**: 压缩对话历史但保留摘要在上下文中
 - **技巧**:
   - 上下文接近满时自动提醒，此时用 `/compact` 可继续长任务
   - 可传自定义指令：`/compact 重点保留架构决策和代码路径`
 
-### `/copy`
+#### `/copy`
 - **用法**: `/copy [N]`
 - **说明**: 复制最后一条回复到系统剪贴板，`/copy 3` 复制倒数第3条
 
-### `/export`
+#### `/export`
 - **用法**: `/export [filename]`
 - **说明**: 导出当前对话到文件或剪贴板（JSON/Markdown/剪贴板）
 
-### `/resume` (别名: `/continue`)
+#### `/resume` (别名: `/continue`)
 - **用法**: `/resume [conversation_id 或搜索词]`
 - **说明**: 从历史会话中搜索并恢复
 - **技巧**: 可用关键词搜索历史会话，如 `/resume 修复bug`
 
-### `/branch` (别名: `/fork` [条件性])
+#### `/branch` (别名: `/fork` [条件性])
 - **用法**: `/branch [name]`
 - **说明**: 在当前对话节点创建分支，探索不同方案
 
-### `/rewind` (别名: `/checkpoint`)
+#### `/rewind` (别名: `/checkpoint`)
 - **用法**: `/rewind`
 - **说明**: 将代码和/或对话回退到之前的节点
 - **技巧**: AI 改错了代码？`/rewind` 立即回退
 
-### `/tag`
+#### `/tag`
 - **用法**: `/tag <tag-name>`
 - **说明**: 为当前会话添加/移除可搜索标签
 
-### `/rename`
+#### `/rename`
 - **用法**: `/rename [name]`
 - **说明**: 重命名当前对话
 
-### `/btw`
+#### `/btw`
 - **用法**: `/btw <问题>`
 - **说明**: 快速插问，不打断主对话上下文
 
----
+### 三、代码操作命令
 
-## 三、代码操作命令
-
-### `/commit`
+#### `/commit`
 - **用法**: `/commit`
 - **说明**: 分析 git diff，自动生成符合项目风格的 commit message 并提交
 - **技巧**: Undercover 模式下自动屏蔽内部信息
 
-### `/commit-push-pr` (别名: `/cpp`)
+#### `/commit-push-pr` (别名: `/cpp`)
 - **用法**: `/commit-push-pr`
 - **说明**: 一键完成 commit → push → 创建 PR
 
-### `/diff`
+#### `/diff`
 - **用法**: `/diff`
 - **说明**: 显示 `git diff HEAD` 和每轮对话的代码变更
 
-### `/review`
+#### `/review`
 - **用法**: `/review [PR number]`
 - **说明**: 审查 Pull Request，无 PR 编号时列出 open PRs
 
-### `/pr-comments` (别名: `/pr_comments`)
+#### `/pr-comments` (别名: `/pr_comments`)
 - **用法**: `/pr-comments [PR number]`
 - **说明**: 获取 GitHub PR 的所有评论并总结
 
-### `/security-review`
+#### `/security-review`
 - **用法**: `/security-review`
 - **说明**: 对待提交变更做安全审查
 - **技巧**: 上线前必做，检查 XSS/注入/敏感信息泄露
 
-### `/ultrareview`
+#### `/ultrareview`
 - **用法**: `/ultrareview`
 - **说明**: 深度审查（约 10-20 分钟），自动化 bug 查找
 
----
+### 四、模型与推理命令
 
-## 四、模型与推理命令
-
-### `/model`
+#### `/model`
 - **用法**: `/model [model_name]`
 - **说明**: 切换 AI 模型
 - **可选**: `opus`（最强）、`sonnet`（日常推荐）、`haiku`（最快）
 - **技巧**: 复杂架构设计用 Opus，日常编码用 Sonnet，快速查询用 Haiku
 
-### `/effort`
+#### `/effort`
 - **用法**: `/effort [low|medium|high|max|auto]`
 - **说明**: 调节模型推理深度
 - **技巧**: 简单任务用 `low` 节省 token
 
-### `/fast`
+#### `/fast`
 - **用法**: `/fast [on|off]`
 - **说明**: 切换高速模式（Opus 4.6 专用）
 - **条件**: 🔒 需要 Claude.ai 订阅
 
-### `/advisor`
+#### `/advisor`
 - **用法**: `/advisor [model_name]`
 - **说明**: 配置顾问模型（辅助主模型决策）
 
-### `/torch`
+#### `/torch`
 - **用法**: `/torch`
 - **说明**: Torch 模式 — 增强模型推理过程可见性
 
----
+### 五、配置设置命令
 
-## 五、配置设置命令
-
-### `/config` (别名: `/settings`)
+#### `/config` (别名: `/settings`)
 - **用法**: `/config`
 - **说明**: 打开交互式配置面板
 
-### `/theme`
+#### `/theme`
 - **用法**: `/theme`
 - **说明**: 选择终端配色主题
 
-### `/color`
+#### `/color`
 - **用法**: `/color <color|default>`
 - **说明**: 设置本次会话提示栏颜色
 - **技巧**: 多窗口工作时用不同颜色区分
 
-### `/vim`
+#### `/vim`
 - **用法**: `/vim`
 - **说明**: 切换 Vim/普通编辑模式
 
-### `/keybindings`
+#### `/keybindings`
 - **用法**: `/keybindings`
 - **说明**: 打开快捷键配置文件
 
-### `/language`
+#### `/language`
 - **用法**: `/language [en|zh|...]`
 - **说明**: 切换界面语言
 
-### `/persona`
+#### `/persona`
 - **用法**: `/persona [模式]`
 - **说明**: 切换人格模式
 - **模式**: `work`（专业）、`companion`（陪伴）、`study`（学习）、`creative`（创意）、`butler`（管家）
 - 🆕 **Sense Pipeline 联动**: auto 模式下根据时间/mood/活动自动切换
 
-### `/privacy`
+#### `/privacy`
 - **用法**: `/privacy`
 - **说明**: 查看隐私状态
 
-### `/sandbox`
+#### `/sandbox`
 - **用法**: `/sandbox`
 - **说明**: 配置 Bash 命令沙盒模式
 
-### `/statusline`
+#### `/statusline`
 - **用法**: `/statusline`
 - **说明**: 设置状态栏 UI 显示
 
----
+### 六、工具与权限命令
 
-## 六、工具与权限命令
-
-### `/permissions` (别名: `/allowed-tools`)
+#### `/permissions` (别名: `/allowed-tools`)
 - **用法**: `/permissions`
 - **说明**: 管理 Allow/Ask/Deny 工具权限规则
 - **技巧**: 可配置 Bash 正则，如允许 `git *` 但拒绝 `rm -rf *`
 
-### `/mcp`
+#### `/mcp`
 - **用法**: `/mcp [enable|disable server-name]`
 - **说明**: 管理 MCP 服务器扩展
 - 🆕 MCP 工具结果上限提升至 **500K 字符**（原 100K）
 
-### `/hooks`
+#### `/hooks`
 - **用法**: `/hooks`
 - **说明**: 查看工具事件钩子配置
 
-### `/tasks` (别名: `/bashes`)
+#### `/tasks` (别名: `/bashes`)
 - **用法**: `/tasks`
 - **说明**: 列出和管理后台任务
 
----
+### 七、超级助手系统（v2.5 数字生命体）
 
-## 七、🆕 超级助手系统（v2.5 数字生命体）
-
-### `/dream` 🆕
+#### `/dream` 🆕
 - **用法**: `/dream`
 - **说明**: 手动触发记忆整合 — 四阶段流程
 - **四阶段**: Orient(盘点) → Gather(采集) → Consolidate(整合) → Prune(裁剪)
@@ -1205,7 +1220,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
   - 包含 Phase 3.5 情绪记忆扫描
   - MEMORY.md 保持 ≤200 行 / 25KB
 
-### `/assistant` 🆕
+#### `/assistant` 🆕
 - **用法**: `/assistant`
 - **说明**: 启用 KAIROS 助手模式 — 激活主动引擎 + 定时任务
 - **效果**:
@@ -1214,7 +1229,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
   - 启动 builtinTasks（dream/briefing/health）
 - **技巧**: 长时间工作时开启，AI 会在空闲时自动整理记忆
 
-### `/proactive` 🆕
+#### `/proactive` 🆕
 - **用法**: `/proactive [on|off]`
 - **说明**: 切换主动自主模式 — v2.5 扩展为 **71 个主动推送场景**
 - **核心内置任务**:
@@ -1224,33 +1239,33 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
 - **v2.5 场景覆盖**: 系统健康(3) + 开发者(10) + 文件管理(6) + 个人生活(3) + 效率(4) + 高级系统(5) + 扩展(8) + 知识(8) + 生活(8) = **55 个非敏感场景**（默认开启）+ **16 个敏感场景**（需 `proactive.json` 显式开启）
 - **技巧**: 配合 `/night-mode` 实现全天候自主工作；敏感场景配置详见本手册"七、主动推送系统"章节
 
-### `/night-mode` 🆕
+#### `/night-mode` 🆕
 - **用法**: `/night-mode`
 - **说明**: 夜间自主模式（22:00-06:00）
 - **编排器**: 顺序执行启用任务，5 分钟节流，单任务失败不阻塞后续
 - **技巧**: 适合离开电脑时让 AI 自动整理记忆和检查代码
 
-### `/buddy`
+#### `/buddy`
 - **用法**: `/buddy [show|hide|mute|unmute|info]`
 - **说明**: 编程伙伴 — 可交互的熊猫伙伴
 
-### `/brief`
+#### `/brief`
 - **用法**: `/brief [on|off]`
 - **说明**: 简报模式 — AI 只输出简洁摘要
 
-### `/write` 🆕
+#### `/write` 🆕
 - **用法**: `/write outline <topic>` / `/write compile <dir>`
 - **说明**: 写作助理 — 生成大纲或编译 Markdown 写作项目
 - **示例**:
   - `/write outline "AI个人助理的未来"` — 生成结构化大纲
   - `/write compile ~/manuscript/` — 编译目录下所有 Markdown 为统一文稿
 
-### `/capture` 🆕
+#### `/capture` 🆕
 - **用法**: `/capture <text>`
 - **说明**: 快速捕获想法到 `working/inbox/` 目录，自动按 PARA 方法论分类
 - **示例**: `/capture "想到一个架构思路：用事件驱动替代轮询"`
 
-### `/learn` 🆕
+#### `/learn` 🆕
 - **用法**: `/learn from <file>` / `/learn review` / `/learn plan <topic>`
 - **说明**: 学习助理 — 从文件生成闪卡、间隔重复复习（FSRS 算法）、学习路径规划
 - **示例**:
@@ -1258,11 +1273,11 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
   - `/learn review` — 开始间隔重复复习
   - `/learn plan "学习 Rust"` — 生成学习路径
 
-### 🆕 主动推送系统（v2.5 新增 — 71 场景）
+#### 主动推送系统（v2.5 新增 — 71 场景）
 
 v2.5 将主动推送从 3 个内置任务扩展为 **71 个场景**，分为非敏感（默认开启）和敏感（默认关闭）两类。
 
-#### 非敏感场景（默认开启）
+**非敏感场景（默认开启）**
 
 | 分类 | 场景数 | 示例 |
 |------|--------|------|
@@ -1276,7 +1291,7 @@ v2.5 将主动推送从 3 个内置任务扩展为 **71 个场景**，分为非�
 | 知识 | 8 | 浏览器知识卡、书签整理、闪卡复习、RSS、笔记汇总 |
 | 生活 | 8 | 倒计时、备份、屏幕时间、会议占比 |
 
-#### 敏感场景（默认关闭，需 proactive.json 开启）
+**敏感场景（默认关闭，需 proactive.json 开启）**
 
 | 分类 | 场景数 | 需要的授权 |
 |------|--------|-----------|
@@ -1286,7 +1301,7 @@ v2.5 将主动推送从 3 个内置任务扩展为 **71 个场景**，分为非�
 | IM 聚合 | 6 | 需配置 `connectors.json` |
 | 浏览器/笔记/屏幕 | 6 | 部分需 FDA |
 
-#### 激活方式
+**激活方式**
 
 ```
 /proactive        # 激活主动推送
@@ -1294,9 +1309,9 @@ v2.5 将主动推送从 3 个内置任务扩展为 **71 个场景**，分为非�
 /night-mode       # 夜间自主模式（22:00-06:00）
 ```
 
-- **技巧**: 配置文件 `~/.pandacc/config/proactive.json` 可自定义所有阈值和敏感场景开关，详见 README 配置参考章节。
+- **技巧**: 配置文件 `~/.pandacc/config/proactive.json` 可自定义所有阈值和敏感场景开关，详见 [1.4 配置参考](#14-配置参考)。
 
-### 🆕 IM Connector 系统（v2.5 新增 — 6 平台）
+#### IM Connector 系统（v2.5 新增 — 6 平台）
 
 v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
@@ -1309,52 +1324,50 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | Telegram | API | 需 @BotFather 获取的 Bot Token |
 | Teams | API | 需 Azure AD Tenant ID + Client ID/Secret |
 
-- **配置**: 编辑 `~/.pandacc/config/connectors.json`，详见 README [connectors.json 章节](README.md)
+- **配置**: 编辑 `~/.pandacc/config/connectors.json`，详见 [1.4 配置参考 → connectors.json](#connectorsjson--im-平台连接器)
 - **关联场景**: 配置连接器后可启用 `im-unread-digest`、`im-daily-brief`、`im-calendar-sync`、`im-approval-alert`、`im-document-update`、`im-reverse-push` 等 6 个 IM 聚合场景
 
-### 🆕 Mood 检测（自动）
+#### Mood 检测（自动）
 - **无需命令** — 每条用户消息自动分析情绪
 - **6 类情绪**: neutral / focused / frustrated / curious / satisfied / urgent
 - **中英双语**: 支持中英文关键词匹配
 - **5 分钟衰减**: 无强信号时自动回归 neutral
 - **联动**: persona 自动切换 + dream 上下文注入
 
-### 🆕 Memory 持久化（自动）
+#### Memory 持久化（自动）
 - **emotionalMemory**: 情绪事件记录，JSON 持久化，LRU 100 条
 - **workingMemory**: 键值对工作记忆，JSON 持久化，LRU 50 条，TTL 24h
 - **存储路径**: `~/.pandacc/assistant/emotional-memory.json` / `working-memory.json`
 
----
+### 八、Agent 与协作
 
-## 八、Agent 与协作
-
-### `/agents`
+#### `/agents`
 - **用法**: `/agents`
 - **说明**: 管理自定义 Agent 配置
 
-### `/plan`
+#### `/plan`
 - **用法**: `/plan [open|描述]`
 - **说明**: 启用计划模式
 - **技巧**: 强烈推荐复杂任务先用计划模式
 
-### `/fork`
+#### `/fork`
 - **用法**: `/fork <任务描述>`
 - **说明**: 派生后台子 Agent 并行执行
 
-### `/workflows`
+#### `/workflows`
 - **用法**: `/workflows`
 - **说明**: 列出和管理工作流脚本
 
-### `/skills`
+#### `/skills`
 - **用法**: `/skills`
 - **说明**: 列出所有可用技能
 
-### 🆕 Coordinator 多 Agent 模式
+#### Coordinator 多 Agent 模式
 - **启用**: `CLAUDE_CODE_COORDINATOR_MODE=1`
 - **说明**: 多智能体协作模式，自动分配 worker agent
 - **Worker**: 具有完整工具权限的通用 worker
 
-### 🆕 Multi-Model Agent Routing
+#### Multi-Model Agent Routing
 - **启用**: `PANDA_MODEL_ROUTING=1` 或 settings.json `enableModelRouting: true`
 - **说明**: 不同 agent 使用不同模型，按能力路由，版本无关
 - **命令**: `/routing [status|preset <name>|test <agent> <prompt>]`
@@ -1376,103 +1389,93 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
   - 自定义别名通过 `customModelAliases` 配置
   - 路由默认关闭（`enableModelRouting: false`），不影响现有行为
 
----
+### 九、插件与扩展
 
-## 九、插件与扩展
-
-### `/plugin` (别名: `/plugins`, `/marketplace`)
+#### `/plugin` (别名: `/plugins`, `/marketplace`)
 - **用法**: `/plugin`
 - **说明**: 浏览、安装、配置插件市场（138+ 插件）
 
-### `/reload-plugins`
+#### `/reload-plugins`
 - **用法**: `/reload-plugins`
 - **说明**: 热重载插件变更，无需重启
 
----
+### 十、信息查询命令
 
-## 十、信息查询命令
-
-### `/context`
+#### `/context`
 - **用法**: `/context`
 - **说明**: 以彩色网格可视化上下文使用情况
 
-### `/files`
+#### `/files`
 - **用法**: `/files`
 - **说明**: 列出当前上下文中的所有文件
 
-### `/doctor`
+#### `/doctor`
 - **用法**: `/doctor`
 - **说明**: 诊断并验证安装和配置
 - **技巧**: 排障首选
 
-### `/cost`
+#### `/cost`
 - **用法**: `/cost`
 - **说明**: 显示当前会话总花费和持续时间
 
-### `/usage`
+#### `/usage`
 - **用法**: `/usage`
 - **说明**: 显示套餐用量限额
 
-### `/stats`
+#### `/stats`
 - **用法**: `/stats`
 - **说明**: 显示使用统计（月度热力图 + token 统计）
 
-### `/insights`
+#### `/insights`
 - **用法**: `/insights`
 - **说明**: 生成会话分析报告
 
-### `/memory`
+#### `/memory`
 - **用法**: `/memory`
 - **说明**: 编辑记忆文件（auto-memory/project memory/user memory）
 
----
+### 十一、远程与连接命令
 
-## 十一、远程与连接命令
-
-### `/remote-control` (别名: `/rc`)
+#### `/remote-control` (别名: `/rc`)
 - **用法**: `/remote-control`
 - **说明**: 连接终端进行远程控制会话
 
-### `/session` (别名: `/remote`)
+#### `/session` (别名: `/remote`)
 - **用法**: `/session`
 - **说明**: 显示远程会话 URL 和二维码
 
-### `/mobile` (别名: `/ios`, `/android`)
+#### `/mobile` (别名: `/ios`, `/android`)
 - **用法**: `/mobile`
 - **说明**: 显示移动应用下载二维码
 
-### `/desktop` (别名: `/app`)
+#### `/desktop` (别名: `/app`)
 - **用法**: `/desktop`
 - **说明**: 在 Claude Desktop 中继续当前会话
 
-### `/chrome`
+#### `/chrome`
 - **用法**: `/chrome`
 - **说明**: Chrome 扩展设置 (Beta)
 
----
+### 十二、初始化与安装
 
-## 十二、初始化与安装
-
-### `/init`
+#### `/init`
 - **用法**: `/init`
 - **说明**: 初始化 CLAUDE.md 项目记忆文件
 - **技巧**: 新项目首先运行
 
-### `/terminal-setup`
+#### `/terminal-setup`
 - **用法**: `/terminal-setup`
 - **说明**: 安装 Shift+Enter 换行键绑定
 
-### `/release-notes`
+#### `/release-notes`
 - **用法**: `/release-notes`
 - **说明**: 查看版本发布说明
 
-### `/add-dir`
+#### `/add-dir`
 - **用法**: `/add-dir <path>`
 - **说明**: 添加新工作目录
 
----
-
-## 十三、Ant-Only 高级命令
+### 十三、Ant-Only 高级命令
 
 > 以下命令原为 Anthropic 内部专用，已在 Panda Code 中全部启用。
 
@@ -1487,9 +1490,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `/heapdump` | JS 堆转储到 ~/Desktop | ✅ |
 | `/voice` | 语音输入输出 | 🔒 需 Claude.ai |
 
----
-
-## 十四、不可用的存根命令
+### 十四、不可用的存根命令
 
 > 原版 Claude Code 发布时已替换为存根（源码不在 npm 包中），无法使用。
 
@@ -1508,11 +1509,9 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 **反向禁用**: `/feedback`（ant 内部渠道）、`/peers`（UDS_INBOX 未启用）
 
----
+### 十五、环境变量参考
 
-## 十五、🆕 环境变量参考
-
-### Panda Code 专属
+#### Panda Code 专属
 
 | 环境变量 | 默认 | 说明 |
 |---------|------|------|
@@ -1521,7 +1520,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `PANDA_NO_AUTO_COLLAPSE` | 未设置 | 设为 `1` 禁止 Read/Grep 结果自动折叠 |
 | `PANDA_SHOW_DEVBAR` | 未设置 | 设为 `1` 在非 dev 构建中显示 DevBar |
 
-### 功能控制
+#### 功能控制
 
 | 环境变量 | 默认 | 说明 |
 |---------|------|------|
@@ -1530,7 +1529,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | `1` | 禁用非必要网络流量（遥测/分析/GrowthBook） |
 | `CLAUDE_INTERNAL_FC_OVERRIDES` | 自动设置 | GrowthBook Feature Flag 覆盖（31+ tengu flags） |
 
-### API 配置
+#### API 配置
 
 | 环境变量 | 说明 |
 |---------|------|
@@ -1539,9 +1538,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `ANTHROPIC_MODEL` | 默认模型 |
 | `ANTHROPIC_SMALL_FAST_MODEL` | 快速模型 |
 
----
-
-## 十六、Feature Flag 对照表
+### 十六、Feature Flag 对照表
 
 | Feature Flag | 控制的命令/功能 | 状态 |
 |-------------|----------------|------|
@@ -1564,9 +1561,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `PROACTIVE_SCENARIOS` | 主动推送 71 场景 | ✅ 已启用 |
 | `NOTIFICATION_CENTER` | 系统通知中心感知 | ✅ 已启用 |
 
----
-
-## 十七、快捷键速查
+### 十七、快捷键速查
 
 | 快捷键 | 功能 |
 |--------|------|
@@ -1585,9 +1580,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `@` | 文件路径自动补全 |
 | `&` | 后台运行（加在命令末尾） |
 
----
-
-## 十八、工作流建议
+### 十八、工作流建议
 
 | 场景 | 推荐流程 |
 |------|---------|
@@ -1602,7 +1595,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | **记忆整理** | `/dream` 手动整合 or `/proactive` 自动定时 |
 | **多 Agent** | `CLAUDE_CODE_COORDINATOR_MODE=1` → 自动分配 worker |
 
-### 常见问题
+#### 常见问题
 
 | 问题 | 解决方案 |
 |------|---------|
@@ -1616,9 +1609,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | Read/Grep 结果被折叠 | `PANDA_NO_AUTO_COLLAPSE=1` |
 | 安全限制阻碍研究 | `PANDA_SECURITY_RESEARCH=1` |
 
----
-
-## 十九、🆕 v2.5.1 新增能力总览
+### 十九、v2.5 新增能力总览
 
 | 能力 | 来源 | 说明 |
 |------|------|------|
@@ -1642,6 +1633,8 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | IM Connector 6 平台 | v2.5 | 飞书/钉钉/Slack/微信/Telegram/Teams |
 | 系统通知中心感知 | v2.5 | macOS SQLite + Windows wpndb，3 场景 |
 | IM 主动推送 6 场景 | v2.5 | 未读汇总/日报/日历同步/审批/文档/反向推送 |
+
+</details>
 
 ---
 
