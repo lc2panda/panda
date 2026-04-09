@@ -171,7 +171,7 @@ export const DESKTOP = join(HOME, 'Desktop')
 
 // ─── 首次启动目录初始化 ───
 
-import { mkdirSync } from 'fs'
+import { mkdirSync, writeFileSync, existsSync } from 'fs'
 
 const PANDACC_DIRS = [
   '.pandacc/config',
@@ -196,10 +196,53 @@ let _dirsEnsured = false
  * 幂等操作，首次调用时创建，后续跳过。
  * 由 proactive 激活时调用，也可在启动时调用。
  */
+// 首次安装时生成的默认配置文件（仅文件不存在时写入）
+const DEFAULT_CONFIG_FILES: Record<string, string> = {
+  '.pandacc/config/proactive.json': JSON.stringify({
+    diskFreePercent: 10, diskFreeGB: 20, memoryUsedPercent: 85,
+    batteryLowPercent: 20, networkLatencyMs: 500, networkLossPercent: 30,
+    downloadsFileCount: 50, desktopFileCount: 30,
+    gitUncommittedHours: 3, gitBranchStaleDays: 7,
+    noBreakMinutes: 90, lateNightStartHour: 23, lateNightEndHour: 5,
+    sshKeyMaxDays: 365, sslCertWarnDays: 30,
+    enabledScenarios: {},
+  }, null, 2),
+  '.pandacc/config/privacy.json': JSON.stringify({
+    excludePaths: ['~/.ssh/**', '~/.gnupg/**', '~/.aws/**', '**/node_modules/**'],
+    excludeApps: ['1Password', 'Keychain Access'],
+    excludeBrowserDomains: ['*.bank.*', '*.gov'],
+    sensitivePatterns: ['password', 'secret', 'api[._-]?key', 'token', 'sk-'],
+    dataRetentionDays: 90,
+  }, null, 2),
+  '.pandacc/config/connectors.json': JSON.stringify({
+    feishu: { enabled: false, mode: 'mcp', appId: '', appSecret: '' },
+    dingtalk: { enabled: false, mode: 'mcp', appKey: '', appSecret: '' },
+    slack: { enabled: false, token: '' },
+    telegram: { enabled: false, botToken: '' },
+    wechat: { enabled: false, mode: 'local-db', keysFile: '' },
+    teams: { enabled: false, tenantId: '', clientId: '', clientSecret: '' },
+  }, null, 2),
+  '.pandacc/config/dates.json': '[]',
+  '.pandacc/config/habits.json': '[]',
+  '.pandacc/config/wechat-keywords.json': '["合同", "截止", "紧急", "上线", "发版"]',
+  '.pandacc/config/wechat-vip.json': '[]',
+  '.pandacc/config/wechat-topics.json': '[]',
+}
+
 export function ensurePandaccDirs(): void {
   if (_dirsEnsured) return
   _dirsEnsured = true
+  // 创建目录
   for (const sub of PANDACC_DIRS) {
     try { mkdirSync(join(HOME, sub), { recursive: true }) } catch {}
+  }
+  // 生成默认配置文件（仅首次，不覆盖已有）
+  for (const [relPath, content] of Object.entries(DEFAULT_CONFIG_FILES)) {
+    const fullPath = join(HOME, relPath)
+    try {
+      if (!existsSync(fullPath)) {
+        writeFileSync(fullPath, content, 'utf-8')
+      }
+    } catch {}
   }
 }
