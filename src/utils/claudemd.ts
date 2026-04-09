@@ -158,8 +158,7 @@ const TEXT_FILE_EXTENSIONS = new Set([
   '.ps1',
   '.bat',
   '.cmd',
-  // Config
-  '.env',
+  // Config (NOTE: .env excluded — sensitive secrets risk via @include injection)
   '.ini',
   '.cfg',
   '.conf',
@@ -350,6 +349,13 @@ function parseMemoryFileContent(
   const ext = extname(filePath).toLowerCase()
   if (ext && !TEXT_FILE_EXTENSIONS.has(ext)) {
     logForDebugging(`Skipping non-text file in @include: ${filePath}`)
+    return { info: null, includePaths: [] }
+  }
+
+  // Block .env files (.env, .env.local, .env.production, etc.) — secrets leak risk
+  const fileBasename = basename(filePath)
+  if (fileBasename === '.env' || fileBasename.startsWith('.env.')) {
+    logForDebugging(`Blocking .env file in @include (secrets risk): ${filePath}`)
     return { info: null, includePaths: [] }
   }
 

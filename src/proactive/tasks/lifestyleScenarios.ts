@@ -580,6 +580,219 @@ const appleCertExpiry: SmartCronTask = {
   },
 }
 
+// ─── 健康趋势分析 ───
+
+const healthTrend: SmartCronTask = {
+  id: 'health-trend',
+  description: '健康趋势分析 · Health trend analysis (Apple Health)',
+  cron: '0 21 * * *',
+  priority: 'normal',
+  enabled: true,
+  condition: () => isScenarioEnabled('health-trend'),
+  skipIf: () => !IS_MAC,
+  action: async () => {
+    logForDebugging('[lifestyleScenarios] health-trend: analyzing Apple Health data')
+    try {
+      if (!IS_MAC) return
+
+      const { existsSync, readFileSync } = require('fs')
+      const { join } = require('path')
+      const { execSync } = require('child_process')
+
+      // Apple Health 数据通过 HealthKit 导出或 shortcuts 获取
+      // 方案 1: 检查用户导出的 Health 数据 (export.xml)
+      const healthExportPath = join(HOME, 'Documents', 'apple_health_export', 'export.xml')
+      // 方案 2: 使用 Shortcuts 命令行接口获取步数等基本指标
+      let stepCount = 0
+      let sleepHours = 0
+      let heartRateAvg = 0
+      let dataSource = ''
+
+      // 尝试通过 shortcuts 运行预置快捷指令获取今日步数
+      try {
+        const raw: string = execSync(
+          `shortcuts run "Get Today Steps" 2>/dev/null || echo ""`,
+          { encoding: 'utf-8', timeout: 15000 },
+        )
+        const parsed = parseInt(raw.trim(), 10)
+        if (!isNaN(parsed) && parsed > 0) {
+          stepCount = parsed
+          dataSource = 'Shortcuts'
+        }
+      } catch {}
+
+      // 降级：从 knowledgeC.db 获取活动数据
+      if (stepCount === 0) {
+        try {
+          const knowledgeDbPath = join(HOME, 'Library', 'Application Support', 'Knowledge', 'knowledgeC.db')
+          if (existsSync(knowledgeDbPath)) {
+            const raw: string = execSync(
+              `sqlite3 "${knowledgeDbPath}" "SELECT ZSTREAMNAME, SUM(ZNUMBEROFSTEPS) FROM ZOBJECT WHERE ZSTREAMNAME = '/activity/steps' AND date(ZCREATIONDATE + 978307200, 'unixepoch', 'localtime') >= date('now', '-7 days', 'localtime') GROUP BY ZSTREAMNAME;" 2>/dev/null`,
+              { encoding: 'utf-8', timeout: 10000 },
+            )
+            if (raw.trim()) {
+              const parts = raw.trim().split('|')
+              const weeklySteps = parseInt(parts[1] || '0', 10)
+              stepCount = Math.round(weeklySteps / 7) // 日均
+              dataSource = 'knowledgeC.db'
+            }
+          }
+        } catch {}
+      }
+
+      // 降级：从 Health 导出 XML 获取最近数据
+      if (stepCount === 0 && existsSync(healthExportPath)) {
+        try {
+          // 只读取文件末尾以获取最近记录（文件可能很大）
+          const raw: string = execSync(
+            `tail -200 "${healthExportPath}" | grep "StepCount" | tail -1`,
+            { encoding: 'utf-8', timeout: 10000 },
+          )
+          const valueMatch = raw.match(/value="(\d+)"/)
+          if (valueMatch) {
+            stepCount = parseInt(valueMatch[1], 10)
+            dataSource = 'export.xml'
+          }
+        } catch {}
+      }
+
+      if (stepCount === 0 && sleepHours === 0) {
+        logForDebugging('[lifestyleScenarios] health-trend: 无法获取健康数据（需配置 Shortcuts 或导出 Health 数据）')
+        return
+      }
+
+      const insights: string[] = []
+      if (stepCount > 0) {
+        insights.push(`日均步数: ${stepCount.toLocaleString()} 步`)
+        if (stepCount < 5000) {
+          insights.push('⚠️ 步数偏低，建议增加日常活动量')
+        } else if (stepCount >= 10000) {
+          insights.push('✅ 步数达标，运动量充足')
+        }
+      }
+
+      if (insights.length === 0) return
+
+      pushNotification({
+        type: 'info',
+        title: '❤️ 健康趋势',
+        body: `${insights.join('\n')}\n\n数据来源: ${dataSource}`,
+        channel: 'system',
+      })
+
+      logForDebugging(`[lifestyleScenarios] health-trend: steps=${stepCount} source=${dataSource}`)
+    } catch (e) {
+      logForDebugging(`[lifestyleScenarios] health-trend failed: ${(e as Error).message}`)
+    }
+  },
+}
+
+// ─── 财务异常检测 ───
+
+const financeAnomaly: SmartCronTask = {
+  id: 'finance-anomaly',
+  description: '财务异常检测 · Finance anomaly detection',
+  cron: '0 20 * * *',
+  priority: 'critical',
+  enabled: true,
+  condition: () => isScenarioEnabled('finance-anomaly'),
+  action: async () => {
+    logForDebugging('[lifestyleScenarios] finance-anomaly: checking for anomalies')
+    try {
+      const { existsSync, readFileSync } = require('fs')
+      const { join } = require('path')
+
+      // 读取用户配置的财务记录路径
+      const configPath = join(HOME, '.pandacc', 'config', 'finance.json')
+      if (!existsSync(configPath)) {
+        logForDebugging('[lifestyleScenarios] finance-anomaly: finance.json 不存在')
+        return
+      }
+
+      const config = JSON.parse(readFileSync(configPath, 'utf-8'))
+      const {
+        csvPath,
+        monthlyBudget = 10000,
+        alertThresholdPercent = 80,
+        largeTransactionAmount = 1000,
+      } = config as {
+        csvPath?: string
+        monthlyBudget?: number
+        alertThresholdPercent?: number
+        largeTransactionAmount?: number
+      }
+
+      // 支持 CSV 交易记录文件
+      if (!csvPath || !existsSync(csvPath)) {
+        logForDebugging('[lifestyleScenarios] finance-anomaly: 交易记录 CSV 路径未配置或不存在')
+        return
+      }
+
+      const csvContent = readFileSync(csvPath, 'utf-8')
+      const lines = csvContent.trim().split('\n')
+      if (lines.length < 2) return // 只有 header
+
+      // 解析最近 30 天交易
+      const now = Date.now()
+      const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
+      let monthlyTotal = 0
+      const largeTransactions: Array<{ date: string; amount: number; desc: string }> = []
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+        if (cols.length < 3) continue
+
+        // 假设格式: date, description, amount (负数=支出)
+        const dateStr = cols[0]
+        const desc = cols[1]
+        const amount = Math.abs(parseFloat(cols[2]) || 0)
+
+        const txDate = new Date(dateStr)
+        if (isNaN(txDate.getTime())) continue
+        if (txDate.getTime() < thirtyDaysAgo) continue
+
+        monthlyTotal += amount
+        if (amount >= largeTransactionAmount) {
+          largeTransactions.push({ date: dateStr, amount, desc })
+        }
+      }
+
+      const alerts: string[] = []
+
+      // 预算预警
+      const budgetUsed = Math.round((monthlyTotal / monthlyBudget) * 100)
+      if (budgetUsed >= alertThresholdPercent) {
+        alerts.push(`月度支出已达预算 ${budgetUsed}%（¥${monthlyTotal.toFixed(0)} / ¥${monthlyBudget}）`)
+      }
+
+      // 大额交易
+      if (largeTransactions.length > 0) {
+        const details = largeTransactions
+          .slice(0, 5)
+          .map(t => `  • ${t.date} ¥${t.amount.toFixed(0)} ${t.desc}`)
+          .join('\n')
+        alerts.push(`${largeTransactions.length} 笔大额交易（≥¥${largeTransactionAmount}）：\n${details}`)
+      }
+
+      if (alerts.length === 0) {
+        logForDebugging(`[lifestyleScenarios] finance-anomaly: 月度支出 ¥${monthlyTotal.toFixed(0)}，无异常`)
+        return
+      }
+
+      pushNotification({
+        type: 'warning',
+        title: '💰 财务异常',
+        body: alerts.join('\n\n'),
+        channel: 'system',
+      })
+
+      logForDebugging(`[lifestyleScenarios] finance-anomaly: total=¥${monthlyTotal.toFixed(0)}, ${largeTransactions.length} large txns`)
+    } catch (e) {
+      logForDebugging(`[lifestyleScenarios] finance-anomaly failed: ${(e as Error).message}`)
+    }
+  },
+}
+
 // ─── 导出 ───
 
 export function getLifestyleTasks(): SmartCronTask[] {
@@ -592,5 +805,7 @@ export function getLifestyleTasks(): SmartCronTask[] {
     meetingTimeRatio,
     cloudBillingAlert,
     appleCertExpiry,
+    healthTrend,
+    financeAnomaly,
   ]
 }

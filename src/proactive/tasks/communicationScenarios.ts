@@ -591,6 +591,78 @@ const emailDailyDigest: SmartCronTask = {
   },
 }
 
+// ─── B9: iMessage 未读消息 ───
+
+const imessageUnread: SmartCronTask = {
+  id: 'imessage-unread',
+  description: 'iMessage 未读消息 · iMessage unread messages',
+  cron: '*/15 * * * *',
+  priority: 'normal',
+  enabled: true,
+  condition: () => isScenarioEnabled('imessage-unread'),
+  skipIf: () => !IS_MAC,
+  action: async () => {
+    logForDebugging('[communicationScenarios] imessage-unread: checking unread iMessages')
+    try {
+      if (!IS_MAC) return
+
+      const { existsSync } = require('fs')
+      const { join } = require('path')
+      const { execSync } = require('child_process')
+
+      const chatDbPath = join(HOME, 'Library', 'Messages', 'chat.db')
+      if (!existsSync(chatDbPath)) {
+        logForDebugging('[communicationScenarios] imessage-unread: chat.db 不存在')
+        return
+      }
+
+      // 查询未读消息数量及最近的发送者
+      let unreadCount = 0
+      let recentSenders: string[] = []
+
+      try {
+        const countRaw: string = execSync(
+          `sqlite3 "${chatDbPath}" "SELECT COUNT(*) FROM message WHERE is_read = 0 AND is_from_me = 0 AND date > (strftime('%s','now','-24 hours') - 978307200) * 1000000000;" 2>/dev/null`,
+          { encoding: 'utf-8', timeout: 10000 },
+        )
+        unreadCount = parseInt(countRaw.trim(), 10) || 0
+      } catch {
+        logForDebugging('[communicationScenarios] imessage-unread: 未读计数查询失败（可能需要全盘访问权限）')
+        return
+      }
+
+      if (unreadCount === 0) {
+        logForDebugging('[communicationScenarios] imessage-unread: 无未读消息')
+        return
+      }
+
+      // 获取最近 5 个发送者
+      try {
+        const sendersRaw: string = execSync(
+          `sqlite3 "${chatDbPath}" "SELECT DISTINCT h.id FROM message m JOIN handle h ON m.handle_id = h.ROWID WHERE m.is_read = 0 AND m.is_from_me = 0 AND m.date > (strftime('%s','now','-24 hours') - 978307200) * 1000000000 ORDER BY m.date DESC LIMIT 5;" 2>/dev/null`,
+          { encoding: 'utf-8', timeout: 10000 },
+        )
+        recentSenders = sendersRaw.trim().split('\n').filter(Boolean)
+      } catch {}
+
+      let body = `你有 ${unreadCount} 条未读 iMessage 消息`
+      if (recentSenders.length > 0) {
+        body += `\n最近来自：${recentSenders.join(', ')}`
+      }
+
+      pushNotification({
+        type: 'info',
+        title: '💬 iMessage 未读',
+        body,
+        channel: 'system',
+      })
+      logForDebugging(`[communicationScenarios] imessage-unread: ${unreadCount} unread from ${recentSenders.length} senders`)
+    } catch (e) {
+      logForDebugging(`[communicationScenarios] imessage-unread failed: ${(e as Error).message}`)
+    }
+  },
+}
+
 // ─── 导出 ───
 
 export function getCommunicationTasks(): SmartCronTask[] {
@@ -603,5 +675,6 @@ export function getCommunicationTasks(): SmartCronTask[] {
     emailUnreplied,
     contactBirthday,
     emailDailyDigest,
+    imessageUnread,
   ]
 }
