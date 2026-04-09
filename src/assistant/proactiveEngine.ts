@@ -1,18 +1,20 @@
 // Input: 对话上下文（消息列表、回合数、会话开始时间）
 // Output: 主动建议列表 ProactiveSuggestion[]，格式化为系统消息
 // Pos: assistant/ 主动交互引擎（被动层），由 stopHooks 在每轮结束后调用
-//      主动层（时间驱动）在 proactive/builtinTasks.ts 中：日历提醒、Git 提醒、画像过期
+//      主动层（时间驱动）在 proactive/builtinTasks.ts 中：日历提醒、Git 提醒、画像过期、前瞻扫描
+//      检查器 6 桥接主动层通知到被动层（pending-notifications）
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
 
 import { join } from 'path'
-import { readFileSync, statSync } from 'fs'
+import { existsSync, readFileSync, statSync } from 'fs'
+import { homedir } from 'os'
 
 // ═══════════════════════════════════════════════════════════════════
 // SA-P4: 主动交互引擎——零 API 调用，纯本地条件检测
 // ═══════════════════════════════════════════════════════════════════
 
 export interface ProactiveSuggestion {
-  type: 'reminder' | 'insight' | 'alert' | 'tip'
+  type: 'reminder' | 'insight' | 'alert' | 'tip' | 'pending-notifications'
   priority: 'low' | 'medium' | 'high'
   message: string
   source: string // 触发来源
@@ -40,6 +42,7 @@ export async function checkProactiveSuggestions(context: {
     () => _checkMorningBriefing(),
     () => _checkContextPressure(context),
     () => _checkRepetitivePattern(context),
+    () => _checkPendingNotifications(),
   ]
 
   for (const checker of checkers) {
@@ -239,4 +242,28 @@ function _checkRepetitivePattern(context: {
     // 消息格式异常
   }
   return null
+}
+
+// ─── 检查器 6: 未读通知消费（主动层 → 被动层桥接） ───
+
+function _checkPendingNotifications(): ProactiveSuggestion | null {
+  try {
+    const notifPath = join(homedir(), '.pandacc', 'channels', 'outbox', 'notifications.jsonl')
+    if (!existsSync(notifPath)) return null
+    const lines = readFileSync(notifPath, 'utf-8').trim().split('\n').filter(Boolean)
+    // 只看最近 1 小时的未读通知
+    const cutoff = Date.now() - 3600000
+    const recent = lines
+      .map(l => { try { return JSON.parse(l) } catch { return null } })
+      .filter((n: any) => n && n.timestamp && new Date(n.timestamp).getTime() > cutoff && !n.displayed)
+      .slice(-3)
+
+    if (recent.length === 0) return null
+    return {
+      type: 'pending-notifications',
+      message: `\u{1F4EC} ${recent.length} 条未读通知: ${recent.map((n: any) => n.title || n.message?.slice(0, 30)).join(', ')}`,
+      priority: 'medium',
+      source: 'pending_notifications',
+    }
+  } catch { return null }
 }

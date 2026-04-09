@@ -304,6 +304,30 @@ export async function saveEpisodicMemory(sessionSummary: string, opts?: {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// 前瞻记忆 (Prospective Memory)
+// ═══════════════════════════════════════════════════════════════════
+
+export function saveProspectiveMemory(content: string): void {
+  try {
+    const memDir = getAutoMemPath()
+    if (!memDir) return
+    const dir = join(memDir, 'dreams', 'prospective')
+    mkdirSync(dir, { recursive: true })
+    const date = new Date().toISOString().split('T')[0]
+    const filePath = join(dir, `${date}.md`)
+    const frontmatter = [
+      '---',
+      'type: prospective',
+      `date: ${date}`,
+      `generated: ${new Date().toISOString()}`,
+      '---',
+      '',
+    ].join('\n')
+    writeFileSync(filePath, frontmatter + content, 'utf-8')
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // 记忆访问时间更新 (P1-7)
 // ═══════════════════════════════════════════════════════════════════
 
