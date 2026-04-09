@@ -18,7 +18,7 @@
 ```
 
 **项目代号**：Panda Code
-**版本**：v2.5.7（基线 Claude Code v2.1.92）
+**版本**：v2.6.0（基线 Claude Code v2.1.92）
 **技术栈**：Bun + TypeScript + React/Ink + Commander.js
 **运行时**：Bun >= 1.2.0 / Node.js >= 18.0.0
 
@@ -160,6 +160,21 @@ panda auth login
     "notification-stats": false,       // 通知统计趋势
     // IM 平台（需配置 connectors.json）
     "wechat-messages": false,          // 微信消息（企微API或本地DB解密）
+    // 微信全态势感知（14 场景，需配置 connectors.json 微信密钥）
+    "wechat-daily-situational": false, // 每日全态势报告（22:00）
+    "wechat-mention-alert": false,     // @提及实时告警（10分钟）
+    "wechat-keyword-monitor": false,   // 关键词监控（15分钟）
+    "wechat-unreplied-reminder": false, // 未回复提醒（3小时）
+    "wechat-group-digest": false,      // 群聊摘要（12/18:00）
+    "wechat-contact-insights": false,  // 联系人洞察（周五）
+    "wechat-noise-filter": false,      // 噪音过滤建议（周日）
+    "wechat-sentiment-pulse": false,   // 情感脉搏（21:00）
+    "wechat-weekly-trend": false,      // 周度趋势（周五）
+    "wechat-monthly-report": false,    // 月度深度分析（1号）
+    "wechat-quarterly-review": false,  // 季度复盘（季首月）
+    "wechat-yearly-digest": false,     // 年度总结（12/31）
+    "wechat-relationship-health": false, // 关系健康度（周日）
+    "wechat-topic-tracker": false,     // 话题追踪（6小时）
     "feishu-messages": false,          // 飞书消息（需 App ID/Secret）
     "dingtalk-messages": false,        // 钉钉消息（需 App Key/Secret）
     // IM 聚合场景
@@ -215,13 +230,12 @@ panda auth login
   },
   "wechat": {
     "enabled": false,
-    "mode": "wecom",                        // wecom（企业微信API）| local-db（本地解密）
-    // ── 企业微信模式 ──
-    "corpId": "ww_xxx",                     // 企业 ID
-    "agentId": "1000002",                   // 应用 Agent ID
-    "secret": "keychain:wecom-secret",      // 应用 Secret
-    // ── 本地 DB 模式（需解密密钥，见"系统授权与数据解密指南"） ──
-    "keysFile": "/path/to/wechat_keys.json" // wechat-db-decrypt-macos 导出的密钥文件
+    "mode": "local-db",                     // local-db（推荐）| wecom（企业微信）
+    "keysFile": "/path/to/wechat_keys.json", // wechat-db-decrypt-macos 导出的密钥文件
+    // ── 企业微信模式（mode=wecom 时使用）──
+    "corpId": "",
+    "agentId": "",
+    "secret": "keychain:wecom-secret"
   },
   "teams": {
     "enabled": false,
@@ -249,6 +263,30 @@ panda auth login
 [
   { "name": "运动", "frequency": "daily" },
   { "name": "阅读", "frequency": "daily", "target": "30min" }
+]
+```
+
+#### wechat-keywords.json — 微信关键词监控
+
+```json
+// ~/.pandacc/config/wechat-keywords.json
+["合同", "截止", "紧急", "bug", "上线", "发版", "付款", "会议"]
+```
+
+#### wechat-vip.json — 微信重要联系人
+
+```json
+// ~/.pandacc/config/wechat-vip.json
+["老板的备注名", "客户A", "项目经理"]
+```
+
+#### wechat-topics.json — 微信话题追踪
+
+```json
+// ~/.pandacc/config/wechat-topics.json
+[
+  { "topic": "项目上线", "keywords": ["上线", "发版", "部署", "发布"] },
+  { "topic": "客户反馈", "keywords": ["客户", "反馈", "投诉", "建议"] }
 ]
 ```
 
@@ -476,7 +514,7 @@ panda auth login
 
 #### 隐私敏感场景
 
-涉及邮件、通讯录、浏览历史、即时消息、通知中心、屏幕时间、IM 平台等 **29 个**敏感场景**默认全部关闭**。
+涉及邮件、通讯录、浏览历史、即时消息、通知中心、屏幕时间、IM 平台、微信态势感知等 **43 个**敏感场景**默认全部关闭**。
 需用户在 `~/.pandacc/config/proactive.json` 中显式开启。
 
 > 详见上方 **[1.4 配置参考 → proactive.json](#proactivejson--主动推送配置)** 的 `enabledScenarios` 字段。
@@ -545,6 +583,31 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 - **配置**: 编辑 `~/.pandacc/config/connectors.json`，详见 [1.4 配置参考 → connectors.json](#connectorsjson--im-平台连接器)
 - **关联场景**: 配置连接器后可启用 `im-unread-digest`、`im-daily-brief`、`im-calendar-sync`、`im-approval-alert`、`im-document-update`、`im-reverse-push` 等 6 个 IM 聚合场景
+
+### 3.8 微信全态势感知
+
+微信用户每天面对大量群消息，超级助手提供全时间维度的态势感知：
+
+| 时间维度 | 场景 | 频率 | 核心价值 |
+|----------|------|------|---------|
+| **实时** | @提及告警 | 10 分钟 | 群里被 @ 立即推送 |
+| | 关键词监控 | 15 分钟 | 自定义关键词命中告警 |
+| | 话题追踪 | 6 小时 | 关注话题全盘监控 |
+| **日度** | 全态势报告 | 22:00 | 上帝视角：活跃排行 + 重点关注 + 降噪建议 |
+| | 未回复提醒 | 3 小时 | 私聊对方等你回 > 2h |
+| | 群聊摘要 | 12/18:00 | 高消息群自动摘要 |
+| | 情感脉搏 | 21:00 | 正/负面情感分布 |
+| **周度** | 趋势报告 | 周五 | 本周 vs 上周全维度对比 |
+| | 联系人洞察 | 周五 | 谁沉默了？谁活跃了？ |
+| | 关系健康度 | 周日 | VIP 断联预警 + 建议主动联系 |
+| | 噪音过滤 | 周日 | 退群/屏蔽建议 |
+| **月度** | 深度分析 | 1 号 | 社交圈层 + 群健康度 + 关键词趋势 |
+| **季度** | 复盘 | 季首月 | 社交网络演变 + 群生命周期 |
+| **年度** | 总结 | 12/31 | 年度社交大数据 + 关键词云 + 年度最佳 |
+
+**配置文件**：`wechat-keywords.json`（监控词）、`wechat-vip.json`（VIP 联系人）、`wechat-topics.json`（关注话题）
+
+**数据持久化**：每日统计快照 `~/.pandacc/data/wechat-stats/YYYY-MM-DD.json`，周/月/季/年报告基于快照做趋势分析。
 
 ### 3.7 隐私铁律
 
@@ -1013,7 +1076,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
 
 ## 8. 命令使用手册
 
-> 本手册基于 v2.5.7 实机 PTY 验证，覆盖 **85+ 个命令** + Phase 1-5 全部新增能力 + v2.5 超级助手/IM Connector/主动推送 71 场景。
+> 本手册基于 v2.6.0 实机 PTY 验证，覆盖 **85+ 个命令** + Phase 1-5 全部新增能力 + v2.5 超级助手/IM Connector/主动推送 85 场景。
 
 <details>
 <summary>展开查看完整手册（85+ 命令）</summary>
@@ -1070,7 +1133,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
 #### `/help`
 - **用法**: `/help`
 - **说明**: 显示交互式帮助界面，包含所有可用命令和快捷键
-- **实测**: ✅ 显示 Panda Code v2.5.7 帮助信息
+- **实测**: ✅ 显示 Panda Code v2.6.0 帮助信息
 
 #### `/exit` (别名: `/quit`)
 - **用法**: `/exit`
@@ -1285,7 +1348,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
   - `dream-consolidate` — 22:00 自动记忆整合（调用 autoDream）
   - `morning-briefing` — 07:00 设置晨间简报 pending flag
   - `code-health` — 23:00 设置健康检查 pending flag
-- **v2.5 场景覆盖**: 系统健康(3) + 开发者(10) + 文件管理(6) + 个人生活(3) + 效率(4) + 高级系统(5) + 扩展(8) + 知识(8) + 生活(8) = **55 个非敏感场景**（默认开启）+ **16 个敏感场景**（需 `proactive.json` 显式开启）
+- **v2.6 场景覆盖**: 系统健康(3) + 开发者(10) + 文件管理(6) + 个人生活(3) + 效率(4) + 高级系统(5) + 扩展(8) + 知识(8) + 生活(8) = **55 个非敏感场景**（默认开启）+ **30 个敏感场景**（含 14 个微信态势感知，需 `proactive.json` 显式开启）
 - **技巧**: 配合 `/night-mode` 实现全天候自主工作；敏感场景配置详见本手册"七、主动推送系统"章节
 
 #### `/night-mode` 🆕
@@ -1322,7 +1385,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
   - `/learn review` — 开始间隔重复复习
   - `/learn plan "学习 Rust"` — 生成学习路径
 
-#### 主动推送系统（v2.5 新增 — 71 场景）
+#### 主动推送系统（v2.5 新增 — 85 场景）
 
 v2.5 将主动推送从 3 个内置任务扩展为 **71 个场景**，分为非敏感（默认开启）和敏感（默认关闭）两类。
 
@@ -1349,6 +1412,7 @@ v2.5 将主动推送从 3 个内置任务扩展为 **71 个场景**，分为非�
 | 通讯录 | 1 | macOS AppleScript 授权 |
 | IM 聚合 | 6 | 需配置 `connectors.json` |
 | 浏览器/笔记/屏幕 | 6 | 部分需 FDA |
+| 微信态势感知 | 14 | 需配置 `connectors.json` 微信密钥 |
 
 **激活方式**
 
@@ -1607,7 +1671,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `KAIROS_CAPTURE` | `/capture` 快速捕获 | ✅ 已启用 |
 | `KAIROS_LEARN` | `/learn` 学习助理 | ✅ 已启用 |
 | `IM_CONNECTOR` | IM 平台连接器（6 平台） | ✅ 已启用 |
-| `PROACTIVE_SCENARIOS` | 主动推送 71 场景 | ✅ 已启用 |
+| `PROACTIVE_SCENARIOS` | 主动推送 85 场景 | ✅ 已启用 |
 | `NOTIFICATION_CENTER` | 系统通知中心感知 | ✅ 已启用 |
 
 ### 十七、快捷键速查
@@ -1678,10 +1742,11 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `/write` 写作助理 | v2.5 | 大纲生成 + Markdown 文稿编译 |
 | `/capture` 快速捕获 | v2.5 | 想法捕获到 working/inbox/，PARA 自动分类 |
 | `/learn` 学习助理 | v2.5 | 闪卡生成 + FSRS 间隔重复 + 学习路径 |
-| 主动推送 71 场景 | v2.5 | 8 大维度，55 非敏感 + 16 敏感场景 |
+| 主动推送 85 场景 | v2.5 | 8 大维度，55 非敏感 + 30 敏感场景 |
 | IM Connector 6 平台 | v2.5 | 飞书/钉钉/Slack/微信/Telegram/Teams |
 | 系统通知中心感知 | v2.5 | macOS SQLite + Windows wpndb，3 场景 |
 | IM 主动推送 6 场景 | v2.5 | 未读汇总/日报/日历同步/审批/文档/反向推送 |
+| 微信全态势感知 14 场景 | v2.6 | 实时/日/周/月/季/年 6 维度，关键词+VIP+话题追踪 |
 
 </details>
 
