@@ -827,46 +827,68 @@ sqlite3 ~/Library/Group\ Containers/group.com.apple.usernoted/db2/db "SELECT COU
 
 **解密步骤**：
 
-1. **安装解密工具**（二选一）：
+1. **安装 sqlcipher**（读取加密数据库必需）：
    ```bash
-   # 方案 A：使用 wechat-db-decrypt-macos（推荐）
+   # macOS
+   brew install sqlcipher
+   
+   # Linux
+   sudo apt install sqlcipher
+   ```
+
+2. **安装解密工具并提取密钥**：
+   ```bash
+   # 推荐：wechat-db-decrypt-macos
    git clone https://github.com/Thearas/wechat-db-decrypt-macos.git
    cd wechat-db-decrypt-macos
    pip3 install -r requirements.txt
    python3 decrypt.py
-   
-   # 方案 B：使用 wechat-decrypt
-   git clone https://github.com/ylytdeng/wechat-decrypt.git
-   cd wechat-decrypt
-   pip3 install -r requirements.txt
-   python3 main.py
    ```
+   
+   > 需要**微信保持运行**状态。工具会自动扫描微信进程内存，提取每个数据库的独立解密密钥，输出到 `wechat_keys.json`。
 
-2. **提取密钥**：工具会自动扫描微信进程内存，输出 32 字节十六进制密钥。需要微信保持运行状态。
+3. **确认 `wechat_keys.json` 生成**（格式如下）：
+   ```json
+   {
+     "__salts__": ["..."],
+     "message/message_0.db": "32字节hex密钥",
+     "message/message_1.db": "32字节hex密钥",
+     "contact/contact.db": "32字节hex密钥",
+     "session/session.db": "32字节hex密钥",
+     "..."
+   }
+   ```
+   > 微信 4.x 每个数据库使用**独立密钥**，Panda Code 已支持这种 per-db 密钥格式。
 
-3. **配置到 Panda Code**：
+4. **配置到 Panda Code**：
    ```json
    // ~/.pandacc/config/connectors.json
    {
      "wechat": {
        "enabled": true,
        "mode": "local-db",
-       "dbKey": "提取到的32字节hex密钥",
-       "dbPath": "自动检测，通常无需手动填写"
+       "keysFile": "/绝对路径/wechat_keys.json"
      }
    }
    ```
+   > `keysFile` 指向第 3 步生成的密钥文件的**绝对路径**。数据库路径会自动检测（`~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/`），无需手动配置。
 
-4. **启用场景**：
+5. **启用场景**：
    ```json
    // ~/.pandacc/config/proactive.json
    { "enabledScenarios": { "wechat-messages": true } }
    ```
 
-5. **验证**：
+6. **验证**：
    ```bash
-   panda  # 启动后在对话中询问"检查微信数据连接"
+   # 验证 sqlcipher 已安装
+   sqlcipher --version
+   
+   # 启动 panda 测试
+   panda  # 在对话中询问"检查微信数据连接"
    ```
+
+> **⚠️ 安全提醒**：`wechat_keys.json` 包含数据库解密密钥，请妥善保管，不要上传到 Git 或公共位置。建议存放在 `~/.pandacc/config/` 目录下并设置 `chmod 600` 权限。
 
 #### Windows 系统授权
 
@@ -909,19 +931,25 @@ Windows 微信数据库路径：
 %APPDATA%\Tencent\WeChat\xwechat_files\{用户名}_{hash}\db_storage\
 ```
 
-**解密步骤**（与 macOS 类似）：
+**解密步骤**：
 
-1. **安装解密工具**：
+1. **安装 sqlcipher**：
+   ```powershell
+   # 通过 choco 安装
+   choco install sqlcipher
+   # 或从 https://github.com/nicoleaucoin/sqlcipher-windows 下载预编译版
+   ```
+
+2. **安装解密工具并提取密钥**：
    ```powershell
    git clone https://github.com/ylytdeng/wechat-decrypt.git
    cd wechat-decrypt
    pip install -r requirements.txt
    python main.py
    ```
+   > 需要微信保持运行。工具输出 `wechat_keys.json`（per-db 独立密钥）。
 
-2. **提取密钥**：工具扫描微信进程内存提取密钥。
-
-3. **配置**：同 macOS，写入 `connectors.json` 的 `wechat.dbKey` 字段。
+3. **配置**：同 macOS，在 `connectors.json` 中设置 `wechat.keysFile` 指向 `wechat_keys.json` 绝对路径。
 
 #### Linux
 
