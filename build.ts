@@ -209,10 +209,15 @@ for (const file of files) {
     }
 }
 
-// Step 4: Ensure dist/cli.js has a shebang for `npm install -g` / `npx` usage
+// Step 4: Ensure dist/cli.js has node shebang for `npm install -g` / `npx` usage
+// Bun build adds #!/usr/bin/env bun, but Windows users may not have bun installed.
+// Replace with node shebang so npm generates correct .cmd/.ps1 launchers.
 const cliPath = join(outdir, "cli.js");
-const cliContent = await readFile(cliPath, "utf-8");
-if (!cliContent.startsWith("#!")) {
+let cliContent = await readFile(cliPath, "utf-8");
+if (cliContent.startsWith("#!/usr/bin/env bun")) {
+    cliContent = cliContent.replace("#!/usr/bin/env bun", "#!/usr/bin/env node");
+    await writeFile(cliPath, cliContent);
+} else if (!cliContent.startsWith("#!")) {
     await writeFile(cliPath, `#!/usr/bin/env node\n${cliContent}`);
 }
 
