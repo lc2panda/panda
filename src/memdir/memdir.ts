@@ -232,6 +232,109 @@ type: user
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// 情景记忆写入 (P0-2)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * 保存情景记忆到 episodes/ 目录。
+ * 每次会话结束或 DeepDream 触发时调用。
+ * 写入 episodes/YYYY-MM-DD_HH-mm.md 格式文件。
+ */
+export async function saveEpisodicMemory(sessionSummary: string, opts?: {
+  tools?: string[]
+  decisions?: string[]
+}): Promise<string | null> {
+  const memoryDir = getAutoMemPath()
+  if (!memoryDir) return null
+
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`
+  const episodesDir = join(memoryDir, 'episodes')
+  const filePath = join(episodesDir, `${dateStr}.md`)
+
+  const toolsList = opts?.tools ?? []
+  const decisionsList = opts?.decisions ?? []
+  const timestamp = now.getTime()
+
+  const frontmatter = [
+    '---',
+    'type: episodic',
+    `date: ${now.toISOString()}`,
+    `tools: [${toolsList.map(t => `"${t}"`).join(', ')}]`,
+    'strength: 1.0',
+    `lastAccessed: ${timestamp}`,
+    '---',
+  ].join('\n')
+
+  const body = [
+    '',
+    `## 会话摘要`,
+    '',
+    sessionSummary,
+    '',
+  ]
+
+  if (decisionsList.length > 0) {
+    body.push('## 关键决策', '')
+    for (const d of decisionsList) {
+      body.push(`- ${d}`)
+    }
+    body.push('')
+  }
+
+  if (toolsList.length > 0) {
+    body.push('## 使用工具', '')
+    for (const t of toolsList) {
+      body.push(`- ${t}`)
+    }
+    body.push('')
+  }
+
+  body.push(`> 记录时间: ${now.toISOString()}`)
+
+  try {
+    await mkdir(episodesDir, { recursive: true })
+    await writeFile(filePath, frontmatter + '\n' + body.join('\n') + '\n', 'utf-8')
+    return filePath
+  } catch {
+    return null
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 记忆访问时间更新 (P1-7)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * 更新记忆文件 frontmatter 中的 lastAccessed 字段。
+ * 用于搜索命中时刷新访问时间，使 Ebbinghaus 衰减机制正常工作。
+ * 注意：不在 decayAndPruneMemories 中调用，避免循环。
+ */
+export function touchMemoryAccess(filePath: string): void {
+  try {
+    let content = readFileSync(filePath, 'utf-8')
+    const fmMatch = content.match(/^---\n([\s\S]*?)\n---/)
+    if (!fmMatch) return
+
+    const now = Date.now()
+    const fmEnd = content.indexOf('\n---', 4)
+    if (fmEnd < 0) return
+
+    const fmSection = content.slice(0, fmEnd)
+    const rest = content.slice(fmEnd)
+
+    if (/lastAccessed:\s*\d+/.test(fmSection)) {
+      content = fmSection.replace(/lastAccessed:\s*\d+/, `lastAccessed: ${now}`) + rest
+    } else {
+      content = fmSection + `\nlastAccessed: ${now}` + rest
+    }
+
+    writeFileSync(filePath, content, 'utf-8')
+  } catch {}
+}
+
 /**
  * Log memory directory file/subdir counts asynchronously.
  * Fire-and-forget — doesn't block prompt building.
@@ -950,11 +1053,37 @@ export function searchMemory(query: string, memoryDir: string, topK: number = 5)
   if (files.length === 0) return []
 
   // 优先 FTS5，不可用时 fallback 到 TF-IDF
+  let results: Array<{ file: string; score: number; excerpt: string }>
   try {
-    return _searchMemoryFTS5(query, memoryDir, files, topK)
+    results = _searchMemoryFTS5(query, memoryDir, files, topK)
   } catch {
-    return _searchMemoryTFIDF(query, memoryDir, files, topK)
+    results = _searchMemoryTFIDF(query, memoryDir, files, topK)
   }
+
+  // 更新命中记忆的 lastAccessed（驱动 Ebbinghaus 衰减）
+  for (const r of results) {
+    const absPath = r.file.startsWith('/') ? r.file : join(memoryDir, r.file)
+    touchMemoryAccess(absPath)
+  }
+
+  return results
+}
+
+/**
+ * 中文 bigram 分词——将连续中文字符提取并生成二元组。
+ * 例如 "机器学习" → "机器 器学 学习"
+ * 非中文部分原样保留，用于改善 FTS5 unicode61 分词器对中文的召回率。
+ */
+function chineseBigram(text: string): string {
+  // 匹配连续中文字符块
+  return text.replace(/[\u4e00-\u9fff]{2,}/g, (match) => {
+    const bigrams: string[] = []
+    for (let i = 0; i < match.length - 1; i++) {
+      bigrams.push(match[i] + match[i + 1])
+    }
+    // 保留原始字符 + bigram，提高精确匹配和模糊匹配的召回率
+    return match + ' ' + bigrams.join(' ')
+  })
 }
 
 /** SQLite FTS5 全文搜索实现 */
@@ -969,12 +1098,14 @@ function _searchMemoryFTS5(query: string, memoryDir: string, files: string[], to
   for (const filePath of files) {
     try {
       const content = readFileSync(filePath, 'utf-8')
-      insert.run(relative(memoryDir, filePath), content)
+      // 对中文内容做 bigram 预处理，提高中文召回率
+      insert.run(relative(memoryDir, filePath), chineseBigram(content))
     } catch {}
   }
 
-  // 对查询词做处理以兼容 FTS5 MATCH 语法
-  const queryTerms = tokenize(query)
+  // 对查询词做 bigram 处理 + tokenize 以兼容 FTS5 MATCH 语法
+  const bigramQuery = chineseBigram(query)
+  const queryTerms = tokenize(bigramQuery)
   if (queryTerms.length === 0) { db.close(); return [] }
 
   // 用 OR 连接各词项，提高召回率

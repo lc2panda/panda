@@ -598,8 +598,10 @@ export const feishuConnectorFactory: ConnectorFactory = {
     'documents.read', 'contacts.read', 'tasks.read',
     'approvals.read', 'unread.summary',
   ],
-  create(): IMConnector {
-    // 优先尝试 MCP 模式，配置中有 appId 时 fallback 到 API 模式
+  create(config?: ConnectorConfig): IMConnector {
+    if (config?.mode === 'api') return new FeishuAPIConnector()
+    if (config?.mode === 'mcp') return new FeishuMCPConnector()
+    // 默认 MCP 模式
     return new FeishuMCPConnector()
   },
 }

@@ -278,7 +278,7 @@ export interface ConnectorFactory {
   description: string
   supportedModes: ConnectorMode[]
   defaultCapabilities: ConnectorCapability[]
-  create(): IMConnector
+  create(config?: ConnectorConfig): IMConnector
 }
 
 // ─── 聚合数据类型 ───

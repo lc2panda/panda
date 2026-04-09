@@ -36,6 +36,9 @@ function getCached<T>(key: string): T | null {
     cache.delete(key)
     return null
   }
+  // LRU reinsert：删除再 set，使最近访问的条目移到 Map 末尾
+  cache.delete(key)
+  cache.set(key, entry)
   return entry.data as T
 }
 
@@ -61,7 +64,7 @@ function deduplicateMessages(messages: IMMessage[], windowMs: number = 5000): IM
   const seen = new Map<string, IMMessage>()
 
   for (const msg of messages) {
-    const fingerprint = `${msg.senderId}:${msg.content.slice(0, 100)}`
+    const fingerprint = `${msg.platform}:${msg.senderId}:${msg.content.slice(0, 100)}`
     const existing = seen.get(fingerprint)
     if (existing && Math.abs(existing.timestamp - msg.timestamp) < windowMs) {
       continue
