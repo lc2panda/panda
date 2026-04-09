@@ -294,6 +294,9 @@ panda auth login
 
 ## 2. 命令速查
 
+<details>
+<summary>展开查看命令速查表</summary>
+
 > 完整手册请查看 [第 8 章 命令使用手册](#8-命令使用手册)
 
 ### 2.1 核心命令速查表
@@ -311,7 +314,7 @@ panda auth login
 
 ### 2.2 超级助手命令
 
-> 超级助手 = 数字生命体。以下命令是超级助手的交互入口。
+> 超级助手 = 智能助理。以下命令是超级助手的交互入口。
 
 | 命令              | 说明                                                  |
 | --------------- | --------------------------------------------------- |
@@ -325,6 +328,7 @@ panda auth login
 | `/write`        | 写作助理 — 生成大纲、编译文稿                                    |
 | `/capture`      | 快速捕获 — 将想法保存到工作记忆                                   |
 | `/learn`        | 学习助理 — 闪卡生成、间隔重复、学习路径规划                            |
+| `/wechat`       | 微信数据查询 — 会话/聊天/搜索/联系人                                |
 
 ### 2.3 Ant-Only 高级命令（已全部启用）
 
@@ -403,9 +407,11 @@ panda auth login
 | `DEBUG_CACHE=1`                  | 输出第三方 API Cache Token 原始数据到 stderr |
 | `PANDA_DEBUG=1`                  | 输出任务分类、进化写回等调试日志                   |
 
+</details>
+
 ---
 
-## 3. 超级助手 — 数字生命体
+## 3. 超级助手 — 智能助理
 
 > "越用越了解你的贴身助理。白天人来接管，夜间 AI 自主整理所有数据资产。"
 >
@@ -823,6 +829,9 @@ query() 执行顺序：
 
 ### 6.1 隐私保护
 
+<details>
+<summary>展开查看隐私保护详情</summary>
+
 所有渠道均可启用隐私增强模式（配置 `privacyEnhanced: true` 或使用 `/privacy` 命令）。非 Anthropic 渠道自动启用。
 
 | 防护层                | 内容                                                                  | 状态  |
@@ -840,12 +849,14 @@ query() 执行顺序：
 
 查看当前隐私状态：`/privacy`
 
-### 6.2 系统授权与数据解密指南
+</details>
 
-超级助手的部分高级感知能力需要**系统级权限授权**或**数据解密操作**。以下按平台分别说明。所有操作均为**一次性**，授权后永久生效。
+### 6.2 系统授权与数据解密指南
 
 <details>
 <summary>展开查看各平台授权步骤</summary>
+
+超级助手的部分高级感知能力需要**系统级权限授权**或**数据解密操作**。以下按平台分别说明。所有操作均为**一次性**，授权后永久生效。
 
 #### macOS 系统授权
 
@@ -953,39 +964,38 @@ sqlite3 ~/Library/Group\ Containers/group.com.apple.usernoted/db2/db "SELECT COU
    python3 export_messages.py --all
    ```
 
-6. **集成到 Panda Code**（两种方式，任选其一）：
-
-   **方式 A：MCP Server 集成（推荐，无需 Panda Code 配置）**：
-   ```bash
-   pip3 install fastmcp
-   panda mcp add wechat -- python3 $(pwd)/mcp_server.py
-   ```
-   > 该工具自带 MCP Server，添加后 Panda Code 可直接通过 AI 对话查询微信数据：
-   > - `get_recent_sessions` — 最近会话列表
-   > - `get_chat_history` — 聊天记录（模糊匹配联系人）
-   > - `search_messages` — 跨会话关键词搜索
-   > - `get_contacts` — 联系人搜索
-
-   **方式 B：Panda Code Connector 配置**：
+6. **集成到 Panda Code**：
    ```json
    // ~/.pandacc/config/connectors.json
    {
      "wechat": {
        "enabled": true,
        "mode": "local-db",
-       "keysFile": "/绝对路径/wechat-db-decrypt-macos/wechat_keys.json"
+       "keysFile": "/绝对路径/wechat_keys.json"
      }
    }
    ```
+
+7. **启用场景**：
    ```json
    // ~/.pandacc/config/proactive.json
-   { "enabledScenarios": { "wechat-messages": true } }
+   { "enabledScenarios": { "wechat-messages": true, "wechat-daily-situational": true } }
    ```
 
-7. **验证**：
+8. **使用**：
+   ```
+   /wechat sessions          — 最近会话
+   /wechat chat 张三          — 聊天记录
+   /wechat search 合同        — 跨会话搜索
+   /wechat contacts 李四      — 联系人搜索
+   ```
+
+   > 微信数据已原生整合到 Panda Code，无需 Python/fastmcp/MCP Server。
+
+9. **验证**：
    ```bash
    sqlcipher --version    # 确认 sqlcipher 已安装
-   panda                  # 启动后询问"查看最近微信消息"
+   panda                  # 启动后使用 /wechat sessions 查看最近会话
    ```
 
 > **⚠️ 安全提醒**：
@@ -1146,6 +1156,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
 | `/write` | | 写作助理 — 大纲生成/文稿编译 | 🆕✅ |
 | `/capture` | | 快速捕获想法到工作目录 | 🆕✅ |
 | `/learn` | | 学习助理 — 闪卡/复习/学习路径 | 🆕✅ |
+| `/wechat` | | 微信数据查询 — 会话/聊天/搜索/联系人 | 🆕✅ |
 
 ### 一、基础控制命令
 
@@ -1339,7 +1350,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
 - **用法**: `/tasks`
 - **说明**: 列出和管理后台任务
 
-### 七、超级助手系统（v2.5 数字生命体）
+### 七、超级助手系统（v2.5 智能助理）
 
 #### `/dream` 🆕
 - **用法**: `/dream`
