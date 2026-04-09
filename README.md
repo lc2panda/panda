@@ -1,6 +1,6 @@
-# Panda Code — AI 终端编程助手
+# Panda — Your AI, Your Data, Your Life.
 
-> **此项目的任何功能、架构更新，必须在结束后同步更新相关文档。这是我们契约的一部分。**
+> 懂你所有数据的 AI 伙伴 | 编码 · 助理 · 感知 · 生活
 
 ```
  ██████╗   █████╗  ███╗   ██╗ ██████╗   █████╗
@@ -9,16 +9,12 @@
  ██╔═══╝  ██╔══██║ ██║╚██╗██║ ██║  ██║ ██╔══██║
  ██║      ██║  ██║ ██║ ╚████║ ██████╔╝ ██║  ██║
  ╚═╝      ╚═╝  ╚═╝ ╚═╝  ╚═══╝ ╚═════╝  ╚═╝  ╚═╝
- ██████╗  ██████╗  ██████╗  ███████╗
- ██╔════╝ ██╔═══██╗██╔══██╗ ██╔════╝
- ██║      ██║   ██║██║  ██║ █████╗
- ██║      ██║   ██║██║  ██║ ██╔══╝
- ╚██████╗ ╚██████╔╝██████╔╝ ███████╗
- ╚═════╝  ╚═════╝ ╚═════╝  ╚══════╝
 ```
 
-**项目代号**：Panda Code
-**版本**：v2.6.0（基线 Claude Code v2.1.92）
+> **此项目的任何功能、架构更新，必须在结束后同步更新相关文档。这是我们契约的一部分。**
+
+**项目**：Panda
+**版本**：v2.6.7（基线 Claude Code v2.1.92）
 **技术栈**：Bun + TypeScript + React/Ink + Commander.js
 **运行时**：Bun >= 1.2.0 / Node.js >= 18.0.0
 
@@ -105,7 +101,7 @@ panda auth login
 
 #### proactive.json — 主动推送配置
 
-> ⚠️ **重要隐私说明**：下方 `enabledScenarios` 中的场景涉及读取邮件、通讯录、浏览历史、即时消息等**高度敏感的个人数据**。这些场景**默认全部关闭**，Panda Code 不会在未经授权的情况下读取任何个人隐私数据。用户必须**手动编辑配置文件并显式设为 `true`** 才会启用对应的数据采集。所有数据仅在用户本机处理，永不上传。
+> ⚠️ **重要隐私说明**：下方 `enabledScenarios` 中的场景涉及读取邮件、通讯录、浏览历史、即时消息等**高度敏感的个人数据**。这些场景**默认全部关闭**，Panda 不会在未经授权的情况下读取任何个人隐私数据。用户必须**手动编辑配置文件并显式设为 `true`** 才会启用对应的数据采集。所有数据仅在用户本机处理，永不上传。
 
 ```json
 // ~/.pandacc/config/proactive.json
@@ -650,7 +646,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 ## 4. 治理能力
 
-Panda Code 内置了 11 项治理能力。
+Panda 内置了 11 项治理能力。
 
 <details>
 <summary>展开查看 11 项治理能力</summary>
@@ -964,7 +960,7 @@ sqlite3 ~/Library/Group\ Containers/group.com.apple.usernoted/db2/db "SELECT COU
    python3 export_messages.py --all
    ```
 
-6. **集成到 Panda Code**：
+6. **集成到 Panda**：
    ```json
    // ~/.pandacc/config/connectors.json
    {
@@ -990,7 +986,7 @@ sqlite3 ~/Library/Group\ Containers/group.com.apple.usernoted/db2/db "SELECT COU
    /wechat contacts 李四      — 联系人搜索
    ```
 
-   > 微信数据已原生整合到 Panda Code，无需 Python/fastmcp/MCP Server。
+   > 微信数据已原生整合到 Panda，无需 Python/fastmcp/MCP Server。
 
 9. **验证**：
    ```bash
@@ -1013,7 +1009,7 @@ Windows 通知数据库无需特殊权限，位于当前用户目录下可直接
 %LOCALAPPDATA%\Microsoft\Windows\Notifications\wpndatabase.db
 ```
 
-**注意**：Windows 的通知在用户清除后**立即从数据库删除**。Panda Code 会每 5 分钟轮询捕获新通知并本地持久化，但无法恢复已清除的历史通知。
+**注意**：Windows 的通知在用户清除后**立即从数据库删除**。Panda 会每 5 分钟轮询捕获新通知并本地持久化，但无法恢复已清除的历史通知。
 
 **2. 邮件/日历/通讯录**
 
@@ -1086,7 +1082,7 @@ Windows 微信数据库路径：
 { "appSecret": "keychain:feishu-app-secret" }
 ```
 
-Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Service 读取。
+Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Service 读取。
 
 </details>
 
@@ -1163,7 +1159,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
 #### `/help`
 - **用法**: `/help`
 - **说明**: 显示交互式帮助界面，包含所有可用命令和快捷键
-- **实测**: ✅ 显示 Panda Code v2.6.0 帮助信息
+- **实测**: ✅ 显示 Panda v2.6.0 帮助信息
 
 #### `/exit` (别名: `/quit`)
 - **用法**: `/exit`
@@ -1177,7 +1173,7 @@ Panda Code 会自动从 macOS Keychain / Windows Credential Manager / Linux Secr
 #### `/version`
 - **用法**: `/version`
 - **说明**: 显示当前版本和构建时间
-- **实测**: ✅ 输出 `2.5.7 (Panda Code)`
+- **实测**: ✅ 输出 `2.5.7 (Panda)`
 
 #### `/status`
 - **用法**: `/status`
@@ -1620,7 +1616,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 ### 十三、Ant-Only 高级命令
 
-> 以下命令原为 Anthropic 内部专用，已在 Panda Code 中全部启用。
+> 以下命令原为 Anthropic 内部专用，已在 Panda 中全部启用。
 
 | 命令 | 说明 | 状态 |
 |------|------|------|
@@ -1654,7 +1650,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 ### 十五、环境变量参考
 
-#### Panda Code 专属
+#### Panda 专属
 
 | 环境变量 | 默认 | 说明 |
 |---------|------|------|
@@ -1782,4 +1778,4 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 ---
 
-*此文档是项目契约的一部分。一旦 Panda Code 功能更新，此文档必须同步更新。*
+*此文档是项目契约的一部分。一旦 Panda 功能更新，此文档必须同步更新。*
