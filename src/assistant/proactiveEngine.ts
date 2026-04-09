@@ -18,8 +18,9 @@ export interface ProactiveSuggestion {
   source: string // 触发来源
 }
 
-// 频率限制：每会话每类型最多推送 1 次
-const _emittedTypes = new Set<string>()
+// 频率限制：同类型建议 1 小时内最多推送 1 次（TTL Map，防止内存泄漏）
+const _emittedTypes = new Map<string, number>()
+const EMIT_TTL_MS = 60 * 60 * 1000 // 1 小时
 
 /**
  * 主函数：检查所有条件并返回建议
@@ -50,11 +51,17 @@ export async function checkProactiveSuggestions(context: {
     }
   }
 
-  // 频率限制过滤：同类型建议每会话仅推送一次
+  // 频率限制：同类型建议 1 小时内仅推送一次（TTL 自动过期，防止内存泄漏）
+  const now = Date.now()
+  // 清理过期条目
+  for (const [k, t] of _emittedTypes) {
+    if (now - t > EMIT_TTL_MS) _emittedTypes.delete(k)
+  }
   const filtered = suggestions.filter(s => {
     const key = `${s.type}:${s.source}`
-    if (_emittedTypes.has(key)) return false
-    _emittedTypes.add(key)
+    const lastEmit = _emittedTypes.get(key)
+    if (lastEmit && now - lastEmit < EMIT_TTL_MS) return false
+    _emittedTypes.set(key, now)
     return true
   })
 
