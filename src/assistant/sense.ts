@@ -141,12 +141,15 @@ function _pushToChannels(notification: PandaNotification): void {
         body: notification.body,
         timestamp: new Date().toISOString(),
       })
-      // 异步 fetch，不阻塞
+      // 异步 fetch + 5 秒超时，不阻塞
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
       fetch(config.webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: payload,
-      }).catch(() => {})
+        signal: controller.signal,
+      }).catch(() => {}).finally(() => clearTimeout(timeoutId))
     }
   } catch {}
 

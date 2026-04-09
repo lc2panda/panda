@@ -179,7 +179,7 @@ export async function* handleStopHooks(
         void checkProactiveSuggestions({
           messages: stopHookContext.messages,
           turnCount: stopHookContext.messages.filter((m: any) => m.type === 'user').length,
-          sessionStartTime: Date.now(),
+          sessionStartTime: 0, // 未使用，频率限制由 proactiveEngine 内部 TTL Map 处理
         }).then(suggestions => {
           if (suggestions.length > 0 && toolUseContext.appendSystemMessage) {
             toolUseContext.appendSystemMessage(formatSuggestionsAsSystemMessage(suggestions))

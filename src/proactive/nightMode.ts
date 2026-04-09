@@ -99,6 +99,9 @@ export async function runNightTasks(): Promise<void> {
     if (result.success) {
       _taskLastExecMap.set(task.id, now)
       logForDebugging(`[proactive] ${task.id} succeeded: ${result.output}`)
+    } else if (result.output?.includes('__SKIPPED__')) {
+      // skipIf 跳过的任务不更新 _taskLastExecMap，下次仍可执行
+      logForDebugging(`[proactive] ${task.id} skipped (skipIf)`)
     } else {
       logForDebugging(`[proactive] ${task.id} failed: ${result.output}`)
     }

@@ -4,7 +4,7 @@
 
 import type { ProactiveTask } from '../taskRegistry.js'
 import { getDiskInfo, getMemoryInfo, checkNetwork, IS_WIN } from '../platform.js'
-import { getProactiveConfig } from '../proactiveConfig.js'
+import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { pushNotification } from '../../assistant/sense.js'
 import { logForDebugging } from '../../utils/debug.js'
 
@@ -21,6 +21,7 @@ const diskSpaceAlert: SmartCronTask = {
   cron: '*/15 * * * *',
   priority: 'critical',
   enabled: true,
+  condition: () => isScenarioEnabled('disk-space-alert'),
   action: async () => {
     try {
       const config = getProactiveConfig()
@@ -84,6 +85,7 @@ const memoryPressureAlert: SmartCronTask = {
   cron: '*/5 * * * *',
   priority: 'critical',
   enabled: true,
+  condition: () => isScenarioEnabled('memory-pressure-alert'),
   action: async () => {
     try {
       const config = getProactiveConfig()
@@ -117,6 +119,7 @@ const networkAnomaly: SmartCronTask = {
   cron: '*/3 * * * *',
   priority: 'normal',
   enabled: true,
+  condition: () => isScenarioEnabled('network-anomaly'),
   action: async () => {
     try {
       const config = getProactiveConfig()

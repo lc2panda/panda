@@ -4,7 +4,7 @@
 
 import type { ProactiveTask } from '../taskRegistry.js'
 import { getUserIdleSeconds } from '../platform.js'
-import { getProactiveConfig } from '../proactiveConfig.js'
+import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { pushNotification } from '../../assistant/sense.js'
 import { logForDebugging } from '../../utils/debug.js'
 
@@ -55,6 +55,7 @@ const weatherAlert: SmartCronTask = {
   description: '天气变化提醒 · Weather change alert',
   cron: '0 7,20 * * *',
   priority: 'normal',
+  condition: () => isScenarioEnabled('weather-alert'),
   enabled: true,
   action: async () => {
     try {
@@ -177,6 +178,7 @@ const holidayReminder: SmartCronTask = {
   description: '节日/纪念日提醒 · Holiday & anniversary reminder',
   cron: '0 8 * * *',
   priority: 'normal',
+  condition: () => isScenarioEnabled('holiday-reminder'),
   enabled: true,
   action: async () => {
     try {
@@ -211,6 +213,7 @@ const lateNightCare: SmartCronTask = {
   description: '深夜工作关怀 · Late night care',
   cron: '*/30 22-23,0-5 * * *',
   priority: 'low',
+  condition: () => isScenarioEnabled('late-night-care'),
   enabled: true,
   action: async () => {
     try {

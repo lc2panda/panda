@@ -439,7 +439,7 @@ export const BUILTIN_TASKS: ProactiveTask[] = ALL_TASKS.map(task => ({
     // Smart skip 检查
     if (task.skipIf?.()) {
       logForDebugging(`[builtinTasks] ${task.id}: skipped (skipIf condition met)`)
-      return
+      throw new Error('__SKIPPED__') // 标记为跳过，nightMode 不更新 _taskLastExecMap
     }
     await task.action()
   },
