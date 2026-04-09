@@ -63,12 +63,19 @@ async function jxa(script: string): Promise<string> {
   return _execFallback(`osascript -l JavaScript -e '${script.replace(/'/g, "'\\''")}'`).text().then((r: string) => r.trim())
 }
 
+function spawnSyncCompat(cmd: string, args: string[]): { stdout: string } {
+  if (typeof globalThis.Bun !== 'undefined') {
+    const result = Bun.spawnSync({ cmd: [cmd, ...args], stdout: 'pipe', stderr: 'pipe' })
+    return { stdout: new TextDecoder().decode(result.stdout) }
+  }
+  const { spawnSync } = require('child_process')
+  const result = spawnSync(cmd, args, { encoding: 'utf-8' })
+  return { stdout: result.stdout || '' }
+}
+
 function jxaSync(script: string): string {
-  const result = Bun.spawnSync({
-    cmd: ['osascript', '-l', 'JavaScript', '-e', script],
-    stdout: 'pipe', stderr: 'pipe',
-  })
-  return new TextDecoder().decode(result.stdout).trim()
+  const result = spawnSyncCompat('osascript', ['-l', 'JavaScript', '-e', script])
+  return result.stdout.trim()
 }
 
 function buildMouseJxa(eventType: string, x: number, y: number, btn: number, clickState?: number): string {
@@ -158,19 +165,16 @@ async function typeText(text: string): Promise<void> {
 
 function getFrontmostAppInfo(): FrontmostAppInfo | null {
   try {
-    const result = Bun.spawnSync({
-      cmd: ['osascript', '-e', `
+    const script = `
         tell application "System Events"
           set frontApp to first application process whose frontmost is true
           set appName to name of frontApp
           set bundleId to bundle identifier of frontApp
           return bundleId & "|" & appName
         end tell
-      `],
-      stdout: 'pipe',
-      stderr: 'pipe',
-    })
-    const output = new TextDecoder().decode(result.stdout).trim()
+      `
+    const result = spawnSyncCompat('osascript', ['-e', script])
+    const output = result.stdout.trim()
     if (!output || !output.includes('|')) return null
     const [bundleId, appName] = output.split('|', 2)
     return { bundleId: bundleId!, appName: appName! }

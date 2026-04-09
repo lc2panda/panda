@@ -11,6 +11,7 @@ import type {
 } from './types.js'
 import type { TaskProfile } from './taskClassifier.js'
 import { capabilityRegistry } from './capabilityRegistry.js'
+import { getPreset } from './presets.js'
 import { logForDebugging } from '../utils/debug.js'
 
 // ─────────────────────────────────────────────────────────────
@@ -279,9 +280,30 @@ function isExplicitModelId(model: string): boolean {
 // Helper: Find preset by name from settings
 // ─────────────────────────────────────────────────────────────
 
-function findPresetByName(_name: string): RoutingPreset | null {
-  // TODO: Read from settings.json routing config
-  // For now, return null — presets are resolved by the caller
+function findPresetByName(name: string): RoutingPreset | null {
+  // Check presets registry (custom from settings.json + builtins)
+  const preset = getPreset(name)
+  if (preset) return preset
+
+  // Try loading from global config directly as a last resort
+  try {
+    const { getGlobalConfig } = require('../utils/config.js')
+    const config = getGlobalConfig()
+    const routingPresets = config.routingPresets as Record<string, Partial<RoutingPreset>> | undefined
+    if (routingPresets?.[name]) {
+      const raw = routingPresets[name]
+      return {
+        name,
+        description: raw.description ?? name,
+        defaultModel: raw.defaultModel ?? 'sonnet-latest',
+        agentOverrides: raw.agentOverrides,
+        globalWeights: raw.globalWeights,
+      }
+    }
+  } catch {
+    // Config not available — ignore
+  }
+
   return null
 }
 
@@ -324,12 +346,37 @@ function routeByTask(profile: TaskProfile): ModelTarget | null {
   const resolved = capabilityRegistry.resolveAlias(targetAlias)
   if (!resolved) return null
 
+  // Build fallback chain based on resolved model tier
+  const modelId = resolved.resolveModelId()
+  const fallbackChain = buildTierFallback(modelId)
+
   return {
-    modelId: resolved.resolveModelId(),
+    modelId,
     provider: resolved.provider as string,
     reason: `task-route: ${profile.complexity}/${profile.domain} → ${targetAlias} → ${resolved.alias}`,
-    fallbackChain: [],
+    fallbackChain,
   }
+}
+
+/**
+ * Build a fallback chain based on model tier.
+ * opus → [sonnet], sonnet → [haiku], haiku → []
+ */
+function buildTierFallback(modelId: string): string[] {
+  const id = modelId.toLowerCase()
+
+  if (id.includes('opus')) {
+    const sonnet = capabilityRegistry.resolveAlias('sonnet-latest')
+    return sonnet ? [sonnet.resolveModelId()] : []
+  }
+
+  if (id.includes('sonnet')) {
+    const haiku = capabilityRegistry.resolveAlias('haiku-latest')
+    return haiku ? [haiku.resolveModelId()] : []
+  }
+
+  // haiku or unknown — no further fallback
+  return []
 }
 
 // ─────────────────────────────────────────────────────────────

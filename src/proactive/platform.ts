@@ -5,7 +5,7 @@
 import { execSync } from 'child_process'
 import { homedir, platform, totalmem, freemem } from 'os'
 import { join } from 'path'
-import { readdirSync, statSync } from 'fs'
+import { readdirSync, statSync, readFileSync } from 'fs'
 
 const IS_MAC = platform() === 'darwin'
 const IS_WIN = platform() === 'win32'
@@ -132,6 +132,16 @@ export function getBatteryInfo(): BatteryInfo | null {
       const last = lines[lines.length - 1].split(',')
       return { percent: parseInt(last[2], 10) || 100, charging: last[1] === '2', cycleCount: 0, health: 100 }
     }
+    // Linux: /sys/class/power_supply/BAT0
+    try {
+      const batPath = '/sys/class/power_supply/BAT0'
+      if (existsSync(batPath)) {
+        const capacity = parseInt(readFileSync(join(batPath, 'capacity'), 'utf-8').trim(), 10)
+        const status = readFileSync(join(batPath, 'status'), 'utf-8').trim()
+        const charging = status === 'Charging' || status === 'Full'
+        return { percent: capacity, charging, cycleCount: 0, health: 100 }
+      }
+    } catch {}
   } catch {}
   return null
 }

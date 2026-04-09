@@ -2,8 +2,54 @@ import { z } from 'zod/v4'
 import { buildTool, type ToolDef } from '../../Tool.js'
 import { lazySchema } from '../../utils/lazySchema.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
+import { exec } from 'node:child_process'
 
 const MONITOR_TOOL_NAME = 'Monitor'
+const MAX_HISTORY = 5
+
+type CheckResult = {
+  timestamp: string
+  success: boolean
+  output: string
+}
+
+type ActiveMonitor = {
+  id: string
+  target: string
+  condition: string | undefined
+  intervalMs: number
+  timer: ReturnType<typeof setInterval>
+  history: CheckResult[]
+  status: 'running' | 'stopped'
+}
+
+const activeMonitors = new Map<string, ActiveMonitor>()
+
+function runCheck(target: string, condition: string | undefined): Promise<CheckResult> {
+  return new Promise((resolve) => {
+    const cmd = condition ? `${condition}` : `test -e "${target}" && echo "exists" || echo "not found"`
+    exec(cmd, { timeout: 30_000 }, (error, stdout, stderr) => {
+      resolve({
+        timestamp: new Date().toISOString(),
+        success: !error,
+        output: (stdout || stderr || (error ? error.message : '')).trim().slice(0, 2000),
+      })
+    })
+  })
+}
+
+function startMonitorInterval(monitor: ActiveMonitor): void {
+  const tick = async () => {
+    const result = await runCheck(monitor.target, monitor.condition)
+    monitor.history.push(result)
+    if (monitor.history.length > MAX_HISTORY) {
+      monitor.history.shift()
+    }
+  }
+  // Run first check immediately
+  tick()
+  monitor.timer = setInterval(tick, monitor.intervalMs)
+}
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
@@ -89,7 +135,7 @@ The monitor runs in-session only and does not persist across restarts.`
   },
 
   async call(input) {
-    const { action, target, monitor_id } = input
+    const { action, target, interval_seconds, condition, monitor_id } = input
 
     switch (action) {
       case 'start': {
@@ -97,11 +143,23 @@ The monitor runs in-session only and does not persist across restarts.`
           throw new Error('target is required for start action')
         }
         const id = `mon_${Date.now().toString(36)}`
+        const intervalMs = (interval_seconds ?? 30) * 1000
+        const monitor: ActiveMonitor = {
+          id,
+          target,
+          condition,
+          intervalMs,
+          timer: null as unknown as ReturnType<typeof setInterval>,
+          history: [],
+          status: 'running',
+        }
+        activeMonitors.set(id, monitor)
+        startMonitorInterval(monitor)
         return {
           data: {
             monitor_id: id,
             status: 'started',
-            message: `Monitor ${id} started for target: ${target}`,
+            message: `Monitor ${id} started for target: ${target} (interval: ${interval_seconds ?? 30}s)`,
           },
         }
       }
@@ -109,11 +167,24 @@ The monitor runs in-session only and does not persist across restarts.`
         if (!monitor_id) {
           throw new Error('monitor_id is required for stop action')
         }
+        const monitor = activeMonitors.get(monitor_id)
+        if (!monitor) {
+          return {
+            data: {
+              monitor_id,
+              status: 'not_found',
+              message: `Monitor ${monitor_id} not found.`,
+            },
+          }
+        }
+        clearInterval(monitor.timer)
+        monitor.status = 'stopped'
+        activeMonitors.delete(monitor_id)
         return {
           data: {
             monitor_id,
             status: 'stopped',
-            message: `Monitor ${monitor_id} stopped.`,
+            message: `Monitor ${monitor_id} stopped. Last ${monitor.history.length} check(s) recorded.`,
           },
         }
       }
@@ -121,11 +192,26 @@ The monitor runs in-session only and does not persist across restarts.`
         if (!monitor_id) {
           throw new Error('monitor_id is required for status action')
         }
+        const monitor = activeMonitors.get(monitor_id)
+        if (!monitor) {
+          return {
+            data: {
+              monitor_id,
+              status: 'not_found',
+              message: `Monitor ${monitor_id} not found. It may have been stopped or never started.`,
+            },
+          }
+        }
+        const lastCheck = monitor.history.length > 0
+          ? monitor.history[monitor.history.length - 1]
+          : null
         return {
           data: {
             monitor_id,
-            status: 'unknown',
-            message: `Monitor ${monitor_id}: no active session monitor found (session-only, may have expired).`,
+            status: monitor.status,
+            message: lastCheck
+              ? `Monitor ${monitor_id} is ${monitor.status}. Last check at ${lastCheck.timestamp}: ${lastCheck.success ? 'OK' : 'FAIL'} — ${lastCheck.output}`
+              : `Monitor ${monitor_id} is ${monitor.status}. No checks completed yet.`,
           },
         }
       }

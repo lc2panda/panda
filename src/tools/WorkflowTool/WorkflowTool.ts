@@ -3,6 +3,7 @@ import { buildTool, type ToolDef } from '../../Tool.js'
 import { lazySchema } from '../../utils/lazySchema.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import { WORKFLOW_TOOL_NAME } from './constants.js'
+import { getWorkflow, listWorkflows } from './createWorkflowCommand.js'
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
@@ -65,11 +66,38 @@ Available workflows are registered at startup. If no workflows are registered, t
   async call(input) {
     const { workflow, args } = input
 
+    const definition = getWorkflow(workflow)
+    if (definition) {
+      try {
+        const result = await definition.execute(args ?? {})
+        return {
+          data: {
+            workflow,
+            status: 'success',
+            result,
+            message: `Workflow "${workflow}" executed successfully.`,
+          },
+        }
+      } catch (err) {
+        return {
+          data: {
+            workflow,
+            status: 'error',
+            message: `Workflow "${workflow}" failed: ${err instanceof Error ? err.message : String(err)}`,
+          },
+        }
+      }
+    }
+
+    const available = listWorkflows()
+    const availableNames = available.map((w) => w.name).join(', ')
     return {
       data: {
         workflow,
         status: 'not_found',
-        message: `Workflow "${workflow}" not found. No workflows are currently registered in this session.`,
+        message: available.length > 0
+          ? `Workflow "${workflow}" not found. Available workflows: ${availableNames}`
+          : `Workflow "${workflow}" not found. No workflows are currently registered in this session.`,
       },
     }
   },

@@ -88,12 +88,16 @@ export function registerLearnSkill(): void {
 3. **进行复习**：
    - 逐张展示卡片正面（问题）
    - 等待用户思考后展示答案
-   - 使用 AskUserQuestion 让用户自评：记住了 / 模糊 / 忘了
-4. **更新记录**：
-   - 根据自评结果更新复习间隔
-   - 记住了: 间隔 x2（最长 30 天）
-   - 模糊: 间隔不变
-   - 忘了: 重置为 1 天
+   - 使用 AskUserQuestion 让用户自评：0=忘了 / 1=模糊 / 2=记住了 / 3=太简单
+4. **使用 FSRS 算法更新记录**：
+   - .review-log.json 中每张卡片应记录: { cardId, stability, difficulty, lastReview, grade }
+   - 初始值: stability=1, difficulty=0.5
+   - 调用 fsrsNextInterval(grade, stability, difficulty, elapsed) 计算:
+     - grade: 用户自评映射 (忘了=0, 模糊=1, 记住了=2, 太简单=3)
+     - elapsed: 距 lastReview 的天数（首次默认 1）
+     - 返回 { interval, nextStability, nextDifficulty }
+   - 用 nextStability 和 nextDifficulty 更新卡片记录
+   - 下次复习日期 = 今天 + interval 天
    - 保存到 .review-log.json
 5. **复习总结**：展示本次复习的统计数据
 

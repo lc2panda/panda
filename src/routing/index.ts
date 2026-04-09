@@ -29,6 +29,37 @@ export type { FormatAdapter } from './formatAlignment.js'
 export { getPreset, getAllPresets, getActivePreset, setActivePreset, loadPresetsFromSettings } from './presets.js'
 
 // ─────────────────────────────────────────────────────────────
+// Fallback Executor — retry across models on overload errors
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Execute an API call with automatic fallback through a model chain.
+ * Only retries on 503 (overloaded) and 529 (rate-limited) errors.
+ * All other errors are thrown immediately.
+ */
+export async function executeWithFallback(
+  primaryModel: string,
+  fallbackChain: string[],
+  execute: (model: string) => Promise<any>,
+): Promise<any> {
+  const models = [primaryModel, ...fallbackChain]
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i]
+    try {
+      return await execute(model)
+    } catch (e: any) {
+      const status = e?.status ?? e?.statusCode
+      if ((status === 503 || status === 529) && i < models.length - 1) {
+        // Overloaded or rate-limited — try next model in chain
+        continue
+      }
+      throw e
+    }
+  }
+  throw new Error('All models in fallback chain exhausted')
+}
+
+// ─────────────────────────────────────────────────────────────
 // Feature Toggle — master switch for model routing
 // ─────────────────────────────────────────────────────────────
 
