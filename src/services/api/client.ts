@@ -100,13 +100,13 @@ export async function getAnthropicClient({
   model?: string
   fetchOverride?: ClientOptions['fetch']
   source?: string
-  /** Panda Code: per-request provider override from Multi-Model Routing.
+  /** Panda: per-request provider override from Multi-Model Routing.
    *  When set, creates a client pointed at a specific endpoint instead of
    *  the global provider. Only used when enableModelRouting=true and the
    *  agent is routed to a third-party model. */
   routingOverride?: { baseURL: string; apiKey: string }
 }): Promise<Anthropic> {
-  // Panda Code: per-request routing override takes highest priority
+  // Panda: per-request routing override takes highest priority
   if (routingOverride) {
     // Temporarily set env vars for this client creation only.
     // The Anthropic SDK reads these during construction.
@@ -375,7 +375,7 @@ export async function getAnthropicClient({
 
   const client = new Anthropic(clientConfig)
 
-  // Panda Code: restore env vars after routing override client creation
+  // Panda: restore env vars after routing override client creation
   const restoreEnv = (globalThis as Record<string, unknown>).__pandaRoutingRestore as (() => void) | undefined
   if (restoreEnv) {
     restoreEnv()

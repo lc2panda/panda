@@ -50,7 +50,7 @@ export function initBundledSkills(): void {
   registerCaptureSkill()
   registerLearnSkill()
   registerWechatQuerySkill()
-  // Panda Code: /dream skill available unconditionally — memory consolidation
+  // Panda: /dream skill available unconditionally — memory consolidation
   // should be accessible to all users, not just KAIROS mode.
   {
     /* eslint-disable @typescript-eslint/no-require-imports */

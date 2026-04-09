@@ -20,7 +20,7 @@ import type {
 /**
  * Built-in model profiles for Anthropic's Claude family.
  *
- * Capability scores are relative 0–100 rankings within the Panda Code
+ * Capability scores are relative 0–100 rankings within the Panda
  * ecosystem. They are updated when model launches change the landscape,
  * NOT when version numbers change — the `resolveModelId` function
  * defers to getModelStrings() for runtime version resolution.

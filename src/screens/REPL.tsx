@@ -733,7 +733,7 @@ export function REPL({
   const [ideInstallationStatus, setIDEInstallationStatus] = useState<IDEExtensionInstallationStatus | null>(null);
   const [showIdeOnboarding, setShowIdeOnboarding] = useState(false);
   // Dead code elimination: model switch callout state (ant-only)
-  // Panda Code: Also guard on AntModelSwitchCallout existence — if the component
+  // Panda: Also guard on AntModelSwitchCallout existence — if the component
   // is null, enabling the state creates a dead-lock (same as undercover callout).
   const [showModelSwitchCallout, setShowModelSwitchCallout] = useState(() => {
     if (("external" as string) === 'ant' && AntModelSwitchCallout) {
@@ -1015,7 +1015,7 @@ export function REPL({
   }, []);
   const [showUndercoverCallout, setShowUndercoverCallout] = useState(false);
   useEffect(() => {
-    // Panda Code: Only trigger undercover callout if the component exists.
+    // Panda: Only trigger undercover callout if the component exists.
     // UndercoverAutoCallout is null in non-Anthropic builds — setting
     // showUndercoverCallout=true without a renderable component creates a
     // dead-lock: focusedInputDialog='undercover-callout' hides the input bar,
@@ -1140,7 +1140,7 @@ export function REPL({
   // session from mid-conversation context.
   const haikuTitleAttemptedRef = useRef((initialMessages?.length ?? 0) > 0);
   const agentTitle = mainThreadAgentDefinition?.agentType;
-  const terminalTitle = sessionTitle ?? agentTitle ?? haikuTitle ?? 'Panda Code';
+  const terminalTitle = sessionTitle ?? agentTitle ?? haikuTitle ?? 'Panda';
   const isWaitingForApproval = toolUseConfirmQueue.length > 0 || promptQueue.length > 0 || pendingWorkerRequest || pendingSandboxRequest;
   // Local-jsx commands (like /plugin, /config) show user-facing dialogs that
   // wait for input. Require jsx != null — if the flag is stuck true but jsx
@@ -2689,7 +2689,7 @@ export function REPL({
     // which was broken by SessionStart hook messages (prepended via
     // useDeferredHookMessages) and attachment messages (appended by
     // processTextPrompt) — both pushed length past 1 on turn one, so the
-    // title silently fell through to the "Panda Code" default.
+    // title silently fell through to the "Panda" default.
     if (!titleDisabled && !sessionTitle && !agentTitle && !haikuTitleAttemptedRef.current) {
       const firstUserMessage = newMessages.find(m => m.type === 'user' && !m.isMeta);
       const text = firstUserMessage?.type === 'user' ? getContentText(firstUserMessage.message.content as string | ContentBlockParam[]) : null;
@@ -4132,7 +4132,7 @@ export function REPL({
   useEffect(() => {
     const handleSuspend = () => {
       // Print suspension instructions
-      process.stdout.write(`\nPanda Code has been suspended. Run \`fg\` to bring Panda Code back.\nNote: ctrl + z now suspends Panda Code, ctrl + _ undoes input.\n`);
+      process.stdout.write(`\nPanda has been suspended. Run \`fg\` to bring Panda back.\nNote: ctrl + z now suspends Panda, ctrl + _ undoes input.\n`);
     };
     const handleResume = () => {
       // Force complete component tree replacement instead of terminal clear

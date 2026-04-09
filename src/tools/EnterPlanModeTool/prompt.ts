@@ -164,6 +164,6 @@ User: "Fix the typo in the README"
 }
 
 export function getEnterPlanModeToolPrompt(): string {
-  // Panda Code: unlocked — ant prompt is more concise and action-oriented
+  // Panda: unlocked — ant prompt is more concise and action-oriented
   return getEnterPlanModeToolPromptAnt()
 }

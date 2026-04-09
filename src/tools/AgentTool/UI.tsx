@@ -431,7 +431,7 @@ export function renderToolUseTag(input: Partial<{
     const mainModel = getMainLoopModel();
     const agentModel = parseUserSpecifiedModel(input.model);
     if (agentModel !== mainModel) {
-      // Panda Code: show routed model with routing indicator when routing is active
+      // Panda: show routed model with routing indicator when routing is active
       const isRouted = (input as Record<string, unknown>)._routingReason;
       tags.push(<Box key="model" flexWrap="nowrap" marginLeft={1}>
           <Text dimColor>{isRouted ? '⚡ ' : ''}{renderModelName(agentModel)}</Text>

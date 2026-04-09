@@ -465,7 +465,7 @@ export const CLEAR_TAB_STATUS = osc(
  * DCS-passthrough carries the sequence to the outer terminal.
  */
 export function supportsTabStatus(): boolean {
-  // Panda Code: tab status is safe unconditionally — terminals that don't recognize it discard silently
+  // Panda: tab status is safe unconditionally — terminals that don't recognize it discard silently
   return true
 }
 

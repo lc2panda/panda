@@ -731,7 +731,7 @@ export function buildPlanApprovalOptions({
   });
   if (showUltraplan) {
     options.push({
-      label: isZh() ? '否，用 Ultraplan 继续优化' : 'No, refine with Ultraplan on Panda Code on the web',
+      label: isZh() ? '否，用 Ultraplan 继续优化' : 'No, refine with Ultraplan on Panda on the web',
       value: 'ultraplan'
     });
   }

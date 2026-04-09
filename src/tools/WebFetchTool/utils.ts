@@ -21,7 +21,7 @@ import { makeSecondaryModelPrompt } from './prompt.js'
 // Custom error classes for domain blocking
 class DomainBlockedError extends Error {
   constructor(domain: string) {
-    super(`Panda Code is unable to fetch from ${domain}`)
+    super(`Panda is unable to fetch from ${domain}`)
     this.name = 'DomainBlockedError'
   }
 }
@@ -101,7 +101,7 @@ function getTurndownService(): Promise<InstanceType<TurndownCtor>> {
 // for a data exfiltration. However, this is too restrictive for some customers'
 // legitimate use cases, such as JWT-signed URLs (e.g., cloud service signed URLs)
 // that can be much longer. We already require user approval for each domain,
-// which provides a primary security boundary. In addition, Panda Code has
+// which provides a primary security boundary. In addition, Panda has
 // other data exfil channels, and this one does not seem relatively high risk,
 // so I'm removing that length restriction. -ab
 const MAX_URL_LENGTH = 2000
@@ -405,7 +405,7 @@ export async function getURLMarkdownContent(
       }
     }
 
-    // Panda Code: unlocked — analytics for all users
+    // Panda: unlocked — analytics for all users
     logEvent('tengu_web_fetch_host', {
       hostname:
         hostname as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,

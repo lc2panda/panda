@@ -48,7 +48,7 @@ export function getPlanModeV2ExploreAgentCount(): number {
  * Config: ant=always_on, external=tengu_plan_mode_interview_phase gate, envVar=true
  */
 export function isPlanModeInterviewPhaseEnabled(): boolean {
-  // Panda Code: plan mode interview phase always enabled
+  // Panda: plan mode interview phase always enabled
   return true
 }
 

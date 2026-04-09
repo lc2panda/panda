@@ -261,7 +261,7 @@ export function createSessionSpawner(deps: SessionSpawnerDeps): SessionSpawner {
         } else {
           debugFile = `${deps.debugFile}-${safeId}`
         }
-      // Panda Code: auto-create debug log for all users when verbose
+      // Panda: auto-create debug log for all users when verbose
       } else if (deps.verbose || true) {
         debugFile = join(tmpdir(), 'claude', `bridge-session-${safeId}.log`)
       }

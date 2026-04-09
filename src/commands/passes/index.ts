@@ -10,9 +10,9 @@ export default {
   get description() {
     const reward = getCachedReferrerReward()
     if (reward) {
-      return 'Share a free week of Panda Code with friends and earn extra usage · 分享免费周并赚取额外用量'
+      return 'Share a free week of Panda with friends and earn extra usage · 分享免费周并赚取额外用量'
     }
-    return 'Share a free week of Panda Code with friends · 分享免费体验周给朋友'
+    return 'Share a free week of Panda with friends · 分享免费体验周给朋友'
   },
   get isHidden() {
     const { eligible, hasCache } = checkCachedPassesEligibility()

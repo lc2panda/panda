@@ -4,7 +4,7 @@
  */
 
 /**
- * A session ID uniquely identifies a Panda Code session.
+ * A session ID uniquely identifies a Panda session.
  * Returned by getSessionId().
  */
 export type SessionId = string & { readonly __brand: 'SessionId' }

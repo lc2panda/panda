@@ -47,7 +47,7 @@ import status from './commands/status/index.js'
 import tasks from './commands/tasks/index.js'
 import teleport from './commands/teleport/index.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
-// Panda Code: unconditionally load agents-platform (was gated by USER_TYPE === 'ant')
+// Panda: unconditionally load agents-platform (was gated by USER_TYPE === 'ant')
 const agentsPlatform = require('./commands/agents-platform/index.js').default
 /* eslint-enable @typescript-eslint/no-require-imports */
 import securityReview from './commands/security-review.js'
@@ -194,7 +194,7 @@ import stats from './commands/stats/index.js'
 const usageReport: Command = {
   type: 'prompt',
   name: 'insights',
-  description: 'Generate a report analyzing your Panda Code sessions · 生成会话分析报告',
+  description: 'Generate a report analyzing your Panda sessions · 生成会话分析报告',
   contentLength: 0,
   progressMessage: 'analyzing your sessions',
   source: 'builtin',
@@ -349,7 +349,7 @@ const COMMANDS = memoize((): Command[] => [
   tasks,
   ...(workflowsCmd ? [workflowsCmd] : []),
   ...(torch ? [torch] : []),
-  // Panda Code: INTERNAL_ONLY_COMMANDS unconditionally registered.
+  // Panda: INTERNAL_ONLY_COMMANDS unconditionally registered.
   // Original: gated by process.env.USER_TYPE === 'ant' (runtime check).
   // Build-time external→ant replacement does not affect process.env reads.
   ...(!process.env.IS_DEMO ? INTERNAL_ONLY_COMMANDS : []),

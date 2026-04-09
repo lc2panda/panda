@@ -221,7 +221,7 @@ export function createBridgeLogger(options: {
       suffix += chalk.dim(' \u00b7 ') + chalk.dim(branch)
     }
 
-    // Panda Code: show debug log path for all users
+    // Panda: show debug log path for all users
     if (debugLogPath) {
       writeStatus(
         `${chalk.yellow('[DEBUG] Logs:')} ${chalk.dim(debugLogPath)}\n`,

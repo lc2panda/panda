@@ -91,7 +91,7 @@ const AgentJsonSchema = lazySchema(() =>
     initialPrompt: z.string().optional(),
     memory: z.enum(['user', 'project', 'local']).optional(),
     background: z.boolean().optional(),
-    // Panda Code: unlocked — remote isolation available for all users
+    // Panda: unlocked — remote isolation available for all users
     isolation: (process.env.USER_TYPE === 'ant'
       ? z.enum(['worktree', 'remote'])
       : z.enum(['worktree', 'remote'])
@@ -131,7 +131,7 @@ export type BaseAgentDefinition = {
    * full CLAUDE.md and interprets their output. Saves ~5-15 Gtok/week across
    * 34M+ Explore spawns. Kill-switch: tengu_slim_subagent_claudemd. */
   omitClaudeMd?: boolean
-  // ── Multi-Model Agent Routing (Panda Code extension) ──────
+  // ── Multi-Model Agent Routing (Panda extension) ──────
   /**
    * Model preferences for routing — when enableModelRouting is on,
    * the router uses these to select the optimal model for this agent.
@@ -560,7 +560,7 @@ export function parseAgentsFromJson(
 /**
  * Parse modelPreferences and modelPreset from agent frontmatter.
  * All fields are optional — returns empty object if nothing is specified.
- * Panda Code: Multi-Model Agent Routing extension.
+ * Panda: Multi-Model Agent Routing extension.
  */
 function parseModelPreferences(frontmatter: Record<string, unknown>): {
   modelPreferences?: BaseAgentDefinition['modelPreferences']
@@ -667,7 +667,7 @@ export function parseAgentFromMarkdown(
 
     // Parse isolation mode. 'remote' is ant-only; external builds reject it at parse time.
     type IsolationMode = 'worktree' | 'remote'
-    // Panda Code: unlocked — remote isolation available for all users
+    // Panda: unlocked — remote isolation available for all users
     const VALID_ISOLATION_MODES: readonly IsolationMode[] =
       ['worktree', 'remote']
     const isolationRaw = frontmatter['isolation'] as string | undefined
@@ -806,7 +806,7 @@ export function parseAgentFromMarkdown(
       ...(background ? { background } : {}),
       ...(memory ? { memory } : {}),
       ...(isolation ? { isolation } : {}),
-      // Panda Code: Multi-Model Routing preferences from frontmatter
+      // Panda: Multi-Model Routing preferences from frontmatter
       ...parseModelPreferences(frontmatter),
     }
     return agentDef

@@ -34,7 +34,7 @@ export { BUILTIN_PERSONAS }
 function getThirdPartyModelGuidance(): string | null {
   if (!isThirdPartyProvider()) return null
   return [
-    'You are running inside Panda Code (a Claude Code fork). Follow these native tool and workflow conventions:',
+    'You are running inside Claude Code. Follow these native tool and workflow conventions:',
     '',
     '## Native Tools First',
     '- Prefer dedicated read/edit/write/search tools (Read, Edit, Write, Glob, Grep) over shell commands.',
@@ -78,7 +78,7 @@ function getTimeAwareness(): string {
 function getPersonaContext(): string | null {
   const config = getGlobalConfig()
   let key = config.persona?.active
-  // Panda Code: auto-detect persona from time/mood when set to 'auto' or not set
+  // Panda: auto-detect persona from time/mood when set to 'auto' or not set
   if (!key || key === 'auto') {
     try {
       const { detectPersona } = require('./assistant/personaDetector.js')
@@ -93,7 +93,7 @@ function getPersonaContext(): string | null {
   if (!persona) return null
   const parts = [`[Persona: ${persona.name}] 风格：${persona.style}`]
   if (custom?.systemPrompt) parts.push(custom.systemPrompt)
-  // Panda Code: append mood from sense pipeline when available
+  // Panda: append mood from sense pipeline when available
   try {
     const { getMoodSense } = require('./assistant/moodSense.js')
     const mood = getMoodSense()

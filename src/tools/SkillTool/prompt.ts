@@ -122,7 +122,7 @@ export function formatCommandsWithinBudget(
 
   if (maxDescLen < MIN_DESC_LENGTH) {
     // Extreme case: non-bundled go names-only, bundled keep descriptions
-    // Panda Code: unlocked — analytics for all users
+    // Panda: unlocked — analytics for all users
     logEvent('tengu_skill_descriptions_truncated', {
       skill_count: commands.length,
       budget,

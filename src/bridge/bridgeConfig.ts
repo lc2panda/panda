@@ -14,12 +14,12 @@
 import { getOauthConfig } from '../constants/oauth.js'
 import { getClaudeAIOAuthTokens } from '../utils/auth.js'
 
-/** Panda Code: dev override CLAUDE_BRIDGE_OAUTH_TOKEN available for all users. */
+/** Panda: dev override CLAUDE_BRIDGE_OAUTH_TOKEN available for all users. */
 export function getBridgeTokenOverride(): string | undefined {
   return process.env.CLAUDE_BRIDGE_OAUTH_TOKEN || undefined
 }
 
-/** Panda Code: dev override CLAUDE_BRIDGE_BASE_URL available for all users. */
+/** Panda: dev override CLAUDE_BRIDGE_BASE_URL available for all users. */
 export function getBridgeBaseUrlOverride(): string | undefined {
   return process.env.CLAUDE_BRIDGE_BASE_URL || undefined
 }

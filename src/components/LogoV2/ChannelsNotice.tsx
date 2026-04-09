@@ -136,7 +136,7 @@ export function ChannelsNotice() {
   }
   let t2;
   if ($[24] !== flag) {
-    t2 = <Text dimColor={true}>{t(`Experimental · inbound messages will be pushed into this session, this carries prompt injection risks. Restart Panda Code without ${flag} to disable.`, `实验性功能 · 入站消息将推送到此会话，存在提示注入风险。不带 ${flag} 重启 Panda Code 可禁用。`)}</Text>;
+    t2 = <Text dimColor={true}>{t(`Experimental · inbound messages will be pushed into this session, this carries prompt injection risks. Restart Panda without ${flag} to disable.`, `实验性功能 · 入站消息将推送到此会话，存在提示注入风险。不带 ${flag} 重启 Panda 可禁用。`)}</Text>;
     $[24] = flag;
     $[25] = t2;
   } else {

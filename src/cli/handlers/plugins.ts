@@ -342,7 +342,7 @@ export async function pluginListHandler(options: {
     // through to the session section so the failure is visible.
     if (inlineLoadErrors.length === 0) {
       cliOk(
-        'No plugins installed. Use `claude plugin install` to install a plugin.',
+        'No plugins installed. Use `panda plugin install` to install a plugin.',
       )
     }
   }

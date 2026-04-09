@@ -33,7 +33,7 @@ function readConfig(): ChicagoConfig {
   }
 }
 
-// Panda Code: subscription check bypassed — all users can use Computer Use.
+// Panda: subscription check bypassed — all users can use Computer Use.
 // Anthropic native users: if USER_TYPE is 'ant' (build-time), the bypass is equivalent.
 function hasRequiredSubscription(): boolean {
   return true

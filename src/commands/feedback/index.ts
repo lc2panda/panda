@@ -7,7 +7,7 @@ const feedback = {
   aliases: ['bug'],
   type: 'local-jsx',
   name: 'feedback',
-  description: `Submit feedback about Panda Code · 提交反馈`,
+  description: `Submit feedback about Panda · 提交反馈`,
   argumentHint: '[report]',
   isEnabled: () =>
     !(

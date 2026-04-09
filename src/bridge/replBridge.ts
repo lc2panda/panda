@@ -326,7 +326,7 @@ export async function initBridgeCore(
   })
   // Ant-only: interpose so /bridge-kick can inject poll/register/heartbeat
   // failures. Zero cost in external builds (rawApi passes through unchanged).
-  // Panda Code: fault injection available for all users (testing/debug tool)
+  // Panda: fault injection available for all users (testing/debug tool)
   const api = wrapApiForFaultInjection(rawApi)
 
   const bridgeConfig: BridgeConfig = {
@@ -969,7 +969,7 @@ export async function initBridgeCore(
   // ~30s poll wait — fire-and-observe in the debug log immediately.
   // Windows has no USR signals; `process.on` would throw there.
   let sigusr2Handler: (() => void) | undefined
-  // Panda Code: SIGUSR2 debug handler available for all users
+  // Panda: SIGUSR2 debug handler available for all users
   if (process.platform !== 'win32') {
     sigusr2Handler = () => {
       logForDebugging(
@@ -985,7 +985,7 @@ export async function initBridgeCore(
   // invoke it directly — the real setOnClose callback is buried inside
   // wireTransport which is itself inside onWorkReceived.
   let debugFireClose: ((code: number) => void) | null = null
-  // Panda Code: bridge debug handle available for all users
+  // Panda: bridge debug handle available for all users
   {
     registerBridgeDebugHandle({
       fireClose: code => {
@@ -1574,7 +1574,7 @@ export async function initBridgeCore(
     if (sigusr2Handler) {
       process.off('SIGUSR2', sigusr2Handler)
     }
-    // Panda Code: always clean up debug handle on teardown
+    // Panda: always clean up debug handle on teardown
     clearBridgeDebugHandle()
     debugFireClose = null
     pollController.abort()

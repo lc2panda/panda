@@ -415,7 +415,7 @@ export async function initReplBridge(
         `[bridge:repl] Skipping: ${versionError}`,
         true,
       )
-      onStateChange?.('failed', 'run `claude update` to upgrade')
+      onStateChange?.('failed', 'run `panda update` to upgrade')
       return null
     }
     logForDebugging(
@@ -456,7 +456,7 @@ export async function initReplBridge(
   const versionError = checkBridgeMinVersion()
   if (versionError) {
     logBridgeSkip('version_too_old', `[bridge:repl] Skipping: ${versionError}`)
-    onStateChange?.('failed', 'run `claude update` to upgrade')
+    onStateChange?.('failed', 'run `panda update` to upgrade')
     return null
   }
 
@@ -464,7 +464,7 @@ export async function initReplBridge(
   // Everything from here down is passed explicitly to bridgeCore.
   const branch = await getBranch()
   const gitRepoUrl = await getRemoteUrl()
-  // Panda Code: session ingress URL override available for all users
+  // Panda: session ingress URL override available for all users
   const sessionIngressUrl =
     process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL
       ? process.env.CLAUDE_BRIDGE_SESSION_INGRESS_URL

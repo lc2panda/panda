@@ -23,7 +23,7 @@ export const REPL_TOOL_NAME = 'REPL'
 export function isReplModeEnabled(): boolean {
   if (isEnvDefinedFalsy(process.env.CLAUDE_CODE_REPL)) return false
   if (isEnvTruthy(process.env.CLAUDE_REPL_MODE)) return true
-  // Panda Code: unlocked — REPL mode available for all CLI users
+  // Panda: unlocked — REPL mode available for all CLI users
   return process.env.CLAUDE_CODE_ENTRYPOINT === 'cli'
 }
 

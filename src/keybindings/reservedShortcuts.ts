@@ -11,7 +11,7 @@ export type ReservedShortcut = {
 }
 
 /**
- * Shortcuts that cannot be rebound - they are hardcoded in Panda Code.
+ * Shortcuts that cannot be rebound - they are hardcoded in Panda.
  */
 export const NON_REBINDABLE: ReservedShortcut[] = [
   {

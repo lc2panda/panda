@@ -189,7 +189,7 @@ export async function handlePromptSubmit(
     return
   }
 
-  // Panda Code: feed user input to mood sense pipeline (lightweight keyword match)
+  // Panda: feed user input to mood sense pipeline (lightweight keyword match)
   try {
     const { updateMoodFromMessage } = await import('../assistant/moodSense.js')
     updateMoodFromMessage(input)

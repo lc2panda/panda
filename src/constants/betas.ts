@@ -26,7 +26,7 @@ export const SUMMARIZE_CONNECTOR_TEXT_BETA_HEADER = feature('CONNECTOR_TEXT')
 export const AFK_MODE_BETA_HEADER = feature('TRANSCRIPT_CLASSIFIER')
   ? 'afk-mode-2026-01-31'
   : ''
-// Panda Code: unconditionally enable internal beta header for all users
+// Panda: unconditionally enable internal beta header for all users
 export const CLI_INTERNAL_BETA_HEADER = 'cli-internal-2026-02-09'
 export const ADVISOR_BETA_HEADER = 'advisor-tool-2026-03-01'
 export const EXTENDED_CACHE_TTL_BETA_HEADER = 'extended-cache-ttl-2025-04-11'

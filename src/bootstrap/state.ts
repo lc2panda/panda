@@ -388,7 +388,7 @@ function getInitialState(): State {
     mainThreadAgentType: undefined,
     // Remote mode
     isRemoteMode: false,
-    // Panda Code: bridge state available for all users
+    // Panda: bridge state available for all users
     replBridgeActive: false,
     // Direct connect server URL
     directConnectServerUrl: undefined,
@@ -963,7 +963,7 @@ export function setMeter(
     description: 'Number of git commits created',
   })
   STATE.costCounter = createCounter('claude_code.cost.usage', {
-    description: 'Cost of the Panda Code session',
+    description: 'Cost of the Panda session',
     unit: 'USD',
   })
   STATE.tokenCounter = createCounter('claude_code.token.usage', {
@@ -1564,7 +1564,7 @@ const MAX_SLOW_OPERATIONS = 10
 const SLOW_OPERATION_TTL_MS = 10000
 
 export function addSlowOperation(operation: string, durationMs: number): void {
-  // Panda Code: slow operations tracking enabled for all users
+  // Panda: slow operations tracking enabled for all users
   // Skip tracking for editor sessions (user editing a prompt file in $EDITOR)
   // These are intentionally slow since the user is drafting text
   if (operation.includes('exec') && operation.includes('claude-prompt-')) {

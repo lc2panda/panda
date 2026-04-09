@@ -13,7 +13,7 @@ import type { APIProvider } from '../utils/model/providers.js'
  * Capability dimensions for model classification.
  *
  * Binary flags indicate hard feature support (has or doesn't).
- * Scored dimensions are *relative* 0–100 rankings within the Panda Code
+ * Scored dimensions are *relative* 0–100 rankings within the Panda
  * model ecosystem — they are NOT absolute benchmark scores.
  *
  * Updated when model configs change in src/utils/model/configs.ts —
