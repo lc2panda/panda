@@ -3497,6 +3497,21 @@ export function REPL({
     // Update mood sense from user input (non-blocking, failure-safe)
     try { const { updateMoodFromMessage } = require('../assistant/moodSense.js'); updateMoodFromMessage(input); } catch {}
 
+    // Panda: record emotional event on user satisfaction signals
+    try {
+      const { recordEmotionalEvent } = require('../assistant/emotionalMemory.js')
+      if (input && /谢谢|thanks|thank you|太好了|perfect|great/i.test(input)) {
+        recordEmotionalEvent(`user_thanks: ${input.slice(0, 100)}`, 'satisfaction')
+      }
+    } catch {}
+
+    // Panda: update working memory with latest prompt
+    try {
+      const { setWorkingMemory } = require('../assistant/workingMemory.js')
+      setWorkingMemory('lastPrompt', input.slice(0, 200))
+      setWorkingMemory('lastPromptTime', new Date().toISOString())
+    } catch {}
+
     // Ensure SessionStart hook context is available before the first API call.
     await awaitPendingHooks();
     await handlePromptSubmit({

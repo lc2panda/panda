@@ -436,6 +436,13 @@ export async function gracefulShutdown(
   cleanupTerminalModes()
   printResumeHint()
 
+  // 保存情景记忆
+  try {
+    const { saveEpisodicMemory } = require('../memdir/memdir.js')
+    const sessionId = getSessionId()
+    saveEpisodicMemory(`Session ${sessionId} ended.`, { tools: [] })
+  } catch {}
+
   // Flush session data first — this is the most critical cleanup. If the
   // terminal is dead (SIGHUP, SSH disconnect), hooks and analytics may hang
   // on I/O to a dead TTY or unreachable network, eating into the

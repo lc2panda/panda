@@ -377,6 +377,38 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
     if (clipboard) sections.push(`- 剪贴板最近内容: ${clipboard.slice(0, 50)}...`)
   } catch {}
 
+  // 读取最近 7 天的情景记忆
+  try {
+    const { readdirSync, readFileSync: readFileSyncFs, statSync } = require('fs')
+    const { join: joinPath } = require('path')
+    const { homedir } = require('os')
+
+    const episodesDir = joinPath(homedir(), '.pandacc', 'auto_memory', 'episodes')
+    const cutoff = Date.now() - 7 * 86400000
+    const recentEpisodes = readdirSync(episodesDir)
+      .filter((f: string) => f.endsWith('.md'))
+      .map((f: string) => ({ name: f, path: joinPath(episodesDir, f), mtime: statSync(joinPath(episodesDir, f)).mtimeMs }))
+      .filter((f: { mtime: number }) => f.mtime > cutoff)
+      .sort((a: { mtime: number }, b: { mtime: number }) => b.mtime - a.mtime)
+      .slice(0, 10)
+      .map((f: { path: string }) => (readFileSyncFs(f.path, 'utf-8') as string).slice(0, 500))
+
+    if (recentEpisodes.length > 0) {
+      sections.push('\n## Recent Episodes (last 7 days)')
+      sections.push(recentEpisodes.join('\n---\n'))
+    }
+  } catch {}
+
+  // 读取情感记忆
+  try {
+    const { getRecentEmotionalEvents } = require('../../assistant/emotionalMemory.js')
+    const events = getRecentEmotionalEvents()
+    if (events && events.length > 0) {
+      sections.push('\n## Recent Emotional Events')
+      sections.push(events.map((e: { type: string; trigger: string; timestamp?: string }) => `- ${e.type}: ${e.trigger} (${e.timestamp || 'recent'})`).join('\n'))
+    }
+  } catch {}
+
   // Phase 2: Understand — 统计、分析和模式识别
   const allFiles = scanMdFiles(memoryDir)
   const patterns = allFiles.filter((f: string) => f.includes('/patterns/'))
