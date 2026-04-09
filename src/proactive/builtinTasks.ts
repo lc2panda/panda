@@ -1,5 +1,5 @@
 // Input: SmartCronTask definitions for scheduled autonomous work.
-// Output: 核心内置任务 + Phase 1~4 场景模块（系统健康/开发/文件/个人生活/安全/效率/高级系统/高级文件/通信/扩展）
+// Output: 核心内置任务（含前瞻记忆扫描） + Phase 1~4 场景模块（系统健康/开发/文件/个人生活/安全/效率/高级系统/高级文件/通信/扩展）
 // Pos: Registered by proactive/index.ts on activateProactive(); executed by night orchestrator.
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
@@ -7,6 +7,13 @@ import type { ProactiveTask } from './taskRegistry.js'
 import { isProactiveActive } from './index.js'
 import { isNightModeActive } from './nightMode.js'
 import { logForDebugging } from '../utils/debug.js'
+import { platform } from 'os'
+import { execSync } from 'child_process'
+import { readFileSync } from 'fs'
+import { join } from 'path'
+import { homedir } from 'os'
+
+const HOME = homedir()
 
 function canRun(): boolean {
   return isProactiveActive() || isNightModeActive()
@@ -379,6 +386,60 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
         }
       } catch (e) {
         logForDebugging(`[builtinTasks] profile-stale-reminder failed: ${(e as Error).message}`)
+      }
+    },
+  },
+  // ─── 前瞻记忆扫描 ───
+  {
+    id: 'prospective-scan',
+    description: '前瞻记忆扫描 · Prospective memory scan',
+    cron: '0 20 * * *',
+    priority: 'normal',
+    enabled: true,
+    condition: canRun,
+    action: async () => {
+      logForDebugging('[builtinTasks] prospective-scan: scanning upcoming events and deadlines')
+      const parts: string[] = []
+      // 读取倒计时事件
+      try {
+        const countdowns = JSON.parse(readFileSync(join(HOME, '.pandacc/config/countdowns.json'), 'utf-8'))
+        if (Array.isArray(countdowns) && countdowns.length > 0) {
+          const upcoming = countdowns.filter((c: any) => {
+            const diff = (new Date(c.date).getTime() - Date.now()) / 86400000
+            return diff > 0 && diff <= 3
+          })
+          if (upcoming.length > 0) {
+            parts.push('## 即将到来的事件')
+            upcoming.forEach((c: any) => {
+              const days = Math.ceil((new Date(c.date).getTime() - Date.now()) / 86400000)
+              parts.push(`- ${c.name}: ${days}天后 (${c.date})`)
+            })
+          }
+        }
+      } catch {}
+      // 读取日历 (macOS)
+      try {
+        if (platform() === 'darwin') {
+          const cal = execSync(`osascript -e 'tell application "Calendar" to get summary of (every event of every calendar whose start date > (current date) and start date < ((current date) + 3 * days))' 2>/dev/null`, { encoding: 'utf-8', timeout: 5000 }).trim()
+          if (cal) parts.push('## 日历事件\n' + cal)
+        }
+      } catch {}
+      // 读取 TODO
+      try {
+        const todoOut = execSync('grep -r "TODO\\|FIXME" . --include="*.ts" --include="*.tsx" -l 2>/dev/null | head -5', { encoding: 'utf-8', timeout: 5000, cwd: process.cwd() }).trim()
+        if (todoOut) parts.push(`## 待办文件\n${todoOut}`)
+      } catch {}
+
+      if (parts.length > 0) {
+        try {
+          const { saveProspectiveMemory } = await import('../memdir/memdir.js')
+          saveProspectiveMemory(parts.join('\n\n'))
+          logForDebugging(`[builtinTasks] prospective-scan: completed with ${parts.length} data sources`)
+        } catch (e) {
+          logForDebugging(`[builtinTasks] prospective-scan save failed: ${(e as Error).message}`)
+        }
+      } else {
+        logForDebugging('[builtinTasks] prospective-scan: no prospective items found')
       }
     },
   },
