@@ -1719,22 +1719,39 @@ export function generateFlashcards(content: string, maxCards: number = 10): stri
 }
 
 /**
- * FSRS 间隔重复计算。
- * 返回下次复习的天数间隔。
+ * FSRS-4 简化版间隔重复计算。
+ * 基于 FSRS 核心公式: 可提取性衰减 R = e^(-t/S)，稳定度增长 SInc。
+ * 返回下次复习间隔、更新后的稳定度和难度。
  */
 export function fsrsNextInterval(
-  difficulty: number,      // 0-1，越高越难
-  stability: number,       // 记忆稳定度（天）
-  _retrievability: number, // 当前可提取性（0-1）
-  grade: 'again' | 'hard' | 'good' | 'easy',
-): { interval: number; newStability: number } {
-  const gradeMultiplier = { again: 0.2, hard: 0.6, good: 1.0, easy: 1.5 }
-  const m = gradeMultiplier[grade]
+  grade: number,           // 0-3: again/hard/good/easy
+  stability: number,       // 当前稳定度（天）
+  difficulty: number,      // 0-1 难度
+  elapsed: number,         // 距上次复习的天数
+): { interval: number; nextStability: number; nextDifficulty: number } {
+  // FSRS-4 核心: 可提取性 R = e^(-elapsed/stability)
+  const retrievability = Math.exp(-elapsed / Math.max(stability, 0.1))
 
-  const newStability = stability * (1 + m * (1 - difficulty))
-  const interval = Math.max(1, Math.round(newStability * -Math.log(0.9) / Math.log(Math.E)))
+  // 难度更新: D' = D + w*(2 - grade)，grade越高难度越低
+  const w = 0.1
+  const nextDifficulty = Math.max(0, Math.min(1, difficulty + w * (2 - grade)))
 
-  return { interval, newStability: Math.max(0.1, newStability) }
+  // 稳定度增长因子 SInc (FSRS-4 简化)
+  const gradeMultipliers = [0.2, 0.8, 1.0, 1.3] // again/hard/good/easy
+  const SInc = gradeMultipliers[grade] * (1 + 11 * Math.pow(nextDifficulty, -0.5))
+    * Math.pow(stability, -0.2) * (Math.exp(0.05 * (1 - retrievability)) - 1)
+
+  let nextStability: number
+  if (grade === 0) {
+    // again: 重置稳定度（大幅衰减）
+    nextStability = Math.max(1, stability * 0.2)
+  } else {
+    nextStability = Math.max(1, stability * (1 + SInc))
+  }
+
+  // 间隔 = 稳定度 * 目标保留率系数
+  const interval = Math.round(nextStability * 0.9)
+  return { interval: Math.max(1, interval), nextStability, nextDifficulty }
 }
 
 // ═══════════════════════════════════════════════════════════════════

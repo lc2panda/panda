@@ -353,7 +353,7 @@ panda auth login
 - `code-generator` — 编码优化（model: balanced → Sonnet）
 - `triage` — 快速分类（model: fast → Haiku）
 
-**完整功能**（26/26 任务实装）：
+**完整功能**（21/26 任务实装）：
 
 - 5 Phase: Capability Registry → Routing Core → Format Alignment → UX & Presets → Production Hardening
 - 8 级优先级模型选择：显式 pin > 工具覆盖 > 能力要求 > 预设 > 偏好 > 别名 > 任务 > 默认
@@ -480,7 +480,7 @@ panda auth login
 | **代码健康**       | 每晚 23:00 | 构建检查 → 工作记忆                       |
 | **周报汇总**       | 每周一 08:00 | 汇总本周 DeepDream 报告                |
 
-> 完整 62 场景设计见 `monitor/proactive-scenarios-design.md`，覆盖系统(8)、通信(8)、文件(9)、开发(10)、知识(6)、效率(7)、安全(7)、个人(7) 八大维度。
+> 完整 95+ 场景设计见 `monitor/proactive-scenarios-design.md`，覆盖系统(8)、通信(8)、文件(9)、开发(10)、知识(6)、效率(7)、安全(7)、个人(7) 八大维度。
 
 **使用示例**：
 
@@ -729,7 +729,7 @@ EOF
 └──────────────┬──────────────────────────────┬───────────────────┘
                │                              │
 ┌──────────────┴──────────────┐ ┌─────────────┴───────────────────┐
-│      工 具 系 统 (59个)      │ │       API / Provider 层          │
+│      工 具 系 统 (56个)      │ │       API / Provider 层          │
 │  BashTool │ AgentTool       │ │  Anthropic │ Bedrock │ Vertex   │
 │  SleepTool │ MonitorTool    │ │  Foundry │ DeepSeek │ Kimi     │
 │  SnipTool │ WorkflowTool   │ │  Qwen │ MiniMax │ GLM │ 火山   │
@@ -748,7 +748,7 @@ EOF
 └─────────────────────────────────────────────────────────────────┘
 
 ╔═════════════════════════════════════════════════════════════════╗
-║      Feature Flag 系 统 (92 个全开 + 31 GrowthBook tengu flags)  ║
+║      Feature Flag 系 统 (89 个全开 + 31 GrowthBook tengu flags)  ║
 ╚═════════════════════════════════════════════════════════════════╝
 ```
 
@@ -1369,7 +1369,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 
 #### `/proactive` 🆕
 - **用法**: `/proactive [on|off]`
-- **说明**: 切换主动自主模式 — v2.5 扩展为 **71 个主动推送场景**
+- **说明**: 切换主动自主模式 — v2.5 扩展为 **95+ 个主动推送场景**
 - **核心内置任务**:
   - `dream-consolidate` — 22:00 自动记忆整合（调用 autoDream）
   - `morning-briefing` — 07:00 设置晨间简报 pending flag
@@ -1411,9 +1411,9 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
   - `/learn review` — 开始间隔重复复习
   - `/learn plan "学习 Rust"` — 生成学习路径
 
-#### 主动推送系统（v2.5 新增 — 85 场景）
+#### 主动推送系统（v2.5 新增 — 95+ 场景）
 
-v2.5 将主动推送从 3 个内置任务扩展为 **71 个场景**，分为非敏感（默认开启）和敏感（默认关闭）两类。
+v2.5 将主动推送从 3 个内置任务扩展为 **95+ 个场景**，分为非敏感（默认开启）和敏感（默认关闭）两类。
 
 **非敏感场景（默认开启）**
 

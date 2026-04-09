@@ -16,20 +16,25 @@ interface NativeModule {
   } | null
 }
 
+function spawnSyncCompat(cmd: string, args: string[]): { stdout: string; exitCode: number } {
+  if (typeof globalThis.Bun !== 'undefined') {
+    const result = Bun.spawnSync({ cmd: [cmd, ...args], stdout: 'pipe', stderr: 'pipe' })
+    return { stdout: new TextDecoder().decode(result.stdout), exitCode: result.exitCode }
+  }
+  const { spawnSync } = require('child_process')
+  const result = spawnSync(cmd, args, { encoding: 'utf-8' })
+  return { stdout: result.stdout || '', exitCode: result.status ?? 1 }
+}
+
 function createDarwinNativeModule(): NativeModule {
   return {
     hasClipboardImage(): boolean {
       try {
-        const result = Bun.spawnSync({
-          cmd: [
-            'osascript',
-            '-e',
-            'try\nthe clipboard as «class PNGf»\nreturn "yes"\non error\nreturn "no"\nend try',
-          ],
-          stdout: 'pipe',
-          stderr: 'pipe',
-        })
-        const output = result.stdout.toString().trim()
+        const result = spawnSyncCompat('osascript', [
+          '-e',
+          'try\nthe clipboard as «class PNGf»\nreturn "yes"\non error\nreturn "no"\nend try',
+        ])
+        const output = result.stdout.trim()
         return output === 'yes'
       } catch {
         return false
@@ -51,18 +56,12 @@ write png_data to fp
 close access fp
 return "${tmpPath}"
 `
-        const result = Bun.spawnSync({
-          cmd: ['osascript', '-e', script],
-          stdout: 'pipe',
-          stderr: 'pipe',
-        })
+        const result = spawnSyncCompat('osascript', ['-e', script])
 
         if (result.exitCode !== 0) {
           return null
         }
 
-        const file = Bun.file(tmpPath)
-        // Use synchronous read via Node compat
         const fs = require('fs')
         const buffer: Buffer = fs.readFileSync(tmpPath)
 

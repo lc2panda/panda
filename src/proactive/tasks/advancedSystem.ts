@@ -174,11 +174,22 @@ const zombieProcessAlert: SmartCronTask = {
           const threshold4GB = 4 * 1024 * 1024 // RSS 单位 KB
           for (const line of lines) {
             const parts = line.trim().split(/\s+/)
-            const rss = parseInt(parts[5], 10)
-            if (rss > threshold4GB) {
-              const cmd = parts.slice(10).join(' ').slice(0, 40)
-              const gb = (rss / 1048576).toFixed(1)
-              issues.push(`进程 ${cmd} 占用 ${gb}GB 内存`)
+            if (IS_MAC) {
+              // ps -Arx -o pid,rss,comm → 3 列: PID RSS COMM（COMM 可含空格）
+              const rss = parseInt(parts[1], 10)
+              if (rss > threshold4GB) {
+                const cmd = parts.slice(2).join(' ').slice(0, 40)
+                const gb = (rss / 1048576).toFixed(1)
+                issues.push(`进程 ${cmd} 占用 ${gb}GB 内存`)
+              }
+            } else {
+              // ps aux → 11 列: USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND
+              const rss = parseInt(parts[5], 10)
+              if (rss > threshold4GB) {
+                const cmd = parts.slice(10).join(' ').slice(0, 40)
+                const gb = (rss / 1048576).toFixed(1)
+                issues.push(`进程 ${cmd} 占用 ${gb}GB 内存`)
+              }
             }
           }
         } catch {}

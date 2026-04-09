@@ -40,20 +40,28 @@ ${content}
 ## 步骤
 
 1. **分析内容**：判断内容类型（想法/TODO/问题/代码片段/参考链接/灵感）
-2. **创建笔记文件**：
-   - 保存路径: \`${cwd}/working/inbox/${timestamp}.md\`（如果 working/inbox 目录不存在，先创建它）
+2. **PARA 分类**：根据内容特征判断最合适的归档位置：
+   - **Projects** (\`${cwd}/working/projects/\`): 有明确截止日期或交付物的活跃项目相关内容
+   - **Areas** (\`${cwd}/working/areas/\`): 持续关注的责任领域（健康、财务、职业发展等）
+   - **Resources** (\`${cwd}/working/resources/\`): 感兴趣的参考资料、教程、工具收集
+   - **Archives** (\`${cwd}/working/archives/\`): 已完成或不再活跃的内容
+   - **Inbox** (\`${cwd}/working/inbox/\`): 无法明确归类时的默认位置
+   - 判断依据：如果内容提到具体项目名称/截止日期→Projects；如果是长期关注领域→Areas；如果是参考资料/链接收集→Resources；否则→Inbox
+3. **创建笔记文件**：
+   - 保存路径: \`${cwd}/working/<PARA分类>/${timestamp}.md\`（如果目录不存在，先创建它）
    - 如果用户有 memory 目录 (\`${memoryDir}\`)，同时在 memory 中追加索引条目
-3. **文件内容格式**：
+4. **文件内容格式**：
    \`\`\`markdown
    ---
    type: <想法|TODO|问题|代码片段|参考|灵感>
+   para: <projects|areas|resources|archives|inbox>
    captured: ${new Date().toISOString()}
    source: manual
    ---
 
    <用户原文，适当格式化>
    \`\`\`
-4. **确认输出**：告知用户文件已保存的位置和内容摘要
+5. **确认输出**：告知用户文件已保存的位置和内容摘要
 
 ## 安全规则
 
