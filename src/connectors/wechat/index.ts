@@ -920,8 +920,10 @@ export const wechatConnectorFactory: ConnectorFactory = {
   description: '微信 Connector（企微 API + macOS 本地 DB 双模）',
   supportedModes: ['api', 'local-db'],
   defaultCapabilities: ['messages.read', 'contacts.read', 'unread.summary'],
-  create(): IMConnector {
-    // 默认企微模式
+  create(config?: ConnectorConfig): IMConnector {
+    if (config?.mode === 'local-db') return new WechatLocalDBConnector()
+    if (config?.mode === 'api') return new WecomAPIConnector()
+    // 默认企微 API 模式
     return new WecomAPIConnector()
   },
 }

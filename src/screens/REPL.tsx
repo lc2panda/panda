@@ -3494,6 +3494,9 @@ export function REPL({
       return;
     }
 
+    // Update mood sense from user input (non-blocking, failure-safe)
+    try { const { updateMoodFromMessage } = require('../assistant/moodSense.js'); updateMoodFromMessage(input); } catch {}
+
     // Ensure SessionStart hook context is available before the first API call.
     await awaitPendingHooks();
     await handlePromptSubmit({

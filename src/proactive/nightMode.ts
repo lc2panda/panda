@@ -8,6 +8,9 @@ import { getEnabledTasks } from './taskRegistry.js'
 import { safeExecute } from './safeExecutor.js'
 import { logForDebugging } from '../utils/debug.js'
 import { matchesCronNow } from '../utils/cron.js'
+import { readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { join } from 'path'
+import { homedir } from 'os'
 
 export interface NightModeConfig {
   enabled: boolean
@@ -28,7 +31,37 @@ const TASK_INTERVAL_MS = 5 * 60 * 1000 // 5 min between tasks
 
 let _lastOrchestratorRun = 0
 // 记录每个任务的最后执行时间，避免同一 cron 窗口内重复执行
-const _taskLastExecMap = new Map<string, number>()
+const _EXEC_HISTORY_PATH = join(homedir(), '.pandacc', 'data', 'task-exec-history.json')
+const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000
+
+function _loadExecHistory(): Map<string, number> {
+  try {
+    const raw = readFileSync(_EXEC_HISTORY_PATH, 'utf-8')
+    const entries: [string, number][] = JSON.parse(raw)
+    const now = Date.now()
+    // Only keep entries from the last 24 hours
+    return new Map(entries.filter(([, ts]) => now - ts < TWENTY_FOUR_HOURS))
+  } catch {
+    return new Map()
+  }
+}
+
+function _saveExecHistory(): void {
+  try {
+    const now = Date.now()
+    // Prune old entries before saving
+    for (const [key, ts] of _taskLastExecMap) {
+      if (now - ts >= TWENTY_FOUR_HOURS) _taskLastExecMap.delete(key)
+    }
+    const dir = join(homedir(), '.pandacc', 'data')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(_EXEC_HISTORY_PATH, JSON.stringify([..._taskLastExecMap.entries()]))
+  } catch (e) {
+    logForDebugging(`[nightMode] failed to save exec history: ${e}`)
+  }
+}
+
+const _taskLastExecMap = _loadExecHistory()
 const EXEC_MAP_MAX = 256
 const _tasksExecuting = new Set<string>()
 
@@ -116,6 +149,7 @@ export async function runNightTasks(): Promise<void> {
     _tasksExecuting.delete(task.id)
     if (result.success) {
       _taskLastExecMap.set(task.id, now)
+      _saveExecHistory()
       logForDebugging(`[proactive] ${task.id} succeeded: ${result.output}`)
     } else if (result.output?.includes('__SKIPPED__')) {
       logForDebugging(`[proactive] ${task.id} skipped (skipIf)`)

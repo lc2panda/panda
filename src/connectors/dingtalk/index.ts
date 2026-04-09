@@ -382,7 +382,10 @@ export const dingtalkConnectorFactory: ConnectorFactory = {
     'messages.read', 'messages.send', 'calendar.read',
     'contacts.read', 'tasks.read', 'unread.summary',
   ],
-  create(): IMConnector {
+  create(config?: ConnectorConfig): IMConnector {
+    if (config?.mode === 'api') return new DingtalkAPIConnector()
+    if (config?.mode === 'mcp') return new DingtalkMCPConnector()
+    // 默认 MCP 模式
     return new DingtalkMCPConnector()
   },
 }
