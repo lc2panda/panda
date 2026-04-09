@@ -3,6 +3,7 @@
 // Pos: assistant/ 主动交互引擎（被动层），由 stopHooks 在每轮结束后调用
 //      主动层（时间驱动）在 proactive/builtinTasks.ts 中：日历提醒、Git 提醒、画像过期、前瞻扫描
 //      检查器 6 桥接主动层通知到被动层（pending-notifications）
+//      检查器 7 习惯偏差检查（深夜关怀 + 长时间连续工作提醒）
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
 
 import { join } from 'path'
@@ -43,6 +44,7 @@ export async function checkProactiveSuggestions(context: {
     () => _checkContextPressure(context),
     () => _checkRepetitivePattern(context),
     () => _checkPendingNotifications(),
+    () => _checkHabitDeviation(),
   ]
 
   for (const checker of checkers) {
@@ -241,6 +243,41 @@ function _checkRepetitivePattern(context: {
   } catch {
     // 消息格式异常
   }
+  return null
+}
+
+// ─── 检查器 6: 未读通知消费（主动层 → 被动层桥接） ───
+
+// ─── 检查器 7: 习惯偏差检查（深夜工作关怀 + 长时间连续工作） ───
+
+function _checkHabitDeviation(): ProactiveSuggestion | null {
+  try {
+    const hour = new Date().getHours()
+    // 深夜工作关怀
+    if (hour >= 23 || hour < 5) {
+      return {
+        type: 'tip' as any,
+        message: '🌙 深夜了，注意休息。持续工作效率会下降，明天继续也不迟。',
+        priority: 'low',
+        source: 'habit_deviation_late_night',
+      }
+    }
+    // 长时间连续工作（通过工作记忆判断）
+    const { getWorkingMemory } = require('./workingMemory.js') as typeof import('./workingMemory.js')
+    const lastTime = getWorkingMemory('lastPromptTime')
+    const firstTime = getWorkingMemory('sessionStartTime')
+    if (lastTime && firstTime) {
+      const duration = (new Date(lastTime).getTime() - new Date(firstTime).getTime()) / 3600000
+      if (duration > 3) {
+        return {
+          type: 'tip' as any,
+          message: `⏰ 已连续工作 ${Math.round(duration)} 小时，建议休息 10 分钟。`,
+          priority: 'low',
+          source: 'habit_deviation_long_session',
+        }
+      }
+    }
+  } catch {}
   return null
 }
 

@@ -3507,9 +3507,13 @@ export function REPL({
 
     // Panda: update working memory with latest prompt
     try {
-      const { setWorkingMemory } = require('../assistant/workingMemory.js')
+      const { setWorkingMemory, getWorkingMemory } = require('../assistant/workingMemory.js')
       setWorkingMemory('lastPrompt', input.slice(0, 200))
       setWorkingMemory('lastPromptTime', new Date().toISOString())
+      // 记录会话开始时间（仅首次）
+      if (!getWorkingMemory('sessionStartTime')) {
+        setWorkingMemory('sessionStartTime', new Date().toISOString())
+      }
     } catch {}
 
     // Ensure SessionStart hook context is available before the first API call.
