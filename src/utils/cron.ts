@@ -101,6 +101,34 @@ export function parseCronExpression(expr: string): CronFields | null {
 }
 
 /**
+ * Check if a cron expression matches the current time (within a tolerance window).
+ * Used by the proactive task orchestrator to determine which tasks should fire now.
+ */
+export function matchesCronNow(cronExpr: string, toleranceMinutes: number = 5): boolean {
+  const fields = parseCronExpression(cronExpr)
+  if (!fields) return false
+  const now = new Date()
+  // Check current minute and the previous toleranceMinutes-1 minutes
+  for (let offset = 0; offset < toleranceMinutes; offset++) {
+    const check = new Date(now.getTime() - offset * 60000)
+    const m = check.getMinutes()
+    const h = check.getHours()
+    const dom = check.getDate()
+    const mon = check.getMonth() + 1
+    const dow = check.getDay()
+    if (
+      fields.minute.includes(m) &&
+      fields.hour.includes(h) &&
+      fields.month.includes(mon) &&
+      (fields.dayOfMonth.includes(dom) || fields.dayOfWeek.includes(dow))
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
  * Compute the next Date strictly after `from` that matches the cron fields,
  * using the process's local timezone. Walks forward minute-by-minute. Bounded
  * at 366 days; returns null if no match (impossible for valid cron, but

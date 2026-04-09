@@ -51,8 +51,9 @@ export function useProactive(options: UseProactiveOptions): void {
 
     if (tickTimerRef.current === null) {
       if (!isLoading) {
-        // During night hours, run scheduled tasks (dream, health) before the tick prompt
-        if (isNightModeActive()) {
+        // 执行已注册的 cron 定时任务（dream, health, 71 场景等）
+        // /proactive on 或 night-mode 均可触发，不限于夜间
+        if (isProactiveActive() || isNightModeActive()) {
           void runNightTasks().catch(() => {})
         }
         onSubmitTick(tickPrompt)
