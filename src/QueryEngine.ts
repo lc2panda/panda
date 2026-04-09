@@ -1105,6 +1105,12 @@ export class QueryEngine {
     }
 
     if (!isResultSuccessful(result, lastStopReason)) {
+      // Panda: record emotional event on execution errors
+      try {
+        const { recordEmotionalEvent } = require('./assistant/emotionalMemory.js')
+        recordEmotionalEvent(`tool_error: stop_reason=${lastStopReason}`, 'frustration')
+      } catch {}
+
       yield {
         type: 'result',
         subtype: 'error_during_execution',
@@ -1156,6 +1162,15 @@ export class QueryEngine {
       }
       isApiError = Boolean(result.isApiErrorMessage)
     }
+
+    // Panda: record emotional event on user satisfaction signals
+    try {
+      const { recordEmotionalEvent } = require('./assistant/emotionalMemory.js')
+      const userMsg = typeof prompt === 'string' ? prompt : ''
+      if (userMsg && /谢谢|thanks|thank you|太好了|perfect|great/i.test(userMsg)) {
+        recordEmotionalEvent(`user_thanks: ${userMsg.slice(0, 100)}`, 'satisfaction')
+      }
+    } catch {}
 
     yield {
       type: 'result',
