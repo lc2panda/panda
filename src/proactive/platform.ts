@@ -227,6 +227,11 @@ const DEFAULT_CONFIG_FILES: Record<string, string> = {
   '.pandacc/config/wechat-keywords.json': '["合同", "截止", "紧急", "上线", "发版"]',
   '.pandacc/config/wechat-vip.json': '[]',
   '.pandacc/config/wechat-topics.json': '[]',
+  '.pandacc/config/wechat-user.json': '{"nickname": ""}',
+  '.pandacc/config/countdowns.json': '[]',
+  '.pandacc/config/rss-feeds.json': '[]',
+  '.pandacc/config/tracking.json': '[]',
+  '.pandacc/config/cloud-billing.json': '{}',
 }
 
 export function ensurePandaccDirs(): void {
