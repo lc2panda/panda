@@ -1,6 +1,9 @@
 // Extracted from dream.ts so auto-dream ships independently of KAIROS
 // feature flags (dream.ts is behind a feature()-gated require).
 
+import { join } from 'path'
+import { existsSync, readFileSync, readdirSync } from 'fs'
+
 import {
   DIR_EXISTS_GUIDANCE,
   ENTRYPOINT_NAME,
@@ -12,6 +15,30 @@ export function buildConsolidationPrompt(
   transcriptDir: string,
   extra: string,
 ): string {
+  let habitsSection = ''
+  let prospectiveSection = ''
+
+  // 读取行为习惯
+  try {
+    const habitsPath = join(memoryRoot, 'procedural', 'habits.md')
+    if (existsSync(habitsPath)) {
+      const habits = readFileSync(habitsPath, 'utf-8').slice(0, 500)
+      habitsSection = '\n\n## Behavioral Patterns\n' + habits
+    }
+  } catch {}
+
+  // 读取前瞻记忆
+  try {
+    const prospDir = join(memoryRoot, 'dreams', 'prospective')
+    if (existsSync(prospDir)) {
+      const files = readdirSync(prospDir).filter(f => f.endsWith('.md')).sort().reverse()
+      if (files.length > 0) {
+        const prosp = readFileSync(join(prospDir, files[0]), 'utf-8').slice(0, 500)
+        prospectiveSection = '\n\n## Upcoming Events\n' + prosp
+      }
+    }
+  } catch {}
+
   return `# Dream: Memory Consolidation
 
 You are performing a dream — a reflective pass over your memory files. Synthesize what you've learned recently into durable, well-organized memories so that future sessions can orient quickly.
@@ -65,5 +92,10 @@ Update \`${ENTRYPOINT_NAME}\` so it stays under ${MAX_ENTRYPOINT_LINES} lines AN
 
 ---
 
-Return a brief summary of what you consolidated, updated, or pruned. If nothing changed (memories are already tight), say so.${extra ? `\n\n## Additional context\n\n${extra}` : ''}`
+Return a brief summary of what you consolidated, updated, or pruned. If nothing changed (memories are already tight), say so.
+
+在整合完成后，请明确指出：
+1. 哪些记忆应强化（列出文件名和建议 strength 增量）
+2. 哪些记忆可归档（超过 30 天未访问且 strength < 0.3）
+3. 哪些新知识应提取到 semantic/ 目录${habitsSection}${prospectiveSection}${extra ? `\n\n## Additional context\n\n${extra}` : ''}`
 }

@@ -1837,23 +1837,110 @@ export async function recordBehavior(
 /**
  * 分析行为模式——返回用户的活跃时段分布。
  */
-export function analyzeHabits(memoryDir: string): { peakHours: number[]; avgSessionLength: number } {
+export function analyzeHabits(memoryDir: string): { peakHours: number[]; avgSessionLength: number; topTools: [string, number][] } {
   const habitsPath = join(memoryDir, 'procedural', 'habits.md')
-  const hourCounts = new Array(24).fill(0)
+  const hourCounts: Record<number, number> = {}
 
   try {
     const content = readFileSync(habitsPath, 'utf-8')
     const timeMatches = content.match(/\d{4}-\d{2}-\d{2}T(\d{2}):/g) || []
     for (const m of timeMatches) {
       const hour = parseInt(m.match(/T(\d{2})/)?.[1] || '0', 10)
-      hourCounts[hour]++
+      hourCounts[hour] = (hourCounts[hour] || 0) + 1
     }
   } catch {}
 
-  // 找出活跃高峰时段（前 5 名）
-  const indexed = hourCounts.map((count: number, hour: number) => ({ hour, count }))
-  indexed.sort((a: { count: number }, b: { count: number }) => b.count - a.count)
-  const peakHours = indexed.slice(0, 5).filter((h: { count: number }) => h.count > 0).map((h: { hour: number }) => h.hour)
+  // 识别高频工作时段（前 3 名）
+  const peakHours = Object.entries(hourCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([h]) => parseInt(h, 10))
 
-  return { peakHours, avgSessionLength: 0 }
+  // 识别工具使用偏好
+  const toolCounts: Record<string, number> = {}
+  try {
+    const episodesDir = join(memoryDir, 'episodes')
+    if (existsSync(episodesDir)) {
+      for (const f of readdirSync(episodesDir).filter(f => f.endsWith('.md')).slice(-30)) {
+        const content = readFileSync(join(episodesDir, f), 'utf-8')
+        const toolMatch = content.match(/tools?:\s*\[([^\]]*)\]/i)
+        if (toolMatch) {
+          toolMatch[1].split(',').map(t => t.trim().replace(/['"]/g, '')).filter(Boolean)
+            .forEach(t => { toolCounts[t] = (toolCounts[t] || 0) + 1 })
+        }
+      }
+    }
+  } catch {}
+
+  // 扫描 working/ 目录提取工具名
+  try {
+    const workingDir = join(memoryDir, 'working')
+    if (existsSync(workingDir)) {
+      for (const f of readdirSync(workingDir).filter(f => f.endsWith('.md')).slice(-20)) {
+        const content = readFileSync(join(workingDir, f), 'utf-8')
+        const toolMatch = content.match(/tools?:\s*\[([^\]]*)\]/i)
+        if (toolMatch) {
+          toolMatch[1].split(',').map(t => t.trim().replace(/['"]/g, '')).filter(Boolean)
+            .forEach(t => { toolCounts[t] = (toolCounts[t] || 0) + 1 })
+        }
+      }
+    }
+  } catch {}
+
+  const topTools: [string, number][] = Object.entries(toolCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
+
+  // 估算平均连续工作时长（基于时间戳间隔）
+  let avgSessionLength = 0
+  try {
+    const content = readFileSync(habitsPath, 'utf-8')
+    const timestamps = (content.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/g) || [])
+      .map(t => new Date(t).getTime())
+      .filter(t => !isNaN(t))
+      .sort((a, b) => a - b)
+    if (timestamps.length >= 2) {
+      const sessions: number[] = []
+      let sessionStart = timestamps[0]
+      for (let i = 1; i < timestamps.length; i++) {
+        const gap = timestamps[i] - timestamps[i - 1]
+        if (gap > 2 * 60 * 60 * 1000) { // 2小时间隔视为新 session
+          sessions.push(timestamps[i - 1] - sessionStart)
+          sessionStart = timestamps[i]
+        }
+      }
+      sessions.push(timestamps[timestamps.length - 1] - sessionStart)
+      const validSessions = sessions.filter(s => s > 0)
+      if (validSessions.length > 0) {
+        avgSessionLength = validSessions.reduce((a, b) => a + b, 0) / validSessions.length / 3600000
+      }
+    }
+  } catch {}
+
+  // 写入结构化 habits.md（覆盖写入）
+  try {
+    const proceduralDir = join(memoryDir, 'procedural')
+    mkdirSync(proceduralDir, { recursive: true })
+    const now = new Date().toISOString().slice(0, 10)
+    const peakHoursStr = peakHours.map(h => `${h}:00`).join(', ') || '暂无数据'
+    const toolLines = topTools.length > 0
+      ? topTools.map(([name, count], i) => `${i + 1}. ${name} (${count}次)`).join('\n')
+      : '暂无数据'
+    const avgStr = avgSessionLength > 0 ? `${avgSessionLength.toFixed(1)} 小时` : '暂无数据'
+
+    const habitsContent = `---
+type: procedural
+updated: ${now}
+---
+## 工作时段
+高频时段: ${peakHoursStr}
+
+## 工具偏好
+${toolLines}
+
+## 行为模式
+- 连续工作时长: 平均 ${avgStr}
+`
+    writeFileSync(habitsPath, habitsContent)
+  } catch {}
+
+  return { peakHours, avgSessionLength, topTools }
 }
