@@ -154,6 +154,12 @@ export const DIRS_EXIST_GUIDANCE =
  * try/catch needed for the happy path.
  */
 export async function ensureMemoryDirExists(memoryDir: string): Promise<void> {
+  // 确保 ~/.pandacc/ 基础目录结构存在（首次启动）
+  try {
+    const { ensurePandaccDirs } = require('../proactive/platform.js') as typeof import('../proactive/platform.js')
+    ensurePandaccDirs()
+  } catch {}
+
   const fs = getFsImplementation()
   try {
     await fs.mkdir(memoryDir)

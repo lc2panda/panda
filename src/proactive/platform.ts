@@ -168,3 +168,38 @@ export { IS_MAC, IS_WIN }
 export const HOME = homedir()
 export const DOWNLOADS = join(HOME, 'Downloads')
 export const DESKTOP = join(HOME, 'Desktop')
+
+// ─── 首次启动目录初始化 ───
+
+import { mkdirSync } from 'fs'
+
+const PANDACC_DIRS = [
+  '.pandacc/config',
+  '.pandacc/data/clipboard',
+  '.pandacc/data/notification-stats',
+  '.pandacc/data/todo-history',
+  '.pandacc/data/wechat-stats',
+  '.pandacc/data/wechat-decrypted',
+  '.pandacc/data/wechat-situational',
+  '.pandacc/data/wechat-situational/weekly',
+  '.pandacc/data/wechat-situational/monthly',
+  '.pandacc/data/wechat-situational/quarterly',
+  '.pandacc/data/wechat-situational/yearly',
+  '.pandacc/channels/outbox',
+  '.pandacc/assistant',
+]
+
+let _dirsEnsured = false
+
+/**
+ * 确保 ~/.pandacc/ 下所有必要子目录存在。
+ * 幂等操作，首次调用时创建，后续跳过。
+ * 由 proactive 激活时调用，也可在启动时调用。
+ */
+export function ensurePandaccDirs(): void {
+  if (_dirsEnsured) return
+  _dirsEnsured = true
+  for (const sub of PANDACC_DIRS) {
+    try { mkdirSync(join(HOME, sub), { recursive: true }) } catch {}
+  }
+}

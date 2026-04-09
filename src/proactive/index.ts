@@ -30,6 +30,11 @@ export function isProactivePaused(): boolean {
 export function activateProactive(_source?: string): void {
   if (_active) return
   _active = true
+  // 首次激活时确保所有 ~/.pandacc/ 子目录存在
+  try {
+    const { ensurePandaccDirs } = require('./platform.js') as typeof import('./platform.js')
+    ensurePandaccDirs()
+  } catch {}
   for (const task of BUILTIN_TASKS) {
     registerTask(task)
   }
