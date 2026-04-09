@@ -130,6 +130,21 @@ const HIGH_PRIVACY_SCENARIOS = new Set([
   'im-approval-alert',
   'im-document-update',
   'im-reverse-push',
+  // 微信态势感知（读取微信聊天记录/联系人/群组数据）
+  'wechat-daily-situational',
+  'wechat-mention-alert',
+  'wechat-keyword-monitor',
+  'wechat-unreplied-reminder',
+  'wechat-group-digest',
+  'wechat-contact-insights',
+  'wechat-noise-filter',
+  'wechat-sentiment-pulse',
+  'wechat-weekly-trend',
+  'wechat-monthly-report',
+  'wechat-quarterly-review',
+  'wechat-yearly-digest',
+  'wechat-relationship-health',
+  'wechat-topic-tracker',
 ])
 
 export function isScenarioEnabled(scenarioId: string): boolean {

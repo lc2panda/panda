@@ -413,6 +413,8 @@ function loadScenarioModules(): SmartCronTask[] {
     { path: './tasks/notificationScenarios.js', getter: 'getNotificationTasks' },
     // Phase 6: IM 聚合
     { path: './tasks/imScenarios.js', getter: 'getIMTasks' },
+    // Phase 7: 微信态势感知
+    { path: './tasks/wechatSituational.js', getter: 'getWechatSituationalTasks' },
   ]
   for (const { path, getter } of modules) {
     try {
