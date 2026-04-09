@@ -609,6 +609,25 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 **数据持久化**：每日统计快照 `~/.pandacc/data/wechat-stats/YYYY-MM-DD.json`，周/月/季/年报告基于快照做趋势分析。
 
+**快速启用**（在 `~/.pandacc/config/proactive.json` 的 `enabledScenarios` 中添加）：
+
+```json
+{
+  "enabledScenarios": {
+    "wechat-messages": true,
+    "wechat-daily-situational": true,
+    "wechat-mention-alert": true,
+    "wechat-keyword-monitor": true,
+    "wechat-unreplied-reminder": true,
+    "wechat-group-digest": true,
+    "wechat-weekly-trend": true,
+    "wechat-relationship-health": true
+  }
+}
+```
+
+> 以上为推荐的最小启用集（8 个核心场景）。全部 14 个场景可按需逐一开启，详见 [1.4 配置参考 → proactive.json](#14-配置参考)。
+
 ### 3.7 隐私铁律
 
 ```
