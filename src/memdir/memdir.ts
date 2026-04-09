@@ -768,7 +768,7 @@ function _extractTechKeywords(text: string): Record<string, string[]> {
       const re = new RegExp(`\\b${pattern}\\b`, 'i')
       if (re.test(lower)) {
         // 用原始关键词名（去掉正则转义）
-        found.add(pattern.replace(/\\[.?+]/g, m => m[1]))
+        found.add(pattern.replace(/\\(.)/g, '$1'))
       }
     }
     if (found.size > 0) result[category] = [...found]
@@ -841,7 +841,7 @@ async function _extractUserFeatures(messages: readonly any[], memoryDir: string)
       '',
       '## 基础信息',
       `- 语言偏好: ${langPref}`,
-      '- 时区: Asia/Singapore (+08:00)',
+      `- 时区: ${Intl.DateTimeFormat().resolvedOptions().timeZone} (UTC${new Date().getTimezoneOffset() <= 0 ? '+' : '-'}${String(Math.abs(Math.floor(new Date().getTimezoneOffset() / 60))).padStart(2, '0')}:${String(Math.abs(new Date().getTimezoneOffset() % 60)).padStart(2, '0')})`,
       '',
       '## 工作模式',
       `- 活跃时段: ${hourStr}-${hourStr}`,
@@ -1119,10 +1119,16 @@ export async function decayAndPruneMemories(memoryDir: string): Promise<{ decaye
         unlinkSync(filePath)
         pruned++
       } else if (Math.abs(newStrength - currentStrength) > 0.05) {
-        if (strengthMatch) {
-          content = content.replace(/strength:\s*[\d.]+/, `strength: ${newStrength.toFixed(2)}`)
-        } else {
-          content = content.replace(/^---\n/, `---\nstrength: ${newStrength.toFixed(2)}\n`)
+        // 在 frontmatter 内更新或添加 strength 字段
+        const fmEnd = content.indexOf('\n---', 4) // 跳过开头的 ---
+        if (fmEnd > 0 && strengthMatch) {
+          // 替换已有 strength（仅替换 frontmatter 内的第一个）
+          const before = content.slice(0, fmEnd)
+          const after = content.slice(fmEnd)
+          content = before.replace(/strength:\s*[\d.]+/, `strength: ${newStrength.toFixed(2)}`) + after
+        } else if (fmEnd > 0) {
+          // frontmatter 内添加新字段
+          content = content.slice(0, fmEnd) + `\nstrength: ${newStrength.toFixed(2)}` + content.slice(fmEnd)
         }
         writeFileSync(filePath, content, 'utf-8')
         decayed++

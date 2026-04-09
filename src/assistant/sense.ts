@@ -54,8 +54,8 @@ export function getGitSense(): { branch: string; uncommitted: number; behindRemo
  */
 export function getProjectSense(): { todoCount: number; fixmeCount: number } {
   try {
-    const { execSync } = require('child_process')
-    const todoOutput = execSync('grep -r "TODO\\|FIXME" --include="*.ts" --include="*.tsx" -c . 2>/dev/null || echo "0"', { encoding: 'utf-8', timeout: 5000 })
+    const { execFileSync } = require('child_process')
+    const todoOutput = execFileSync('grep', ['-r', 'TODO\\|FIXME', '--include=*.ts', '--include=*.tsx', '-c', '.'], { encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }).toString()
     const total = todoOutput.split('\n').reduce((sum: number, line: string) => {
       const match = line.match(/:(\d+)$/)
       return sum + (match ? parseInt(match[1], 10) : 0)
@@ -101,12 +101,16 @@ export function pushNotification(notification: PandaNotification): void {
           `display notification ${JSON.stringify(notification.body)} with title "Panda Code" subtitle ${JSON.stringify(notification.title)}`
         ], { timeout: 3000 })
       } else if (platform === 'win32') {
-        // Windows: PowerShell BurntToast 或原生 toast
+        // Windows: PowerShell BurntToast（使用 execFileSync 避免命令注入）
         try {
-          execSync(`powershell -c "New-BurntToastNotification -Text 'Panda Code: ${notification.title}','${notification.body.replace(/'/g, "''")}'\" 2>nul`, { timeout: 5000 })
+          const safeTitle = notification.title.replace(/"/g, '\\"')
+          const safeBody = notification.body.replace(/"/g, '\\"')
+          execFileSync('powershell', ['-c',
+            `New-BurntToastNotification -Text "Panda Code: ${safeTitle}","${safeBody}"`
+          ], { timeout: 5000 })
         } catch {
-          // fallback: msg 命令
-          try { execSync(`msg %username% "Panda Code: ${notification.title} - ${notification.body}"`, { timeout: 3000 }) } catch {}
+          // fallback: msg（同样用 execFileSync）
+          try { execFileSync('msg', ['*', `Panda Code: ${notification.title} - ${notification.body}`], { timeout: 3000 }) } catch {}
         }
       } else {
         // Linux: notify-send
