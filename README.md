@@ -1785,3 +1785,5 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 ---
 
 *Panda — Your AI, Your Data, Your Life.*
+
+💬 社区交流: [LINUX DO](https://linux.do/)
