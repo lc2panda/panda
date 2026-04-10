@@ -27,49 +27,42 @@ export function registerCaptureSkill(): void {
         ]
       }
 
-      const prompt = `# 快速捕获
+      const slug = content.slice(0, 30).replace(/[^a-zA-Z0-9\u4e00-\u9fff]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'note'
+      const isoNow = new Date().toISOString()
 
-## 用户输入
+      const prompt = `你正在执行 /capture 命令。
 
-${content}
+任务：将用户的想法快速捕获并归档到记忆系统。
 
-## 任务
+用户输入: ${content}
 
-将上述内容保存为一条结构化笔记。
+步骤：
+1. 分析内容，判定 PARA 分类:
+   - Projects: 有明确截止日期或交付物的项目相关 → working/projects/
+   - Areas: 持续关注的责任领域（健康、学习、团队管理等）→ working/areas/
+   - Resources: 有价值的参考资料、灵感、方法论 → working/resources/
+   - Archives: 已完成或不再活跃的内容 → working/archives/
+   - 无法明确分类 → working/inbox/
 
-## 步骤
+2. 使用 Write 工具创建文件:
+   路径: ${memoryDir}/working/{para-category}/${timestamp}-${slug}.md
 
-1. **分析内容**：判断内容类型（想法/TODO/问题/代码片段/参考链接/灵感）
-2. **PARA 分类**：根据内容特征判断最合适的归档位置：
-   - **Projects** (\`${cwd}/working/projects/\`): 有明确截止日期或交付物的活跃项目相关内容
-   - **Areas** (\`${cwd}/working/areas/\`): 持续关注的责任领域（健康、财务、职业发展等）
-   - **Resources** (\`${cwd}/working/resources/\`): 感兴趣的参考资料、教程、工具收集
-   - **Archives** (\`${cwd}/working/archives/\`): 已完成或不再活跃的内容
-   - **Inbox** (\`${cwd}/working/inbox/\`): 无法明确归类时的默认位置
-   - 判断依据：如果内容提到具体项目名称/截止日期→Projects；如果是长期关注领域→Areas；如果是参考资料/链接收集→Resources；否则→Inbox
-3. **创建笔记文件**：
-   - 保存路径: \`${cwd}/working/<PARA分类>/${timestamp}.md\`（如果目录不存在，先创建它）
-   - 如果用户有 memory 目录 (\`${memoryDir}\`)，同时在 memory 中追加索引条目
-4. **文件内容格式**：
-   \`\`\`markdown
+   文件内容:
    ---
-   type: <想法|TODO|问题|代码片段|参考|灵感>
-   para: <projects|areas|resources|archives|inbox>
-   captured: ${new Date().toISOString()}
-   source: manual
+   type: capture
+   para: {category}
+   created: ${isoNow}
+   tags: [自动推断的标签]
    ---
 
-   <用户原文，适当格式化>
-   \`\`\`
-5. **确认输出**：告知用户文件已保存的位置和内容摘要
+   ${content}
 
-## 安全规则
+   ## AI 补充
+   {对内容的简要分析和可能的后续行动建议}
 
-- 不要修改用户原始内容的语义
-- 如果内容看起来像代码，用代码块包裹
-- 如果内容包含 URL，提取为链接格式
+3. 返回确认: "已保存到 working/{category}/{filename}"
 
-全程使用中文输出。`
+注意：必须实际创建文件。使用 Write 工具，不要让用户手动操作。全程使用中文输出。`
       return [{ type: 'text', text: prompt }]
     },
   })
