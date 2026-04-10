@@ -16,7 +16,7 @@ import { homedir } from 'os'
 // ═══════════════════════════════════════════════════════════════════
 
 export interface ProactiveSuggestion {
-  type: 'reminder' | 'insight' | 'alert' | 'tip' | 'pending-notifications' | 'llm-insight'
+  type: 'uncommitted-changes' | 'profile-stale' | 'morning-briefing' | 'context-pressure' | 'repetitive-pattern' | 'pending-notifications' | 'habit-deviation' | 'llm-insight' | 'reminder' | 'insight' | 'alert' | 'tip'
   priority: 'low' | 'medium' | 'high'
   message: string
   source: string // 触发来源
@@ -258,7 +258,7 @@ function _checkHabitDeviation(): ProactiveSuggestion | null {
     // 深夜工作关怀
     if (hour >= 23 || hour < 5) {
       return {
-        type: 'tip' as any,
+        type: 'tip' as ProactiveSuggestion['type'],
         message: '🌙 深夜了，注意休息。持续工作效率会下降，明天继续也不迟。',
         priority: 'low',
         source: 'habit_deviation_late_night',
@@ -272,7 +272,7 @@ function _checkHabitDeviation(): ProactiveSuggestion | null {
       const duration = (new Date(lastTime).getTime() - new Date(firstTime).getTime()) / 3600000
       if (duration > 3) {
         return {
-          type: 'tip' as any,
+          type: 'tip' as ProactiveSuggestion['type'],
           message: `⏰ 已连续工作 ${Math.round(duration)} 小时，建议休息 10 分钟。`,
           priority: 'low',
           source: 'habit_deviation_long_session',

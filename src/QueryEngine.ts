@@ -645,6 +645,10 @@ export class QueryEngine {
           success: true,
           timestamp: Date.now(),
         })
+        // 防止长会话内存泄漏
+        if (_turnSummaries.length > 200) {
+          _turnSummaries.splice(0, _turnSummaries.length - 200)
+        }
       } catch {}
 
       yield {
@@ -1152,6 +1156,10 @@ export class QueryEngine {
           success: false,
           timestamp: Date.now(),
         })
+        // 防止长会话内存泄漏
+        if (_turnSummaries.length > 200) {
+          _turnSummaries.splice(0, _turnSummaries.length - 200)
+        }
       } catch {}
 
       yield {
@@ -1228,6 +1236,10 @@ export class QueryEngine {
         success: !isApiError,
         timestamp: Date.now(),
       })
+      // 防止长会话内存泄漏
+      if (_turnSummaries.length > 200) {
+        _turnSummaries.splice(0, _turnSummaries.length - 200)
+      }
     } catch {}
 
     yield {
