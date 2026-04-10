@@ -14,7 +14,7 @@
 > **此项目的任何功能、架构更新，必须在结束后同步更新相关文档。这是我们契约的一部分。**
 
 **项目**：Panda
-**版本**：v2.6.7（基线 Claude Code v2.1.92）
+**版本**：v2.6.9（基线 Claude Code v2.1.92）
 **技术栈**：Bun + TypeScript + React/Ink + Commander.js
 **运行时**：Bun >= 1.2.0 / Node.js >= 18.0.0
 
@@ -99,7 +99,8 @@ panda auth login
 }
 ```
 
-#### proactive.json — 主动推送配置
+<details>
+<summary><code>proactive.json</code> — 主动推送配置</summary>
 
 > ⚠️ **重要隐私说明**：下方 `enabledScenarios` 中的场景涉及读取邮件、通讯录、浏览历史、即时消息等**高度敏感的个人数据**。这些场景**默认全部关闭**，Panda 不会在未经授权的情况下读取任何个人隐私数据。用户必须**手动编辑配置文件并显式设为 `true`** 才会启用对应的数据采集。所有数据仅在用户本机处理，永不上传。
 
@@ -184,7 +185,10 @@ panda auth login
 }
 ```
 
-#### privacy.json — 隐私排除规则
+</details>
+
+<details>
+<summary><code>privacy.json</code> — 隐私排除规则</summary>
 
 ```json
 // ~/.pandacc/config/privacy.json
@@ -197,7 +201,10 @@ panda auth login
 }
 ```
 
-#### connectors.json — IM 平台连接器
+</details>
+
+<details>
+<summary><code>connectors.json</code> — IM 平台连接器</summary>
 
 ```json
 // ~/.pandacc/config/connectors.json
@@ -242,7 +249,10 @@ panda auth login
 }
 ```
 
-#### dates.json — 自定义纪念日
+</details>
+
+<details>
+<summary><code>dates.json</code> — 自定义纪念日</summary>
 
 ```json
 // ~/.pandacc/config/dates.json
@@ -252,7 +262,10 @@ panda auth login
 ]
 ```
 
-#### habits.json — 习惯打卡
+</details>
+
+<details>
+<summary><code>habits.json</code> — 习惯打卡</summary>
 
 ```json
 // ~/.pandacc/config/habits.json
@@ -262,21 +275,30 @@ panda auth login
 ]
 ```
 
-#### wechat-keywords.json — 微信关键词监控
+</details>
+
+<details>
+<summary><code>wechat-keywords.json</code> — 微信关键词监控</summary>
 
 ```json
 // ~/.pandacc/config/wechat-keywords.json
 ["合同", "截止", "紧急", "bug", "上线", "发版", "付款", "会议"]
 ```
 
-#### wechat-vip.json — 微信重要联系人
+</details>
+
+<details>
+<summary><code>wechat-vip.json</code> — 微信重要联系人</summary>
 
 ```json
 // ~/.pandacc/config/wechat-vip.json
 ["老板的备注名", "客户A", "项目经理"]
 ```
 
-#### wechat-topics.json — 微信话题追踪
+</details>
+
+<details>
+<summary><code>wechat-topics.json</code> — 微信话题追踪</summary>
 
 ```json
 // ~/.pandacc/config/wechat-topics.json
@@ -285,6 +307,8 @@ panda auth login
   { "topic": "客户反馈", "keywords": ["客户", "反馈", "投诉", "建议"] }
 ]
 ```
+
+</details>
 
 ---
 
@@ -480,7 +504,7 @@ panda auth login
 | **代码健康**       | 每晚 23:00 | 构建检查 → 工作记忆                       |
 | **周报汇总**       | 每周一 08:00 | 汇总本周 DeepDream 报告                |
 
-> 完整 95+ 场景设计见 `monitor/proactive-scenarios-design.md`，覆盖系统(8)、通信(8)、文件(9)、开发(10)、知识(6)、效率(7)、安全(7)、个人(7) 八大维度。
+> 完整 102 场景设计见 `monitor/proactive-scenarios-design.md`，覆盖系统(8)、通信(8)、文件(9)、开发(10)、知识(6)、效率(7)、安全(7)、个人(7) 八大维度。
 
 **使用示例**：
 
@@ -1101,7 +1125,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 
 ## 8. 命令使用手册
 
-> 本手册基于 v2.6.0 实机 PTY 验证，覆盖 **85+ 个命令** + Phase 1-5 全部新增能力 + v2.5 超级助手/IM Connector/主动推送 85 场景。
+> 本手册基于 v2.6.9 实机 PTY 验证，覆盖 **85+ 个命令** + Phase 1-5 全部新增能力 + v2.5 超级助手/IM Connector/主动推送 85 场景。
 
 <details>
 <summary>展开查看完整手册（85+ 命令）</summary>
@@ -1111,7 +1135,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 | 标记 | 含义 |
 |------|------|
 | ✅ | 已验证正常工作 |
-| 🆕 | v2.5 新增/增强 |
+| ✅ | v2.5 新增/增强 |
 | 🔒 | 需要特定认证（Claude.ai 订阅/消费者账户） |
 | ⚠️ | 功能受限或有已知问题 |
 | 🔧 | 需要特定环境（Feature Flag / 硬件 / 平台） |
@@ -1129,7 +1153,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 | `/model` | | 切换模型（Opus/Sonnet/Haiku） | ✅ |
 | `/diff` | | 查看未提交变更和每轮代码差异 | ✅ |
 | `/commit` | | 智能生成 commit message 并提交 | ✅ |
-| `/dream` | | 记忆整合 — 四阶段巩固 | 🆕✅ |
+| `/dream` | | 记忆整合 — 四阶段巩固 | ✅ |
 | `/exit` | `/quit` | 退出 REPL | ✅ |
 
 #### 高频使用
@@ -1141,25 +1165,25 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 | `/copy` | | 复制最后回复到剪贴板 | ✅ |
 | `/config` | `/settings` | 打开配置面板 | ✅ |
 | `/resume` | `/continue` | 恢复历史对话 | ✅ |
-| `/assistant` | | 启用 KAIROS 助手 + 主动引擎 | 🆕✅ |
-| `/proactive` | | 切换主动自主模式 | 🆕✅ |
+| `/assistant` | | 启用 KAIROS 助手 + 主动引擎 | ✅ |
+| `/proactive` | | 切换主动自主模式 | ✅ |
 | `/context` | | 可视化上下文使用情况 | ✅ |
 
 #### v2.5 新增
 
 | 命令 | 别名 | 一句话说明 | 状态 |
 |------|------|-----------|------|
-| `/write` | | 写作助理 — 大纲生成/文稿编译 | 🆕✅ |
-| `/capture` | | 快速捕获想法到工作目录 | 🆕✅ |
-| `/learn` | | 学习助理 — 闪卡/复习/学习路径 | 🆕✅ |
-| `/wechat` | | 微信数据查询 — 会话/聊天/搜索/联系人 | 🆕✅ |
+| `/write` | | 写作助理 — 大纲生成/文稿编译 | ✅ |
+| `/capture` | | 快速捕获想法到工作目录 | ✅ |
+| `/learn` | | 学习助理 — 闪卡/复习/学习路径 | ✅ |
+| `/wechat` | | 微信数据查询 — 会话/聊天/搜索/联系人 | ✅ |
 
 ### 一、基础控制命令
 
 #### `/help`
 - **用法**: `/help`
 - **说明**: 显示交互式帮助界面，包含所有可用命令和快捷键
-- **实测**: ✅ 显示 Panda v2.6.0 帮助信息
+- **实测**: ✅ 显示 Panda v2.6.9 帮助信息
 
 #### `/exit` (别名: `/quit`)
 - **用法**: `/exit`
@@ -1312,7 +1336,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 - **用法**: `/persona [模式]`
 - **说明**: 切换人格模式
 - **模式**: `work`（专业）、`companion`（陪伴）、`study`（学习）、`creative`（创意）、`butler`（管家）
-- 🆕 **Sense Pipeline 联动**: auto 模式下根据时间/mood/活动自动切换
+- **Sense Pipeline 联动**: auto 模式下根据时间/mood/活动自动切换
 
 #### `/privacy`
 - **用法**: `/privacy`
@@ -1336,7 +1360,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 #### `/mcp`
 - **用法**: `/mcp [enable|disable server-name]`
 - **说明**: 管理 MCP 服务器扩展
-- 🆕 MCP 工具结果上限提升至 **500K 字符**（原 100K）
+- MCP 工具结果上限提升至 **500K 字符**（原 100K）
 
 #### `/hooks`
 - **用法**: `/hooks`
@@ -1348,8 +1372,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 
 ### 七、超级助手系统（v2.5 智能助理）
 
-#### `/dream` 🆕
-- **用法**: `/dream`
+#### `/dream`- **用法**: `/dream`
 - **说明**: 手动触发记忆整合 — 四阶段流程
 - **四阶段**: Orient(盘点) → Gather(采集) → Consolidate(整合) → Prune(裁剪)
 - **后台 cron**: 每天 22:00 自动执行（需启用 `/proactive` 或 `/night-mode`）
@@ -1358,8 +1381,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
   - 包含 Phase 3.5 情绪记忆扫描
   - MEMORY.md 保持 ≤200 行 / 25KB
 
-#### `/assistant` 🆕
-- **用法**: `/assistant`
+#### `/assistant`- **用法**: `/assistant`
 - **说明**: 启用 KAIROS 助手模式 — 激活主动引擎 + 定时任务
 - **效果**:
   - `isAssistantMode()` 返回 true
@@ -1367,9 +1389,8 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
   - 启动 builtinTasks（dream/briefing/health）
 - **技巧**: 长时间工作时开启，AI 会在空闲时自动整理记忆
 
-#### `/proactive` 🆕
-- **用法**: `/proactive [on|off]`
-- **说明**: 切换主动自主模式 — v2.5 扩展为 **95+ 个主动推送场景**
+#### `/proactive`- **用法**: `/proactive [on|off]`
+- **说明**: 切换主动自主模式 — v2.5 扩展为 **102 个主动推送场景**
 - **核心内置任务**:
   - `dream-consolidate` — 22:00 自动记忆整合（调用 autoDream）
   - `morning-briefing` — 07:00 设置晨间简报 pending flag
@@ -1377,8 +1398,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 - **v2.6 场景覆盖**: 系统健康(3) + 开发者(10) + 文件管理(6) + 个人生活(3) + 效率(4) + 高级系统(5) + 扩展(8) + 知识(8) + 生活(8) = **55 个非敏感场景**（默认开启）+ **30 个敏感场景**（含 14 个微信态势感知，需 `proactive.json` 显式开启）
 - **技巧**: 配合 `/night-mode` 实现全天候自主工作；敏感场景配置详见本手册"七、主动推送系统"章节
 
-#### `/night-mode` 🆕
-- **用法**: `/night-mode`
+#### `/night-mode`- **用法**: `/night-mode`
 - **说明**: 夜间自主模式（22:00-06:00）
 - **编排器**: 顺序执行启用任务，5 分钟节流，单任务失败不阻塞后续
 - **技巧**: 适合离开电脑时让 AI 自动整理记忆和检查代码
@@ -1391,29 +1411,26 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 - **用法**: `/brief [on|off]`
 - **说明**: 简报模式 — AI 只输出简洁摘要
 
-#### `/write` 🆕
-- **用法**: `/write outline <topic>` / `/write compile <dir>`
+#### `/write`- **用法**: `/write outline <topic>` / `/write compile <dir>`
 - **说明**: 写作助理 — 生成大纲或编译 Markdown 写作项目
 - **示例**:
   - `/write outline "AI个人助理的未来"` — 生成结构化大纲
   - `/write compile ~/manuscript/` — 编译目录下所有 Markdown 为统一文稿
 
-#### `/capture` 🆕
-- **用法**: `/capture <text>`
+#### `/capture`- **用法**: `/capture <text>`
 - **说明**: 快速捕获想法到 `working/inbox/` 目录，自动按 PARA 方法论分类
 - **示例**: `/capture "想到一个架构思路：用事件驱动替代轮询"`
 
-#### `/learn` 🆕
-- **用法**: `/learn from <file>` / `/learn review` / `/learn plan <topic>`
+#### `/learn`- **用法**: `/learn from <file>` / `/learn review` / `/learn plan <topic>`
 - **说明**: 学习助理 — 从文件生成闪卡、间隔重复复习（FSRS 算法）、学习路径规划
 - **示例**:
   - `/learn from paper.pdf` — 从 PDF 提取知识点生成闪卡
   - `/learn review` — 开始间隔重复复习
   - `/learn plan "学习 Rust"` — 生成学习路径
 
-#### 主动推送系统（v2.5 新增 — 95+ 场景）
+#### 主动推送系统（v2.5 新增 — 102 场景）
 
-v2.5 将主动推送从 3 个内置任务扩展为 **95+ 个场景**，分为非敏感（默认开启）和敏感（默认关闭）两类。
+v2.5 将主动推送从 3 个内置任务扩展为 **102 个场景**，分为非敏感（默认开启）和敏感（默认关闭）两类。
 
 **非敏感场景（默认开启）**
 
