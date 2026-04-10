@@ -140,6 +140,15 @@ class DingtalkMCPConnector extends MCPBridgeConnector {
       return emptyUnreadSummary()
     }
   }
+
+  async sendNotification(notification: PandaNotification): Promise<void> {
+    try {
+      const msg = `📢 [${notification.title || 'Panda'}]\n${notification.body || ''}`
+      await this.sendMessage('default', msg)
+    } catch (e) {
+      logForDebugging(`[dingtalk] sendNotification failed: ${e}`)
+    }
+  }
 }
 
 // ─── REST API fallback 模式 ───
@@ -272,6 +281,15 @@ class DingtalkAPIConnector implements IMConnector {
 
   async getUnreadSummary(): Promise<UnreadSummary> {
     return emptyUnreadSummary()
+  }
+
+  async sendNotification(notification: PandaNotification): Promise<void> {
+    try {
+      const msg = `📢 [${notification.title || 'Panda'}]\n${notification.body || ''}`
+      await this.sendMessage('default', msg)
+    } catch (e) {
+      logForDebugging(`[dingtalk-api] sendNotification failed: ${e}`)
+    }
   }
 }
 
