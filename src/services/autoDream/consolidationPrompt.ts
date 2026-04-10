@@ -85,9 +85,39 @@ Focus on:
 - 如果 emotional 事件与某个决策记忆关联 → 在 semantic 记忆中标注情感标签
 - 如果 prospective 事件即将到来 → 在晨间简报中优先展示
 
+## Phase 3 — 语义记忆提取
+
+从最近的 episodic 记忆和对话中，提取并更新 semantic/profile.md 的以下 section:
+
+### 技术栈偏好
+- 从工具使用频率推断（Edit > Bash = 偏好精确编辑；Bash > Edit = 偏好脚本化）
+- 从对话中提到的框架/语言/工具记录
+
+### 工作模式
+- 活跃时段（从 episodic 时间戳推断）
+- 偏好的交互方式（简洁指令 vs 详细讨论）
+- 单任务专注 vs 多任务切换
+
+### 当前目标与项目
+- 从最近 3 天的 episodic 提取主要话题
+- 识别正在进行的项目名称和目标
+
+### 沟通风格
+- 中文/英文/混合偏好
+- 期望的回复详细程度
+
+使用 Edit 工具直接更新 profile.md 的对应 section。
+
 ## Phase 3.5 — Emotional memory
 
 Scan for emotionally salient moments: frustration spikes, breakthroughs, repeated user corrections, or praise. These signals reveal what matters most to the user beyond raw facts. Persist a brief emotional-context note alongside the relevant topic file (e.g., "user was frustrated by X — avoid suggesting Y in future").
+
+## Phase 3 附加 — 程序记忆整合
+
+扫描 procedural/patterns/ 和 procedural/scars/ 目录：
+- 如果同一工具链模式在 patterns/ 中出现 3+ 次 → 提炼为稳定规则，追加到 habits.md
+- 如果同一错误在 scars/ 中出现 2+ 次 → 提炼为避坑指南，写入 scars/summary.md
+- 整合完成后，可以删除已提炼的单条 pattern/scar 文件（保持目录整洁）
 
 ## Phase 4 — Prune and index
 

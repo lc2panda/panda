@@ -315,6 +315,24 @@ export function saveProspectiveMemory(content: string): void {
     mkdirSync(dir, { recursive: true })
     const date = new Date().toISOString().split('T')[0]
     const filePath = join(dir, `${date}.md`)
+
+    // 读取 habits.md 生成行为预测
+    let habitsPrediction = ''
+    try {
+      const habitsPath = join(memDir, 'procedural', 'habits.md')
+      if (existsSync(habitsPath)) {
+        const habitsContent = readFileSync(habitsPath, 'utf-8')
+        const peakMatch = habitsContent.match(/高频时段[：:]\s*(.+)/)?.[1]
+        if (peakMatch) {
+          habitsPrediction = `\n## 行为预测（基于习惯）\n- 预计高产时段: ${peakMatch}\n`
+          // 判断明天是周几
+          const tomorrow = new Date(Date.now() + 86400000)
+          const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+          habitsPrediction += `- 明天是${dayNames[tomorrow.getDay()]}，参考历史同天活动模式\n`
+        }
+      }
+    } catch {}
+
     const frontmatter = [
       '---',
       'type: prospective',
@@ -323,7 +341,66 @@ export function saveProspectiveMemory(content: string): void {
       '---',
       '',
     ].join('\n')
-    writeFileSync(filePath, frontmatter + content, 'utf-8')
+    writeFileSync(filePath, frontmatter + content + habitsPrediction, 'utf-8')
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 程序记忆 — 成功模式 & 失败教训
+// ═══════════════════════════════════════════════════════════════════
+
+export function recordPattern(tools: string[], context: string): void {
+  try {
+    const memDir = getAutoMemPath()
+    if (!memDir) return
+    const dir = join(memDir, 'procedural', 'patterns')
+    mkdirSync(dir, { recursive: true })
+    const now = new Date()
+    const ts = now.toISOString().replace(/[:.]/g, '-').slice(0, 16)
+    const filePath = join(dir, `${ts}.md`)
+    const content = [
+      '---',
+      'type: pattern',
+      `date: ${now.toISOString()}`,
+      `tools: [${tools.map(t => `"${t}"`).join(', ')}]`,
+      `context: "${context.replace(/"/g, '\\"')}"`,
+      'strength: 1.0',
+      '---',
+      '',
+      `## 成功模式`,
+      '',
+      `工具链: ${tools.join(' → ')}`,
+      `场景: ${context}`,
+      '',
+    ].join('\n')
+    writeFileSync(filePath, content, 'utf-8')
+  } catch {}
+}
+
+export function recordScar(error: string, context: string): void {
+  try {
+    const memDir = getAutoMemPath()
+    if (!memDir) return
+    const dir = join(memDir, 'procedural', 'scars')
+    mkdirSync(dir, { recursive: true })
+    const now = new Date()
+    const ts = now.toISOString().replace(/[:.]/g, '-').slice(0, 16)
+    const filePath = join(dir, `${ts}.md`)
+    const content = [
+      '---',
+      'type: scar',
+      `date: ${now.toISOString()}`,
+      `error: "${error.slice(0, 100).replace(/"/g, '\\"')}"`,
+      `context: "${context.replace(/"/g, '\\"')}"`,
+      '---',
+      '',
+      `## 失败教训`,
+      '',
+      `错误: ${error.slice(0, 200)}`,
+      `场景: ${context}`,
+      '',
+    ].join('\n')
+    writeFileSync(filePath, content, 'utf-8')
   } catch {}
 }
 
