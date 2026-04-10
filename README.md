@@ -11,12 +11,9 @@
  ╚═╝      ╚═╝  ╚═╝ ╚═╝  ╚═══╝ ╚═════╝  ╚═╝  ╚═╝
 ```
 
-> **此项目的任何功能、架构更新，必须在结束后同步更新相关文档。这是我们契约的一部分。**
-
-**项目**：Panda
-**版本**：v2.6.9（基线 Claude Code v2.1.92）
-**技术栈**：Bun + TypeScript + React/Ink + Commander.js
-**运行时**：Bun >= 1.2.0 / Node.js >= 18.0.0
+| 版本 | 运行时 |
+|------|--------|
+| v2.7.0 | Bun >= 1.2.0 / Node.js >= 18.0.0 |
 
 ---
 
@@ -334,7 +331,7 @@ panda auth login
 
 ### 2.2 超级助手命令
 
-> 超级助手 = 智能助理。以下命令是超级助手的交互入口。
+> 以下命令是智能助理的交互入口。
 
 | 命令              | 说明                                                  |
 | --------------- | --------------------------------------------------- |
@@ -435,8 +432,6 @@ panda auth login
 
 > "越用越了解你的贴身助理。白天人来接管，夜间 AI 自主整理所有数据资产。"
 >
-> **注**：第 2 章"超级助手命令"（`/dream`, `/assistant` 等）是超级助手的交互入口，
-> 原 v2.1.92 "私人助手"已整合为统一体系。
 
 <details>
 <summary>展开查看完整功能</summary>
@@ -766,7 +761,7 @@ EOF
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│                  私 人 助 手 系 统 (v2.1.92 新增)                 │
+│                       智 能 助 理 系 统                          │
 │  autoDream │ KAIROS │ Proactive │ NightMode │ Mood │ Sense    │
 │  Coordinator │ Buddy │ Brief │ Persona │ Memory │ Dream     │
 └─────────────────────────────────────────────────────────────────┘
@@ -1125,7 +1120,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 
 ## 8. 命令使用手册
 
-> 本手册基于 v2.6.9 实机 PTY 验证，覆盖 **85+ 个命令** + Phase 1-5 全部新增能力 + v2.5 超级助手/IM Connector/主动推送 85 场景。
+> 覆盖 **85+ 个命令**，含智能助理、IM 连接器、102 主动推送场景等全部能力。
 
 <details>
 <summary>展开查看完整手册（85+ 命令）</summary>
@@ -1378,7 +1373,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 - **后台 cron**: 每天 22:00 自动执行（需启用 `/proactive` 或 `/night-mode`）
 - **技巧**:
   - 手动 `/dream` 后自动重置 24h 冷却门控
-  - 包含 Phase 3.5 情绪记忆扫描
+  - 包含情绪记忆扫描
   - MEMORY.md 保持 ≤200 行 / 25KB
 
 #### `/assistant`- **用法**: `/assistant`
@@ -1648,7 +1643,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 ### 十四、不可用的存根命令
 
-> 原版 Claude Code 发布时已替换为存根（源码不在 npm 包中），无法使用。
+> 以下命令为平台限定功能，当前环境下不可用。
 
 | 命令 | 原功能 | 命令 | 原功能 |
 |------|--------|------|--------|
@@ -1765,34 +1760,28 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | Read/Grep 结果被折叠 | `PANDA_NO_AUTO_COLLAPSE=1` |
 | 安全限制阻碍研究 | `PANDA_SECURITY_RESEARCH=1` |
 
-### 十九、v2.5 新增能力总览
+### 十九、能力总览
 
-| 能力 | 来源 | 说明 |
-|------|------|------|
-| autoDream 四阶段 + cron | Phase 4A | 后台记忆整合，22:00 自动执行 |
-| KAIROS 助手模式 | Phase 1.1 | /assistant 激活完整主动引擎 |
-| Mood 双语检测 | Phase 1.2 | 每条消息自动分析 6 类情绪 |
-| 夜间任务链 | Phase 1.4 | 顺序执行 + 错误隔离 + 5min 节流 |
-| Memory 持久化 | Phase 1.5 | 情绪/工作记忆 JSON + LRU + TTL |
-| Coordinator 多 Agent | Phase 2.1 | COORDINATOR_MODE + worker agent |
-| Sense Pipeline | Phase 2.4 | mood→persona→dream 全链路 |
-| GrowthBook 31+ flags | Phase 2.3 | 含 1h prompt cache |
-| 安全限制可配置 | Phase 3.2 | PANDA_SECURITY_RESEARCH env |
-| 1h prompt cache | Phase 4B | tengu_prompt_cache_1h_config |
-| ToolSearch 全 Provider | Phase 4B | ENABLE_TOOL_SEARCH=true |
-| MCP 500K 结果 | Phase 5 | maxResultSizeChars 提升 |
-| UX 双开关 | Phase 4B | 隐藏 context 警告 + 禁止折叠 |
-| `/write` 写作助理 | v2.5 | 大纲生成 + Markdown 文稿编译 |
-| `/capture` 快速捕获 | v2.5 | 想法捕获到 working/inbox/，PARA 自动分类 |
-| `/learn` 学习助理 | v2.5 | 闪卡生成 + FSRS 间隔重复 + 学习路径 |
-| 主动推送 85 场景 | v2.5 | 8 大维度，55 非敏感 + 30 敏感场景 |
-| IM Connector 6 平台 | v2.5 | 飞书/钉钉/Slack/微信/Telegram/Teams |
-| 系统通知中心感知 | v2.5 | macOS SQLite + Windows wpndb，3 场景 |
-| IM 主动推送 6 场景 | v2.5 | 未读汇总/日报/日历同步/审批/文档/反向推送 |
-| 微信全态势感知 14 场景 | v2.6 | 实时/日/周/月/季/年 6 维度，关键词+VIP+话题追踪 |
+| 能力 | 说明 |
+|------|------|
+| DeepDream 记忆整合 | 后台记忆整合，22:00 自动执行 |
+| 助手模式 | `/assistant` 激活完整主动引擎 |
+| 情绪检测 | 每条消息自动分析 6 类情绪 + 多维信号 |
+| 夜间任务链 | 顺序执行 + 错误隔离 + 5min 节流 |
+| 五层记忆 | 情景/语义/程序/前瞻/工作记忆全链路 |
+| 多 Agent 协调 | Coordinator 模式 + worker agent |
+| 感知管道 | mood→persona→dream 全链路 |
+| `/write` 写作助理 | 大纲生成 + Markdown 文稿编译 |
+| `/capture` 快速捕获 | PARA 自动分类到 Projects/Areas/Resources/Archives |
+| `/learn` 学习助理 | 闪卡生成 + FSRS 间隔重复 + 学习路径 |
+| 主动推送 102 场景 | 8 大维度，55 非敏感 + 43 敏感场景 |
+| IM Connector 6 平台 | 飞书/钉钉/Slack/微信/Telegram/Teams |
+| 通知中心感知 | macOS/Windows，3 场景 |
+| 微信全态势感知 | 14 场景，实时/日/周/月/季/年 6 维度 |
+| 5 路通知推送 | 桌面/Webhook/Outbox/Connector/MCP 插件 |
 
 </details>
 
 ---
 
-*此文档是项目契约的一部分。一旦 Panda 功能更新，此文档必须同步更新。*
+*Panda — Your AI, Your Data, Your Life.*
