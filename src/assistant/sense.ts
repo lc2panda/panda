@@ -172,6 +172,44 @@ function _pushToChannels(notification: PandaNotification): void {
     }) + '\n'
     appendFileSync(join(queueDir, 'notifications.jsonl'), entry)
   } catch {}
+
+  // 方式 3：已连接的 IM Connector 直接投递
+  try {
+    const { getConnectorRegistry } = require('../connectors/registry.js')
+    const registry = getConnectorRegistry()
+    const connectors = registry?.getConnectedConnectors?.() || []
+
+    for (const conn of connectors) {
+      try {
+        if (typeof conn.sendNotification === 'function') {
+          // 异步发送，不 await（避免阻塞推送管道）
+          void conn.sendNotification(notification).catch(() => {})
+        }
+      } catch {}
+    }
+  } catch {}
+
+  // 方式 4：高优先级通知填充 reverse-push 队列
+  try {
+    if (notification.type === 'warning' || notification.type === 'action') {
+      const { setWorkingMemory, getWorkingMemory } = require('./workingMemory.js')
+      const existing = (() => { try { const v = getWorkingMemory('im-reverse-push-queue'); return Array.isArray(v) ? v : [] } catch { return [] } })()
+      existing.push({
+        platform: 'all',
+        target: 'default',
+        content: `[${notification.title || notification.type}] ${notification.body || ''}`,
+        timestamp: Date.now()
+      })
+      setWorkingMemory('im-reverse-push-queue', existing.slice(-20))
+    }
+  } catch {}
+
+  // 方式 5：通过已注册的 MCP Channel 插件推送（WeChat/飞书等）
+  // 使用 channelRegistry 中缓存的 server 引用和最近 inbound context
+  try {
+    const { pushViaChannelMCP } = require('./channelRegistry.js')
+    pushViaChannelMCP(notification.title, notification.body)
+  } catch {}
 }
 
 export function getNotifications(): readonly PandaNotification[] {
