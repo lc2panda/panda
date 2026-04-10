@@ -96,3 +96,22 @@ export function clearWorkingMemory() {
   entries.clear()
   save()
 }
+
+export function getRelevantMemory(context: string): WorkingMemoryEntry[] {
+  const all = getAllWorkingMemory()
+  if (!context || context.length < 3) return all.slice(0, 10)
+  const ctx = context.toLowerCase()
+  // 按相关性排序：key 或 value 包含上下文关键词的优先
+  return all
+    .map(e => {
+      let score = 0
+      if (ctx.includes(e.key.toLowerCase())) score += 2
+      if (typeof e.value === 'string' && ctx.includes(e.value.slice(0, 50).toLowerCase())) score += 1
+      // 语义 key 加分
+      if (['currentProject', 'recentFiles', 'lastToolChain'].includes(e.key)) score += 1
+      return { ...e, _score: score }
+    })
+    .sort((a, b) => (b as any)._score - (a as any)._score)
+    .slice(0, 10)
+    .map(({ _score, ...rest }) => rest) as WorkingMemoryEntry[]
+}

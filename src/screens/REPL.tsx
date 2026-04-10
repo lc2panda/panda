@@ -3514,6 +3514,9 @@ export function REPL({
       if (!getWorkingMemory('sessionStartTime')) {
         setWorkingMemory('sessionStartTime', new Date().toISOString())
       }
+      // 语义 key：当前项目
+      const cwd = process.cwd()
+      setWorkingMemory('currentProject', cwd.split('/').pop() || 'unknown')
     } catch {}
 
     // Ensure SessionStart hook context is available before the first API call.

@@ -119,6 +119,19 @@ const getCoordinatorUserContext: (
   : () => ({})
 /* eslint-enable @typescript-eslint/no-require-imports */
 
+// 情景记忆：收集每轮查询摘要（零API开销，纯本地）
+interface TurnSummary {
+  prompt: string   // 用户 prompt 前 100 字
+  tools: string[]  // 使用的工具名列表
+  success: boolean // 是否成功
+  timestamp: number
+}
+const _turnSummaries: TurnSummary[] = []
+
+export function _getTurnSummaries(): TurnSummary[] {
+  return _turnSummaries
+}
+
 // Dead code elimination: conditional import for snip compaction
 /* eslint-disable @typescript-eslint/no-require-imports */
 const snipModule = feature('HISTORY_SNIP')
@@ -619,6 +632,21 @@ export class QueryEngine {
         }
       }
 
+      // 情景记忆：记录早期成功返回
+      try {
+        const toolNames = messages
+          .filter((m: any) => m.type === 'assistant')
+          .flatMap((m: any) => (Array.isArray(m.message?.content) ? m.message.content : []))
+          .filter((b: any) => b.type === 'tool_use')
+          .map((b: any) => b.name as string)
+        _turnSummaries.push({
+          prompt: (typeof prompt === 'string' ? prompt : '').slice(0, 100),
+          tools: [...new Set(toolNames)],
+          success: true,
+          timestamp: Date.now(),
+        })
+      } catch {}
+
       yield {
         type: 'result',
         subtype: 'success',
@@ -1111,6 +1139,21 @@ export class QueryEngine {
         recordEmotionalEvent(`tool_error: stop_reason=${lastStopReason}`, 'frustration')
       } catch {}
 
+      // 情景记忆：记录失败
+      try {
+        const toolNames = this.mutableMessages
+          .filter((m: any) => m.type === 'assistant')
+          .flatMap((m: any) => (Array.isArray(m.message?.content) ? m.message.content : []))
+          .filter((b: any) => b.type === 'tool_use')
+          .map((b: any) => b.name as string)
+        _turnSummaries.push({
+          prompt: (typeof prompt === 'string' ? prompt : '').slice(0, 100),
+          tools: [...new Set(toolNames)],
+          success: false,
+          timestamp: Date.now(),
+        })
+      } catch {}
+
       yield {
         type: 'result',
         subtype: 'error_during_execution',
@@ -1170,6 +1213,21 @@ export class QueryEngine {
       if (userMsg && /谢谢|thanks|thank you|太好了|perfect|great/i.test(userMsg)) {
         recordEmotionalEvent(`user_thanks: ${userMsg.slice(0, 100)}`, 'satisfaction')
       }
+    } catch {}
+
+    // 情景记忆：记录最终成功
+    try {
+      const toolNames = this.mutableMessages
+        .filter((m: any) => m.type === 'assistant')
+        .flatMap((m: any) => (Array.isArray(m.message?.content) ? m.message.content : []))
+        .filter((b: any) => b.type === 'tool_use')
+        .map((b: any) => b.name as string)
+      _turnSummaries.push({
+        prompt: (typeof prompt === 'string' ? prompt : '').slice(0, 100),
+        tools: [...new Set(toolNames)],
+        success: !isApiError,
+        timestamp: Date.now(),
+      })
     } catch {}
 
     yield {

@@ -436,11 +436,23 @@ export async function gracefulShutdown(
   cleanupTerminalModes()
   printResumeHint()
 
-  // 保存情景记忆
+  // 保存情景记忆（含真实轮次摘要）
   try {
     const { saveEpisodicMemory } = require('../memdir/memdir.js')
     const sessionId = getSessionId()
-    saveEpisodicMemory(`Session ${sessionId} ended.`, { tools: [] })
+    let content = `Session ${sessionId} ended.`
+    let tools: string[] = []
+    try {
+      const { _getTurnSummaries } = require('../QueryEngine.js')
+      const summaries = _getTurnSummaries?.() || []
+      if (summaries.length > 0) {
+        tools = [...new Set(summaries.flatMap((s: any) => s.tools || []))]
+        content = summaries.map((s: any) =>
+          `- ${s.prompt || '(empty)'} → ${(s.tools || []).join(',')} [${s.success ? '✓' : '✗'}]`
+        ).join('\n')
+      }
+    } catch {}
+    saveEpisodicMemory(content, { tools })
   } catch {}
 
   // Flush session data first — this is the most critical cleanup. If the
