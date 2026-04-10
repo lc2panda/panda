@@ -257,12 +257,16 @@ export async function saveEpisodicMemory(sessionSummary: string, opts?: {
   const toolsList = opts?.tools ?? []
   const decisionsList = opts?.decisions ?? []
   const timestamp = now.getTime()
+  const turnCount = toolsList.length
+  const durationSec = Math.round((Date.now() - ((globalThis as any).__sessionStartMs || Date.now())) / 1000)
 
   const frontmatter = [
     '---',
     'type: episodic',
     `date: ${now.toISOString()}`,
     `tools: [${toolsList.map(t => `"${t}"`).join(', ')}]`,
+    `turnCount: ${turnCount}`,
+    `duration: ${durationSec}`,
     'strength: 1.0',
     `lastAccessed: ${timestamp}`,
     '---',
