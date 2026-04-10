@@ -82,6 +82,10 @@ import {
   findChannelEntry,
 } from 'src/services/mcp/channelNotification.js'
 import {
+  registerChannelServer,
+  saveChannelContext,
+} from 'src/assistant/channelRegistry.js'
+import {
   isChannelAllowlisted,
   isChannelsEnabled,
 } from 'src/services/mcp/channelAllowlist.js'
@@ -4733,6 +4737,9 @@ function handleChannelEnable(
   logMCPDebug(serverName, 'Channel notifications registered')
   logEvent('tengu_mcp_channel_enable', { plugin: pluginId })
 
+  // 注册 channel server 到 registry，供主动推送使用
+  registerChannelServer(serverName, connection.client)
+
   // Identical enqueue shape to the interactive register block in
   // useManageMCPConnections. drainCommandQueue processes it between turns —
   // channel messages queue at priority 'next' and are seen by the model on
@@ -4741,6 +4748,10 @@ function handleChannelEnable(
     ChannelMessageNotificationSchema(),
     async notification => {
       const { content, meta } = notification.params
+
+      // 保存 inbound context 供主动推送 reply 使用
+      saveChannelContext(serverName, meta)
+
       logMCPDebug(
         serverName,
         `notifications/claude/channel: ${content.slice(0, 80)}`,
@@ -4813,10 +4824,18 @@ function reregisterChannelHandlerAfterReconnect(
     connection.name,
     'Channel notifications re-registered after reconnect',
   )
+
+  // 重新注册 channel server（reconnect 后 client 可能已更新）
+  registerChannelServer(connection.name, connection.client)
+
   connection.client.setNotificationHandler(
     ChannelMessageNotificationSchema(),
     async notification => {
       const { content, meta } = notification.params
+
+      // 保存 inbound context 供主动推送 reply 使用
+      saveChannelContext(connection.name, meta)
+
       logMCPDebug(
         connection.name,
         `notifications/claude/channel: ${content.slice(0, 80)}`,
