@@ -72,12 +72,6 @@ export function useProactive(options: UseProactiveOptions): void {
         tickTimerRef.current = null
       }
     }
-  }, [
-    isLoading,
-    queuedCommandsLength,
-    hasActiveLocalJsxUI,
-    isInPlanMode,
-    onSubmitTick,
-    onQueueTick,
-  ])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, queuedCommandsLength, hasActiveLocalJsxUI, isInPlanMode])
 }

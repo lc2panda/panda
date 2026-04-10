@@ -1,5 +1,5 @@
 // Input: user messages (text strings)
-// Output: mood detection with bilingual keyword matching
+// Output: mood detection with bilingual keyword matching + LLM-driven multi-signal fallback
 // Pos: assistant sense pipeline — consumed by sense.ts → persona/proactive
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
@@ -67,11 +67,86 @@ function detectMoodFromText(text: string): Mood | null {
   return null
 }
 
+// --- LLM-driven multi-signal mood analysis (fallback for keyword-neutral messages) ---
+
+let _lastLLMAnalysis = 0
+let _llmMoodCache: { mood: Mood; until: number } | null = null
+
+async function analyzeMoodWithLLM(message: string): Promise<Mood> {
+  // Cache: skip if result still valid (5 min TTL)
+  if (_llmMoodCache && Date.now() < _llmMoodCache.until) {
+    return _llmMoodCache.mood
+  }
+  // Rate limit: at least 30s between calls
+  if (Date.now() - _lastLLMAnalysis < 30000) return 'neutral'
+  _lastLLMAnalysis = Date.now()
+
+  try {
+    const text = message.slice(0, 200).toLowerCase()
+
+    const score = { frustrated: 0, focused: 0, curious: 0, satisfied: 0, urgent: 0 }
+
+    // Punctuation signals
+    if ((text.match(/[!！]{2,}/g) || []).length > 0) score.frustrated += 2
+    if ((text.match(/[?？]{2,}/g) || []).length > 0) score.curious += 2
+    if (text.includes('...') || text.includes('。。。')) score.frustrated += 1
+
+    // Length signals (short → urgent, long → focused)
+    if (text.length < 10) score.urgent += 1
+    if (text.length > 100) score.focused += 1
+
+    // Negative word density
+    const negatives = (text.match(/不|没|无法|cannot|can't|won't|doesn't|failed|error|bug|crash|问题|报错/g) || []).length
+    if (negatives >= 3) score.frustrated += 3
+    if (negatives >= 1) score.frustrated += 1
+
+    // Positive word signals
+    const positives = (text.match(/好的|谢谢|感谢|great|thanks|perfect|excellent|awesome|太好了|不错|完美/g) || []).length
+    if (positives >= 1) score.satisfied += 3
+
+    // Exploration signals
+    const exploring = (text.match(/如何|怎么|为什么|what|how|why|could|would|是否|能不能|可以/g) || []).length
+    if (exploring >= 2) score.curious += 2
+
+    // Focus signals
+    const focusing = (text.match(/继续|接着|然后|next|continue|also|另外|还有|同时/g) || []).length
+    if (focusing >= 2) score.focused += 2
+
+    // Urgency signals
+    const urgentWords = (text.match(/紧急|马上|立刻|immediately|asap|urgent|赶紧|快/g) || []).length
+    if (urgentWords >= 1) score.urgent += 3
+
+    // Pick highest scoring mood
+    const entries = Object.entries(score) as [Mood, number][]
+    const max = entries.reduce((a, b) => b[1] > a[1] ? b : a)
+
+    if (max[1] >= 2) {
+      const mood = max[0] as Mood
+      _llmMoodCache = { mood, until: Date.now() + 300000 } // 5 min cache
+      return mood
+    }
+
+    return 'neutral'
+  } catch {
+    return 'neutral'
+  }
+}
+
 export function updateMoodFromMessage(text: string): void {
   const detected = detectMoodFromText(text)
   if (detected) {
     _currentMood = detected
     _lastUpdateTime = Date.now()
+  }
+
+  // LLM fallback: async, non-blocking — only when keyword match yielded neutral
+  if (!detected && text.length > 20) {
+    analyzeMoodWithLLM(text).then(mood => {
+      if (mood !== 'neutral') {
+        _currentMood = mood
+        _lastUpdateTime = Date.now()
+      }
+    }).catch(() => {})
   }
 }
 

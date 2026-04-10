@@ -30,6 +30,7 @@ const NIGHT_END_HOUR = 6
 const TASK_INTERVAL_MS = 5 * 60 * 1000 // 5 min between tasks
 
 let _lastOrchestratorRun = 0
+let _isRunning = false
 // 记录每个任务的最后执行时间，避免同一 cron 窗口内重复执行
 const _EXEC_HISTORY_PATH = join(homedir(), '.pandacc', 'data', 'task-exec-history.json')
 const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000
@@ -104,61 +105,70 @@ export async function runNightTasks(): Promise<void> {
     logForDebugging('[nightMode] orchestrator throttled — too soon since last run')
     return
   }
-  _lastOrchestratorRun = now
-
-  const tasks = getEnabledTasks()
-  if (tasks.length === 0) {
-    logForDebugging('[nightMode] no enabled tasks to run')
+  if (_isRunning) {
+    logForDebugging('[nightMode] orchestrator already running — skipping')
     return
   }
+  _isRunning = true
 
-  logForDebugging(`[nightMode] orchestrator starting — ${tasks.length} enabled task(s)`)
+  try {
+    const tasks = getEnabledTasks()
+    if (tasks.length === 0) {
+      logForDebugging('[nightMode] no enabled tasks to run')
+      return
+    }
 
-  for (const task of tasks) {
-    // 防止并发执行同一任务
-    if (_tasksExecuting.has(task.id)) continue
+    logForDebugging(`[nightMode] orchestrator starting — ${tasks.length} enabled task(s)`)
 
-    // cron 时间匹配：只执行 cron 表达式匹配当前时间窗口的任务
-    if (task.cron) {
-      if (!matchesCronNow(task.cron, 6)) {
-        continue // cron 不匹配，静默跳过
+    for (const task of tasks) {
+      // 防止并发执行同一任务
+      if (_tasksExecuting.has(task.id)) continue
+
+      // cron 时间匹配：只执行 cron 表达式匹配当前时间窗口的任务
+      if (task.cron) {
+        if (!matchesCronNow(task.cron, 6)) {
+          continue // cron 不匹配，静默跳过
+        }
+        // 去重：同一任务在同一 cron 窗口内不重复执行
+        const lastExec = _taskLastExecMap.get(task.id) || 0
+        if (now - lastExec < 5 * 60 * 1000) {
+          continue // 5 分钟内已执行过
+        }
       }
-      // 去重：同一任务在同一 cron 窗口内不重复执行
-      const lastExec = _taskLastExecMap.get(task.id) || 0
-      if (now - lastExec < 5 * 60 * 1000) {
-        continue // 5 分钟内已执行过
+
+      if (task.condition && !task.condition()) {
+        logForDebugging(`[proactive] skipping ${task.id} — condition not met`)
+        continue
+      }
+
+      _tasksExecuting.add(task.id)
+      logForDebugging(`[proactive] executing ${task.id}: ${task.description}`)
+      const result = await safeExecute(
+        task.id,
+        async () => {
+          await task.action()
+          return `Task ${task.id} completed`
+        },
+        'execute',
+      )
+
+      _tasksExecuting.delete(task.id)
+      if (result.success) {
+        _taskLastExecMap.set(task.id, now)
+        _saveExecHistory()
+        logForDebugging(`[proactive] ${task.id} succeeded: ${result.output}`)
+      } else if (result.output?.includes('__SKIPPED__')) {
+        logForDebugging(`[proactive] ${task.id} skipped (skipIf)`)
+      } else {
+        logForDebugging(`[proactive] ${task.id} failed: ${result.output}`)
       }
     }
 
-    if (task.condition && !task.condition()) {
-      logForDebugging(`[proactive] skipping ${task.id} — condition not met`)
-      continue
-    }
-
-    _tasksExecuting.add(task.id)
-    logForDebugging(`[proactive] executing ${task.id}: ${task.description}`)
-    const result = await safeExecute(
-      task.id,
-      async () => {
-        await task.action()
-        return `Task ${task.id} completed`
-      },
-      'execute',
-    )
-
-    _tasksExecuting.delete(task.id)
-    if (result.success) {
-      _taskLastExecMap.set(task.id, now)
-      _saveExecHistory()
-      logForDebugging(`[proactive] ${task.id} succeeded: ${result.output}`)
-    } else if (result.output?.includes('__SKIPPED__')) {
-      logForDebugging(`[proactive] ${task.id} skipped (skipIf)`)
-    } else {
-      logForDebugging(`[proactive] ${task.id} failed: ${result.output}`)
-    }
+    logForDebugging('[proactive] orchestrator complete')
+  } finally {
+    _isRunning = false
+    _lastOrchestratorRun = Date.now()
   }
-
-  logForDebugging('[proactive] orchestrator complete')
 }
 
 /**

@@ -479,8 +479,15 @@ function loadScenarioModules(): SmartCronTask[] {
   ]
   for (const { path, getter } of modules) {
     try {
-      const mod = require(path) as Record<string, () => SmartCronTask[]>
-      if (mod[getter]) extra.push(...mod[getter]())
+      const mod = require(path) as Record<string, unknown>
+      if (typeof mod?.[getter] === 'function') {
+        const tasks = (mod[getter] as () => SmartCronTask[])()
+        if (Array.isArray(tasks)) {
+          extra.push(...tasks)
+        }
+      } else {
+        logForDebugging(`[builtinTasks] 场景模块 ${path} 未导出 ${getter}`)
+      }
     } catch (e) {
       logForDebugging(`[builtinTasks] 场景模块 ${path} 加载失败: ${(e as Error).message}`)
     }
