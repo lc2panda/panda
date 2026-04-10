@@ -49,15 +49,21 @@ export function useProactive(options: UseProactiveOptions): void {
 
     const tickPrompt = '/proactive-tick'
 
+    // 设置定时 tick（每 5 分钟一次），而非每次 effect 都触发
+    // 首次立即执行一次 cron 任务检查
     if (tickTimerRef.current === null) {
-      if (!isLoading) {
-        // 执行已注册的 cron 定时任务（dream, health, 71 场景等）
-        // /proactive on 或 night-mode 均可触发，不限于夜间
+      // 立即执行一次 cron 任务
+      if (isProactiveActive() || isNightModeActive()) {
+        void runNightTasks().catch(() => {})
+      }
+
+      // 设置 5 分钟间隔的定时器
+      const TICK_INTERVAL_MS = 5 * 60 * 1000
+      tickTimerRef.current = setInterval(() => {
         if (isProactiveActive() || isNightModeActive()) {
           void runNightTasks().catch(() => {})
         }
-        onSubmitTick(tickPrompt)
-      }
+      }, TICK_INTERVAL_MS)
     }
 
     return () => {
