@@ -167,9 +167,8 @@ function getPersonaContext(): string | null {
   try {
     const { getAllWorkingMemory } = require('./assistant/workingMemory.js')
     const wm = getAllWorkingMemory()
-    const keys = Object.keys(wm || {})
-    if (keys.length > 0) {
-      const summary = keys.slice(0, 5).map(k => `${k}: ${wm[k].value}`).join('; ')
+    if (Array.isArray(wm) && wm.length > 0) {
+      const summary = wm.slice(0, 5).map((e: any) => `${e.key}: ${e.value}`).join('; ')
       parts.push(`当前工作记忆: ${summary}`)
     }
   } catch {}
@@ -179,7 +178,7 @@ function getPersonaContext(): string | null {
     const events = getRecentEmotionalEvents()
     if (events && events.length > 0) {
       const last = events[events.length - 1]
-      parts.push(`最近情感: ${last.type}(${last.trigger})`)
+      parts.push(`最近情感: ${last.emotion}(${(last.description || '').slice(0, 30)})`)
     }
   } catch {}
   return parts.join('\n')

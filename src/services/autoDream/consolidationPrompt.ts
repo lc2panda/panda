@@ -77,6 +77,14 @@ Focus on:
 - Converting relative dates ("yesterday", "last week") to absolute dates so they remain interpretable after time passes
 - Deleting contradicted facts — if today's investigation disproves an old memory, fix it at the source
 
+### Phase 3 Enhanced: 跨记忆层整合
+
+在整合时，注意以下跨层关联：
+- 如果多个 episodic 记忆指向同一主题 → 提炼为 1 条 semantic 记忆
+- 如果 episodic 记忆包含重复行为模式 → 提炼为 procedural/habits 更新
+- 如果 emotional 事件与某个决策记忆关联 → 在 semantic 记忆中标注情感标签
+- 如果 prospective 事件即将到来 → 在晨间简报中优先展示
+
 ## Phase 3.5 — Emotional memory
 
 Scan for emotionally salient moments: frustration spikes, breakthroughs, repeated user corrections, or praise. These signals reveal what matters most to the user beyond raw facts. Persist a brief emotional-context note alongside the relevant topic file (e.g., "user was frustrated by X — avoid suggesting Y in future").
@@ -89,6 +97,35 @@ Update \`${ENTRYPOINT_NAME}\` so it stays under ${MAX_ENTRYPOINT_LINES} lines AN
 - Demote verbose entries: if an index line is over ~200 chars, it's carrying content that belongs in the topic file — shorten the line, move the detail
 - Add pointers to newly important memories
 - Resolve contradictions — if two files disagree, fix the wrong one
+
+### Phase 4 Enhanced: 智能记忆管理
+
+在完成记忆修剪后，对每条 strength < 0.5 的记忆进行价值评估：
+
+#### 评估维度
+1. **项目相关性**: 是否与用户当前活跃项目直接相关？
+2. **经验价值**: 是否包含可复用的模式、教训、或最佳实践？
+3. **情感锚点**: 是否关联重要的情感事件（突破、挫折、里程碑）？
+4. **时效性**: 是否有明确的时间窗口后将失去价值？
+
+#### 输出格式（必须严格遵守）
+在报告末尾，用以下格式输出记忆管理指令：
+
+\`\`\`memory-actions
+KEEP: [文件名] — [保留理由，10字以内]
+ARCHIVE: [文件名] — [归档理由]
+EXTRACT: [文件名] → patterns/[新文件名] — [提取的模式描述]
+STRENGTHEN: [文件名] +0.2 — [强化理由]
+WEAKEN: [文件名] -0.3 — [弱化理由]
+\`\`\`
+
+#### 决策规则
+- 与活跃项目相关 → KEEP 或 STRENGTHEN
+- 包含通用经验 → EXTRACT 到 patterns/
+- 有情感价值 → KEEP，标记 important: true
+- 超过 30 天未访问且无以上价值 → ARCHIVE
+- 事实性信息已过时 → WEAKEN
+- 每次整合最多 ARCHIVE 5 条记忆（防止过度清理）
 
 ---
 

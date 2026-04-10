@@ -4,6 +4,7 @@
 //      主动层（时间驱动）在 proactive/builtinTasks.ts 中：日历提醒、Git 提醒、画像过期、前瞻扫描
 //      检查器 6 桥接主动层通知到被动层（pending-notifications）
 //      检查器 7 习惯偏差检查（深夜关怀 + 长时间连续工作提醒）
+//      检查器 8 LLM 元检查器（本地智能推理：重复话题/错误累积/工具委派建议）
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
 
 import { join } from 'path'
@@ -15,7 +16,7 @@ import { homedir } from 'os'
 // ═══════════════════════════════════════════════════════════════════
 
 export interface ProactiveSuggestion {
-  type: 'reminder' | 'insight' | 'alert' | 'tip' | 'pending-notifications'
+  type: 'reminder' | 'insight' | 'alert' | 'tip' | 'pending-notifications' | 'llm-insight'
   priority: 'low' | 'medium' | 'high'
   message: string
   source: string // 触发来源
@@ -45,11 +46,12 @@ export async function checkProactiveSuggestions(context: {
     () => _checkRepetitivePattern(context),
     () => _checkPendingNotifications(),
     () => _checkHabitDeviation(),
+    () => _checkLLMInsight(context),
   ]
 
   for (const checker of checkers) {
     try {
-      const result = checker()
+      const result = await Promise.resolve(checker())
       if (result) suggestions.push(result)
     } catch {
       // 单个检查器失败，静默跳过
@@ -303,4 +305,103 @@ function _checkPendingNotifications(): ProactiveSuggestion | null {
       source: 'pending_notifications',
     }
   } catch { return null }
+}
+
+// ─── 检查器 8: LLM 驱动元检查器（本地智能推理，零 API 调用） ───
+
+let _lastLLMInsightTime = 0
+const LLM_INSIGHT_INTERVAL = 30 * 60 * 1000 // 30 分钟限频
+
+function _checkLLMInsight(context: { messages: readonly any[]; turnCount: number }): ProactiveSuggestion | null {
+  try {
+    // 限频：30 分钟内只触发一次
+    if (Date.now() - _lastLLMInsightTime < LLM_INSIGHT_INTERVAL) return null
+    if (context.turnCount < 5) return null // 对话太短不分析
+
+    _lastLLMInsightTime = Date.now()
+
+    // 收集上下文信号
+    const signals: string[] = []
+
+    // 1. 分析对话模式
+    const recentMessages = context.messages.slice(-10)
+    const userMessages = recentMessages.filter((m: any) => m.type === 'user' || m.role === 'user')
+
+    // 检测重复提问模式（用户可能卡住了）
+    if (userMessages.length >= 3) {
+      const lastThree = userMessages.slice(-3).map((m: any) => {
+        const text = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+        return text.slice(0, 50).toLowerCase()
+      })
+      // 简单相似度：共同词比例
+      const words1 = new Set(lastThree[0]?.split(/\s+/) || [])
+      const words2 = new Set(lastThree[1]?.split(/\s+/) || [])
+      const words3 = new Set(lastThree[2]?.split(/\s+/) || [])
+      const common12 = [...words1].filter(w => words2.has(w)).length
+      const common23 = [...words2].filter(w => words3.has(w)).length
+      if (common12 > words1.size * 0.5 && common23 > words2.size * 0.5) {
+        signals.push('repeated-topic')
+      }
+    }
+
+    // 2. 检测长时间未使用高效工具
+    const toolUses = recentMessages
+      .filter((m: any) => m.type === 'assistant')
+      .flatMap((m: any) => {
+        if (!Array.isArray(m.content)) return []
+        return m.content.filter((b: any) => b.type === 'tool_use').map((b: any) => b.name)
+      })
+
+    const hasAgent = toolUses.some((t: string) => t === 'Agent' || t === 'agent')
+    const hasPlan = toolUses.some((t: string) => t === 'EnterPlanMode')
+
+    // 如果对话超过 10 轮但未使用 Agent 或 Plan，可能需要分解任务
+    if (context.turnCount > 10 && !hasAgent && !hasPlan) {
+      signals.push('no-delegation')
+    }
+
+    // 3. 检测错误累积
+    const errorCount = recentMessages
+      .filter((m: any) => m.type === 'assistant')
+      .flatMap((m: any) => {
+        if (!Array.isArray(m.content)) return []
+        return m.content.filter((b: any) => b.type === 'tool_result' && b.is_error)
+      }).length
+
+    if (errorCount >= 3) {
+      signals.push('error-accumulation')
+    }
+
+    // 4. 生成建议（按优先级返回最重要的一个）
+    if (signals.includes('repeated-topic')) {
+      return {
+        type: 'llm-insight',
+        message: '💡 检测到重复话题 — 试试换个角度描述需求，或用 /plan 先梳理思路？',
+        priority: 'medium',
+        source: 'llm_insight_repeated_topic',
+      }
+    }
+
+    if (signals.includes('error-accumulation')) {
+      return {
+        type: 'llm-insight',
+        message: '🔍 多次错误 — 建议先 /debug 查看日志，或用 Agent 分析根因。',
+        priority: 'medium',
+        source: 'llm_insight_error_accumulation',
+      }
+    }
+
+    if (signals.includes('no-delegation')) {
+      return {
+        type: 'llm-insight',
+        message: '🤖 长对话建议 — 考虑用 Agent 委派子任务，或 /plan 规划后再执行。',
+        priority: 'low',
+        source: 'llm_insight_no_delegation',
+      }
+    }
+
+    return null
+  } catch {
+    return null
+  }
 }
