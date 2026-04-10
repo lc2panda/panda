@@ -134,7 +134,12 @@ class WecomAPIConnector implements IMConnector {
   }
 
   async sendNotification(notification: PandaNotification): Promise<void> {
-    logForDebugging(`[wechat-wecom] sendNotification: ${notification.title}`)
+    try {
+      const msg = `📢 [${notification.title || 'Panda'}]\n${notification.body || ''}`
+      await this.sendMessage('@all', msg)
+    } catch (e) {
+      logForDebugging(`[wechat-wecom] sendNotification failed: ${e}`)
+    }
   }
 }
 

@@ -196,7 +196,12 @@ class TeamsConnector implements IMConnector {
   }
 
   async sendNotification(notification: PandaNotification): Promise<void> {
-    logForDebugging(`[teams] sendNotification: ${notification.title}`)
+    try {
+      const msg = `📢 [${notification.title || 'Panda'}]\n${notification.body || ''}`
+      await this.sendMessage('me', msg)
+    } catch (e) {
+      logForDebugging(`[teams] sendNotification failed: ${e}`)
+    }
   }
 
   // ─── OAuth2 client_credentials ───

@@ -29,11 +29,13 @@ class TelegramConnector implements IMConnector {
   private _status: ConnectorStatus = 'disconnected'
   private botToken = ''
   private lastUpdateId = 0
+  private config: ConnectorConfig | null = null
 
   get status(): ConnectorStatus { return this._status }
   get mode(): ConnectorMode { return 'api' }
 
   async initialize(config: ConnectorConfig): Promise<void> {
+    this.config = config
     this.botToken = config.botToken || process.env.TELEGRAM_BOT_TOKEN || ''
 
     if (!this.botToken) {
@@ -181,7 +183,17 @@ class TelegramConnector implements IMConnector {
   }
 
   async sendNotification(notification: PandaNotification): Promise<void> {
-    logForDebugging(`[telegram] sendNotification: ${notification.title}`)
+    try {
+      const msg = `📢 [${notification.title || 'Panda'}]\n${notification.body || ''}`
+      const chatId = (this.config?.extra?.chatId as string) || (this.config?.extra?.adminChatId as string) || ''
+      if (chatId) {
+        await this.sendMessage(chatId, msg)
+      } else {
+        logForDebugging('[telegram] sendNotification skipped: no chatId configured')
+      }
+    } catch (e) {
+      logForDebugging(`[telegram] sendNotification failed: ${e}`)
+    }
   }
 
   // ─── 内部方法 ───

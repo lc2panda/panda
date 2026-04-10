@@ -439,8 +439,12 @@ class FeishuAPIConnector implements IMConnector {
   }
 
   async sendNotification(notification: PandaNotification): Promise<void> {
-    // 飞书暂不直接支持通知推送到 Connector
-    logForDebugging(`[feishu-api] sendNotification: ${notification.title}`)
+    try {
+      const msg = `📢 [${notification.title || 'Panda'}]\n${notification.body || ''}`
+      await this.sendMessage('default', msg)
+    } catch (e) {
+      logForDebugging(`[feishu-api] sendNotification failed: ${e}`)
+    }
   }
 }
 

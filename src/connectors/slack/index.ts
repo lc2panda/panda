@@ -202,7 +202,12 @@ class SlackConnector implements IMConnector {
   }
 
   async sendNotification(notification: PandaNotification): Promise<void> {
-    logForDebugging(`[slack] sendNotification: ${notification.title}`)
+    try {
+      const msg = `📢 *${notification.title || 'Panda'}*\n${notification.body || ''}`
+      await this.sendMessage('#general', msg)
+    } catch (e) {
+      logForDebugging(`[slack] sendNotification failed: ${e}`)
+    }
   }
 
   // ─── 内部方法 ───
