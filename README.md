@@ -339,7 +339,7 @@ panda auth login
 | `/assistant`    | 启用 KAIROS 助手模式 — 激活主动引擎 + 定时任务                      |
 | `/proactive`    | 切换主动自主模式 — 含 dream/briefing/health 三个内置任务           |
 | `/night-mode`   | 夜间自主模式（22:00-06:00）— 顺序执行 + 错误隔离                    |
-| `/buddy`        | 编程伙伴 — 可交互的熊猫伙伴                                     |
+| `/buddy`        | 编程伙伴 — 可交互的虚拟宠物（随机物种）                           |
 | `/brief`        | 简报模式 — AI 只输出简洁摘要                                   |
 | `/persona auto` | 自动人格切换 — 根据时间/情绪/活动自动调整                             |
 | `/write`        | 写作助理 — 生成大纲、编译文稿                                    |
@@ -1400,7 +1400,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 
 #### `/buddy`
 - **用法**: `/buddy [show|hide|mute|unmute|info]`
-- **说明**: 编程伙伴 — 可交互的熊猫伙伴
+- **说明**: 编程伙伴 — 终端中的虚拟宠物（随机物种，可 show/hide/mute）
 
 #### `/brief`
 - **用法**: `/brief [on|off]`
