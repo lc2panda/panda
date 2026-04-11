@@ -3,6 +3,7 @@ import type { UUID } from 'crypto'
 import type { CanUseToolFn } from '../hooks/useCanUseTool.js'
 import type { CompactionResult } from '../services/compact/compact.js'
 import type { ScopedMcpServerConfig } from '../services/mcp/types.js'
+import type { SkillTrustMetadata } from '../skills/skillSchema.js'
 import type { ToolUseContext } from '../Tool.js'
 import type { EffortValue } from '../utils/effort.js'
 import type { IDEExtensionInstallationStatus, IdeType } from '../utils/ide.js'
@@ -50,6 +51,10 @@ export type PromptCommand = {
   // Glob patterns for file paths this skill applies to
   // When set, the skill is only visible after the model touches matching files
   paths?: string[]
+  // Hermes Skill Schema 扩展（P1-4）：信任等级 + 所需环境变量。
+  // bundled skills 未声明时默认 'builtin'（见 getSkillTrustMetadata）。
+  // 用户侧 / 远程 canonical / community skill 加载时可以注入此字段。
+  trustMetadata?: SkillTrustMetadata
   getPromptForCommand(
     args: string,
     context: ToolUseContext,

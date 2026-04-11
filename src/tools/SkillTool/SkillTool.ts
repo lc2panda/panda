@@ -57,6 +57,11 @@ import { lazySchema } from '../../utils/lazySchema.js'
 import { createUserMessage, normalizeMessages } from '../../utils/messages.js'
 import type { ModelAlias } from '../../utils/model/aliases.js'
 import { resolveSkillModelOverride } from '../../utils/model/model.js'
+import {
+  checkSkillTrustLevel,
+  formatMissingEnvMessage,
+  validateSkillEnvironment,
+} from '../../skills/skillSchema.js'
 import { recordSkillUsage } from '../../utils/suggestions/skillUsageTracking.js'
 import { createAgentId } from '../../utils/uuid.js'
 import { runAgent } from '../AgentTool/runAgent.js'
@@ -450,6 +455,36 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
         message: `Skill ${normalizedCommandName} is not a prompt-based skill`,
         errorCode: 5,
       }
+    }
+
+    // Hermes Skill Schema 扩展（P1-4）：
+    //   1) 环境变量校验 — 缺失必需变量时拒绝激活；
+    //   2) 信任等级检查 — community skill 允许但记录 warning。
+    // bundled skills 默认 builtin + 无 env 要求，不会触发拒绝分支。
+    const envCheck = validateSkillEnvironment(foundCommand)
+    if (!envCheck.valid) {
+      return {
+        result: false,
+        message: formatMissingEnvMessage(
+          normalizedCommandName,
+          envCheck.missing,
+        ),
+        errorCode: 7,
+      }
+    }
+    const trustCheck = checkSkillTrustLevel(foundCommand)
+    if (!trustCheck.allowed) {
+      return {
+        result: false,
+        message: `Skill ${normalizedCommandName} 被信任等级策略拒绝：${trustCheck.reason ?? 'unknown'}`,
+        errorCode: 8,
+      }
+    }
+    if (trustCheck.reason) {
+      // 非致命 warning — 用 logEvent 上报，避免打断执行
+      logForDebugging(
+        `[SkillTrust] ${normalizedCommandName}: ${trustCheck.reason}`,
+      )
     }
 
     return { result: true }
