@@ -298,6 +298,20 @@ export class QueryEngine {
         : { type: 'disabled' }
 
     headlessProfilerCheckpoint('before_getSystemPrompt')
+    // HERMES_PROMPT_FREEZE (P0-4): capture memory file bytes at session
+    // start so subsequent turns produce byte-identical system prompts
+    // even if mid-session events (settings sync, team memory sync, etc.)
+    // clear the memoize layer. Idempotent — second call is a no-op.
+    if (feature('HERMES_PROMPT_FREEZE')) {
+      try {
+        const { freezeSessionContextFromDisk } = await import(
+          './utils/claudemd.js'
+        )
+        await freezeSessionContextFromDisk()
+      } catch {
+        // Non-fatal — fall back to normal disk reads.
+      }
+    }
     // Narrow once so TS tracks the type through the conditionals below.
     const customPrompt =
       typeof customSystemPrompt === 'string' ? customSystemPrompt : undefined

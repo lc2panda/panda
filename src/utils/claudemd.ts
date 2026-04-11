@@ -460,6 +460,13 @@ function handleMemoryFileReadError(error: unknown, filePath: string): void {
  * responsive during the directory walk (many readFile attempts, most
  * ENOENT). When includeBasePath is given, @include paths are resolved in
  * the same lex pass and returned alongside the parsed file.
+ *
+ * HERMES_PROMPT_FREEZE: If the session has been frozen (Hermes P0-4), the
+ * disk read is skipped and the frozen snapshot is used instead. This
+ * preserves prefix cache hits across mid-session events that clear the
+ * memoize layer (settings sync, team memory sync, compaction). The
+ * frozen layer only applies to paths that were in scope at session
+ * start — unfrozen/new paths fall through to the normal disk read.
  */
 async function safelyReadMemoryFileAsync(
   filePath: string,
@@ -467,8 +474,19 @@ async function safelyReadMemoryFileAsync(
   includeBasePath?: string,
 ): Promise<{ info: MemoryFileInfo | null; includePaths: string[] }> {
   try {
-    const fs = getFsImplementation()
-    const rawContent = await fs.readFile(filePath, { encoding: 'utf-8' })
+    let rawContent: string | null = null
+    if (feature('HERMES_PROMPT_FREEZE')) {
+      const { readFrozen, isSessionFrozen } = await import(
+        '../services/sessionContext/frozenContext.js'
+      )
+      if (isSessionFrozen()) {
+        rawContent = readFrozen(filePath)
+      }
+    }
+    if (rawContent === null) {
+      const fs = getFsImplementation()
+      rawContent = await fs.readFile(filePath, { encoding: 'utf-8' })
+    }
     return parseMemoryFileContent(rawContent, filePath, type, includeBasePath)
   } catch (error) {
     handleMemoryFileReadError(error, filePath)
@@ -1167,6 +1185,17 @@ export function resetGetMemoryFilesCache(
   nextEagerLoadReason = reason
   shouldFireHook = true
   clearMemoryFileCaches()
+  // HERMES_PROMPT_FREEZE: /clear and compact are genuine session
+  // boundaries — release the frozen snapshot so the next freeze captures
+  // fresh disk state (user-edited CLAUDE.md finally takes effect).
+  // clearMemoryFileCaches() callers (settings sync, worktree, team memory
+  // sync) INTENTIONALLY do not unfreeze — the frozen layer is the whole
+  // point of the feature.
+  if (feature('HERMES_PROMPT_FREEZE')) {
+    void import('../services/sessionContext/frozenContext.js').then(mod => {
+      mod.unfreezeSession()
+    })
+  }
 }
 
 export function getLargeMemoryFiles(files: MemoryFileInfo[]): MemoryFileInfo[] {
@@ -1516,4 +1545,62 @@ export function getAllMemoryFilePaths(
   }
 
   return Array.from(paths)
+}
+
+/**
+ * HERMES_PROMPT_FREEZE (P0-4): Capture the exact bytes of every memory
+ * file discoverable at session start into the frozen snapshot. Returns
+ * the count of files frozen (0 if feature off or already frozen).
+ *
+ * Uses the standard getMemoryFiles() walk to enumerate candidates, then
+ * re-reads raw bytes from disk — re-reading bypasses the freeze hook in
+ * safelyReadMemoryFileAsync so the snapshot is populated even if some
+ * concurrent call has already flipped isSessionFrozen().
+ *
+ * Safe to call multiple times: the second call is a no-op because
+ * isSessionFrozen() is already true after the first.
+ *
+ * Writes continue to flow through to disk immediately via the normal
+ * write path; the freeze only affects READS. This matches Hermes's
+ * "disk immediately, prompt next session" contract.
+ */
+export async function freezeSessionContextFromDisk(): Promise<number> {
+  if (!feature('HERMES_PROMPT_FREEZE')) {
+    return 0
+  }
+  const { freezeFile, markSessionFrozen, isSessionFrozen, getFrozenStats } =
+    await import('../services/sessionContext/frozenContext.js')
+  if (isSessionFrozen()) {
+    return getFrozenStats().count
+  }
+  try {
+    // Enumerate candidates via the normal walk. This may hit disk for
+    // the initial read, but we then snapshot raw bytes separately so
+    // later turns are guaranteed to get the same content even when the
+    // memoize layer is cleared.
+    const files = await getMemoryFiles()
+    const fs = getFsImplementation()
+    let frozen = 0
+    for (const f of files) {
+      try {
+        const raw = await fs.readFile(f.path, { encoding: 'utf-8' })
+        freezeFile(f.path, raw)
+        frozen++
+      } catch {
+        // ENOENT / EACCES: file vanished between enumeration and read.
+        // Skip — caller's normal fallback on subsequent reads will also
+        // fail the disk read and produce the same empty result.
+      }
+    }
+    markSessionFrozen()
+    logForDebugging(
+      `[HERMES_PROMPT_FREEZE] session frozen (${frozen} files)`,
+    )
+    return frozen
+  } catch (error) {
+    logForDebugging(
+      `[HERMES_PROMPT_FREEZE] freeze failed: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return 0
+  }
 }
