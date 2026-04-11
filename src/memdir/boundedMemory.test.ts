@@ -71,3 +71,75 @@ test('checkBounded — basename extracted from full path', () => {
   expect(result.withinLimit).toBe(false)
   expect(result.maxChars).toBe(2200)
 })
+
+// ───────────────────────────────────────────────
+// P0-1 Wave 5A：compressBoundedContent 超限时自动落盘 overflow
+// ───────────────────────────────────────────────
+test('compressBoundedContent — 超限时自动写 overflow（fire-and-forget）', async () => {
+  // 使用独立 topic 避免污染真实 MEMORY.md
+  const TOPIC = 'TEST_BOUNDED_OVERFLOW.md'
+  // 先清理
+  const { rmSync, existsSync: existsSync2 } = await import('fs')
+  const { join: join2 } = await import('path')
+  const { homedir: homedir2 } = await import('os')
+  const dir = join2(homedir2(), '.pandacc', 'memory', 'overflow', TOPIC)
+  try {
+    if (existsSync2(dir)) rmSync(dir, { recursive: true, force: true })
+  } catch {}
+
+  // 构造一个 basename 命中自定义 topic 的场景：直接用 compressBoundedContent 强制 maxChars
+  const lines = ['# Title', '## Section', 'header3', 'header4', 'header5']
+  for (let i = 0; i < 200; i++) lines.push(`line ${i} ${'x'.repeat(50)}`)
+  const content = lines.join('\n')
+
+  const compressed = compressBoundedContent(`/tmp/${TOPIC}`, content, 2200)
+  expect(compressed.length).toBeLessThanOrEqual(2200)
+  expect(compressed).toContain('overflow')
+
+  // 等异步 saveOverflow 完成
+  await new Promise(r => setTimeout(r, 200))
+
+  const { listOverflow } = await import('./overflowPool.js')
+  const list = listOverflow(TOPIC)
+  expect(list.length).toBeGreaterThan(0)
+  // 内容应包含中段被丢弃的 line
+  const joined = list.map(e => e.content).join('\n')
+  expect(joined).toContain('line ')
+})
+
+test('compressBoundedContent — skipOverflow 选项禁用落盘', async () => {
+  const TOPIC = 'TEST_SKIP_OVERFLOW.md'
+  const { rmSync, existsSync: existsSync2 } = await import('fs')
+  const { join: join2 } = await import('path')
+  const { homedir: homedir2 } = await import('os')
+  const dir = join2(homedir2(), '.pandacc', 'memory', 'overflow', TOPIC)
+  try {
+    if (existsSync2(dir)) rmSync(dir, { recursive: true, force: true })
+  } catch {}
+
+  const lines = ['# T', '## S', 'h3', 'h4', 'h5']
+  for (let i = 0; i < 200; i++) lines.push(`line ${i} ${'y'.repeat(50)}`)
+  const content = lines.join('\n')
+
+  compressBoundedContent(`/tmp/${TOPIC}`, content, 2200, { skipOverflow: true })
+  await new Promise(r => setTimeout(r, 150))
+
+  const { listOverflow } = await import('./overflowPool.js')
+  const list = listOverflow(TOPIC)
+  expect(list.length).toBe(0)
+})
+
+test('enforceBounded — 返回值包含 overflowSaved 标记', () => {
+  const lines = ['# Idx', '## A', 'h3', 'h4', 'h5']
+  for (let i = 0; i < 300; i++) lines.push(`- item ${i} ${'y'.repeat(30)}`)
+  const content = lines.join('\n')
+  const result = enforceBounded('/some/path/MEMORY.md', content)
+  expect(result.compressed).toBe(true)
+  expect(result.overflowSaved).toBe(true)
+})
+
+test('enforceBounded — 未触发压缩时 overflowSaved=false', () => {
+  const result = enforceBounded('/some/path/MEMORY.md', 'short')
+  expect(result.compressed).toBe(false)
+  expect(result.overflowSaved).toBe(false)
+})
