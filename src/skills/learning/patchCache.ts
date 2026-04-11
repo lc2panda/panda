@@ -20,6 +20,11 @@ interface PatchCacheData {
 }
 
 function loadCache(): PatchCacheData {
+  // 完整性校验：损坏 JSON 自动备份为 .broken-<ts>，回退到空 cache
+  try {
+    const { checkAndRecoverJSON } = require('../../memdir/sqliteIntegrity.js')
+    checkAndRecoverJSON(CACHE_PATH)
+  } catch {}
   try {
     if (!existsSync(CACHE_PATH)) return { patches: [], updatedAt: 0 }
     const raw = readFileSync(CACHE_PATH, 'utf-8')

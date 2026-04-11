@@ -19,6 +19,11 @@ let _entries: Map<string, WorkingMemoryEntry> | null = null
 function load(): Map<string, WorkingMemoryEntry> {
   if (_entries !== null) return _entries
   _entries = new Map()
+  // 完整性校验：损坏的 JSON 会被重命名为 .broken-<timestamp>，上层回退到空 Map
+  try {
+    const { checkAndRecoverJSON } = require('../memdir/sqliteIntegrity.js')
+    checkAndRecoverJSON(PERSIST_PATH)
+  } catch {}
   try {
     const raw = readFileSync(PERSIST_PATH, 'utf-8')
     const arr = JSON.parse(raw) as WorkingMemoryEntry[]

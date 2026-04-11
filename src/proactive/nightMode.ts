@@ -36,6 +36,11 @@ const _EXEC_HISTORY_PATH = join(homedir(), '.pandacc', 'data', 'task-exec-histor
 const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000
 
 function _loadExecHistory(): Map<string, number> {
+  // 完整性校验：损坏 JSON 自动备份为 .broken-<ts>，回退到空 Map
+  try {
+    const { checkAndRecoverJSON } = require('../memdir/sqliteIntegrity.js')
+    checkAndRecoverJSON(_EXEC_HISTORY_PATH)
+  } catch {}
   try {
     const raw = readFileSync(_EXEC_HISTORY_PATH, 'utf-8')
     const entries: [string, number][] = JSON.parse(raw)
