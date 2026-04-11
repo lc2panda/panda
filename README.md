@@ -11,9 +11,9 @@
  ╚═╝      ╚═╝  ╚═╝ ╚═╝  ╚═══╝ ╚═════╝  ╚═╝  ╚═╝
 ```
 
-| 版本 | 运行时 |
-|------|--------|
-| v2.7.0 | Bun >= 1.2.0 / Node.js >= 18.0.0 |
+| 版本 | 运行时 | 亮点 |
+|------|--------|-----|
+| v2.11.3 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 🎨 Matrix 主题黑客帝国风启动屏 · Hermes 完整度补齐 · 公开发版就绪 |
 
 ---
 
@@ -53,6 +53,14 @@ panda
 ```
 
 **更新**：`npm update -g @lc2panda/panda-code`
+
+**🎨 可选：启用 Matrix 主题**（黑客帝国风）
+
+```bash
+PANDA_THEME=matrix panda
+```
+
+启用后会看到 ~5.5 秒的字符雨启动屏（Logo 淡入 + "WAKE UP, NEO" 打字机，按 ⏎ 跳过），之后 Spinner 和输入框变绿色。消息区保持默认清爽留白，不干扰阅读。详见 [§8 /theme 命令手册](#theme)。
 
 ### 1.2 首次使用
 
@@ -1311,21 +1319,46 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 - **用法**: `/config`
 - **说明**: 打开交互式配置面板
 
+<a id="theme"></a>
 #### `/theme`
 - **用法**: `/theme`
 - **说明**: 选择终端配色主题
-- **🆕 Matrix 主题**（v2.11.3+）：黑客帝国风格启动屏 + 轻量绿色 UI
-  - 启用方式：`PANDA_THEME=matrix panda` 启动
-  - **启动屏**（~5.5 秒，按 ⏎ 跳过）：
-    - 上下两条字符雨流动（katakana + 数字 + 符号）
-    - Panda Logo 从中央圆角绿框淡入
-    - "〔 W A K E   U P,   N E O … 〕" 文字打字机逐字显示（~2.3 秒）
-    - 完整显示后停留 1.2 秒
-  - **Spinner**：14 帧密集 braille 字符 `⠁⠃⠇⡇⡏⡟⡿⣿`，Matrix 经典绿 #00ff41
-  - **输入框**：绿色圆角边框
-  - **状态栏**：双线绿框（需配置 statusLine hook 才显示）
-  - **消息区**：保持默认清爽留白，**零装饰干扰阅读**
-  - **零回归**：默认仍是 dark/light 主题，必须显式 `PANDA_THEME=matrix` 才启用
+
+##### 🎨 Matrix 主题（v2.11.3+ · 黑客帝国风）
+
+**启用方式**（env 变量 opt-in，不影响默认主题）：
+
+```bash
+# 一次性启用
+PANDA_THEME=matrix panda
+
+# 或写入 shell config 永久启用
+echo 'export PANDA_THEME=matrix' >> ~/.zshrc   # zsh
+echo 'export PANDA_THEME=matrix' >> ~/.bashrc  # bash
+```
+
+**视觉元素**：
+
+| 元素 | 效果 |
+|---|---|
+| **启动屏**（~5.5 秒） | 上下字符雨（katakana / 数字 / 符号）+ Panda Logo 淡入 + "〔 W A K E   U P,   N E O … 〕" 打字机逐字显示 + 1.2 秒停留 |
+| **Spinner** | 14 帧密集 braille `⠁⠃⠇⡇⡏⡟⡿⣿`，Matrix 经典绿 `#00ff41` |
+| **输入框** | 圆角绿色边框 |
+| **状态栏** | 双线绿框（需配置 `statusLine` hook 才渲染） |
+| **消息区** | **保持默认清爽留白，零装饰**（对阅读零干扰） |
+
+**跳过启动屏**：任意时刻按 `⏎` 或 `Esc` 立即进入 REPL。
+
+**关闭主题**：
+
+```bash
+unset PANDA_THEME          # 当前 shell
+PANDA_THEME= panda          # 仅本次启动
+```
+
+**设计哲学**：Matrix 感由三层极轻装饰提供（启动屏冲击 + 输入框常驻识别 + Spinner 动态识别），对话内容区保持与默认主题完全相同的阅读体验，实现"酷炫 ≠ 干扰阅读"的平衡。
+
+**零回归**：默认仍是 `dark` / `light` 主题，必须显式 `PANDA_THEME=matrix` 才启用。关闭后所有 UI 字节等价默认主题。
 
 #### `/color`
 - **用法**: `/color <color|default>`
