@@ -32,7 +32,10 @@ const assistant = {
           )
         } else {
           assistantModule.markAssistantForced()
-          await assistantModule.initializeAssistantTeam()
+          const mcpClients = (context as unknown as {
+            options?: { mcpClients?: ReadonlyArray<{ name: string; type?: string; client?: unknown }> }
+          }).options?.mcpClients
+          await assistantModule.initializeAssistantTeam(mcpClients)
 
           logEvent('tengu_assistant_toggled', {
             enabled: true,
