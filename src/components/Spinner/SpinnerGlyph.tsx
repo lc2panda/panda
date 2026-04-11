@@ -2,9 +2,15 @@ import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
 import { Box, Text, useTheme } from '../../ink.js';
 import { getTheme, type Theme } from '../../utils/theme.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
 import { getDefaultCharacters, interpolateColor, parseRGB, toRGBColor } from './utils.js';
 const DEFAULT_CHARACTERS = getDefaultCharacters();
 const SPINNER_FRAMES = [...DEFAULT_CHARACTERS, ...[...DEFAULT_CHARACTERS].reverse()];
+// Matrix theme: denser braille ramp for a "data-stream" feel. Chosen to
+// monotonically fill 1→8 dots so the spinner reads like a progress bar
+// sweeping across the glyph. Used only when PANDA_THEME=matrix.
+const MATRIX_SPINNER_FRAMES = ['⠁', '⠃', '⠇', '⡇', '⡏', '⡟', '⡿', '⣿', '⣾', '⣼', '⣸', '⣰', '⣠', '⣀'];
+const MATRIX_GREEN = '#00ff41';
 const REDUCED_MOTION_DOT = '●';
 const REDUCED_MOTION_CYCLE_MS = 2000; // 2-second cycle: 1s visible, 1s dim
 const ERROR_RED = {
@@ -33,6 +39,17 @@ export function SpinnerGlyph(t0) {
   const time = t3 === undefined ? 0 : t3;
   const [themeName] = useTheme();
   const theme = getTheme(themeName);
+  // Matrix theme: opt-in via PANDA_THEME=matrix. Swaps frames to a denser
+  // braille ramp and forces a #00ff41 neon-green color. The escape early-
+  // returns so default code paths stay byte-equal when isMatrixTheme() is false.
+  if (isMatrixTheme()) {
+    if (reducedMotion) {
+      const isDim = Math.floor(time / (REDUCED_MOTION_CYCLE_MS / 2)) % 2 === 1;
+      return <Box flexWrap="wrap" height={1} width={2}><Text color={MATRIX_GREEN} dimColor={isDim}>{REDUCED_MOTION_DOT}</Text></Box>;
+    }
+    const matrixChar = MATRIX_SPINNER_FRAMES[frame % MATRIX_SPINNER_FRAMES.length];
+    return <Box flexWrap="wrap" height={1} width={2}><Text color={MATRIX_GREEN}>{matrixChar}</Text></Box>;
+  }
   if (reducedMotion) {
     const isDim = Math.floor(time / (REDUCED_MOTION_CYCLE_MS / 2)) % 2 === 1;
     let t4;
