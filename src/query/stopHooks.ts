@@ -186,6 +186,39 @@ export async function* handleStopHooks(
           }
         }).catch(() => {})
       } catch {}
+
+      // H4 Hermes — skill self-learning cycle. If SkillTool.call() stashed a
+      // `last-skill-execution` record, pick it up here, gather recent user
+      // followups as signal, and run the learning loop. Fire-and-forget.
+      try {
+        const { getWorkingMemory, deleteWorkingMemory } = require('../assistant/workingMemory.js') as typeof import('../assistant/workingMemory.js')
+        const raw = getWorkingMemory('last-skill-execution')
+        if (raw) {
+          try {
+            const exec = JSON.parse(raw) as {
+              skillName: string
+              invokedAt: number
+              args: Record<string, unknown>
+              result: 'success' | 'failure' | 'cancelled'
+            }
+            const followup = stopHookContext.messages
+              .slice(-6)
+              .filter((m: any) => m.type === 'user')
+              .slice(-3)
+              .map((m: any) => ({
+                role: 'user' as const,
+                content:
+                  typeof m.message?.content === 'string'
+                    ? m.message.content
+                    : JSON.stringify(m.message?.content || ''),
+              }))
+            const { runLearningCycle } = require('../skills/learning/index.js') as typeof import('../skills/learning/index.js')
+            void runLearningCycle(exec, followup).catch(() => {})
+          } catch {}
+          // Consume once — always clear, even on parse failure
+          try { deleteWorkingMemory('last-skill-execution') } catch {}
+        }
+      } catch {}
     }
   }
 

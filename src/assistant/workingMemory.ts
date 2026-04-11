@@ -97,6 +97,11 @@ export function clearWorkingMemory() {
   save()
 }
 
+export function deleteWorkingMemory(key: string) {
+  const entries = load()
+  if (entries.delete(key)) save()
+}
+
 export function getRelevantMemory(context: string): WorkingMemoryEntry[] {
   const all = getAllWorkingMemory()
   if (!context || context.length < 3) return all.slice(0, 10)
