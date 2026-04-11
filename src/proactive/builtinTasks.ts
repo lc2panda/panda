@@ -243,6 +243,16 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           }
           await mkdir(join(memoryDir, 'working'), { recursive: true })
           writeFileSync(join(memoryDir, 'working', `weekly_summary_${new Date().toISOString().split('T')[0]}.md`), summaryLines.join('\n'), 'utf-8')
+
+          try {
+            const { pushNotification } = await import('../assistant/sense.js')
+            pushNotification({
+              type: 'action',
+              title: '📊 本周 DeepDream 周报',
+              body: `本周 ${recentDreams.length} 份 DeepDream 报告已汇总。可使用 /memory weekly 查看。`,
+              channel: 'all',
+            })
+          } catch {}
         }
         logForDebugging(`[builtinTasks] dream-report-summary: summarized ${recentDreams.length} of ${dreams.length} reports`)
       } catch (e) {
@@ -435,6 +445,17 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           const { saveProspectiveMemory } = await import('../memdir/memdir.js')
           saveProspectiveMemory(parts.join('\n\n'))
           logForDebugging(`[builtinTasks] prospective-scan: completed with ${parts.length} data sources`)
+
+          try {
+            const { pushNotification } = await import('../assistant/sense.js')
+            const preview = parts[0].replace(/^##\s*/, '').slice(0, 100)
+            pushNotification({
+              type: 'action',
+              title: '🔮 前瞻提醒',
+              body: `检测到 ${parts.length} 项即将到来的事件/截止日期。${preview ? '\n' + preview : ''}`,
+              channel: 'all',
+            })
+          } catch {}
         } catch (e) {
           logForDebugging(`[builtinTasks] prospective-scan save failed: ${(e as Error).message}`)
         }

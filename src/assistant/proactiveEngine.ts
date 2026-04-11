@@ -160,21 +160,28 @@ function _checkProfileStaleness(): ProactiveSuggestion | null {
 
 function _checkMorningBriefing(): ProactiveSuggestion | null {
   const hour = new Date().getHours()
-  if (hour >= 7 && hour < 9) {
+  if (hour >= 7 && hour < 12) {
     try {
       const { getAutoMemPath } = require('../memdir/paths.js') as typeof import('../memdir/paths.js')
       const memDir = getAutoMemPath()
       if (!memDir) return null
 
-      // 检查是否有 briefing 目录下的文件
-      const briefingDir = join(memDir, 'semantic', 'briefing')
       const { readdirSync } = require('fs')
-      const files = readdirSync(briefingDir).filter((f: string) => f.endsWith('.md'))
-      if (files.length > 0) {
+      let count = 0
+      try {
+        const briefingDir = join(memDir, 'semantic', 'briefing')
+        count += readdirSync(briefingDir).filter((f: string) => f.endsWith('.md')).length
+      } catch {}
+      try {
+        const workingDir = join(memDir, 'working')
+        count += readdirSync(workingDir).filter((f: string) => f.startsWith('morning_brief_') && f.endsWith('.md')).length
+      } catch {}
+
+      if (count > 0) {
         return {
           type: 'tip',
           priority: 'low',
-          message: `早上好！发现 ${files.length} 份简报待阅读。可使用 /memory briefing 查看。`,
+          message: `早上好！发现 ${count} 份简报待阅读。可使用 /memory briefing 查看。`,
           source: 'morning_briefing',
         }
       }
@@ -285,19 +292,26 @@ function _checkHabitDeviation(): ProactiveSuggestion | null {
 
 // ─── 检查器 6: 未读通知消费（主动层 → 被动层桥接） ───
 
+const _displayedNotifTimestamps = new Set<string>()
+
 function _checkPendingNotifications(): ProactiveSuggestion | null {
   try {
     const notifPath = join(homedir(), '.pandacc', 'channels', 'outbox', 'notifications.jsonl')
     if (!existsSync(notifPath)) return null
     const lines = readFileSync(notifPath, 'utf-8').trim().split('\n').filter(Boolean)
-    // 只看最近 1 小时的未读通知
-    const cutoff = Date.now() - 3600000
+    const cutoff = Date.now() - 900000
     const recent = lines
       .map(l => { try { return JSON.parse(l) } catch { return null } })
-      .filter((n: any) => n && n.timestamp && new Date(n.timestamp).getTime() > cutoff && !n.displayed)
+      .filter((n: any) => n && n.timestamp && new Date(n.timestamp).getTime() > cutoff && !_displayedNotifTimestamps.has(String(n.timestamp)))
       .slice(-3)
 
     if (recent.length === 0) return null
+    for (const n of recent) _displayedNotifTimestamps.add(String(n.timestamp))
+    if (_displayedNotifTimestamps.size > 200) {
+      const arr = [..._displayedNotifTimestamps]
+      _displayedNotifTimestamps.clear()
+      for (const t of arr.slice(-100)) _displayedNotifTimestamps.add(t)
+    }
     return {
       type: 'pending-notifications',
       message: `\u{1F4EC} ${recent.length} 条未读通知: ${recent.map((n: any) => n.title || n.message?.slice(0, 30)).join(', ')}`,

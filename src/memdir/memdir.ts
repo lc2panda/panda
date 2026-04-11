@@ -1502,6 +1502,26 @@ export async function generateMorningBrief(): Promise<void> {
 
   await mkdir(join(memoryDir, 'working'), { recursive: true })
   await writeFile(briefPath, sections.join('\n'), 'utf-8')
+
+  try {
+    const briefingDir = join(memoryDir, 'semantic', 'briefing')
+    await mkdir(briefingDir, { recursive: true })
+    await writeFile(join(briefingDir, `${dateStr}.md`), sections.join('\n'), 'utf-8')
+  } catch {}
+
+  try {
+    const { pushNotification } = await import('../assistant/sense.js')
+    const contentLines = sections.slice(1).filter(l => l.trim() && !l.startsWith('#')).slice(0, 6)
+    const body = contentLines.length > 0
+      ? contentLines.join('\n')
+      : `今日简报已生成，可在 ${briefPath} 查看`
+    pushNotification({
+      type: 'action',
+      title: '📋 晨间简报已就绪',
+      body,
+      channel: 'all',
+    })
+  } catch {}
 }
 
 // ═══════════════════════════════════════════════════════════════════
