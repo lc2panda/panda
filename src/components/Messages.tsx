@@ -624,11 +624,15 @@ const MessagesImpl = ({
     const hasContentAfter = msg_8.type === 'collapsed_read_search' && (!!streamingText || hasContentAfterIndex(renderableMessages, index, tools, streamingToolUseIDs));
     const k_0 = messageKey(msg_8);
     const rawRow = <MessageRow key={k_0} message={msg_8} isUserContinuation={isUserContinuation} hasContentAfter={hasContentAfter} tools={tools} commands={commands} verbose={verbose || isItemExpanded(msg_8) || cursor?.expanded === true && index === selectedIdx} inProgressToolUseIDs={inProgressToolUseIDs} streamingToolUseIDs={streamingToolUseIDs} screen={screen} canAnimate={canAnimate} onOpenRateLimitOptions={onOpenRateLimitOptions} lastThinkingBlockId={lastThinkingBlockId} latestBashOutputUUID={latestBashOutputUUID} columns={columns} isLoading={isLoading} lookups={lookups_0} />;
-    // Matrix theme (opt-in via PANDA_THEME=matrix): wrap each row in a
-    // round green border so user/assistant/tool messages look like Matrix
-    // terminal cards. Zero impact on default light/dark themes — the
-    // condition collapses to the raw row when isMatrixTheme() is false.
-    const row = isMatrixTheme() ? <Box borderStyle="round" borderColor="#00ff41" paddingX={1} flexDirection="column" width="100%">{rawRow}</Box> : rawRow;
+    // Matrix theme (opt-in via PANDA_THEME=matrix): wrap *only real user /
+    // assistant text messages* in a round green border. Excluding:
+    //   - isMeta user messages (system-injected, often empty render)
+    //   - 'progress' / 'system' / 'attachment' / 'collapsed_read_search'
+    //   - 'grouped_tool_use' (tool batches usually render their own UI)
+    // Without this filter, every meta/progress row renders as an empty green
+    // box, producing the "wall of empty cards" visual bug reported in v2.11.0.
+    const isCardWorthy = (msg_8.type === 'user' || msg_8.type === 'assistant') && !msg_8.isMeta;
+    const row = isMatrixTheme() && isCardWorthy ? <Box borderStyle="round" borderColor="#00ff41" paddingX={1} flexDirection="column" width="100%">{rawRow}</Box> : rawRow;
 
     // Per-row Provider — only 2 rows re-render on selection change.
     // Wrapped BEFORE divider branch so both return paths get it.
