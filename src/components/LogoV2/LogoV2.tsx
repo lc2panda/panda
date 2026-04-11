@@ -43,6 +43,8 @@ import { useAppState } from '../../state/AppState.js';
 import { getEffortSuffix } from '../../utils/effort.js';
 import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
 import { renderModelSetting } from '../../utils/model/model.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MatrixBootSequence } from '../MatrixTheme/MatrixBootSequence.js';
 const LEFT_PANEL_MAX_WIDTH = 50;
 export function LogoV2() {
   const $ = _c(94);
@@ -245,6 +247,11 @@ export function LogoV2() {
       t23 = $[30];
     }
     return t23;
+  }
+  // Matrix theme: opt-in 启动动画（PANDA_THEME=matrix），所有现有 hooks 上方已执行完毕，
+  // 此处早返回不会违反 hooks rules。Phase D 会切到正式的 theme 系统。
+  if (isMatrixTheme()) {
+    return <MatrixBootSequence cols={columns} />;
   }
   const layoutMode = getLayoutMode(columns);
   const userTheme = resolveThemeSetting(getGlobalConfig().theme);
