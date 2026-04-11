@@ -464,6 +464,41 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
       }
     },
   },
+  {
+    id: 'clipboard-poll',
+    description: '剪贴板实时捕获 · Clipboard real-time capture',
+    cron: '*/2 * * * *',
+    priority: 'low',
+    enabled: true,
+    condition: canRun,
+    skipIf: () => {
+      // 用户最近 30 分钟无任何操作 → 跳过（避免后台无意义抓取）
+      const idle = (Date.now() - getLastInteractionTimeSafe()) / 60000
+      return idle > 30
+    },
+    action: async () => {
+      logForDebugging('[builtinTasks] clipboard-poll: capturing clipboard snapshot')
+      try {
+        const { captureClipboard, isSensitiveClipboardContent } = await import('../memdir/memdir.js')
+        const snapshot = await captureClipboard()
+        if (!snapshot) return
+        // 双重脱敏：captureClipboard 已过滤一层，此处再用扩展模式兜底
+        if (isSensitiveClipboardContent(snapshot)) {
+          logForDebugging('[builtinTasks] clipboard-poll: 跳过敏感剪贴板内容')
+          return
+        }
+        // 写入 working memory（后台采集，不推送通知）
+        const { setWorkingMemory } = await import('../assistant/workingMemory.js')
+        const payload = JSON.stringify({
+          content: snapshot.slice(0, 500),
+          timestamp: Date.now(),
+        })
+        setWorkingMemory('clipboard-recent', payload)
+      } catch (e) {
+        logForDebugging(`[builtinTasks] clipboard-poll failed: ${(e as Error).message}`)
+      }
+    },
+  },
 ]
 
 // ═══════════════════════════════════════════════════════════════════

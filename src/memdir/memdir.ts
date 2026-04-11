@@ -1786,6 +1786,30 @@ export async function readAppleNotes(
 }
 
 /**
+ * 判定剪贴板内容是否包含敏感数据（clipboard-poll 轮询专用）。
+ *
+ * 覆盖四类：
+ *   1. OpenAI / Anthropic key：`sk-[a-zA-Z0-9-_]{20,}`
+ *   2. GitHub token：`ghp_[a-zA-Z0-9]{36,}`
+ *   3. 密码/token/api key key=value 样式（中英文）
+ *   4. 信用卡号 16 位（带分隔符）
+ *
+ * 抽成独立导出函数以便 unit test 验证模式覆盖。
+ */
+export function isSensitiveClipboardContent(text: string): boolean {
+  if (!text) return false
+  // 1. API key 格式
+  if (/sk-[a-zA-Z0-9\-_]{20,}/.test(text)) return true
+  // 2. GitHub token
+  if (/ghp_[a-zA-Z0-9]{36,}/.test(text)) return true
+  // 3. 通用 credential key=value
+  if (/(?:password|passwd|secret|token|api[-_]?key)\s*[:=]\s*\S{8,}/i.test(text)) return true
+  // 4. 信用卡号（4-4-4-4）
+  if (/\b\d{4}[\s-]\d{4}[\s-]\d{4}[\s-]\d{4}\b/.test(text)) return true
+  return false
+}
+
+/**
  * 读取当前剪贴板内容并追加到历史。
  * 历史存储：~/.pandacc/data/clipboard/YYYY-MM-DD.jsonl
  */
