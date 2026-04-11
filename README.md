@@ -516,13 +516,16 @@ panda auth login
 
 #### 被动层 — 对话驱动，回合后检查
 
-每轮对话结束后自动检查 5 种条件，在对话内注入建议：
+每轮对话结束后自动检查 8 种条件，在对话内注入建议：
 
 - **上下文压力**：消息 > 50 条 → 建议 `/compact`
 - **重复模式**：连续 3 次相似操作 → 建议创建工作流 `/skillify`
 - **未提交提醒**：2 小时未 commit + 有未提交文件
 - **画像过期**：`profile.md` > 7 天未更新
-- **晨间简报**：7:00-9:00 有未读简报
+- **晨间简报**：7:00-12:00 有未读简报
+- **未读通知消费**：15 分钟内有 outbox 通知未显示 → 摘要提醒
+- **习惯偏差关怀**：23:00-05:00 深夜活跃 / 连续工作 > 3 小时 → 关怀提醒
+- **LLM 元检查器**：重复话题 / 错误累积 / 长对话未委派 → 智能建议
 
 #### 通知渠道（跨平台）
 
@@ -550,14 +553,14 @@ panda auth login
 
 ### 3.3 数据连接器
 
-> 以下连接器由 DeepDream / 感知引擎在内部调用，**暂未暴露为独立 CLI 子命令**。启用需在 `proactive.json` 中开启对应场景（属 43 个高敏场景之一）。
+> 以下连接器既供 DeepDream / 感知引擎内部调用，也暴露为独立 CLI 子命令，随时可在终端手动触发。
 
 | 连接器   | 触发方式                      | 数据源                          | 隐私过滤   |
 | ----- | ------------------------- | ---------------------------- | ------ |
-| 浏览器历史 | DeepDream 阶段自动读取           | Chrome SQLite（只读复制后查询）       | ✅ 域名排除 |
-| 日历    | `calendar-reminder` 任务 / DeepDream | macOS Calendar (AppleScript) | ✅      |
-| 笔记    | DeepDream 阶段自动读取           | Apple Notes SQLite           | ✅      |
-| 剪贴板   | DeepDream 阶段抓取一次           | pbpaste + 敏感过滤               | ✅ 密钥过滤 <sub>· 非实时自动捕获</sub> |
+| 浏览器历史 | `panda history digest --days 7 --limit 50` <sub>· macOS Chrome only</sub> | Chrome SQLite（只读复制后查询）       | ✅ 域名排除 |
+| 日历    | `panda calendar today` / `panda calendar week` <sub>· macOS only</sub> | macOS Calendar (AppleScript) | ✅      |
+| 笔记    | `panda notes search <query>` / `panda notes list` <sub>· macOS only</sub> | Apple Notes SQLite           | ✅      |
+| 剪贴板   | `clipboard-poll` 任务 / DeepDream 阶段 | pbpaste + 敏感过滤               | ✅ 密钥过滤 <sub>· 每 2 分钟轮询，30 分钟无操作自动停</sub> |
 
 ### 3.4 非编码场景
 
@@ -657,7 +660,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 1. 全本地采集和索引 — 数据永不离开设备（除用户主动对话）
 2. 敏感数据自动过滤 — 密码/token/API key/证书 不入索引
 3. privacy.json 排除列表 — 用户自定义不采集的路径/域名/应用
-4. 随时可删 — 直接删除 ~/.pandacc/memory/ 对应文件即可
+4. 随时可删 — `panda memory forget "关于X的一切"`（默认 dry-run，加 `--yes` 才真删）
 5. 数据可导出 — 全部 Markdown + SQLite，Git 可追踪
 ```
 
