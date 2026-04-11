@@ -1239,7 +1239,20 @@ function chineseBigram(text: string): string {
 /** SQLite FTS5 全文搜索实现 */
 function _searchMemoryFTS5(query: string, memoryDir: string, files: string[], topK: number): Array<{ file: string; score: number; excerpt: string }> {
   const { Database } = require('bun:sqlite')
-  const db = new Database(':memory:')
+  // 当前使用 :memory: 数据库，每次搜索重建，无磁盘腐败风险。
+  // 未来若切换到持久化 SQLite，请在此处调用 checkAndRecoverSQLite(dbPath)
+  // —— integrity check 逻辑已在 src/memdir/sqliteIntegrity.ts 就位。
+  const dbPath = ':memory:'
+  if (dbPath !== ':memory:') {
+    try {
+      const { checkAndRecoverSQLite } = require('./sqliteIntegrity.js')
+      const result = checkAndRecoverSQLite(dbPath)
+      if (!result.ok && result.recovered) {
+        logForDebugging(`[memdir] SQLite ${dbPath} corruption detected, backed up. Errors: ${result.errors.join(', ')}`)
+      }
+    } catch {}
+  }
+  const db = new Database(dbPath)
 
   // 创建 FTS5 虚拟表，unicode61 分词器支持中英文
   db.run("CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(path, content, tokenize='unicode61')")
@@ -1535,8 +1548,16 @@ export async function generateMorningBrief(): Promise<void> {
     if (existsSync(statsDir)) {
       const statsFiles = readdirSync(statsDir).filter(f => f.endsWith('.json')).sort().reverse()
       if (statsFiles.length > 0) {
-        const stats = JSON.parse(readFileSync(join(statsDir, statsFiles[0]), 'utf-8'))
-        sections.push(`## 通知摘要\n- 昨日通知: ${stats.total || 0} 条`)
+        const statsPath = join(statsDir, statsFiles[0])
+        // 完整性校验：损坏文件自动备份为 .broken-<ts>，跳过本次读取
+        try {
+          const { checkAndRecoverJSON } = require('./sqliteIntegrity.js')
+          checkAndRecoverJSON(statsPath)
+        } catch {}
+        if (existsSync(statsPath)) {
+          const stats = JSON.parse(readFileSync(statsPath, 'utf-8'))
+          sections.push(`## 通知摘要\n- 昨日通知: ${stats.total || 0} 条`)
+        }
       }
     }
   } catch {}
@@ -1815,6 +1836,11 @@ export function isSensitiveClipboardContent(text: string): boolean {
  */
 export async function captureClipboard(): Promise<string | null> {
   try {
+    // P0-6 跨平台守门：pbpaste 仅 macOS 可用。Windows/Linux 静默 return null，
+    // 避免 clipboard-poll cron 每 2 分钟抛 ENOENT 污染日志。
+    const platform = require('os').platform()
+    if (platform !== 'darwin') return null
+
     const { execSync } = require('child_process')
     const content = execSync('pbpaste', { encoding: 'utf-8', timeout: 3000 })
     if (!content || content.length > 10000) return null // 忽略空和超大内容
