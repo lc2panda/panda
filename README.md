@@ -1314,6 +1314,14 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 #### `/theme`
 - **用法**: `/theme`
 - **说明**: 选择终端配色主题
+- **🆕 Matrix 主题**（v2.11.0+）：黑客帝国风格字符雨启动屏 + 绿色 UI
+  - 启用方式：`PANDA_THEME=matrix panda` 启动
+  - 启动屏：~2 秒字符雨动画 + Logo 中央淡入 + "WAKE UP, NEO …" 文字（按 ⏎ 跳过）
+  - 消息区：圆角绿色边框，user / panda 卡片清晰区分
+  - Spinner：14 帧密集 braille 字符 `⠁⠃⠇⡇⡏⡟⡿⣿`
+  - 状态栏：双线绿框 `╔═╗║╚╝`
+  - **零干扰阅读**：装饰层（顶部 banner）跑字符雨，内容层（消息区）保持高对比度留白
+  - **opt-in**：默认仍是 dark/light，必须显式 `PANDA_THEME=matrix` 才启用
 
 #### `/color`
 - **用法**: `/color <color|default>`
