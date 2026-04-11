@@ -26,6 +26,7 @@ import { getRuntimeMainLoopModel, type ModelName, renderModelName } from '../uti
 import { getCurrentSessionTitle } from '../utils/sessionStorage.js';
 import { doesMostRecentAssistantMessageExceed200k, getCurrentUsage } from '../utils/tokens.js';
 import { getCurrentWorktreeSession } from '../utils/worktree.js';
+import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
 import { isVimModeEnabled } from './PromptInput/utils.js';
 export function statusLineShouldDisplay(settings: ReadonlySettings): boolean {
   // Assistant mode: statusline fields (model, permission mode, cwd) reflect the
@@ -336,6 +337,17 @@ function StatusLineInner({
   // flexShrink:0 so a 0→1 row change when the command finishes steals
   // a row from ScrollBox and shifts content. Reserve the row while loading
   // (same trick as PromptInputFooterLeftSide).
+  // Matrix theme (opt-in via PANDA_THEME=matrix): wrap in a double-line
+  // neon-green frame. The statusline text is the user's free-form output,
+  // so we can't reformat field separators here — just add the border chrome.
+  // NOTE: double border steals one extra row; acceptable for opt-in cosmetic.
+  if (isMatrixTheme()) {
+    return <Box paddingX={paddingX} gap={2} borderStyle="double" borderColor="#00ff41">
+        {statusLineText ? <Text color="#00ff41" wrap="truncate">
+            <Ansi>{statusLineText}</Ansi>
+          </Text> : isFullscreenEnvEnabled() ? <Text> </Text> : null}
+      </Box>;
+  }
   return <Box paddingX={paddingX} gap={2}>
       {statusLineText ? <Text dimColor wrap="truncate">
           <Ansi>{statusLineText}</Ansi>
