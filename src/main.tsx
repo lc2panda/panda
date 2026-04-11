@@ -4398,6 +4398,228 @@ async function run(): Promise<CommanderCommand> {
     await installHandler(target, options);
   });
 
+  // ═══════════════════════════════════════════════════════════════════
+  // 数据连接器 CLI（Wave 3 Agent L）
+  // 浏览器历史 / 日历 / 笔记 / 记忆——将 memdir.ts 的底层采集函数暴露为
+  // 独立子命令，兑现 README 第 3.3 节承诺。
+  // ═══════════════════════════════════════════════════════════════════
+
+  // panda history digest —— 浏览器历史摘要
+  const historyCmd = program.command('history').description('Browse local browser history (macOS Chrome) · 浏览本地浏览器历史').configureHelp(createSortedHelpConfig());
+  historyCmd.command('digest').description('Digest recent Chrome history · 聚合最近浏览器历史').option('--days <n>', 'Days to look back', '7').option('--limit <n>', 'Max entries', '50').action(async (opts: { days: string; limit: string }) => {
+    try {
+      const days = parseInt(opts.days, 10);
+      const limit = parseInt(opts.limit, 10);
+      if (!Number.isFinite(days) || days <= 0) throw new Error('--days 必须为正整数');
+      if (!Number.isFinite(limit) || limit <= 0) throw new Error('--limit 必须为正整数');
+      const { readBrowserHistory } = await import('./memdir/memdir.js');
+      const since = new Date(Date.now() - days * 86400000);
+      const rows = await readBrowserHistory(since, limit);
+      if (rows.length === 0) {
+        process.stdout.write('无浏览器历史记录（请确认 Chrome 已安装且未在运行）\n');
+        process.exit(0);
+      }
+      for (const r of rows) {
+        const d = r.visitTime;
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const ts = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        process.stdout.write(`[${ts}] ${r.title || '(无标题)'} — ${r.url}\n`);
+      }
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(`读取浏览器历史失败: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+  });
+
+  // panda calendar today / week —— 日历事件
+  const calendarCmd = program.command('calendar').description('Read macOS Calendar events · 读取 macOS 日历事件').configureHelp(createSortedHelpConfig());
+  const runCalendar = async (daysAhead: number, emptyMsg: string) => {
+    if (process.platform !== 'darwin') {
+      process.stderr.write('需 macOS（日历读取仅支持 Apple Calendar）\n');
+      process.exit(1);
+    }
+    try {
+      const { readCalendarEvents } = await import('./memdir/memdir.js');
+      const events = await readCalendarEvents(daysAhead);
+      if (events.length === 0) {
+        process.stdout.write(`${emptyMsg}\n`);
+        process.exit(0);
+      }
+      const parseTs = (s: string): number => {
+        const t = Date.parse(s);
+        return Number.isFinite(t) ? t : 0;
+      };
+      events.sort((a, b) => parseTs(a.startDate) - parseTs(b.startDate));
+      for (const evt of events) {
+        const t = parseTs(evt.startDate);
+        let hm = '--:--';
+        if (t > 0) {
+          const d = new Date(t);
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+        const loc = evt.location ? `  @${evt.location}` : '';
+        process.stdout.write(`${hm}  ${evt.title}${loc}\n`);
+      }
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(`读取日历失败: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+  };
+  calendarCmd.command('today').description('Today\'s events · 今日日程').action(() => runCalendar(1, '今日无日程'));
+  calendarCmd.command('week').description('Events in the next 7 days · 本周日程').action(() => runCalendar(7, '本周无日程'));
+
+  // panda notes search / list —— Apple Notes
+  const notesCmd = program.command('notes').description('Read Apple Notes · 读取 Apple 备忘录').configureHelp(createSortedHelpConfig());
+  const formatNotes = (notes: Array<{ title: string; snippet: string; modDate: Date }>) => {
+    for (const n of notes) {
+      const d = n.modDate;
+      const pad = (x: number) => x.toString().padStart(2, '0');
+      const ts = Number.isFinite(d.getTime()) && d.getTime() > 0
+        ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+        : '未知时间';
+      const excerpt = (n.snippet || '').slice(0, 80).replace(/\s+/g, ' ').trim();
+      process.stdout.write(`[${ts}] ${n.title || '(无标题)'}\n`);
+      if (excerpt) process.stdout.write(`  ${excerpt}\n`);
+    }
+  };
+  notesCmd.command('search <query>').description('Search notes by keyword · 按关键词搜索备忘录').action(async (query: string) => {
+    if (process.platform !== 'darwin') {
+      process.stderr.write('需 macOS（Apple Notes 仅支持 macOS）\n');
+      process.exit(1);
+    }
+    try {
+      const { readAppleNotes } = await import('./memdir/memdir.js');
+      // readAppleNotes 不接受 query，这里先拉 500 条再本地过滤
+      const all = await readAppleNotes(500);
+      const q = query.toLowerCase();
+      const matched = all.filter(n =>
+        (n.title || '').toLowerCase().includes(q) ||
+        (n.snippet || '').toLowerCase().includes(q),
+      );
+      if (matched.length === 0) {
+        process.stdout.write(`未匹配到包含 "${query}" 的备忘录\n`);
+        process.exit(0);
+      }
+      formatNotes(matched);
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(`读取备忘录失败: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+  });
+  notesCmd.command('list').description('List recent notes · 列出最近备忘录').option('--limit <n>', 'Max entries', '20').action(async (opts: { limit: string }) => {
+    if (process.platform !== 'darwin') {
+      process.stderr.write('需 macOS（Apple Notes 仅支持 macOS）\n');
+      process.exit(1);
+    }
+    try {
+      const limit = parseInt(opts.limit, 10) || 20;
+      const { readAppleNotes } = await import('./memdir/memdir.js');
+      const notes = await readAppleNotes(limit);
+      if (notes.length === 0) {
+        process.stdout.write('无备忘录\n');
+        process.exit(0);
+      }
+      formatNotes(notes);
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(`读取备忘录失败: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+  });
+
+  // panda memory list / forget —— 自动记忆管理
+  const memoryCmd = program.command('memory').description('Manage auto-memory files · 管理自动记忆').configureHelp(createSortedHelpConfig());
+  memoryCmd.command('list').description('List all memory .md files · 列出所有记忆文件').action(async () => {
+    try {
+      const [{ getAutoMemPath }, { scanMdFiles }, fs] = await Promise.all([
+        import('./memdir/paths.js'),
+        import('./memdir/memdir.js'),
+        import('node:fs'),
+      ]);
+      const memDir = getAutoMemPath();
+      const files = scanMdFiles(memDir);
+      if (files.length === 0) {
+        process.stdout.write(`无记忆文件（${memDir}）\n`);
+        process.exit(0);
+      }
+      process.stdout.write(`${memDir}\n`);
+      let totalBytes = 0;
+      for (const f of files) {
+        try {
+          const st = fs.statSync(f);
+          totalBytes += st.size;
+          const rel = f.startsWith(memDir) ? f.slice(memDir.length).replace(/^\/+/, '') : f;
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          const d = st.mtime;
+          const ts = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          process.stdout.write(`  ${ts}  ${String(st.size).padStart(8)}B  ${rel}\n`);
+        } catch {}
+      }
+      process.stdout.write(`合计 ${files.length} 个文件，${totalBytes} 字节\n`);
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(`读取记忆目录失败: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+  });
+  memoryCmd.command('forget <pattern>').description('Forget memory files matching pattern (dry-run unless --yes) · 删除匹配模式的记忆文件').option('--yes', 'Actually delete (default: dry-run)').action(async (pattern: string, opts: { yes?: boolean }) => {
+    try {
+      const [{ getAutoMemPath }, { scanMdFiles }, fs] = await Promise.all([
+        import('./memdir/paths.js'),
+        import('./memdir/memdir.js'),
+        import('node:fs'),
+      ]);
+      const memDir = getAutoMemPath();
+      const files = scanMdFiles(memDir);
+      const pat = pattern.toLowerCase();
+      const matched: string[] = [];
+      for (const f of files) {
+        const base = (f.split('/').pop() || '').toLowerCase();
+        const rel = f.startsWith(memDir) ? f.slice(memDir.length).replace(/^\/+/, '').toLowerCase() : f.toLowerCase();
+        if (base.includes(pat) || rel.includes(pat)) {
+          matched.push(f);
+          continue;
+        }
+        // 内容包含也匹配（小文件）
+        try {
+          const st = fs.statSync(f);
+          if (st.size <= 64 * 1024) {
+            const content = fs.readFileSync(f, 'utf-8').toLowerCase();
+            if (content.includes(pat)) matched.push(f);
+          }
+        } catch {}
+      }
+      if (matched.length === 0) {
+        process.stdout.write(`未找到匹配 "${pattern}" 的记忆文件\n`);
+        process.exit(0);
+      }
+      process.stdout.write(`${opts.yes ? '将删除' : '匹配到（dry-run，加 --yes 真删）'} ${matched.length} 个文件:\n`);
+      for (const f of matched) {
+        const rel = f.startsWith(memDir) ? f.slice(memDir.length).replace(/^\/+/, '') : f;
+        process.stdout.write(`  ${rel}\n`);
+      }
+      if (!opts.yes) {
+        process.stdout.write('（dry-run）未删除任何文件。确认无误后加 --yes 执行。\n');
+        process.exit(0);
+      }
+      let deleted = 0;
+      for (const f of matched) {
+        try { fs.unlinkSync(f); deleted++; } catch (e) {
+          process.stderr.write(`删除失败 ${f}: ${e instanceof Error ? e.message : String(e)}\n`);
+        }
+      }
+      process.stdout.write(`已删除 ${deleted} 个文件\n`);
+      process.exit(deleted === matched.length ? 0 : 1);
+    } catch (err) {
+      process.stderr.write(`记忆遗忘失败: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+  });
+
   // ant-only commands
   if (("external" as string) === 'ant') {
     const validateLogId = (value: string) => {
