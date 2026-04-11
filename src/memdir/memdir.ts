@@ -1174,6 +1174,17 @@ async function _extractUserFeatures(messages: readonly any[], memoryDir: string)
   }
 
   if (updated !== existingContent) {
+    // ── Bounded Memory 守门：profile.md ≤ 1375 字符（Hermes 标准）──
+    try {
+      const { enforceBounded } = await import('./boundedMemory.js')
+      const result = enforceBounded(profilePath, updated)
+      if (result.compressed) {
+        updated = result.content
+        logForDebugging(
+          `[boundedMemory] ${profilePath} 压缩 ${result.check.currentChars} → ${result.check.maxChars} 字符`,
+        )
+      }
+    } catch {}
     await writeFile(profilePath, updated, 'utf-8')
   }
 }
