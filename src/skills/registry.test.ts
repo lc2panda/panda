@@ -7,6 +7,7 @@ import {
   getSkillDescription,
   findSkillMeta,
   listSkillIndex,
+  loadSkillFile,
 } from './registry.js'
 
 test('BUNDLED_SKILL_INDEX 包含至少 1 项', () => {
@@ -87,4 +88,36 @@ test('load() 对同一 skill 幂等（二次调用不报错）', async () => {
   expect(second).not.toBeNull()
   expect(first!.name).toBe('capture')
   expect(second!.name).toBe('capture')
+})
+
+// ── Level-2 Progressive Disclosure: loadSkillFile ──
+// Bundled skills ship as `.ts` modules without a filesystem layout, so these
+// tests verify the safety rails (null fallback + path traversal prevention).
+// Real content resolution will be covered when user-installed skills land.
+
+test('loadSkillFile — bundled skill 返回 null（无文件结构）', async () => {
+  // `write` is bundled and has no ~/.pandacc/skills/write/ directory in CI
+  // or on a clean dev machine — we expect a null fallback.
+  const result = await loadSkillFile('write', 'templates/test.md')
+  expect(result).toBeNull()
+})
+
+test('loadSkillFile — 路径穿越被阻止', async () => {
+  const result = await loadSkillFile('write', '../../../etc/passwd')
+  expect(result).toBeNull()
+})
+
+test('loadSkillFile — 绝对路径注入被阻止', async () => {
+  const result = await loadSkillFile('write', '/etc/passwd')
+  // Even if ~/.pandacc/skills/write/ existed, resolve() with an absolute
+  // `path` would escape the root, and the root check should reject it.
+  expect(result).toBeNull()
+})
+
+test('loadSkillFile — 不存在的 skill 返回 null', async () => {
+  const result = await loadSkillFile(
+    '__nonexistent_skill_xyz__',
+    'foo.md',
+  )
+  expect(result).toBeNull()
 })

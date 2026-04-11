@@ -1,18 +1,24 @@
-// Input: (none — static index) / skill name for lookup
-// Output: BundledSkillMeta[] (level-1 index) / Command (level-2 full load)
-// Pos: bundled skills Progressive Disclosure 两级加载索引层
+// Input: (none — static index) / skill name for lookup / (name,path) for Level-2
+// Output: BundledSkillMeta[] (level-0 index) / Command (level-1 full load) /
+//         string | null (level-2 附属文件内容)
+// Pos: bundled skills Progressive Disclosure 三级加载索引层
 //
-// Hermes Progressive Disclosure — Two-Level Skill Loading
-// =======================================================
-// Level 1 (index):   `BUNDLED_SKILL_INDEX` — pure static `{name, description}`
-//                    array. Zero I/O, zero skill-module imports, <1ms cold
-//                    cost per entry. Consumers can list / route / describe
-//                    skills without paying the full body cost.
-// Level 2 (payload): `meta.load()` — dynamic-imports the skill module, runs
-//                    its `registerXxxSkill()` which pushes into the
-//                    `bundledSkills` registry, and returns the resulting
-//                    `Command`. First-call cost pays for that skill only;
-//                    subsequent calls reuse the already-registered Command.
+// Hermes Progressive Disclosure — Three-Level Skill Loading
+// =========================================================
+// Level 0 (index):    `BUNDLED_SKILL_INDEX` — pure static `{name, description}`
+//                     array. Zero I/O, zero skill-module imports, <1ms cold
+//                     cost per entry. Consumers can list / route / describe
+//                     skills without paying the full body cost.
+// Level 1 (payload):  `meta.load()` — dynamic-imports the skill module, runs
+//                     its `registerXxxSkill()` which pushes into the
+//                     `bundledSkills` registry, and returns the resulting
+//                     `Command`. First-call cost pays for that skill only;
+//                     subsequent calls reuse the already-registered Command.
+// Level 2 (reference):`loadSkillFile(name, path)` — 加载 user-installed skill
+//                     目录内的附属文件（templates、examples、refs 等）。
+//                     对齐 Hermes 真实的三级 progressive disclosure；bundled
+//                     skills 本身是 .ts 模块无文件结构，此 API 主要服务于
+//                     将来 user-installed skills (~/.pandacc/skills/)。
 //
 // Design contract:
 //   - This module MUST NOT statically import any file under `./bundled/`.
@@ -344,4 +350,70 @@ export function listSkillIndex(): ReadonlyArray<{
     name: m.name,
     description: m.description,
   }))
+}
+
+/**
+ * Level-2 Progressive Disclosure — load an attached reference file from a
+ * user-installed skill directory. Bundled skills (shipped as `.ts` modules
+ * inside `src/skills/bundled/`) do NOT have a filesystem layout, so for
+ * those this function always returns `null`. The API exists to serve future
+ * user-installed skills which live under `~/.pandacc/skills/<name>/`.
+ *
+ * Example:
+ *   await loadSkillFile('write', 'templates/blog-post.md')
+ *   // reads ~/.pandacc/skills/write/templates/blog-post.md
+ *
+ * Security:
+ *   - Rejects `path` containing `..` components that would escape the skill
+ *     root (resolved path must still start with `<skillsRoot>/`).
+ *   - Rejects absolute paths by construction (we always `join(root, path)`
+ *     and verify the result lives under `root`).
+ *
+ * @param name skill identifier (must exist in `BUNDLED_SKILL_INDEX`)
+ * @param path skill-directory-relative file path
+ * @returns file content as UTF-8 string; `null` if skill / file not found
+ *          or path escapes the skill root
+ */
+export async function loadSkillFile(
+  name: string,
+  path: string,
+): Promise<string | null> {
+  try {
+    const meta = findSkillMeta(name)
+    if (!meta) return null
+
+    const { homedir } = await import('os')
+    const { join, sep, resolve } = await import('path')
+    const { existsSync, readFileSync } = await import('fs')
+
+    // The user-installed skills root: ~/.pandacc/skills/<name>/
+    const skillsRoot = join(homedir(), '.pandacc', 'skills', name)
+
+    // Bundled skills have no filesystem layout — return null so callers can
+    // fall back to the Level-1 `meta.load()` path or surface a "not available
+    // for bundled skills" error at their own discretion.
+    if (!existsSync(skillsRoot)) {
+      return null
+    }
+
+    // Prevent path traversal (`../`, absolute path injection, etc.) by
+    // resolving the combined path and confirming it still lives under the
+    // skill root. `resolve` normalizes `..` components.
+    const resolvedPath = resolve(skillsRoot, path)
+    const rootWithSep = skillsRoot.endsWith(sep)
+      ? skillsRoot
+      : skillsRoot + sep
+    if (
+      resolvedPath !== skillsRoot &&
+      !resolvedPath.startsWith(rootWithSep)
+    ) {
+      return null
+    }
+
+    if (!existsSync(resolvedPath)) return null
+
+    return readFileSync(resolvedPath, 'utf-8')
+  } catch {
+    return null
+  }
 }
