@@ -48,6 +48,7 @@ import { setAgentColor } from './agentColorManager.js';
 import { agentToolResultSchema, classifyHandoffIfNeeded, emitTaskProgress, extractPartialResult, finalizeAgentTool, getLastToolUseName, runAsyncAgentLifecycle } from './agentToolUtils.js';
 import { GENERAL_PURPOSE_AGENT } from './built-in/generalPurposeAgent.js';
 import { AGENT_TOOL_NAME, LEGACY_AGENT_TOOL_NAME, ONE_SHOT_BUILTIN_AGENT_TYPES } from './constants.js';
+import { resolveSubagentPolicy, filterSubagentTools } from './subagentPolicy.js';
 import { buildForkedMessages, buildWorktreeNotice, FORK_AGENT, isForkSubagentEnabled, isInForkChild } from './forkSubagent.js';
 import type { AgentDefinition } from './loadAgentsDir.js';
 import { filterAgentsByMcpRequirements, hasRequiredMcpServers, isBuiltInAgent } from './loadAgentsDir.js';
@@ -249,7 +250,10 @@ export const AgentTool = buildTool({
     cwd
   }: AgentToolInput, toolUseContext, canUseTool, assistantMessage, onProgress?) {
     const startTime = Date.now();
-    const model = isCoordinatorMode() ? undefined : modelParam;
+    // Hermes P1-3 subagent policy: haiku 默认 + blocked tools + ~/.pandacc/config/subagent.json 覆盖。
+    // Coordinator 模式保留"不显式覆盖"语义（model=undefined），由下游自行继承 parent。
+    const subagentPolicy = isCoordinatorMode() ? null : resolveSubagentPolicy(modelParam);
+    const model = isCoordinatorMode() ? undefined : subagentPolicy!.model;
 
     // Get app state for permission mode and agent filtering
     const appState = toolUseContext.getAppState();
@@ -577,7 +581,13 @@ export const AgentTool = buildTool({
       ...appState.toolPermissionContext,
       mode: selectedAgent.permissionMode ?? 'acceptEdits'
     };
-    const workerTools = assembleToolPool(workerPermissionContext, appState.mcp.tools);
+    const rawWorkerTools = assembleToolPool(workerPermissionContext, appState.mcp.tools);
+    // Hermes P1-3: 强制剥离 Agent/Task（防 subagent 递归 spawn）+ config 追加项。
+    // Coordinator 模式跳过过滤（它需要调度子 agent）。
+    const workerBlockedTools = subagentPolicy?.blockedTools;
+    const workerTools = workerBlockedTools
+      ? filterSubagentTools(rawWorkerTools, workerBlockedTools)
+      : rawWorkerTools;
 
     // Create a stable agent ID early so it can be used for worktree slug
     const earlyAgentId = createAgentId();
