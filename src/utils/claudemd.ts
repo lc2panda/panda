@@ -54,6 +54,7 @@ import {
   getMemoryPath,
   getUserClaudeRulesDir,
 } from './config.js'
+import { sanitizeContextFile } from './contextSanitize.js'
 import { logForDebugging } from './debug.js'
 import { logForDiagnosticsNoPII } from './diagLogs.js'
 import { getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js'
@@ -339,6 +340,28 @@ function stripHtmlCommentsFromTokens(tokens: ReturnType<Lexer['lex']>): {
  * pass and returned alongside the parsed file (so processMemoryFile doesn't
  * need to lex the same content a second time).
  */
+// H5: 进程级去重——同一文件只在首次加载时通知一次，避免反复刷屏
+const _notifiedInjectionFiles = new Set<string>()
+
+async function _notifyContextInjectionOnce(
+  filePath: string,
+  warnings: string[],
+): Promise<void> {
+  if (_notifiedInjectionFiles.has(filePath)) return
+  _notifiedInjectionFiles.add(filePath)
+  try {
+    const { pushNotification } = await import('../assistant/sense.js')
+    pushNotification({
+      type: 'warning',
+      title: '上下文文件安全扫描',
+      body: `${filePath}：${warnings.length} 条疑似 prompt injection 痕迹（见 debug 日志）`,
+      channel: 'inline',
+    })
+  } catch {
+    // sense.ts 不可用时静默；debug 日志已经记录了详情
+  }
+}
+
 function parseMemoryFileContent(
   rawContent: string,
   filePath: string,
@@ -357,6 +380,17 @@ function parseMemoryFileContent(
   if (fileBasename === '.env' || fileBasename.startsWith('.env.')) {
     logForDebugging(`Blocking .env file in @include (secrets risk): ${filePath}`)
     return { info: null, includePaths: [] }
+  }
+
+  // H5: prompt injection 扫描（仅告警，不修改内容）
+  // 在 HTML 注释剥离之前扫描，这样才能捕捉到隐藏注入
+  const sanitizeResult = sanitizeContextFile(filePath, rawContent)
+  if (sanitizeResult.warnings.length > 0) {
+    for (const w of sanitizeResult.warnings) {
+      logForDebugging(`[contextSanitize] ${w}`)
+    }
+    // 通过 sense.ts 通知一次（高 TTL 避免刷屏：每个文件仅在本次进程首次加载时告警）
+    void _notifyContextInjectionOnce(filePath, sanitizeResult.warnings)
   }
 
   const { content: withoutFrontmatter, paths } =
