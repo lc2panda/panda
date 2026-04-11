@@ -1,6 +1,6 @@
 import { feature } from 'bun:bundle'
 import { join, relative } from 'path'
-import { readFileSync, readdirSync, unlinkSync, writeFileSync, mkdirSync, renameSync, copyFileSync, existsSync } from 'fs'
+import { readFileSync, readdirSync, statSync, unlinkSync, writeFileSync, mkdirSync, renameSync, copyFileSync, existsSync } from 'fs'
 import { access, writeFile, readFile, appendFile, mkdir } from 'fs/promises'
 import { homedir, tmpdir } from 'os'
 import { getFsImplementation } from '../utils/fsOperations.js'
@@ -304,6 +304,40 @@ export async function saveEpisodicMemory(sessionSummary: string, opts?: {
     return filePath
   } catch {
     return null
+  }
+}
+
+/**
+ * 读取最近 N 条情景记忆摘要，供系统提示注入使用。
+ * 按 mtime 倒序，每条取前 8 行。任何异常返回空串。
+ */
+export async function loadRecentEpisodes(n: number = 3): Promise<string> {
+  try {
+    const memDir = getAutoMemPath()
+    if (!memDir) return ''
+    const episodesDir = join(memDir, 'episodes')
+    let files: string[]
+    try {
+      files = readdirSync(episodesDir).filter(f => f.endsWith('.md'))
+    } catch {
+      return ''
+    }
+    if (files.length === 0) return ''
+    const sorted = files
+      .map(f => ({ f, mtime: statSync(join(episodesDir, f)).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime)
+      .slice(0, n)
+    const summaries: string[] = []
+    for (const { f } of sorted) {
+      try {
+        const content = readFileSync(join(episodesDir, f), 'utf-8')
+        const lines = content.split('\n').slice(0, 8).join('\n')
+        summaries.push(`### ${f.replace('.md', '')}\n${lines}`)
+      } catch {}
+    }
+    return summaries.join('\n\n')
+  } catch {
+    return ''
   }
 }
 

@@ -550,12 +550,14 @@ panda auth login
 
 ### 3.3 数据连接器
 
-| 连接器   | 命令 / 触发方式             | 数据源                          | 隐私过滤   |
-| ----- | ---------------------- | ---------------------------- | ------ |
-| 浏览器历史 | `panda history digest` | Chrome SQLite（复制后读取）         | ✅ 域名排除 |
-| 日历    | `panda calendar today` | macOS Calendar (AppleScript) | ✅      |
-| 笔记    | `panda notes search`   | Apple Notes SQLite           | ✅      |
-| 剪贴板   | 自动捕获                   | pbpaste + 敏感过滤               | ✅ 密钥过滤 |
+> 以下连接器由 DeepDream / 感知引擎在内部调用，**暂未暴露为独立 CLI 子命令**。启用需在 `proactive.json` 中开启对应场景（属 43 个高敏场景之一）。
+
+| 连接器   | 触发方式                      | 数据源                          | 隐私过滤   |
+| ----- | ------------------------- | ---------------------------- | ------ |
+| 浏览器历史 | DeepDream 阶段自动读取           | Chrome SQLite（只读复制后查询）       | ✅ 域名排除 |
+| 日历    | `calendar-reminder` 任务 / DeepDream | macOS Calendar (AppleScript) | ✅      |
+| 笔记    | DeepDream 阶段自动读取           | Apple Notes SQLite           | ✅      |
+| 剪贴板   | DeepDream 阶段抓取一次           | pbpaste + 敏感过滤               | ✅ 密钥过滤 <sub>· 非实时自动捕获</sub> |
 
 ### 3.4 非编码场景
 
@@ -598,7 +600,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | 飞书 | MCP / API | 需 App ID/Secret，推荐 MCP 模式 |
 | 钉钉 | MCP / API | 需 App Key/Secret，支持日历/任务/通知模块 |
 | Slack | API | 需 Bot Token（`xoxb-xxx`）或 `SLACK_TOKEN` 环境变量 |
-| 微信 | 企业微信 API / 本地 DB | 企微需 Corp ID；本地 DB 需 SQLCipher 解密密钥 |
+| 微信 | 企业微信 API / 本地 DB | 企微需 Corp ID；本地 DB 需 macOS + `brew install sqlcipher` + 微信 db 密钥 <sub>· experimental</sub> |
 | Telegram | API | 需 @BotFather 获取的 Bot Token |
 | Teams | API | 需 Azure AD Tenant ID + Client ID/Secret |
 
@@ -655,7 +657,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 1. 全本地采集和索引 — 数据永不离开设备（除用户主动对话）
 2. 敏感数据自动过滤 — 密码/token/API key/证书 不入索引
 3. privacy.json 排除列表 — 用户自定义不采集的路径/域名/应用
-4. 随时可删 — panda memory forget "关于X的一切"
+4. 随时可删 — 直接删除 ~/.pandacc/memory/ 对应文件即可
 5. 数据可导出 — 全部 Markdown + SQLite，Git 可追踪
 ```
 
@@ -1471,7 +1473,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | 飞书 | MCP / API | 需 App ID/Secret，推荐 MCP 模式 |
 | 钉钉 | MCP / API | 需 App Key/Secret，支持日历/任务/通知模块 |
 | Slack | API | 需 Bot Token（`xoxb-xxx`）或 `SLACK_TOKEN` 环境变量 |
-| 微信 | 企业微信 API / 本地 DB | 企微需 Corp ID；本地 DB 需 SQLCipher 解密密钥 |
+| 微信 | 企业微信 API / 本地 DB | 企微需 Corp ID；本地 DB 需 macOS + `brew install sqlcipher` + 微信 db 密钥 <sub>· experimental</sub> |
 | Telegram | API | 需 @BotFather 获取的 Bot Token |
 | Teams | API | 需 Azure AD Tenant ID + Client ID/Secret |
 
