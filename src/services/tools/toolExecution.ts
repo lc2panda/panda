@@ -21,6 +21,7 @@ import {
 import {
   addToToolDuration,
   getCodeEditToolDecisionCounter,
+  getSessionId,
   getStatsStore,
 } from '../../bootstrap/state.js'
 import {
@@ -67,6 +68,12 @@ import {
   ShellError,
   TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
 } from '../../utils/errors.js'
+import {
+  hashArgs as auditHashArgs,
+  inferRiskLevel as auditInferRiskLevel,
+  writeAuditEntry,
+  type PermissionDecision as AuditPermissionDecision,
+} from '../../utils/auditLog.js'
 import { executePermissionDeniedHooks } from '../../utils/hooks.js'
 import { logError } from '../../utils/log.js'
 import {
@@ -168,6 +175,54 @@ export function classifyToolError(error: unknown): string {
     return 'Error'
   }
   return 'UnknownError'
+}
+
+/**
+ * 将 PermissionResult 映射为 audit.jsonl 的 decision 字段。
+ * auto-* 表示 classifier 自动判定，user-* 表示人工交互。
+ */
+function mapAuditPermissionDecision(
+  permissionResult: PermissionResult,
+): AuditPermissionDecision {
+  const reason = permissionResult.decisionReason
+  const isAllow = permissionResult.behavior === 'allow'
+  if (reason?.type === 'classifier') {
+    return isAllow ? 'auto-allowed' : 'auto-denied'
+  }
+  // user / hook / rule / other → 视为用户（或配置）决定
+  if (reason) {
+    return isAllow ? 'user-allowed' : 'user-denied'
+  }
+  return 'unknown'
+}
+
+/**
+ * 写审计日志（安全包装），任何异常都不能冒泡到主流程。
+ */
+function safeWriteAudit(
+  toolName: string,
+  toolInput: unknown,
+  permissionResult: PermissionResult | null,
+  outcome: 'success' | 'failure' | 'cancelled' | 'unknown',
+  durationMs?: number,
+  errorBrief?: string,
+): void {
+  try {
+    writeAuditEntry({
+      session_id: getSessionId() as unknown as string,
+      tool_name: toolName,
+      args_hash: auditHashArgs(toolInput),
+      risk_level: auditInferRiskLevel(toolName, toolInput),
+      permission_decision: permissionResult
+        ? mapAuditPermissionDecision(permissionResult)
+        : 'unknown',
+      outcome,
+      ...(durationMs !== undefined && { duration_ms: durationMs }),
+      ...(errorBrief && { error_brief: errorBrief.slice(0, 200) }),
+    })
+  } catch {
+    // 审计日志绝不能影响工具执行
+  }
 }
 
 /**
@@ -1100,6 +1155,13 @@ async function checkPermissionsAndCallTool(
       }
     }
 
+    // P0-3 审计：权限拒绝路径。outcome='unknown' 因为工具未执行。
+    safeWriteAudit(
+      tool.name,
+      processedInput,
+      permissionDecision,
+      'unknown',
+    )
     return resultingMessages
   }
   logEvent('tengu_tool_use_can_use_tool_allowed', {
@@ -1585,6 +1647,14 @@ async function checkPermissionsAndCallTool(
     for (const hookResult of hookResults) {
       resultingMessages.push(hookResult)
     }
+    // P0-3 审计：成功执行。
+    safeWriteAudit(
+      tool.name,
+      processedInput,
+      permissionDecision,
+      'success',
+      durationMs,
+    )
     return resultingMessages
   } catch (error) {
     const durationMs = Date.now() - startTime
@@ -1711,6 +1781,16 @@ async function checkPermissionsAndCallTool(
     )) {
       hookMessages.push(hookResult)
     }
+
+    // P0-3 审计：失败/取消路径。
+    safeWriteAudit(
+      tool.name,
+      processedInput,
+      permissionDecision,
+      isInterrupt ? 'cancelled' : 'failure',
+      durationMs,
+      isInterrupt ? undefined : errorMessage(error),
+    )
 
     return [
       {

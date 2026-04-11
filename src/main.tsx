@@ -910,6 +910,12 @@ async function run(): Promise<CommanderCommand> {
     await init();
     profileCheckpoint('preAction_after_init');
 
+    // P0-3 审计日志滚动：启动时清一次 30 天前的条目（幂等，失败静默）。
+    try {
+      const { rotateAuditLog } = await import('./utils/auditLog.js');
+      rotateAuditLog();
+    } catch {}
+
     // process.title on Windows sets the console title directly; on POSIX,
     // terminal shell integration may mirror the process name to the tab.
     // After init() so settings.json env can also gate this (gh-4765).
