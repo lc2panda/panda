@@ -543,7 +543,7 @@ panda auth login
 #### 基础设施
 
 - **用户画像自动进化**：从对话中提取语言偏好、技术栈、工作模式、沟通风格，写入 `semantic/profile.md`
-- **记忆搜索**：SQLite FTS5 全文索引，支持中英文混合查询
+- **记忆搜索**：SQLite FTS5 全文索引（`bun:sqlite` 原生，`unicode61` 分词器 + 中文 bigram 预处理，零外部依赖，TF-IDF fallback），支持中英文混合查询
 - **隐私守护**：`~/.pandacc/config/privacy.json` 排除列表，所有连接器自动过滤
 - **跨平台抽象层**：`src/proactive/platform.ts` 统一封装磁盘/内存/网络/电池/空闲时间获取
 - **可配置阈值**：`~/.pandacc/config/proactive.json` 覆盖所有默认阈值
