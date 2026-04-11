@@ -1,8 +1,12 @@
 // Input: SQLite database file path or JSON persistence file path
 // Output: integrity check result + auto-recovery (rename corrupted file, let caller rebuild)
 // Pos: defensive layer for FTS5 / future persistent SQLite / critical JSON state files
+//
+// IMPORTANT: bun:sqlite 必须用函数内 require() 而非顶层 import。
+// 否则 Bun build 会把 import 'bun:sqlite' 留在 dist/cli.js 顶部，
+// Node.js ESM loader 不认识 bun: 协议会直接抛 ERR_UNSUPPORTED_ESM_URL_SCHEME。
+// 复用 src/connectors/wechat/index.ts:899 同款 require 模式。
 
-import { Database } from 'bun:sqlite'
 import { existsSync, readFileSync, renameSync } from 'fs'
 
 export interface IntegrityResult {
@@ -27,8 +31,17 @@ export function checkAndRecoverSQLite(dbPath: string): IntegrityResult {
     return { ok: true, errors: [], recovered: false, recoveryAction: 'none' }
   }
 
+  // 函数内 require 避免顶层 import 'bun:sqlite' 污染 ESM bundle
+  let Database: typeof import('bun:sqlite').Database
+  try {
+    Database = (require('bun:sqlite') as typeof import('bun:sqlite')).Database
+  } catch {
+    // 非 Bun runtime（用户用 node 跑） → SQLite 校验功能不可用，但不应阻止启动
+    return { ok: true, errors: [], recovered: false, recoveryAction: 'none' }
+  }
+
   const errors: string[] = []
-  let db: Database | null = null
+  let db: InstanceType<typeof Database> | null = null
 
   try {
     db = new Database(dbPath, { readonly: true })
