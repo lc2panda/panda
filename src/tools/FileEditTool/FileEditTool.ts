@@ -487,8 +487,26 @@ export const FileEditTool = buildTool({
       replaceAll: replace_all,
     })
 
+    // ── Bounded Memory 守门（Hermes 双文件约束）──
+    // mirror FileWriteTool.ts: Edit 路径绕过 bounded 守门是 P1 漏洞
+    // (Wave 5B Agent U / P1-1)。这里对 MEMORY.md / profile.md 的 Edit 最终
+    // 内容强制字符上限，超限时启发式压缩后再落盘。
+    let finalContent = updatedFile
+    try {
+      const { enforceBounded } = await import(
+        '../../memdir/boundedMemory.js'
+      )
+      const result = enforceBounded(absoluteFilePath, updatedFile)
+      if (result.compressed) {
+        finalContent = result.content
+        logForDebugging(
+          `[boundedMemory] ${absoluteFilePath} 压缩 ${result.check.currentChars} → ${result.check.maxChars} 字符（超出 ${result.check.excessChars}）`,
+        )
+      }
+    } catch {}
+
     // 5. Write to disk
-    writeTextContent(absoluteFilePath, updatedFile, encoding, endings)
+    writeTextContent(absoluteFilePath, finalContent, encoding, endings)
 
     // Notify LSP servers about file modification (didChange) and save (didSave)
     const lspManager = getLspServerManager()
@@ -497,7 +515,7 @@ export const FileEditTool = buildTool({
       clearDeliveredDiagnosticsForFile(`file://${absoluteFilePath}`)
       // didChange: Content has been modified
       lspManager
-        .changeFile(absoluteFilePath, updatedFile)
+        .changeFile(absoluteFilePath, finalContent)
         .catch((err: Error) => {
           logForDebugging(
             `LSP: Failed to notify server of file change for ${absoluteFilePath}: ${err.message}`,
@@ -514,11 +532,11 @@ export const FileEditTool = buildTool({
     }
 
     // Notify VSCode about the file change for diff view
-    notifyVscodeFileUpdated(absoluteFilePath, originalFileContents, updatedFile)
+    notifyVscodeFileUpdated(absoluteFilePath, originalFileContents, finalContent)
 
     // 6. Update read timestamp, to invalidate stale writes
     readFileState.set(absoluteFilePath, {
-      content: updatedFile,
+      content: finalContent,
       timestamp: getFileModificationTime(absoluteFilePath),
       offset: undefined,
       limit: undefined,

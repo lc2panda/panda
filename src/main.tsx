@@ -4626,6 +4626,35 @@ async function run(): Promise<CommanderCommand> {
     }
   });
 
+  // panda skills list —— Level-0 Progressive Disclosure 索引浏览
+  // Consumer 位点：让 BUNDLED_SKILL_INDEX 从"只给 test 看"升格为真实产品入口。
+  // 走 registry.listSkillIndex() 零 I/O 枚举，不触发任何 skill 模块 import。
+  const skillsCmd = program.command('skills').description('List and inspect bundled Panda skills · 列出并查看内置技能').configureHelp(createSortedHelpConfig());
+  skillsCmd.command('list').description('List all bundled skills (Level-0 index, zero skill imports) · 列出所有内置技能').option('--json', 'Output as JSON').action(async (opts: { json?: boolean }) => {
+    try {
+      const { listSkillIndex } = await import('./skills/registry.js');
+      const index = listSkillIndex();
+      if (opts.json) {
+        process.stdout.write(`${JSON.stringify(index, null, 2)}\n`);
+        process.exit(0);
+      }
+      if (index.length === 0) {
+        process.stdout.write('No bundled skills registered.\n');
+        process.exit(0);
+      }
+      const maxNameLen = index.reduce((m, s) => Math.max(m, s.name.length), 0);
+      process.stdout.write(`Bundled skills (${index.length}):\n`);
+      for (const skill of index) {
+        const padded = skill.name.padEnd(maxNameLen, ' ');
+        process.stdout.write(`  ${padded}  ${skill.description}\n`);
+      }
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(`Failed to list skills: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+  });
+
   // ant-only commands
   if (("external" as string) === 'ant') {
     const validateLogId = (value: string) => {
