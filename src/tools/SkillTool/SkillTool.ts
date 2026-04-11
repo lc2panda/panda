@@ -610,6 +610,25 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
     // Remove leading slash if present (for compatibility)
     const commandName = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed
 
+    // H4 Hermes self-learning — record invocation start so stopHooks can
+    // build a SkillExecution for `runLearningCycle` after the turn settles.
+    // This is best-effort: any failure must not break skill dispatch.
+    const skillLearningInvokedAt = Date.now()
+    try {
+      const { setWorkingMemory } = await import(
+        '../../assistant/workingMemory.js'
+      )
+      setWorkingMemory(
+        'last-skill-execution',
+        JSON.stringify({
+          skillName: commandName,
+          invokedAt: skillLearningInvokedAt,
+          args: { skill: commandName, args: args ?? '' },
+          result: 'success', // updated to 'failure' if the call throws below
+        }),
+      )
+    } catch {}
+
     // Remote canonical skill execution (ant-only experimental). Intercepts
     // `_canonical_<slug>` before local command lookup — loads SKILL.md from
     // AKI/GCS (with local cache), injects content directly as a user message.
@@ -841,6 +860,26 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
       ),
       toolUseID,
     )
+
+    // H4 Hermes — inject historical improvement signals from previous
+    // executions of this skill. Best-effort: missing module or empty cache
+    // both just skip the injection silently.
+    try {
+      const { retrievePatchesForPrompt, emitPatchApplied } = await import(
+        '../../skills/learning/index.js'
+      )
+      const patchHints = retrievePatchesForPrompt(commandName, 5)
+      if (patchHints) {
+        const hintMessage = createUserMessage({
+          content: `<skill-learning-hints skill="${commandName}">${patchHints}</skill-learning-hints>`,
+          isMeta: true,
+        })
+        const tagged = tagMessagesWithToolUseID([hintMessage], toolUseID)
+        newMessages.push(...tagged)
+        const patchCount = (patchHints.match(/^- /gm) || []).length
+        emitPatchApplied(commandName, patchCount)
+      }
+    } catch {}
 
     logForDebugging(
       `SkillTool returning ${newMessages.length} newMessages for skill ${commandName}`,
