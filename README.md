@@ -499,7 +499,7 @@ panda auth login
 | **代码健康**       | 每晚 23:00 | 构建检查 → 工作记忆                       |
 | **周报汇总**       | 每周一 08:00 | 汇总本周 DeepDream 报告                |
 
-> 完整 102 场景设计见 `monitor/proactive-scenarios-design.md`，覆盖系统(8)、通信(8)、文件(9)、开发(10)、知识(6)、效率(7)、安全(7)、个人(7) 八大维度。
+> 完整 103 场景设计见 `monitor/proactive-scenarios-design.md`，覆盖系统(8)、通信(8)、文件(9)、开发(10)、知识(6)、效率(7)、安全(7)、个人(7) 八大维度。
 
 **使用示例**：
 
@@ -1125,7 +1125,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 
 ## 8. 命令使用手册
 
-> 覆盖 **85+ 个命令**，含智能助理、IM 连接器、102 主动推送场景等全部能力。
+> 覆盖 **85+ 个命令**，含智能助理、IM 连接器、103 主动推送场景等全部能力。
 
 <details>
 <summary>展开查看完整手册（85+ 命令）</summary>
@@ -1390,7 +1390,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 - **技巧**: 长时间工作时开启，AI 会在空闲时自动整理记忆
 
 #### `/proactive`- **用法**: `/proactive [on|off]`
-- **说明**: 切换主动自主模式 — v2.5 扩展为 **102 个主动推送场景**
+- **说明**: 切换主动自主模式 — v2.5 扩展为 **103 个主动推送场景**
 - **核心内置任务**:
   - `dream-consolidate` — 22:00 自动记忆整合（调用 autoDream）
   - `morning-briefing` — 07:00 设置晨间简报 pending flag
@@ -1428,9 +1428,9 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
   - `/learn review` — 开始间隔重复复习
   - `/learn plan "学习 Rust"` — 生成学习路径
 
-#### 主动推送系统（v2.5 新增 — 102 场景）
+#### 主动推送系统（v2.5 新增 — 103 场景）
 
-v2.5 将主动推送从 3 个内置任务扩展为 **102 个场景**，分为非敏感（默认开启）和敏感（默认关闭）两类。
+v2.5 将主动推送从 3 个内置任务扩展为 **103 个场景**，分为非敏感（默认开启）和敏感（默认关闭）两类。
 
 **非敏感场景（默认开启）**
 
@@ -1779,7 +1779,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `/write` 写作助理 | 大纲生成 + Markdown 文稿编译 |
 | `/capture` 快速捕获 | PARA 自动分类到 Projects/Areas/Resources/Archives |
 | `/learn` 学习助理 | 闪卡生成 + FSRS 间隔重复 + 学习路径 |
-| 主动推送 102 场景 | 8 大维度，55 非敏感 + 43 敏感场景 |
+| 主动推送 103 场景 | 8 大维度，56 非敏感 + 43 敏感场景 |
 | IM Connector 6 平台 | 飞书/钉钉/Slack/微信/Telegram/Teams |
 | 通知中心感知 | macOS/Windows，3 场景 |
 | 微信全态势感知 | 14 场景，实时/日/周/月/季/年 6 维度 |

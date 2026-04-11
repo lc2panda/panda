@@ -156,7 +156,7 @@ function _checkProfileStaleness(): ProactiveSuggestion | null {
   return null
 }
 
-// ─── 检查器 3: 晨间简报提醒（7:00-9:00 之间） ───
+// ─── 检查器 3: 晨间简报提醒（7:00-12:00 之间） ───
 
 function _checkMorningBriefing(): ProactiveSuggestion | null {
   const hour = new Date().getHours()

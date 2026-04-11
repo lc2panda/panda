@@ -204,6 +204,30 @@ async function executeForkedSkill(
   const { modifiedGetAppState, baseAgent, promptMessages, skillContent } =
     await prepareForkedCommandContext(command, args || '', context)
 
+  // H4 Hermes self-learning — inject historical patch hints into the
+  // forked skill's prompt so the sub-agent benefits from past corrections.
+  // Best-effort: any failure (missing module, empty cache, readonly array)
+  // must not break forked skill dispatch.
+  try {
+    const { retrievePatchesForPrompt } = await import(
+      '../../skills/learning/patchCache.js'
+    )
+    const patchHints = retrievePatchesForPrompt(commandName, 5)
+    if (patchHints && promptMessages.length > 0) {
+      const first = promptMessages[0] as { message?: { content?: unknown } }
+      const content = first?.message?.content
+      if (typeof content === 'string') {
+        first.message!.content = content + patchHints
+      } else if (Array.isArray(content)) {
+        const textBlock = (content as Array<{ type: string; text?: string }>)
+          .find(b => b && b.type === 'text')
+        if (textBlock && typeof textBlock.text === 'string') {
+          textBlock.text = textBlock.text + patchHints
+        }
+      }
+    }
+  } catch {}
+
   // Merge skill's effort into the agent definition so runAgent applies it
   const agentDefinition =
     command.effort !== undefined
@@ -629,6 +653,11 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
       )
     } catch {}
 
+    // H4 Hermes — wrap the entire dispatch in a try/catch so that any
+    // thrown error re-records `last-skill-execution` with result='failure'
+    // before re-throwing. This lets outcomeScorer see failure signals it
+    // would otherwise miss (the success write above is fire-and-forget).
+    try {
     // Remote canonical skill execution (ant-only experimental). Intercepts
     // `_canonical_<slug>` before local command lookup — loads SKILL.md from
     // AKI/GCS (with local cache), injects content directly as a user message.
@@ -964,6 +993,25 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
 
         return modifiedContext
       },
+    }
+    } catch (err) {
+      // H4 Hermes — re-record last-skill-execution as failure so the
+      // outcomeScorer / learning cycle can see the thrown-exception path.
+      try {
+        const { setWorkingMemory } = await import(
+          '../../assistant/workingMemory.js'
+        )
+        setWorkingMemory(
+          'last-skill-execution',
+          JSON.stringify({
+            skillName: commandName,
+            invokedAt: skillLearningInvokedAt,
+            args: { skill: commandName, args: args ?? '' },
+            result: 'failure',
+          }),
+        )
+      } catch {}
+      throw err
     }
   },
 
