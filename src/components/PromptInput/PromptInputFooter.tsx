@@ -17,6 +17,9 @@ import type { PromptInputMode, VimMode } from '../../types/textInputTypes.js';
 import type { AutoUpdaterResult } from '../../utils/autoUpdater.js';
 import { isFullscreenEnvEnabled } from '../../utils/fullscreen.js';
 import { isUndercover } from '../../utils/undercover.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
+import { getCurrentUsage } from '../../utils/tokens.js';
 import { CoordinatorTaskPanel, useCoordinatorTaskCount } from '../CoordinatorAgentStatus.js';
 import { getLastAssistantMessageId, StatusLine, statusLineShouldDisplay } from '../StatusLine.js';
 import { Notifications } from './Notifications.js';
@@ -118,6 +121,11 @@ function PromptInputFooter({
   const coordinatorTaskIndex = useAppState(s => s.coordinatorTaskIndex);
   const pillSelected = tasksSelected && (coordinatorTaskCount === 0 || coordinatorTaskIndex < 0);
 
+  // Matrix footer: show model + context info when StatusLine is not configured
+  const matrixModel = isMatrixTheme() ? useMainLoopModel() : null;
+  const matrixUsage = isMatrixTheme() ? getCurrentUsage(messages) : null;
+  const showMatrixFooter = isMatrixTheme() && !statusLineShouldDisplay(settings) && mode === 'prompt' && !isShort && !exitMessage.show && !isPasting;
+
   // Hide `? for shortcuts` if the user has a custom status line, or during ctrl-r
   const suppressHint = suppressHintFromProps || statusLineShouldDisplay(settings) || isSearching;
   // Fullscreen: portal data to FullscreenLayout — see promptOverlayContext.tsx
@@ -139,6 +147,21 @@ function PromptInputFooter({
       <Box flexDirection={isNarrow ? 'column' : 'row'} justifyContent={isNarrow ? 'flex-start' : 'space-between'} paddingX={2} gap={isNarrow ? 0 : 1}>
         <Box flexDirection="column" flexShrink={isNarrow ? 0 : 1}>
           {mode === 'prompt' && !isShort && !exitMessage.show && !isPasting && statusLineShouldDisplay(settings) && <StatusLine messagesRef={messagesRef} lastAssistantMessageId={lastAssistantMessageId} vimMode={vimMode} />}
+          {showMatrixFooter && <Box><Text color="#006420">{
+            (() => {
+              const parts: string[] = []
+              if (matrixModel) {
+                // 简化模型名：去掉日期后缀
+                const short = String(matrixModel).replace(/-\d{8}$/, '')
+                parts.push(short)
+              }
+              if (matrixUsage) {
+                const total = matrixUsage.input_tokens + matrixUsage.output_tokens
+                parts.push(total > 1000 ? `${(total / 1000).toFixed(1)}k ctx` : `${total} ctx`)
+              }
+              return parts.join(' · ') || 'matrix'
+            })()
+          }</Text></Box>}
           <PromptInputFooterLeftSide exitMessage={exitMessage} vimMode={vimMode} mode={mode} toolPermissionContext={toolPermissionContext} suppressHint={suppressHint} isLoading={isLoading} tasksSelected={pillSelected} teamsSelected={teamsSelected} teammateFooterIndex={teammateFooterIndex} tmuxSelected={tmuxSelected} isPasting={isPasting} isSearching={isSearching} historyQuery={historyQuery} setHistoryQuery={setHistoryQuery} historyFailedMatch={historyFailedMatch} onOpenTasksDialog={onOpenTasksDialog} />
         </Box>
         <Box flexShrink={1} gap={1}>
