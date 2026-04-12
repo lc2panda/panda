@@ -67,7 +67,10 @@ export function getAgentModel(
     try {
       const { isRoutingEnabled, resolveModelTarget, classifyTask } = require('../../routing/index.js')
       if (isRoutingEnabled()) {
-        const taskProfile = classifyTask('', agentDefinition)
+        const taskProfile = classifyTask(
+          agentDefinition.name || agentDefinition.agentType || '',
+          agentDefinition,
+        )
         const target = resolveModelTarget(agentDefinition, taskProfile, null, parentModel)
         if (target && target.reason !== 'default: inherit from parent') {
           const { logForDebugging } = require('../debug.js')
