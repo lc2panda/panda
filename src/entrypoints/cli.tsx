@@ -107,7 +107,11 @@ try {
             process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS = String(_c.thirdPartyProvider.contextWindow);
         }
     }
-} catch {}
+} catch (e: any) {
+  if (e?.code !== 'ENOENT' && e?.code !== 'MODULE_NOT_FOUND') {
+    console.error(`[panda] .pandacc.json 加载失败: ${e?.message || e}`)
+  }
+}
 
 // Bugfix for corepack auto-pinning, which adds yarnpkg to peoples' package.jsons
 // eslint-disable-next-line custom-rules/no-top-level-side-effects

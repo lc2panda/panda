@@ -1133,7 +1133,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 
 ## 8. 命令使用手册
 
-> 覆盖 **85+ 个命令**，含智能助理、IM 连接器、103 主动推送场景等全部能力。
+> 覆盖 **113 个命令**，含智能助理、IM 连接器、103 主动推送场景等全部能力。
 
 <details>
 <summary>展开查看完整手册（85+ 命令）</summary>
