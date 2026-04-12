@@ -1,5 +1,5 @@
 // Input: cols / rows / onDone callback
-// Output: ~5.5s Matrix 启动动画（v2.11.3 延长）
+// Output: ~5.5s Matrix 启动动画（v2.14.1 refined with CRT scanline + cursor blink）
 // Pos: MatrixTheme 启动屏，由 LogoV2 在 isMatrixTheme() 时返回
 // 一旦我被修改，请更新 MatrixTheme/README.md
 
@@ -7,7 +7,7 @@ import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { Box, Text, useInput } from '../../ink.js'
 import { MatrixCharRain } from './MatrixCharRain.js'
-import { MATRIX_COLORS } from './matrixPalette.js'
+import { MATRIX_SCALE } from './matrixPalette.js'
 
 interface MatrixBootSequenceProps {
   cols: number
@@ -28,18 +28,27 @@ const PANDA_LOGO = [
   '╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚═╝  ╚═╝',
 ]
 
+// CRT scanline: alternate rows use slightly dimmer color
+const LOGO_COLORS = [
+  MATRIX_SCALE.FLASH,  // row 0 — bright
+  MATRIX_SCALE.GLOW,   // row 1 — slightly dimmer (scanline)
+  MATRIX_SCALE.FLASH,  // row 2 — bright
+  MATRIX_SCALE.GLOW,   // row 3 — scanline
+  MATRIX_SCALE.FLASH,  // row 4 — bright
+  MATRIX_SCALE.GLOW,   // row 5 — scanline
+]
+
 const WAKE_UP_TEXT = '〔 W A K E   U P,   N E O … 〕'
-// 打字机逐字显示的字符数 → time 映射
-// 总计 WAKE_UP_TEXT 长度 ~23 字符，每字符 ~100ms = ~2.3s 打字
 const TYPE_INTERVAL_MS = 100
+const CURSOR_BLINK_MS = 500
 
 /**
  * Matrix 主题启动屏（~5.5s total, 按 ⏎/Esc 跳过）。
  *
  * 阶段：
  *  - 0-500ms    rain   : 字符雨快速填屏（提升初始冲击感）
- *  - 500-2000ms logo   : 字符雨 + Panda logo 淡入（1.5s）
- *  - 2000ms+    wakeup : "WAKE UP, NEO …" 打字机逐字显示（~2.3s）
+ *  - 500-2000ms logo   : 字符雨 + Panda logo 淡入（1.5s, CRT scanline effect）
+ *  - 2000ms+    wakeup : "WAKE UP, NEO …" 打字机逐字显示 + blinking cursor（~2.3s）
  *  - 4300-5500ms hold  : 文字完整显示后停留 1.2s 让用户读完
  *  - 5500ms+    done   : 卸载 + onDone 回调
  *
@@ -52,11 +61,11 @@ export function MatrixBootSequence({
 }: MatrixBootSequenceProps): React.ReactNode {
   const [phase, setPhase] = useState<Phase>('rain')
   const [typedChars, setTypedChars] = useState(0)
+  const [cursorVisible, setCursorVisible] = useState(true)
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase('logo'), 500)
     const t2 = setTimeout(() => setPhase('wakeup'), 2000)
-    // hold 阶段（打字完成后）在 wakeup useEffect 里触发
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)
@@ -74,6 +83,13 @@ export function MatrixBootSequence({
     const t = setTimeout(() => setTypedChars(n => n + 1), TYPE_INTERVAL_MS)
     return () => clearTimeout(t)
   }, [phase, typedChars])
+
+  // Blinking cursor during wakeup phase
+  useEffect(() => {
+    if (phase !== 'wakeup') return
+    const t = setInterval(() => setCursorVisible(v => !v), CURSOR_BLINK_MS)
+    return () => clearInterval(t)
+  }, [phase])
 
   // hold 阶段持续 1200ms 后结束
   useEffect(() => {
@@ -101,10 +117,13 @@ export function MatrixBootSequence({
     ? WAKE_UP_TEXT
     : WAKE_UP_TEXT.slice(0, typedChars)
 
+  // Cursor: visible during typing, hidden once complete (hold phase)
+  const cursor = phase === 'wakeup' && cursorVisible ? '▌' : phase === 'wakeup' ? ' ' : ''
+
   return (
     <Box flexDirection="column">
       <MatrixCharRain
-        rows={2}
+        rows={3}
         cols={cols}
         density={0.4}
         fps={30}
@@ -117,25 +136,25 @@ export function MatrixBootSequence({
           <Box
             flexDirection="column"
             borderStyle="round"
-            borderColor={MATRIX_COLORS.MID_HEX}
+            borderColor={MATRIX_SCALE.NEON}
             paddingX={2}
             paddingY={1}
           >
             {PANDA_LOGO.map((line, i) => (
-              <Text key={i} color={MATRIX_COLORS.HEAD_HEX}>
+              <Text key={i} color={LOGO_COLORS[i] || MATRIX_SCALE.FLASH}>
                 {line}
               </Text>
             ))}
             <Box height={1} />
             {/* 打字机阶段永远 reserve 一行高度，避免 wakeupDisplay 从空到有时 logo 框跳动 */}
-            <Text color={MATRIX_COLORS.MID_HEX}>
-              {showWakeup ? wakeupDisplay : ' '}
+            <Text color={MATRIX_SCALE.NEON}>
+              {showWakeup ? `${wakeupDisplay}${cursor}` : ' '}
             </Text>
           </Box>
         )}
       </Box>
       <MatrixCharRain
-        rows={2}
+        rows={3}
         cols={cols}
         density={0.4}
         fps={30}
@@ -144,8 +163,8 @@ export function MatrixBootSequence({
         tailLength={5}
       />
       <Box>
-        <Text color={MATRIX_COLORS.TAIL_HEX}>
-          {'   ▶ SYSTEM BOOT  ·  v2.11.3  ·  ⏎ skip'}
+        <Text color={MATRIX_SCALE.SHADOW}>
+          {`   ▶ PANDA CODE  ·  v${MACRO.VERSION}  ·  SYSTEM INITIALIZED  ·  ⏎ skip`}
         </Text>
       </Box>
     </Box>
