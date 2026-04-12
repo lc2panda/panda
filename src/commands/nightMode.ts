@@ -21,11 +21,12 @@ const nightMode = {
       async call(
         onDone: LocalJSXCommandOnDone,
         context: LocalJSXCommandContext,
+        rawArgs?: string,
       ): Promise<React.ReactNode> {
         const { saveGlobalConfig, getGlobalConfig } = require('../utils/config.js') as typeof import('../utils/config.js')
         const { isNightTime, getNightModeConfig } = require('../proactive/nightMode.js') as typeof import('../proactive/nightMode.js')
 
-        const args = (context.args ?? '').trim().toLowerCase()
+        const args = (rawArgs ?? '').trim().toLowerCase()
         const config = getNightModeConfig()
 
         if (args === 'on') {
