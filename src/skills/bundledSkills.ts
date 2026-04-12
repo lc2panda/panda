@@ -96,6 +96,8 @@ export function registerBundledSkill(definition: BundledSkillDefinition): void {
     progressMessage: 'running',
     getPromptForCommand,
   }
+  // Deduplicate: if a skill with the same name is already registered, skip.
+  if (bundledSkills.some(s => s.name === command.name)) return
   bundledSkills.push(command)
 }
 
