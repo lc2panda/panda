@@ -5,12 +5,15 @@
 
 import { join } from 'path'
 import { homedir } from 'os'
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, statSync, unlinkSync } from 'fs'
 
 const OUTBOX_PATH = join(homedir(), '.pandacc', 'channels', 'outbox', 'notifications.jsonl')
 const SEEN_PATH = join(homedir(), '.pandacc', 'channels', 'outbox', 'seen.json')
 const MAX_SEEN = 500
 const LOOKBACK_MS = 24 * 60 * 60 * 1000 // 24h
+const PRUNE_MAX_LINES = 500
+const PRUNE_MAX_BYTES = 100 * 1024 // 100KB
+const PRUNE_RETAIN_MS = 72 * 60 * 60 * 1000 // 72h
 
 export interface OutboxNotification {
   type?: string
@@ -71,6 +74,10 @@ export function loadUnseenNotifications(): OutboxNotification[] {
         unseen.push(notif)
       } catch {}
     }
+
+    // 触发异步清理（不阻塞返回）
+    pruneNotificationFile()
+
     return unseen
   } catch {
     return []
@@ -141,5 +148,44 @@ export function getOutboxStats(): { total: number; unseen: number; seenCount: nu
     return { total, unseen, seenCount: state.seen.length }
   } catch {
     return { total: 0, unseen: 0, seenCount: 0 }
+  }
+}
+
+/**
+ * 清理 notifications.jsonl：当行数 > PRUNE_MAX_LINES 或文件 > PRUNE_MAX_BYTES 时，
+ * 只保留最近 72h 的记录。使用原子写入（tmp + rename）防止数据丢失。
+ */
+function pruneNotificationFile(): void {
+  try {
+    if (!existsSync(OUTBOX_PATH)) return
+
+    const stat = statSync(OUTBOX_PATH)
+    const content = readFileSync(OUTBOX_PATH, 'utf-8')
+    const lines = content.split('\n').filter(l => l.trim().length > 0)
+
+    // 未达阈值，不清理
+    if (lines.length <= PRUNE_MAX_LINES && stat.size <= PRUNE_MAX_BYTES) return
+
+    const cutoff = Date.now() - PRUNE_RETAIN_MS
+    const retained: string[] = []
+    for (const line of lines) {
+      try {
+        const notif = JSON.parse(line) as OutboxNotification
+        if (!notif.timestamp) continue
+        const ts = new Date(notif.timestamp).getTime()
+        if (isNaN(ts) || ts < cutoff) continue
+        retained.push(line)
+      } catch {
+        // 无法解析的行丢弃
+      }
+    }
+
+    // 原子写入：先写临时文件再 rename
+    const tmpPath = OUTBOX_PATH + '.tmp'
+    writeFileSync(tmpPath, retained.length > 0 ? retained.join('\n') + '\n' : '', 'utf-8')
+    renameSync(tmpPath, OUTBOX_PATH)
+  } catch {
+    // 清理失败不影响主流程
+    try { unlinkSync(OUTBOX_PATH + '.tmp') } catch {}
   }
 }
