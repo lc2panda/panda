@@ -30,6 +30,7 @@ class SlackConnector implements IMConnector {
   private token = ''
   private rateLimitPerMinute = 60
   private lastRequestTime = 0
+  private _rateLimitTimer: ReturnType<typeof setTimeout> | null = null
 
   get status(): ConnectorStatus { return this._status }
   get mode(): ConnectorMode { return 'api' }
@@ -69,6 +70,10 @@ class SlackConnector implements IMConnector {
   }
 
   async dispose(): Promise<void> {
+    if (this._rateLimitTimer) {
+      clearTimeout(this._rateLimitTimer)
+      this._rateLimitTimer = null
+    }
     this._status = 'disconnected'
     this.token = ''
   }
@@ -240,7 +245,12 @@ class SlackConnector implements IMConnector {
       this._status = 'rate-limited'
       const retryAfter = parseInt(resp.headers.get('Retry-After') || '30', 10)
       logForDebugging(`[slack] 被限流，${retryAfter}s 后恢复`)
-      setTimeout(() => { this._status = 'connected' }, retryAfter * 1000)
+      this._rateLimitTimer = setTimeout(() => {
+        this._rateLimitTimer = null
+        if (this._status === 'rate-limited') {
+          this._status = 'connected'
+        }
+      }, retryAfter * 1000)
       throw new Error('Slack rate limited')
     }
 

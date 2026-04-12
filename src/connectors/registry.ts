@@ -162,16 +162,22 @@ class ConnectorRegistry {
   }
 
   private async runHealthChecks(): Promise<void> {
+    // 先收集需要重连的平台，避免迭代 Map 时 connect() 修改 Map
+    const unhealthyPlatforms: ConnectorPlatform[] = []
     for (const [platform, instance] of this.instances) {
       try {
         const healthy = await instance.healthCheck()
         if (!healthy) {
-          logForDebugging(`[registry] ${platform}: health check failed, attempting reconnect`)
-          await this.connect(platform)
+          logForDebugging(`[registry] ${platform}: health check failed, will attempt reconnect`)
+          unhealthyPlatforms.push(platform)
         }
       } catch {
         logForDebugging(`[registry] ${platform}: health check error`)
       }
+    }
+    // 迭代完成后再逐一重连
+    for (const platform of unhealthyPlatforms) {
+      await this.connect(platform)
     }
   }
 
