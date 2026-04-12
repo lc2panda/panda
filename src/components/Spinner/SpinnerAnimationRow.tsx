@@ -8,6 +8,7 @@ import type { InProcessTeammateTaskState } from '../../tasks/InProcessTeammateTa
 import { formatDuration, formatNumber } from '../../utils/format.js';
 import { toInkColor } from '../../utils/ink.js';
 import type { Theme } from '../../utils/theme.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
 import { Byline } from '../design-system/Byline.js';
 import { GlimmerMessage } from './GlimmerMessage.js';
 import { SpinnerGlyph } from './SpinnerGlyph.js';
@@ -230,9 +231,10 @@ export function SpinnerAnimationRow({
           <Byline>{parts}</Byline>
           <Text dimColor>)</Text>
         </> : null;
+  const effectiveMessageColor = isMatrixTheme() ? '#006420' as keyof Theme : messageColor;
   return <Box ref={viewportRef} flexDirection="row" flexWrap="wrap" marginTop={1} width="100%">
       <SpinnerGlyph frame={frame} messageColor={messageColor} stalledIntensity={overrideColor ? 0 : stalledIntensity} reducedMotion={reducedMotion} time={time} />
-      <GlimmerMessage message={message} mode={mode} messageColor={messageColor} glimmerIndex={glimmerIndex} flashOpacity={flashOpacity} shimmerColor={shimmerColor} stalledIntensity={overrideColor ? 0 : stalledIntensity} />
+      <GlimmerMessage message={message} mode={mode} messageColor={effectiveMessageColor} glimmerIndex={glimmerIndex} flashOpacity={flashOpacity} shimmerColor={shimmerColor} stalledIntensity={overrideColor ? 0 : stalledIntensity} />
       {status}
     </Box>;
 }

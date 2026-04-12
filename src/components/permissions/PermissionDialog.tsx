@@ -4,6 +4,7 @@ import { Box } from '../../ink.js';
 import type { Theme } from '../../utils/theme.js';
 import { PermissionRequestTitle } from './PermissionRequestTitle.js';
 import type { WorkerBadgeProps } from './WorkerBadge.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
 type Props = {
   title: string;
   subtitle?: React.ReactNode;
@@ -59,7 +60,7 @@ export function PermissionDialog(t0) {
   }
   let t6;
   if ($[11] !== color || $[12] !== t4 || $[13] !== t5) {
-    t6 = <Box flexDirection="column" borderStyle="round" borderColor={color} borderLeft={false} borderRight={false} borderBottom={false} marginTop={1}>{t4}{t5}</Box>;
+    t6 = <Box flexDirection="column" borderStyle="round" borderColor={isMatrixTheme() ? '#00ff41' : color} borderLeft={false} borderRight={false} borderBottom={false} marginTop={1}>{t4}{t5}</Box>;
     $[11] = color;
     $[12] = t4;
     $[13] = t5;
