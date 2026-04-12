@@ -1,6 +1,7 @@
 node_modules
 .DS_Store
 dist
+dist-vanilla
 coverage
 .env
 *.log
@@ -8,3 +9,14 @@ coverage
 .vscode
 *.suo
 *.lock
+
+# Non-source artifacts
+package-v2.1.88
+monitor
+docs
+data
+plugins
+PC命令使用手册.md
+RECORD.md
+SECURITY.md
+README-DEV.md
