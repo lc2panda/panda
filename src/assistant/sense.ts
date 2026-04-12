@@ -84,6 +84,65 @@ export interface PandaNotification {
 const notificationQueue: PandaNotification[] = []
 const MAX_QUEUE = 20
 
+// ─────────────────────────────────────────────────────────────────────
+// OS 通知失败降级状态（模块级单例，只提示一次）
+// ─────────────────────────────────────────────────────────────────────
+let _osascriptFailureNotified = false
+
+function notifyOsascriptFailure(err: string): void {
+  if (_osascriptFailureNotified) return
+  _osascriptFailureNotified = true
+
+  // 判断是否是授权/辅助功能问题
+  const isAuthIssue = /not\s+authori[sz]ed|not\s+allowed|assistive\s+access|accessibility/i.test(err)
+  const briefErr = err.slice(0, 200)
+
+  // 写 audit
+  try {
+    const { writeAuditEntry, hashArgs } = require('../utils/auditLog.js') as typeof import('../utils/auditLog.js')
+    writeAuditEntry({
+      session_id: 'system',
+      tool_name: 'osascript-notification',
+      args_hash: hashArgs({ auth: isAuthIssue }),
+      risk_level: 'read-only',
+      permission_decision: 'auto-denied',
+      outcome: 'failure',
+      error_brief: (isAuthIssue ? '[auth] ' : '') + briefErr,
+    })
+  } catch {}
+
+  // 写 working memory 让 status panel 能看到
+  try {
+    const { setWorkingMemory } = require('./workingMemory.js') as typeof import('./workingMemory.js')
+    setWorkingMemory('os-notification-degraded', JSON.stringify({
+      isAuthIssue,
+      error: briefErr,
+      at: Date.now(),
+    }))
+  } catch {}
+
+  // debug log（不直接 console.warn，避免干扰 Ink）
+  try {
+    const { logForDebugging } = require('../utils/debug.js') as typeof import('../utils/debug.js')
+    logForDebugging(`[osascript] notification failed${isAuthIssue ? ' (auth denied)' : ''}: ${err.slice(0, 100)}`)
+  } catch {}
+}
+
+/**
+ * 查询当前 OS 通知通道是否降级（供 status 面板使用）
+ */
+export function isOsNotificationDegraded(): { degraded: boolean; isAuth: boolean; lastError: string | null } {
+  try {
+    const { getWorkingMemory } = require('./workingMemory.js') as typeof import('./workingMemory.js')
+    const raw = getWorkingMemory('os-notification-degraded')
+    if (!raw) return { degraded: false, isAuth: false, lastError: null }
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return { degraded: true, isAuth: !!parsed.isAuthIssue, lastError: parsed.error || null }
+  } catch {
+    return { degraded: false, isAuth: false, lastError: null }
+  }
+}
+
 export function pushNotification(notification: PandaNotification): void {
   notificationQueue.push(notification)
   if (notificationQueue.length > MAX_QUEUE) notificationQueue.shift()
@@ -97,9 +156,19 @@ export function pushNotification(notification: PandaNotification): void {
       const platform = require('os').platform()
       if (platform === 'darwin') {
         // macOS: osascript（使用 execFileSync 避免 shell 注入）
-        execFileSync('osascript', ['-e',
-          `display notification ${JSON.stringify(notification.body)} with title "Panda" subtitle ${JSON.stringify(notification.title)}`
-        ], { timeout: 3000 })
+        // 捕获 stderr 以便感知权限/授权失败并触发降级提示
+        try {
+          execFileSync('osascript', ['-e',
+            `display notification ${JSON.stringify(notification.body)} with title "Panda" subtitle ${JSON.stringify(notification.title)}`
+          ], {
+            timeout: 3000,
+            stdio: ['ignore', 'pipe', 'pipe'],
+          })
+        } catch (e) {
+          const err = e as { stderr?: Buffer | string; message?: string }
+          const errText = (typeof err.stderr === 'string' ? err.stderr : err.stderr?.toString?.()) || err.message || 'unknown'
+          notifyOsascriptFailure(errText)
+        }
       } else if (platform === 'win32') {
         // Windows: PowerShell BurntToast（使用 execFileSync 避免命令注入）
         try {
