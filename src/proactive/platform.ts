@@ -155,6 +155,10 @@ export interface NetworkStatus {
 }
 
 export function checkNetwork(host: string = '8.8.8.8'): NetworkStatus {
+  // SECURITY: Validate host to prevent command injection
+  if (!/^[\w.\-:]+$/.test(host)) {
+    return { connected: false, latencyMs: -1, packetLoss: 100 }
+  }
   try {
     const cmd = IS_WIN
       ? `ping -n 3 -w 2000 ${host}`
