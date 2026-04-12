@@ -1557,6 +1557,7 @@ export function isMemoryFilePath(filePath: string): boolean {
   // .md files in .pandacc/rules/ directories
   if (
     name.endsWith('.md') &&
+    filePath.includes(`${sep}.pandacc${sep}rules${sep}`) ||
     filePath.includes(`${sep}.claude${sep}rules${sep}`)
   ) {
     return true
