@@ -142,12 +142,8 @@ class DingtalkMCPConnector extends MCPBridgeConnector {
   }
 
   async sendNotification(notification: PandaNotification): Promise<void> {
-    try {
-      const msg = `📢 [${notification.title || 'Panda'}]\n${notification.body || ''}`
-      await this.sendMessage('default', msg)
-    } catch (e) {
-      logForDebugging(`[dingtalk] sendNotification failed: ${e}`)
-    }
+    // 无配置的通知目标 chat_id，跳过发送
+    logForDebugging('[dingtalk] sendNotification: 无配置的通知目标 chat_id，跳过发送（不应发到 "default"）')
   }
 }
 
@@ -203,10 +199,6 @@ class DingtalkAPIConnector implements IMConnector {
   }
 
   private async refreshToken(): Promise<void> {
-    const resp = await fetch('https://oapi.dingtalk.com/gettoken', {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    })
     // 钉钉使用 URL params: ?appkey=xxx&appsecret=xxx
     const url = `https://oapi.dingtalk.com/gettoken?appkey=${this.config!.appId}&appsecret=${this.config!.appSecret}`
     const tokenResp = await fetch(url)
@@ -284,12 +276,8 @@ class DingtalkAPIConnector implements IMConnector {
   }
 
   async sendNotification(notification: PandaNotification): Promise<void> {
-    try {
-      const msg = `📢 [${notification.title || 'Panda'}]\n${notification.body || ''}`
-      await this.sendMessage('default', msg)
-    } catch (e) {
-      logForDebugging(`[dingtalk-api] sendNotification failed: ${e}`)
-    }
+    // 无配置的通知目标 userid，跳过发送
+    logForDebugging('[dingtalk-api] sendNotification: 无配置的通知目标 userid，跳过发送（不应发到 "default"）')
   }
 }
 
