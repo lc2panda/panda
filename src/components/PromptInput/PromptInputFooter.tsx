@@ -18,7 +18,7 @@ import type { AutoUpdaterResult } from '../../utils/autoUpdater.js';
 import { isFullscreenEnvEnabled } from '../../utils/fullscreen.js';
 import { isUndercover } from '../../utils/undercover.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
-import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
+import { MATRIX_UI, MATRIX_SCALE } from '../MatrixTheme/matrixPalette.js';
 import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
 import { getCurrentUsage } from '../../utils/tokens.js';
 import { CoordinatorTaskPanel, useCoordinatorTaskCount } from '../CoordinatorAgentStatus.js';

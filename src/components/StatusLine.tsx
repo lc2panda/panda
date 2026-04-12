@@ -341,9 +341,12 @@ function StatusLineInner({
   // Matrix theme: green text, no extra border (双线框太重，占行且视觉噪音)
   if (isMatrixTheme()) {
     return <Box paddingX={paddingX} gap={2}>
-        {statusLineText ? <Text color={MATRIX_UI.statusLine} wrap="truncate">
+        {statusLineText ? <>
+          <Text color={MATRIX_UI.divider}>▐</Text>
+          <Text color={MATRIX_UI.statusLine} wrap="truncate">
             <Ansi>{statusLineText}</Ansi>
-          </Text> : isFullscreenEnvEnabled() ? <Text> </Text> : null}
+          </Text>
+        </> : isFullscreenEnvEnabled() ? <Text> </Text> : null}
       </Box>;
   }
   return <Box paddingX={paddingX} gap={2}>
