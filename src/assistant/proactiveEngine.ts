@@ -291,34 +291,29 @@ function _checkHabitDeviation(): ProactiveSuggestion | null {
 }
 
 // ─── 检查器 6: 未读通知消费（主动层 → 被动层桥接） ───
-
-const _displayedNotifTimestamps = new Set<string>()
+// TTL 放宽到 24h + seen.json 持久化去重，修复"通知黑洞"
+// 所有 outbox 读写与去重逻辑集中在 notificationCatchup.ts
 
 function _checkPendingNotifications(): ProactiveSuggestion | null {
   try {
-    const notifPath = join(homedir(), '.pandacc', 'channels', 'outbox', 'notifications.jsonl')
-    if (!existsSync(notifPath)) return null
-    const lines = readFileSync(notifPath, 'utf-8').trim().split('\n').filter(Boolean)
-    const cutoff = Date.now() - 900000
-    const recent = lines
-      .map(l => { try { return JSON.parse(l) } catch { return null } })
-      .filter((n: any) => n && n.timestamp && new Date(n.timestamp).getTime() > cutoff && !_displayedNotifTimestamps.has(String(n.timestamp)))
-      .slice(-3)
-
-    if (recent.length === 0) return null
-    for (const n of recent) _displayedNotifTimestamps.add(String(n.timestamp))
-    if (_displayedNotifTimestamps.size > 200) {
-      const arr = [..._displayedNotifTimestamps]
-      _displayedNotifTimestamps.clear()
-      for (const t of arr.slice(-100)) _displayedNotifTimestamps.add(t)
-    }
+    const { loadUnseenNotifications, markNotificationsSeen } =
+      require('./notificationCatchup.js') as typeof import('./notificationCatchup.js')
+    const unseen = loadUnseenNotifications()
+    if (unseen.length === 0) return null
+    // 被动层限制最多展示最近 3 条，避免消息爆量
+    const recent = unseen.slice(-3)
+    markNotificationsSeen(recent)
     return {
       type: 'pending-notifications',
-      message: `\u{1F4EC} ${recent.length} 条未读通知: ${recent.map((n: any) => n.title || n.message?.slice(0, 30)).join(', ')}`,
+      message: `\u{1F4EC} ${recent.length} 条未读通知: ${recent
+        .map((n: any) => n.title || (n.body || '').slice(0, 30))
+        .join(', ')}`,
       priority: 'medium',
       source: 'pending_notifications',
     }
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 // ─── 检查器 8: LLM 驱动元检查器（本地智能推理，零 API 调用） ───
