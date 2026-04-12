@@ -223,6 +223,29 @@ if (cliContent.startsWith("#!/usr/bin/env bun")) {
     await writeFile(cliPath, `#!/usr/bin/env node\n${cliContent}`);
 }
 
+// Step 5: Copy vendored ripgrep binary if available
+// The source can be: (a) repo-local vendor/, (b) original claude-code vendor/
+const { cpSync, existsSync, chmodSync } = await import("fs");
+const rgSourceCandidates = [
+    join("vendor", "ripgrep"),  // repo-local
+    join(import.meta.dir, "node_modules", "@anthropic-ai", "claude-code", "vendor", "ripgrep"),
+    join(process.env.HOME || "", ".npm-global", "lib", "node_modules", "@anthropic-ai", "claude-code", "vendor", "ripgrep"),
+];
+let rgCopied = false;
+for (const src of rgSourceCandidates) {
+    if (existsSync(src)) {
+        const dest = join(outdir, "vendor", "ripgrep");
+        cpSync(src, dest, { recursive: true });
+        // Ensure binaries are executable
+        for (const plat of ["arm64-darwin", "x64-darwin", "x64-linux", "arm64-linux"]) {
+            const bin = join(dest, plat, "rg");
+            if (existsSync(bin)) try { chmodSync(bin, 0o755); } catch {}
+        }
+        rgCopied = true;
+        break;
+    }
+}
+
 console.log(
-    `Bundled ${result.outputs.length} files to ${outdir}/ (patched ${patched} for Node.js compat)`,
+    `Bundled ${result.outputs.length} files to ${outdir}/ (patched ${patched} for Node.js compat)${rgCopied ? ' + ripgrep vendored' : ' (no ripgrep found)'}`,
 );
