@@ -337,13 +337,10 @@ function StatusLineInner({
   // flexShrink:0 so a 0→1 row change when the command finishes steals
   // a row from ScrollBox and shifts content. Reserve the row while loading
   // (same trick as PromptInputFooterLeftSide).
-  // Matrix theme (opt-in via PANDA_THEME=matrix): wrap in a double-line
-  // neon-green frame. The statusline text is the user's free-form output,
-  // so we can't reformat field separators here — just add the border chrome.
-  // NOTE: double border steals one extra row; acceptable for opt-in cosmetic.
+  // Matrix theme: green text, no extra border (双线框太重，占行且视觉噪音)
   if (isMatrixTheme()) {
-    return <Box paddingX={paddingX} gap={2} borderStyle="double" borderColor="#00ff41">
-        {statusLineText ? <Text color="#00ff41" wrap="truncate">
+    return <Box paddingX={paddingX} gap={2}>
+        {statusLineText ? <Text color="#006420" wrap="truncate">
             <Ansi>{statusLineText}</Ansi>
           </Text> : isFullscreenEnvEnabled() ? <Text> </Text> : null}
       </Box>;
