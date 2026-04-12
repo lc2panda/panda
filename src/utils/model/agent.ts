@@ -1,3 +1,8 @@
+// Input: 模型配置 + 权限模式 + Bedrock/Vertex 区域设置
+// Output: Agent 实例参数（模型 ID、别名解析、能力约束）
+// Pos: utils/model/ Agent 模型工具，被 AgentTool 和路由层调用
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import type { PermissionMode } from '../permissions/PermissionMode.js'
 import { capitalize } from '../stringUtils.js'
 import { MODEL_ALIASES, type ModelAlias } from './aliases.js'

@@ -1,3 +1,8 @@
+// Input: 命令字符串 + 执行模式（dry-run / execute）
+// Output: SafeExecutionResult（成功/失败 + stdout/stderr）
+// Pos: proactive/ 安全执行层，所有主动任务的命令执行入口
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 export type ExecutionMode = 'dry-run' | 'execute'
 
 export interface SafeExecutionResult {

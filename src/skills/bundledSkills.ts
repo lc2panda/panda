@@ -1,3 +1,8 @@
+// Input: 技能名称 + 调用参数
+// Output: 内置技能执行结果（commit、PR、simplify 等）
+// Pos: skills/ 内置技能注册表，被 skill 调度器加载
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
 import { constants as fsConstants } from 'fs'
 import { mkdir, open } from 'fs/promises'

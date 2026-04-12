@@ -1,3 +1,8 @@
+// Input: 技能目录路径 + .gitignore 规则
+// Output: 加载并解析目录下所有 .md 技能定义文件
+// Pos: skills/ 技能目录加载器，被 bundledSkills 和用户自定义技能共用
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { realpath } from 'fs/promises'
 import ignore from 'ignore'
 import memoize from 'lodash-es/memoize.js'

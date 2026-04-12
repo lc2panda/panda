@@ -1,3 +1,8 @@
+// Input: 用户消息 + 系统时钟 + 活动状态 + 环境变量
+// Output: 聚合感知数据 SenseData（时间/活动/情绪/环境）
+// Pos: assistant/ 感知聚合层，供 proactiveEngine 和 persona 消费
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { getTimeSense } from './timeSense.js'
 import { getActivitySense } from './activitySense.js'
 import { getMoodSense } from './moodSense.js'

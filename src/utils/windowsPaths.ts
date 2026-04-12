@@ -1,3 +1,8 @@
+// Input: 文件路径字符串（可能含 Win32 格式）
+// Output: 跨平台标准化路径（POSIX 兼容）
+// Pos: utils/ 路径工具，被所有文件操作工具间接引用
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import memoize from 'lodash-es/memoize.js'
 import * as path from 'path'
 import * as pathWin32 from 'path/win32'

@@ -1,3 +1,8 @@
+// Input: 用户 /model 命令 + 可用模型列表
+// Output: 模型选择 UI（Ink React 组件）+ 切换确认
+// Pos: commands/model/ 模型切换命令，交互式选择器
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { c as _c } from "react/compiler-runtime";
 import chalk from 'chalk';
 import * as React from 'react';

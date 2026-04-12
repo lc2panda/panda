@@ -1,3 +1,8 @@
+// Input: bash 命令字符串 + 超时 + 工作目录
+// Output: 命令 stdout/stderr + 退出码 + React 渲染组件
+// Pos: tools/BashTool/ Shell 命令执行工具，权限敏感
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { feature } from 'bun:bundle';
 import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs';
 import { copyFile, stat as fsStat, truncate as fsTruncate, link } from 'fs/promises';

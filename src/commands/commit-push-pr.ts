@@ -1,3 +1,8 @@
+// Input: git staged changes + PR 模板 + attribution 配置
+// Output: git commit + push + GitHub PR 创建
+// Pos: commands/ commit-push-pr 命令，一键提交发布流程
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import type { Command } from '../commands.js'
 import {
   getAttributionTexts,

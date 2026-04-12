@@ -1,3 +1,8 @@
+// Input: 系统环境 + 用户配置目录
+// Output: 初始化遥测、配置、信任对话框等一次性启动副作用
+// Pos: entrypoints/ 初始化入口，cli.tsx 启动后首次调用
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { profileCheckpoint } from '../utils/startupProfiler.js'
 import '../bootstrap/state.js'
 import '../utils/config.js'

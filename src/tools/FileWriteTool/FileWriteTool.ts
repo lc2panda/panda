@@ -1,3 +1,8 @@
+// Input: 文件路径 + 完整文件内容
+// Output: 写入/覆盖的文件 + diff 预览 + 诊断追踪
+// Pos: tools/FileWriteTool/ 文件整体写入工具，核心写操作之一
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { dirname, sep } from 'path'
 import { logEvent } from 'src/services/analytics/index.js'
 import { z } from 'zod/v4'

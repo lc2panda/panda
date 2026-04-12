@@ -1,3 +1,8 @@
+// Input: API 采样结果 + 工具上下文 + 消息列表
+// Output: 后采样 hook 执行（通知、日志、副作用）
+// Pos: utils/hooks/ 后采样钩子，每次 API 响应后触发
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import type { QuerySource } from '../../constants/querySource.js'
 import type { ToolUseContext } from '../../Tool.js'
 import type { Message } from '../../types/message.js'

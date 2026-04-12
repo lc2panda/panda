@@ -1,3 +1,7 @@
+// Input: 用户键盘输入 + API 流式响应 + 工具调用结果
+// Output: 终端交互界面（消息渲染、权限提示、快捷键处理）
+// Pos: screens/ 主交互界面，Ink React 组件树根节点
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { c as _c } from "react/compiler-runtime";
 import { feature } from 'bun:bundle';
