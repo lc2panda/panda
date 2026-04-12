@@ -227,7 +227,7 @@ function SetModelAndClose({
       onDone(message);
     }
     void handleModelChange();
-  }, [model, onDone, setAppState]);
+  }, [model, onDone, setAppState, isFastMode]);
   return null;
 }
 function isKnownAlias(model: string): boolean {
@@ -252,11 +252,13 @@ function ShowModelAndClose(t0) {
   const effortValue = useAppState(_temp9);
   const displayModel = renderModelLabel(mainLoopModel);
   const effortInfo = effortValue !== undefined ? ` (effort: ${effortValue})` : "";
-  if (mainLoopModelForSession) {
-    onDone(`Current model: ${chalk.bold(renderModelLabel(mainLoopModelForSession))} (session override from plan mode)\nBase model: ${displayModel}${effortInfo}`);
-  } else {
-    onDone(`Current model: ${displayModel}${effortInfo}`);
-  }
+  React.useEffect(() => {
+    if (mainLoopModelForSession) {
+      onDone(`Current model: ${chalk.bold(renderModelLabel(mainLoopModelForSession))} (session override from plan mode)\nBase model: ${displayModel}${effortInfo}`);
+    } else {
+      onDone(`Current model: ${displayModel}${effortInfo}`);
+    }
+  }, [onDone, mainLoopModel, mainLoopModelForSession, effortValue, displayModel, effortInfo]);
   return null;
 }
 function _temp9(s_1) {
