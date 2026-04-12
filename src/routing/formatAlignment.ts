@@ -247,11 +247,13 @@ export const openaiCompatAdapter: FormatAdapter = {
     //                   DeepSeek → prompt_cache_hit_tokens
     //                   Groq → input_tokens_details.cached_tokens
     //                   Kimi/GLM/MiniMax → cached_tokens (顶层)
+    //                   OpenRouter → cache_read_tokens (顶层)
     const cachedTokens =
       (promptDetails?.cached_tokens as number) ||
       (usage?.prompt_cache_hit_tokens as number) ||
       (inputDetails?.cached_tokens as number) ||
       (usage?.cached_tokens as number) ||
+      (usage?.cache_read_tokens as number) ||
       0
     const promptTokens = (usage?.prompt_tokens as number) ?? 0
     const cacheMissTokens = (usage?.prompt_cache_miss_tokens as number) ?? 0
@@ -259,6 +261,12 @@ export const openaiCompatAdapter: FormatAdapter = {
     const effectiveInputTokens = cacheMissTokens > 0
       ? cacheMissTokens
       : cachedTokens > 0 ? promptTokens - cachedTokens : promptTokens
+
+    // OpenRouter: cache_write_tokens 表示本次写入缓存的 token 数
+    const cacheWriteTokens =
+      (usage?.cache_write_tokens as number) ||
+      (usage?.cache_creation_tokens as number) ||
+      0
 
     return {
       id: r.id ?? `msg_${Date.now()}`,
@@ -270,7 +278,7 @@ export const openaiCompatAdapter: FormatAdapter = {
         input_tokens: effectiveInputTokens,
         output_tokens: usage?.completion_tokens ?? 0,
         cache_read_input_tokens: cachedTokens,
-        cache_creation_input_tokens: 0,
+        cache_creation_input_tokens: cacheWriteTokens,
       },
     }
   },
@@ -321,12 +329,18 @@ export const openaiCompatAdapter: FormatAdapter = {
         (streamUsage.prompt_cache_hit_tokens as number) ||
         (sInputDetails?.cached_tokens as number) ||
         (streamUsage.cached_tokens as number) ||
+        (streamUsage.cache_read_tokens as number) ||
         0
       const sPrompt = (streamUsage.prompt_tokens as number) ?? 0
       const sCacheMiss = (streamUsage.prompt_cache_miss_tokens as number) ?? 0
       const sEffectiveInput = sCacheMiss > 0
         ? sCacheMiss
         : sCached > 0 ? sPrompt - sCached : sPrompt
+      // OpenRouter: cache_write_tokens in streaming usage
+      const sCacheWrite =
+        (streamUsage.cache_write_tokens as number) ||
+        (streamUsage.cache_creation_tokens as number) ||
+        0
       return {
         type: 'message_delta',
         delta: { stop_reason: 'end_turn' },
@@ -334,7 +348,7 @@ export const openaiCompatAdapter: FormatAdapter = {
           input_tokens: sEffectiveInput,
           output_tokens: streamUsage.completion_tokens ?? 0,
           cache_read_input_tokens: sCached,
-          cache_creation_input_tokens: 0,
+          cache_creation_input_tokens: sCacheWrite,
         },
       }
     }
