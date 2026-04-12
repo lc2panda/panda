@@ -2013,8 +2013,9 @@ export function fsrsNextInterval(
 // ═══════════════════════════════════════════════════════════════════
 
 /**
- * 记录用户行为到 procedural/habits.md。
- * 追踪：活跃时段分布、常用工具、项目切换模式。
+ * 记录用户行为到 procedural/habits-log/YYYY-MM.jsonl（按月分片）。
+ * habits.md 只存聚合摘要，由 analyzeHabits() 写入。
+ * 超过 6 个月的分片自动清理。
  */
 export async function recordBehavior(
   action: string,
@@ -2023,109 +2024,152 @@ export async function recordBehavior(
   const memoryDir = getAutoMemPath()
   if (!memoryDir) return
 
-  const habitsPath = join(memoryDir, 'procedural', 'habits.md')
-  const entry = `- ${new Date().toISOString()}: ${action} (${Object.entries(context).map(([k, v]) => `${k}=${v}`).join(', ')})\n`
+  const logDir = join(memoryDir, 'procedural', 'habits-log')
+  const now = new Date()
+  const shard = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const entry = JSON.stringify({ ts: now.toISOString(), action, ...context }) + '\n'
 
   try {
-    await mkdir(join(memoryDir, 'procedural'), { recursive: true })
+    await mkdir(logDir, { recursive: true })
+    await appendFile(join(logDir, `${shard}.jsonl`), entry)
 
-    // 检查行数上限，超过500行截断保留最新300行
+    // 清理超过 6 个月的分片（惰性，每次写入时检查）
     try {
-      const stats = await stat(habitsPath)
-      if (stats.size > 100_000) {
-        const content = await readFile(habitsPath, 'utf-8')
-        const lines = content.split('\n')
-        if (lines.length > 500) {
-          const trimmed = lines.slice(-300).join('\n')
-          await writeFile(habitsPath, trimmed)
+      const cutoff = new Date(now.getFullYear(), now.getMonth() - 6, 1)
+      const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}`
+      for (const f of readdirSync(logDir)) {
+        if (f.endsWith('.jsonl') && f.slice(0, 7) < cutoffStr) {
+          unlinkSync(join(logDir, f))
         }
       }
-    } catch {} // 文件不存在时忽略
-
-    await appendFile(habitsPath, entry)
+    } catch {}
   } catch {}
 }
 
 /**
- * 分析行为模式——返回用户的活跃时段分布。
+ * 从 habits-log/*.jsonl 分片读取原始行为记录。
+ * 兼容旧版 habits.md 中的 markdown 格式条目。
  */
-export function analyzeHabits(memoryDir: string): { peakHours: number[]; avgSessionLength: number; topTools: [string, number][] } {
-  const habitsPath = join(memoryDir, 'procedural', 'habits.md')
-  const hourCounts: Record<number, number> = {}
+function loadHabitsTimestamps(memoryDir: string): number[] {
+  const timestamps: number[] = []
 
+  // 新格式：JSONL 分片（最近 3 个月）
+  const logDir = join(memoryDir, 'procedural', 'habits-log')
   try {
-    const content = readFileSync(habitsPath, 'utf-8')
-    const timeMatches = content.match(/\d{4}-\d{2}-\d{2}T(\d{2}):/g) || []
-    for (const m of timeMatches) {
-      const hour = parseInt(m.match(/T(\d{2})/)?.[1] || '0', 10)
-      hourCounts[hour] = (hourCounts[hour] || 0) + 1
+    if (existsSync(logDir)) {
+      for (const f of readdirSync(logDir).filter(f => f.endsWith('.jsonl')).sort().slice(-3)) {
+        const lines = readFileSync(join(logDir, f), 'utf-8').split('\n').filter(Boolean)
+        for (const line of lines) {
+          try {
+            const { ts } = JSON.parse(line) as { ts: string }
+            const t = new Date(ts).getTime()
+            if (!isNaN(t)) timestamps.push(t)
+          } catch {}
+        }
+      }
     }
   } catch {}
 
-  // 识别高频工作时段（前 3 名）
+  // 兼容旧格式：habits.md 中的 markdown 时间戳
+  if (timestamps.length === 0) {
+    try {
+      const habitsPath = join(memoryDir, 'procedural', 'habits.md')
+      const content = readFileSync(habitsPath, 'utf-8')
+      const matches = content.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/g) || []
+      for (const m of matches) {
+        const t = new Date(m).getTime()
+        if (!isNaN(t)) timestamps.push(t)
+      }
+    } catch {}
+  }
+
+  return timestamps.sort((a, b) => a - b)
+}
+
+/**
+ * 从 habits-log/*.jsonl 分片统计工具使用频率。
+ */
+function loadHabitsToolCounts(memoryDir: string): Record<string, number> {
+  const toolCounts: Record<string, number> = {}
+  const logDir = join(memoryDir, 'procedural', 'habits-log')
+  try {
+    if (existsSync(logDir)) {
+      for (const f of readdirSync(logDir).filter(f => f.endsWith('.jsonl')).sort().slice(-3)) {
+        const lines = readFileSync(join(logDir, f), 'utf-8').split('\n').filter(Boolean)
+        for (const line of lines) {
+          try {
+            const rec = JSON.parse(line) as { action?: string; tools?: string }
+            if (rec.action === 'tool_use' && rec.tools) {
+              for (const t of rec.tools.split(',').map(s => s.trim()).filter(Boolean)) {
+                toolCounts[t] = (toolCounts[t] || 0) + 1
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+  } catch {}
+
+  // 补充：episodes/working 目录（保持原逻辑）
+  for (const sub of ['episodes', 'working']) {
+    try {
+      const dir = join(memoryDir, sub)
+      if (existsSync(dir)) {
+        for (const f of readdirSync(dir).filter(f => f.endsWith('.md')).slice(-30)) {
+          const content = readFileSync(join(dir, f), 'utf-8')
+          const toolMatch = content.match(/tools?:\s*\[([^\]]*)\]/i)
+          if (toolMatch) {
+            toolMatch[1].split(',').map(t => t.trim().replace(/['"]/g, '')).filter(Boolean)
+              .forEach(t => { toolCounts[t] = (toolCounts[t] || 0) + 1 })
+          }
+        }
+      }
+    } catch {}
+  }
+
+  return toolCounts
+}
+
+/**
+ * 分析行为模式——返回用户的活跃时段分布。
+ * 数据源：procedural/habits-log/*.jsonl（按月分片），兼容旧版 habits.md。
+ */
+export function analyzeHabits(memoryDir: string): { peakHours: number[]; avgSessionLength: number; topTools: [string, number][] } {
+  // 时段分布
+  const timestamps = loadHabitsTimestamps(memoryDir)
+  const hourCounts: Record<number, number> = {}
+  for (const ts of timestamps) {
+    const hour = new Date(ts).getHours()
+    hourCounts[hour] = (hourCounts[hour] || 0) + 1
+  }
+
   const peakHours = Object.entries(hourCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
     .map(([h]) => parseInt(h, 10))
 
-  // 识别工具使用偏好
-  const toolCounts: Record<string, number> = {}
-  try {
-    const episodesDir = join(memoryDir, 'episodes')
-    if (existsSync(episodesDir)) {
-      for (const f of readdirSync(episodesDir).filter(f => f.endsWith('.md')).slice(-30)) {
-        const content = readFileSync(join(episodesDir, f), 'utf-8')
-        const toolMatch = content.match(/tools?:\s*\[([^\]]*)\]/i)
-        if (toolMatch) {
-          toolMatch[1].split(',').map(t => t.trim().replace(/['"]/g, '')).filter(Boolean)
-            .forEach(t => { toolCounts[t] = (toolCounts[t] || 0) + 1 })
-        }
-      }
-    }
-  } catch {}
-
-  // 扫描 working/ 目录提取工具名
-  try {
-    const workingDir = join(memoryDir, 'working')
-    if (existsSync(workingDir)) {
-      for (const f of readdirSync(workingDir).filter(f => f.endsWith('.md')).slice(-20)) {
-        const content = readFileSync(join(workingDir, f), 'utf-8')
-        const toolMatch = content.match(/tools?:\s*\[([^\]]*)\]/i)
-        if (toolMatch) {
-          toolMatch[1].split(',').map(t => t.trim().replace(/['"]/g, '')).filter(Boolean)
-            .forEach(t => { toolCounts[t] = (toolCounts[t] || 0) + 1 })
-        }
-      }
-    }
-  } catch {}
-
+  // 工具偏好
+  const toolCounts = loadHabitsToolCounts(memoryDir)
   const topTools: [string, number][] = Object.entries(toolCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
 
-  // 估算平均连续工作时长（基于时间戳间隔）
+  // 会话时长估算
   let avgSessionLength = 0
-  try {
-    const content = readFileSync(habitsPath, 'utf-8')
-    const timestamps = (content.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/g) || [])
-      .map(t => new Date(t).getTime())
-      .filter(t => !isNaN(t))
-      .sort((a, b) => a - b)
-    if (timestamps.length >= 2) {
-      const sessions: number[] = []
-      let sessionStart = timestamps[0]
-      for (let i = 1; i < timestamps.length; i++) {
-        const gap = timestamps[i] - timestamps[i - 1]
-        if (gap > 2 * 60 * 60 * 1000) { // 2小时间隔视为新 session
-          sessions.push(timestamps[i - 1] - sessionStart)
-          sessionStart = timestamps[i]
-        }
-      }
-      sessions.push(timestamps[timestamps.length - 1] - sessionStart)
-      const validSessions = sessions.filter(s => s > 0)
-      if (validSessions.length > 0) {
-        avgSessionLength = validSessions.reduce((a, b) => a + b, 0) / validSessions.length / 3600000
+  if (timestamps.length >= 2) {
+    const sessions: number[] = []
+    let sessionStart = timestamps[0]
+    for (let i = 1; i < timestamps.length; i++) {
+      const gap = timestamps[i] - timestamps[i - 1]
+      if (gap > 2 * 60 * 60 * 1000) {
+        sessions.push(timestamps[i - 1] - sessionStart)
+        sessionStart = timestamps[i]
       }
     }
-  } catch {}
+    sessions.push(timestamps[timestamps.length - 1] - sessionStart)
+    const validSessions = sessions.filter(s => s > 0)
+    if (validSessions.length > 0) {
+      avgSessionLength = validSessions.reduce((a, b) => a + b, 0) / validSessions.length / 3600000
+    }
+  }
 
   // 写入结构化 habits.md（覆盖写入）
   try {
