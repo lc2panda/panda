@@ -172,8 +172,9 @@ export function pushNotification(notification: PandaNotification): void {
       } else if (platform === 'win32') {
         // Windows: PowerShell BurntToast（使用 execFileSync 避免命令注入）
         try {
-          const safeTitle = notification.title.replace(/"/g, '\\"')
-          const safeBody = notification.body.replace(/"/g, '\\"')
+          const escapePS = (s: string) => s.replace(/`/g, '``').replace(/\$/g, '`$').replace(/"/g, '`"')
+          const safeTitle = escapePS(notification.title)
+          const safeBody = escapePS(notification.body)
           execFileSync('powershell', ['-c',
             `New-BurntToastNotification -Text "Panda: ${safeTitle}","${safeBody}"`
           ], { timeout: 5000 })
