@@ -4,6 +4,7 @@ import { BLACK_CIRCLE } from '../constants/figures.js';
 import { useBlink } from '../hooks/useBlink.js';
 import { Box, Text } from '../ink.js';
 import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from './MatrixTheme/matrixPalette.js';
 type Props = {
   isError: boolean;
   isUnresolved: boolean;
@@ -17,7 +18,7 @@ export function ToolUseLoader(t0) {
     shouldAnimate
   } = t0;
   const [ref, isBlinking] = useBlink(shouldAnimate);
-  const matrixGreen = isMatrixTheme() ? '#00ff41' : undefined;
+  const matrixGreen = isMatrixTheme() ? MATRIX_UI.toolLoader : undefined;
   const color = isUnresolved ? matrixGreen : isError ? "error" : (matrixGreen ?? "success");
   const t1 = !shouldAnimate || isBlinking || isError || !isUnresolved ? BLACK_CIRCLE : " ";
   let t2;
