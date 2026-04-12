@@ -14,6 +14,26 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 
+// v2.12.1 hotfix: 静态 ESM import 替代 require('./tasks/xxx.js')
+// 根因：Bun bundler 看不到运行时 require 的相对路径字符串，导致 dist 里
+// 所有 15 个场景模块全部加载失败（静默 catch 吞异常 → 空数组），
+// BUILTIN_TASKS 从 103 缩水到 13。改为静态 import 让 bundler 正确 resolve。
+import { getSystemHealthTasks } from './tasks/systemHealth.js'
+import { getPersonalLifeTasks } from './tasks/personalLife.js'
+import { getDevTasks } from './tasks/devScenarios.js'
+import { getFileTasks } from './tasks/fileScenarios.js'
+import { getSecurityTasks } from './tasks/securityScenarios.js'
+import { getEfficiencyTasks } from './tasks/efficiencyScenarios.js'
+import { getAdvancedSystemTasks } from './tasks/advancedSystem.js'
+import { getAdvancedFileTasks } from './tasks/advancedFiles.js'
+import { getCommunicationTasks } from './tasks/communicationScenarios.js'
+import { getExtendedTasks } from './tasks/extendedScenarios.js'
+import { getKnowledgeTasks } from './tasks/knowledgeScenarios.js'
+import { getLifestyleTasks } from './tasks/lifestyleScenarios.js'
+import { getNotificationTasks } from './tasks/notificationScenarios.js'
+import { getIMTasks } from './tasks/imScenarios.js'
+import { getWechatSituationalTasks } from './tasks/wechatSituational.js'
+
 const HOME = homedir()
 
 function canRun(): boolean {
@@ -509,46 +529,44 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
 
 function loadScenarioModules(): SmartCronTask[] {
   const extra: SmartCronTask[] = []
-  // 每个模块独立 try/catch，单个模块加载失败不影响其他
-  const modules = [
+  // v2.12.1 hotfix: 改用静态 ESM import 直接调 getter（不再 require 相对路径字符串）
+  // 根因：运行时 require('./tasks/xxx.js') 的相对路径 Bun bundler 不会解析，
+  // dist 里 15 个模块全部加载失败 → BUILTIN_TASKS 缩水到 13。
+  const modules: Array<{ name: string; getter: () => SmartCronTask[] }> = [
     // Phase 1
-    { path: './tasks/systemHealth.js', getter: 'getSystemHealthTasks' },
-    { path: './tasks/personalLife.js', getter: 'getPersonalLifeTasks' },
-    { path: './tasks/devScenarios.js', getter: 'getDevTasks' },
-    { path: './tasks/fileScenarios.js', getter: 'getFileTasks' },
+    { name: 'systemHealth', getter: getSystemHealthTasks },
+    { name: 'personalLife', getter: getPersonalLifeTasks },
+    { name: 'devScenarios', getter: getDevTasks },
+    { name: 'fileScenarios', getter: getFileTasks },
     // Phase 2
-    { path: './tasks/securityScenarios.js', getter: 'getSecurityTasks' },
-    { path: './tasks/efficiencyScenarios.js', getter: 'getEfficiencyTasks' },
+    { name: 'securityScenarios', getter: getSecurityTasks },
+    { name: 'efficiencyScenarios', getter: getEfficiencyTasks },
     // Phase 3
-    { path: './tasks/advancedSystem.js', getter: 'getAdvancedSystemTasks' },
-    { path: './tasks/advancedFiles.js', getter: 'getAdvancedFileTasks' },
+    { name: 'advancedSystem', getter: getAdvancedSystemTasks },
+    { name: 'advancedFiles', getter: getAdvancedFileTasks },
     // Phase 4
-    { path: './tasks/communicationScenarios.js', getter: 'getCommunicationTasks' },
-    { path: './tasks/extendedScenarios.js', getter: 'getExtendedTasks' },
-    { path: './tasks/knowledgeScenarios.js', getter: 'getKnowledgeTasks' },
-    { path: './tasks/lifestyleScenarios.js', getter: 'getLifestyleTasks' },
+    { name: 'communicationScenarios', getter: getCommunicationTasks },
+    { name: 'extendedScenarios', getter: getExtendedTasks },
+    { name: 'knowledgeScenarios', getter: getKnowledgeTasks },
+    { name: 'lifestyleScenarios', getter: getLifestyleTasks },
     // Phase 5: 通知感知
-    { path: './tasks/notificationScenarios.js', getter: 'getNotificationTasks' },
+    { name: 'notificationScenarios', getter: getNotificationTasks },
     // Phase 6: IM 聚合
-    { path: './tasks/imScenarios.js', getter: 'getIMTasks' },
+    { name: 'imScenarios', getter: getIMTasks },
     // Phase 7: 微信态势感知
-    { path: './tasks/wechatSituational.js', getter: 'getWechatSituationalTasks' },
+    { name: 'wechatSituational', getter: getWechatSituationalTasks },
   ]
-  for (const { path, getter } of modules) {
+  for (const { name, getter } of modules) {
     try {
-      const mod = require(path) as Record<string, unknown>
-      if (typeof mod?.[getter] === 'function') {
-        const tasks = (mod[getter] as () => SmartCronTask[])()
-        if (Array.isArray(tasks)) {
-          extra.push(...tasks)
-        }
-      } else {
-        logForDebugging(`[builtinTasks] 场景模块 ${path} 未导出 ${getter}`)
+      const tasks = getter()
+      if (Array.isArray(tasks)) {
+        extra.push(...tasks)
       }
     } catch (e) {
-      logForDebugging(`[builtinTasks] 场景模块 ${path} 加载失败: ${(e as Error).message}`)
+      logForDebugging(`[builtinTasks] 场景模块 ${name} 加载失败: ${(e as Error).message}`)
     }
   }
+  logForDebugging(`[builtinTasks] 场景模块加载完成：${extra.length} 个扩展任务`)
   return extra
 }
 
