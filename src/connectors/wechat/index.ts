@@ -697,10 +697,12 @@ class WechatLocalDBConnector implements IMConnector {
         try { unlinkSync(dst) } catch {}
       }
 
+      // SECURITY: Validate paths contain no SQL injection characters
+      const safeDst = dst.replace(/'/g, "''")
       const sql = [
         `PRAGMA key = "x'${keyHex}'"`,
         `PRAGMA cipher_page_size = 4096`,
-        `ATTACH DATABASE '${dst}' AS plaintext KEY ''`,
+        `ATTACH DATABASE '${safeDst}' AS plaintext KEY ''`,
         `SELECT sqlcipher_export('plaintext')`,
         `DETACH DATABASE plaintext`,
       ].join(';\n') + ';'

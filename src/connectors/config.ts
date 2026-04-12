@@ -109,6 +109,13 @@ export async function resolveSecret(value: string): Promise<string> {
   if (!value.startsWith('keychain:')) return value
 
   const key = value.slice('keychain:'.length)
+
+  // SECURITY: Strict key validation to prevent shell/command injection
+  if (!/^[\w.\-/]+$/.test(key)) {
+    logForDebugging(`[connectors/config] Keychain key 包含非法字符，已拒绝: ${key}`)
+    return ''
+  }
+
   try {
     const plat = osPlatform()
 
