@@ -134,14 +134,17 @@ export function validateRoutingConfig(
     }
   }
 
-  // ── 3. Check active preset exists ────────────────────────
-  if (settings.activePreset && settings.presets && !settings.presets[settings.activePreset]) {
-    errors.push({
-      code: 'UNKNOWN_PRESET_REF',
-      message: `Active preset "${settings.activePreset}" is not defined in routingPresets`,
-      path: 'activeRoutingPreset',
-      suggestion: `Define the preset in routingPresets or use one of: ${Object.keys(settings.presets).join(', ')}`,
-    })
+  // ── 3. Check active preset exists (both custom and builtin) ─
+  if (settings.activePreset && settings.presets) {
+    const { getPreset } = require('./presets.js') as typeof import('./presets.js')
+    if (!settings.presets[settings.activePreset] && !getPreset(settings.activePreset)) {
+      errors.push({
+        code: 'UNKNOWN_PRESET_REF',
+        message: `Active preset "${settings.activePreset}" is not defined in routingPresets or builtin presets`,
+        path: 'activeRoutingPreset',
+        suggestion: `Define the preset in routingPresets or use one of the builtins: quality, balanced, cost-saving, multi-provider`,
+      })
+    }
   }
 
   // ── 4. Validate capability scores in modelRegistry ───────
