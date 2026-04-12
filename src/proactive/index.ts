@@ -39,6 +39,13 @@ export function activateProactive(_source?: string): void {
     registerTask(task)
   }
   _notifySubscribers()
+  // P1-2 启动补跑：扫描 task-exec-history，对今天该跑但未跑的"安全清单"task
+  // 立即补跑一次。fire-and-forget，不 await，不影响 activateProactive 同步签名。
+  try {
+    void import('./catchupRunner.js')
+      .then(({ runCatchup }) => runCatchup(BUILTIN_TASKS).catch(() => {}))
+      .catch(() => {})
+  } catch {}
 }
 
 export function deactivateProactive(): void {

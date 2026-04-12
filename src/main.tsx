@@ -916,6 +916,12 @@ async function run(): Promise<CommanderCommand> {
       rotateAuditLog();
     } catch {}
 
+    // Wave 7 P0-2 通知 catchup：outbox 24h 未读通知的显示由被动层
+    // _checkPendingNotifications 自动触发（每轮对话末尾），它已通过
+    // notificationCatchup.loadUnseenNotifications 读取 + markNotificationsSeen
+    // 持久化去重。main.tsx 不需要显式调 getCatchupMessage，避免双重消费。
+    // 用户发第一条消息后，被动层会在 stopHooks 处自动 inject 未读通知卡片。
+
     // process.title on Windows sets the console title directly; on POSIX,
     // terminal shell integration may mirror the process name to the tab.
     // After init() so settings.json env can also gate this (gh-4765).

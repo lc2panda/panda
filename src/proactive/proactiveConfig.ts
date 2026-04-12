@@ -147,12 +147,85 @@ const HIGH_PRIVACY_SCENARIOS = new Set([
   'wechat-topic-tracker',
 ])
 
+/**
+ * P1-1 保守安全默认清单 — 仅系统监控 / 文件整理 / 开发者提醒 / 安全告警，
+ * 这些场景默认启用，不涉及用户私人通讯 / 健康 / 财务数据。
+ *
+ * 所有 id 必须与 src/proactive/tasks/*.ts 中的真实 task id 对齐（已核对）。
+ */
+const DEFAULT_ON_SAFE_SCENARIOS = new Set<string>([
+  // systemHealth.ts — 系统健康
+  'disk-space-alert',
+  'memory-pressure-alert',
+  'network-anomaly',
+  // devScenarios.ts — 开发者提醒
+  'dependency-audit',
+  'ci-failure-alert',
+  'git-stale-branches',
+  'git-upstream-changes',
+  // fileScenarios.ts — 文件整理
+  'downloads-clutter',
+  // efficiencyScenarios.ts — 效率关怀
+  'no-break-reminder',
+  // personalLife.ts — 生活关怀
+  'late-night-care',
+  // securityScenarios.ts — 安全告警
+  'ssl-cert-expiry',
+])
+
+/**
+ * P1-1 场景启用判定（倒置为"保守默认"策略）：
+ *
+ * 1. 用户 config 显式值永远优先（true/false 都生效）；
+ * 2. 高敏场景：默认 false（隐私铁律）；
+ * 3. 安全清单场景：默认 true；
+ * 4. 其余未明确场景：默认 false（保守，防止 91 个场景一起刷屏）。
+ */
 export function isScenarioEnabled(scenarioId: string): boolean {
   const config = getProactiveConfig()
-  if (HIGH_PRIVACY_SCENARIOS.has(scenarioId)) {
-    // 高敏场景：必须用户在 proactive.json 中显式设为 true 才启用
+
+  // 用户 config 显式值优先
+  if (scenarioId in config.enabledScenarios) {
     return config.enabledScenarios[scenarioId] === true
   }
-  // 其他场景：默认开启，用户可设为 false 关闭
-  return config.enabledScenarios[scenarioId] !== false
+
+  // 高敏场景默认关
+  if (HIGH_PRIVACY_SCENARIOS.has(scenarioId)) return false
+
+  // 保守安全清单默认开
+  if (DEFAULT_ON_SAFE_SCENARIOS.has(scenarioId)) return true
+
+  // 其他场景默认关（保守）
+  return false
+}
+
+/**
+ * P1-1 暴露安全清单给 status 面板（Xi）使用。
+ */
+export function getDefaultOnScenarios(): string[] {
+  return Array.from(DEFAULT_ON_SAFE_SCENARIOS)
+}
+
+/**
+ * P1-1 场景统计汇总，供 status 面板展示。
+ */
+export function getAllScenarioStats(): {
+  safe: number
+  highPrivacy: number
+  userOptIn: number
+  userOptOut: number
+} {
+  const config = getProactiveConfig()
+  let userOptIn = 0
+  let userOptOut = 0
+  for (const v of Object.values(config.enabledScenarios)) {
+    if (v === true) userOptIn++
+    else if (v === false) userOptOut++
+  }
+  return {
+    safe: DEFAULT_ON_SAFE_SCENARIOS.size,
+    highPrivacy: HIGH_PRIVACY_SCENARIOS.size,
+    userOptIn,
+    userOptOut,
+  }
 }
