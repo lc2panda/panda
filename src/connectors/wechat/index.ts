@@ -71,11 +71,20 @@ class WecomAPIConnector implements IMConnector {
 
   private async refreshToken(): Promise<void> {
     const url = `https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${this.config!.corpId}&corpsecret=${this.config!.appSecret}`
-    const resp = await fetch(url)
-    const data = await resp.json() as any
-    if (data.errcode !== 0) throw new Error(`企微 token 获取失败: ${data.errmsg}`)
-    this.accessToken = data.access_token
-    this.tokenExpiry = Date.now() + (data.expires_in || 7200) * 1000
+    try {
+      const resp = await fetch(url)
+      const data = await resp.json() as any
+      if (data.errcode !== 0) throw new Error(`企微 token 获取失败: ${data.errmsg}`)
+      this.accessToken = data.access_token
+      this.tokenExpiry = Date.now() + (data.expires_in || 7200) * 1000
+    } catch (e) {
+      // 不在错误信息中暴露含凭证的 URL
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('corpid') || msg.includes('corpsecret')) {
+        throw new Error('企微 token 获取失败: 网络或凭证错误')
+      }
+      throw e
+    }
   }
 
   async getMessages(opts: MessageQuery): Promise<IMMessage[]> {
@@ -674,6 +683,7 @@ class WechatLocalDBConnector implements IMConnector {
   /** 用 sqlcipher CLI 解密单个 DB 到明文 */
   private _decryptOne(src: string, dst: string, keyHex: string): boolean {
     if (!this.sqlcipherPath) return false
+    if (!/^[0-9a-fA-F]+$/.test(keyHex)) throw new Error('Invalid hex key: contains non-hex characters')
     try {
       const { execSync } = require('child_process')
       const { unlinkSync, existsSync } = require('fs')

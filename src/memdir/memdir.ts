@@ -2203,6 +2203,7 @@ ${toolLines}
 ## 行为模式
 - 连续工作时长: 平均 ${avgStr}
 `
+    const habitsPath = join(memoryDir, 'procedural', 'habits.md')
     writeFileSync(habitsPath, habitsContent)
   } catch {}
 
