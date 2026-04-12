@@ -4,6 +4,7 @@
 
 import { pushNotification } from '../../assistant/sense.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
+import { localDateStr } from '../../utils/date.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { IS_MAC, IS_WIN, HOME } from '../platform.js'
 
@@ -563,7 +564,7 @@ const emailDailyDigest: SmartCronTask = {
         const memDir = getAutoMemPath()
         const workingDir = join(memDir, 'working')
         await mkdir(workingDir, { recursive: true })
-        const dateStr = new Date().toISOString().split('T')[0]
+        const dateStr = localDateStr()
         const summary = [
           `# 邮件日报 — ${dateStr}`,
           '',

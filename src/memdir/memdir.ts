@@ -20,6 +20,7 @@ import {
 } from '../services/analytics/index.js'
 import { GREP_TOOL_NAME } from '../tools/GrepTool/prompt.js'
 import { isReplModeEnabled } from '../tools/REPLTool/constants.js'
+import { localDateStr } from '../utils/date.js'
 import { logForDebugging } from '../utils/debug.js'
 import { hasEmbeddedSearchTools } from '../utils/embeddedTools.js'
 import { isEnvTruthy } from '../utils/envUtils.js'
@@ -351,7 +352,7 @@ export function saveProspectiveMemory(content: string): void {
     if (!memDir) return
     const dir = join(memDir, 'dreams', 'prospective')
     mkdirSync(dir, { recursive: true })
-    const date = new Date().toISOString().split('T')[0]
+    const date = localDateStr()
     const filePath = join(dir, `${date}.md`)
 
     // 读取 habits.md 生成行为预测
@@ -1031,7 +1032,7 @@ function _detectWorkPattern(): { hour: number; dateStr: string } {
   const now = new Date()
   return {
     hour: now.getHours(),
-    dateStr: now.toISOString().slice(0, 10),
+    dateStr: localDateStr(now),
   }
 }
 
@@ -1447,7 +1448,7 @@ export async function generateMorningBrief(): Promise<void> {
   const memoryDir = getAutoMemPath()
   if (!memoryDir) return
 
-  const dateStr = new Date().toISOString().split('T')[0]
+  const dateStr = localDateStr()
   const briefPath = join(memoryDir, 'working', `morning_brief_${dateStr}.md`)
 
   // 避免重复生成
@@ -1479,7 +1480,7 @@ export async function generateMorningBrief(): Promise<void> {
   } catch {}
 
   // 昨日 dream 报告
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  const yesterday = localDateStr(new Date(Date.now() - 86400000))
   const dreamPath = join(memoryDir, 'dreams', `${yesterday}.md`)
   try {
     const dream = await readFile(dreamPath, 'utf-8')
@@ -1860,7 +1861,7 @@ export async function captureClipboard(): Promise<string | null> {
     const dataDir = join(homedir(), '.pandacc', 'data', 'clipboard')
     await mkdir(dataDir, { recursive: true })
 
-    const dateStr = new Date().toISOString().split('T')[0]
+    const dateStr = localDateStr()
     const logPath = join(dataDir, `${dateStr}.jsonl`)
     const entry = JSON.stringify({ time: new Date().toISOString(), content: content.slice(0, 500) })
     await appendFile(logPath, entry + '\n')
@@ -2115,7 +2116,7 @@ export function analyzeHabits(memoryDir: string): { peakHours: number[]; avgSess
   try {
     const proceduralDir = join(memoryDir, 'procedural')
     mkdirSync(proceduralDir, { recursive: true })
-    const now = new Date().toISOString().slice(0, 10)
+    const now = localDateStr()
     const peakHoursStr = peakHours.map(h => `${h}:00`).join(', ') || '暂无数据'
     const toolLines = topTools.length > 0
       ? topTools.map(([name, count], i) => `${i + 1}. ${name} (${count}次)`).join('\n')

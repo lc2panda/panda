@@ -4,6 +4,7 @@
 
 import { pushNotification } from '../../assistant/sense.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
+import { localDateStr } from '../../utils/date.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { IS_MAC, IS_WIN, HOME } from '../platform.js'
 
@@ -382,7 +383,7 @@ const habitTracker: SmartCronTask = {
 
       if (!Array.isArray(habits) || habits.length === 0) return
 
-      const today = new Date().toISOString().split('T')[0]
+      const today = localDateStr()
       const todayDataPath = join(HOME, '.pandacc', 'data', 'habits', `${today}.json`)
 
       let completed: Record<string, boolean> = {}
@@ -516,7 +517,7 @@ const apiRateLimit: SmartCronTask = {
       }
 
       // 读取今日使用统计
-      const today = new Date().toISOString().split('T')[0]
+      const today = localDateStr()
       let totalTokens = 0
 
       try {

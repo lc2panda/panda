@@ -23,6 +23,7 @@ import {
   createMemorySavedMessage,
 } from '../../utils/messages.js'
 import type { Message } from '../../types/message.js'
+import { localDateStr } from '../../utils/date.js'
 import { logForDebugging } from '../../utils/debug.js'
 import type { ToolUseContext } from '../../Tool.js'
 import { logEvent } from '../analytics/index.js'
@@ -247,7 +248,7 @@ ${sessionIds.map(id => `- ${id}`).join('\n')}`
         if (dreamReport) {
           const dreamsDir = join(memoryRoot, 'dreams')
           await mkdir(dreamsDir, { recursive: true })
-          const dateStr = new Date().toISOString().split('T')[0]
+          const dateStr = localDateStr()
           await writeFile(join(dreamsDir, `${dateStr}.md`), dreamReport, 'utf-8')
         }
       } catch (e) {
@@ -341,7 +342,7 @@ function makeDreamProgressWatcher(
 async function generateDeepDreamReport(memoryDir: string): Promise<string | null> {
   const { scanMdFiles, decayAndPruneMemories, readBrowserHistory, readAppleNotes, captureClipboard } = await import('../../memdir/memdir.js')
 
-  const dateStr = new Date().toISOString().split('T')[0]
+  const dateStr = localDateStr()
   const sections: string[] = [`# DeepDream Report — ${dateStr}\n`]
 
   // Phase 1: Harvest — 扫描当日数据 + 数据连接器

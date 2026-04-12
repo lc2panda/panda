@@ -4,6 +4,7 @@
 
 import { pushNotification } from '../../assistant/sense.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
+import { localDateStr } from '../../utils/date.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { getUserIdleSeconds, HOME } from '../platform.js'
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'fs'
@@ -183,8 +184,8 @@ const weeklyReport: SmartCronTask = {
 
       // 当前日期
       const now = new Date()
-      const dateStr = now.toISOString().slice(0, 10)
-      const weekStart = new Date(now.getTime() - 5 * 86400000).toISOString().slice(0, 10)
+      const dateStr = localDateStr(now)
+      const weekStart = localDateStr(new Date(now.getTime() - 5 * 86400000))
 
       // 生成 Markdown 周报
       const report = [

@@ -371,7 +371,7 @@ export const getUserContext = memoize(
         const { getAutoMemPath } = require('./memdir/paths.js')
         const memDir = getAutoMemPath()
         if (memDir) {
-          const today = new Date().toISOString().split('T')[0]
+          const today = getLocalISODate()
           const briefPath = join(memDir, 'working', `morning_brief_${today}.md`)
           if (existsSync(briefPath)) {
             const brief = readFileSync(briefPath, 'utf-8').slice(0, 1000)
