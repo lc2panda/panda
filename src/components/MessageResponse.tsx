@@ -4,6 +4,7 @@ import { useContext } from 'react';
 import { Box, NoSelect, Text } from '../ink.js';
 import { Ratchet } from './design-system/Ratchet.js';
 import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from './MatrixTheme/matrixPalette.js';
 type Props = {
   children: React.ReactNode;
   height?: number;
@@ -21,7 +22,7 @@ export function MessageResponse(t0) {
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
     t1 = isMatrixTheme()
-      ? <NoSelect fromLeftEdge={true} flexShrink={0}><Text color="#006420">{"  "}╎  </Text></NoSelect>
+      ? <NoSelect fromLeftEdge={true} flexShrink={0}><Text color={MATRIX_UI.gutter}>{"  "}╎  </Text></NoSelect>
       : <NoSelect fromLeftEdge={true} flexShrink={0}><Text dimColor={true}>{"  "}⎿  </Text></NoSelect>;
     $[0] = t1;
   } else {

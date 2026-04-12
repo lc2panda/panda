@@ -3,6 +3,7 @@ import * as React from 'react';
 import { Box, Text, useTheme } from '../../ink.js';
 import { getTheme, type Theme } from '../../utils/theme.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 import { getDefaultCharacters, interpolateColor, parseRGB, toRGBColor } from './utils.js';
 const DEFAULT_CHARACTERS = getDefaultCharacters();
 const SPINNER_FRAMES = [...DEFAULT_CHARACTERS, ...[...DEFAULT_CHARACTERS].reverse()];
@@ -10,7 +11,7 @@ const SPINNER_FRAMES = [...DEFAULT_CHARACTERS, ...[...DEFAULT_CHARACTERS].revers
 // monotonically fill 1→8 dots so the spinner reads like a progress bar
 // sweeping across the glyph. Used only when PANDA_THEME=matrix.
 const MATRIX_SPINNER_FRAMES = ['⠁', '⠃', '⠇', '⡇', '⡏', '⡟', '⡿', '⣿', '⣾', '⣼', '⣸', '⣰', '⣠', '⣀'];
-const MATRIX_GREEN = '#00ff41';
+const MATRIX_GREEN = MATRIX_UI.spinner;
 const REDUCED_MOTION_DOT = '●';
 const REDUCED_MOTION_CYCLE_MS = 2000; // 2-second cycle: 1s visible, 1s dim
 const ERROR_RED = {

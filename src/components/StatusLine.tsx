@@ -27,6 +27,7 @@ import { getCurrentSessionTitle } from '../utils/sessionStorage.js';
 import { doesMostRecentAssistantMessageExceed200k, getCurrentUsage } from '../utils/tokens.js';
 import { getCurrentWorktreeSession } from '../utils/worktree.js';
 import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from './MatrixTheme/matrixPalette.js';
 import { isVimModeEnabled } from './PromptInput/utils.js';
 export function statusLineShouldDisplay(settings: ReadonlySettings): boolean {
   // Assistant mode: statusline fields (model, permission mode, cwd) reflect the
@@ -340,7 +341,7 @@ function StatusLineInner({
   // Matrix theme: green text, no extra border (双线框太重，占行且视觉噪音)
   if (isMatrixTheme()) {
     return <Box paddingX={paddingX} gap={2}>
-        {statusLineText ? <Text color="#006420" wrap="truncate">
+        {statusLineText ? <Text color={MATRIX_UI.statusLine} wrap="truncate">
             <Ansi>{statusLineText}</Ansi>
           </Text> : isFullscreenEnvEnabled() ? <Text> </Text> : null}
       </Box>;

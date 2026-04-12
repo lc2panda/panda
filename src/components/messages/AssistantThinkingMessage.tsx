@@ -6,6 +6,7 @@ import { CtrlOToExpand } from '../CtrlOToExpand.js';
 import { Markdown } from '../Markdown.js';
 import { isZh } from '../../utils/i18n.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 type Props = {
   // Accept either full ThinkingBlock/ThinkingBlockParam or a minimal shape with just type and thinking
   param: ThinkingBlock | ThinkingBlockParam | {
@@ -43,7 +44,7 @@ export function AssistantThinkingMessage(t0) {
     const t4 = addMargin ? 1 : 0;
     let t5;
     if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-      t5 = <Text dimColor={true} italic={true} color={isMatrixTheme() ? '#00ff41' : undefined}>{isZh() ? "\u2234 思考中" : "\u2234 Thinking"} <CtrlOToExpand /></Text>;
+      t5 = <Text dimColor={true} italic={true} color={isMatrixTheme() ? MATRIX_UI.thinking : undefined}>{isZh() ? "\u2234 思考中" : "\u2234 Thinking"} <CtrlOToExpand /></Text>;
       $[0] = t5;
     } else {
       t5 = $[0];
@@ -62,14 +63,14 @@ export function AssistantThinkingMessage(t0) {
   const displayThinking = verbose ? thinking : (thinking.length > 200 ? thinking.slice(0, 200) + (isZh() ? '…\n\n_Ctrl+O 展开完整思考_' : '…\n\n_Ctrl+O to expand full thinking_') : thinking);
   let t5;
   if ($[3] === Symbol.for("react.memo_cache_sentinel")) {
-    t5 = <Text dimColor={true} italic={true} color={isMatrixTheme() ? '#00ff41' : undefined}>{isZh() ? "\u2234 思考中" : "\u2234 Thinking"}…</Text>;
+    t5 = <Text dimColor={true} italic={true} color={isMatrixTheme() ? MATRIX_UI.thinking : undefined}>{isZh() ? "\u2234 思考中" : "\u2234 Thinking"}…</Text>;
     $[3] = t5;
   } else {
     t5 = $[3];
   }
   let t6;
   if ($[4] !== displayThinking) {
-    t6 = <Box paddingLeft={2}><Markdown dimColor={true} color={isMatrixTheme() ? '#006420' : undefined}>{displayThinking}</Markdown></Box>;
+    t6 = <Box paddingLeft={2}><Markdown dimColor={true} color={isMatrixTheme() ? MATRIX_UI.thinkingBody : undefined}>{displayThinking}</Markdown></Box>;
     $[4] = displayThinking;
     $[5] = t6;
   } else {
