@@ -216,6 +216,7 @@ type State = {
   // Lets tests assert recovery paths fired without inspecting message contents.
   transition: Continue | undefined
   completionGuardCount: number
+  antiSlopCount: number
 }
 
 export async function* query(
@@ -279,6 +280,7 @@ async function* queryLoop(
     pendingToolUseSummary: undefined,
     transition: undefined,
     completionGuardCount: 0,
+    antiSlopCount: 0,
   }
   const budgetTracker = feature('TOKEN_BUDGET') ? createBudgetTracker() : null
 
@@ -322,6 +324,7 @@ async function* queryLoop(
       stopHookActive,
       turnCount,
       completionGuardCount,
+      antiSlopCount,
     } = state
 
     // Skill discovery prefetch — per-iteration (uses findWritePivot guard
@@ -1160,6 +1163,7 @@ async function* queryLoop(
               stopHookActive: undefined,
               turnCount,
               completionGuardCount,
+              antiSlopCount,
               transition: {
                 reason: 'collapse_drain_retry',
                 committed: drained.committed,
@@ -1214,6 +1218,7 @@ async function* queryLoop(
             stopHookActive: undefined,
             turnCount,
             completionGuardCount,
+            antiSlopCount,
             transition: { reason: 'reactive_compact_retry' },
           }
           state = next
@@ -1270,6 +1275,7 @@ async function* queryLoop(
             stopHookActive: undefined,
             turnCount,
             completionGuardCount,
+            antiSlopCount,
             transition: { reason: 'max_output_tokens_escalate' },
           }
           state = next
@@ -1299,6 +1305,7 @@ async function* queryLoop(
             stopHookActive: undefined,
             turnCount,
             completionGuardCount,
+            antiSlopCount,
             transition: {
               reason: 'max_output_tokens_recovery',
               attempt: maxOutputTokensRecoveryCount + 1,
@@ -1342,6 +1349,7 @@ async function* queryLoop(
             stopHookActive: undefined,
             turnCount,
             completionGuardCount: completionGuardCount + 1,
+            antiSlopCount,
             transition: { reason: 'completion_guard' },
           }
           state = next
@@ -1351,8 +1359,8 @@ async function* queryLoop(
 
       // Anti-Slop 审查：检测 AI 输出中的废话/重复
       const slopResult = checkAntiSlop(assistantMessages)
-      if (slopResult) {
-        logForDebugging('Anti-Slop triggered — requesting concise response')
+      if (slopResult && antiSlopCount < 2) {
+        logForDebugging(`Anti-Slop triggered (${antiSlopCount + 1}/2) — requesting concise response`)
         state = {
           messages: [...messagesForQuery, ...assistantMessages, slopResult],
           toolUseContext,
@@ -1364,6 +1372,7 @@ async function* queryLoop(
           stopHookActive: undefined,
           turnCount,
           completionGuardCount,
+          antiSlopCount: antiSlopCount + 1,
           transition: { reason: 'anti_slop' as any },
         }
         continue
@@ -1414,6 +1423,7 @@ async function* queryLoop(
           stopHookActive: true,
           turnCount,
           completionGuardCount,
+          antiSlopCount,
           transition: { reason: 'stop_hook_blocking' },
         }
         state = next
@@ -1451,6 +1461,7 @@ async function* queryLoop(
             stopHookActive: undefined,
             turnCount,
             completionGuardCount,
+            antiSlopCount,
             transition: { reason: 'token_budget_continuation' },
           }
           continue
@@ -1839,6 +1850,7 @@ async function* queryLoop(
       maxOutputTokensOverride: undefined,
       stopHookActive,
       completionGuardCount,
+      antiSlopCount,
       transition: { reason: 'next_turn' },
     }
     state = next
@@ -1880,7 +1892,7 @@ function checkCompletionGuard(
 
   // 检查是否包含完成声明关键词
   const completionPatterns = [
-    /已[全部]*完成/,
+    /已(?:全部)?完成/,
     /任务完成/,
     /全部.*完成/,
     /all.*(?:done|completed|finished)/i,
@@ -1899,7 +1911,7 @@ function checkCompletionGuard(
   const hasOpenTodoFindings = sentences.some((s: string) => {
     const hasTodo = /\b(TODO|FIXME|HACK)\b/i.test(s)
     if (!hasTodo) return false
-    const isResolved = /已[全部全]*[完成修复解决处理清理]|fixed|resolved|completed|done/i.test(s)
+    const isResolved = /已(?:全部)?(?:完成|修复|解决|处理|清理)|fixed|resolved|completed|done/i.test(s)
     return !isResolved
   })
   const hasChineseOpenFindings = /待修复|待处理|待完成/.test(textContent)
@@ -1946,6 +1958,25 @@ function checkCompletionGuard(
 }
 
 /**
+ * 分词辅助：CJK 文本使用字符 bigram，其他使用空格分词。
+ * CJK 字符占比 > 30% 时视为中文文本。
+ */
+function tokenize(text: string): Set<string> {
+  const lower = text.toLowerCase()
+  const cjkChars = lower.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g)
+  const cjkRatio = cjkChars ? cjkChars.length / lower.length : 0
+  if (cjkRatio > 0.3) {
+    // 字符级 bigram
+    const tokens = new Set<string>()
+    for (let i = 0; i < lower.length - 1; i++) {
+      tokens.add(lower.slice(i, i + 2))
+    }
+    return tokens
+  }
+  return new Set(lower.split(/\s+/).filter(Boolean))
+}
+
+/**
  * Anti-Slop 审查 — 检测 AI 输出中的低质量模式。
  * 参考 Meta_Kim 的 meta-prism agent 概念。
  * 纯本地正则+启发式，零 API 调用。
@@ -1979,7 +2010,7 @@ function checkAntiSlop(assistantMessages: AssistantMessage[]): UserMessage | nul
   const issues: string[] = []
 
   // 1. 过度 emoji
-  const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu
+  const emojiRegex = /\p{Extended_Pictographic}/gu
   const emojis = new Set(fullText.match(emojiRegex) || [])
   if (emojis.size >= 8) {
     issues.push('excessive emojis')
@@ -1990,8 +2021,8 @@ function checkAntiSlop(assistantMessages: AssistantMessage[]): UserMessage | nul
   if (paragraphs.length >= 3) {
     let repeatCount = 0
     for (let i = 1; i < paragraphs.length; i++) {
-      const words1 = new Set(paragraphs[i - 1].toLowerCase().split(/\s+/))
-      const words2 = new Set(paragraphs[i].toLowerCase().split(/\s+/))
+      const words1 = tokenize(paragraphs[i - 1])
+      const words2 = tokenize(paragraphs[i])
       const intersection = new Set([...words1].filter(w => words2.has(w)))
       const union = new Set([...words1, ...words2])
       if (union.size > 0 && intersection.size / union.size > 0.7) {

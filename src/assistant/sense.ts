@@ -270,7 +270,7 @@ function _pushToChannels(notification: PandaNotification): void {
         content: `[${notification.title || notification.type}] ${notification.body || ''}`,
         timestamp: Date.now()
       })
-      setWorkingMemory('im-reverse-push-queue', existing.slice(-20))
+      setWorkingMemory('im-reverse-push-queue', JSON.stringify(existing.slice(-20)))
     }
   } catch {}
 
