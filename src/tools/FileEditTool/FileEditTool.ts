@@ -468,8 +468,13 @@ export const FileEditTool = buildTool({
     }
 
     // 3. Use findActualString to handle quote normalization
-    const actualOldString =
-      findActualString(originalFileContents, old_string) || old_string
+    const foundString = findActualString(originalFileContents, old_string)
+    if (!foundString && !originalFileContents.includes(old_string)) {
+      throw new Error(
+        'old_string not found in file — the file may have been modified externally since it was last read. Please re-read the file and retry.',
+      )
+    }
+    const actualOldString = foundString || old_string
 
     // Preserve curly quotes in new_string when the file uses them
     const actualNewString = preserveQuoteStyle(

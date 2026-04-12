@@ -751,7 +751,7 @@ export const BashTool = buildTool({
         // File may already be gone — stdout preview is sufficient
       }
     }
-    const commandType = input.command.split(' ')[0];
+    const commandType = input.command.trimStart().split(' ')[0];
     logEvent('tengu_bash_tool_command_executed', {
       command_type: commandType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       stdout_length: stdout.length,

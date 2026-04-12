@@ -209,7 +209,8 @@ export const FileWriteTool = buildTool({
     // getFileModificationTime. The readTimestamp guard above ensures this
     // block is always reached when the file exists.
     const lastWriteTime = Math.floor(fileMtimeMs)
-    if (lastWriteTime > readTimestamp.timestamp) {
+    // Allow 1ms tolerance to avoid TOCTOU race between validateInput and call
+    if (lastWriteTime > readTimestamp.timestamp + 1) {
       return {
         result: false,
         message:
