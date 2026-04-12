@@ -9,6 +9,7 @@ import { stringWidth } from '../../ink/stringWidth.js';
 import { Box, Text, useTheme } from '../../ink.js';
 import { useAppStateMaybeOutsideOfProvider } from '../../state/AppState.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 import { findToolByName, type Tool, type ToolProgressData, type Tools } from '../../Tool.js';
 import type { ProgressMessage } from '../../types/message.js';
 import { useIsClassifierChecking } from '../../utils/classifierApprovalsHook.js';
@@ -185,7 +186,7 @@ export function AssistantToolUseMessage(t0) {
   const t6 = stringWidth(userFacingToolName) + (shouldShowDot ? 2 : 0);
   let t7;
   if ($[31] !== isQueued || $[32] !== isResolved || $[33] !== lookups.erroredToolUseIDs || $[34] !== param.id || $[35] !== shouldAnimate || $[36] !== shouldShowDot) {
-    t7 = shouldShowDot && (isQueued ? <Box minWidth={2}><Text dimColor={isQueued} color={isMatrixTheme() ? '#00ff41' : undefined}>{BLACK_CIRCLE}</Text></Box> : <ToolUseLoader shouldAnimate={shouldAnimate} isUnresolved={!isResolved} isError={lookups.erroredToolUseIDs.has(param.id)} />);
+    t7 = shouldShowDot && (isQueued ? <Box minWidth={2}><Text dimColor={isQueued} color={isMatrixTheme() ? MATRIX_UI.gutterDot : undefined}>{BLACK_CIRCLE}</Text></Box> : <ToolUseLoader shouldAnimate={shouldAnimate} isUnresolved={!isResolved} isError={lookups.erroredToolUseIDs.has(param.id)} />);
     $[31] = isQueued;
     $[32] = isResolved;
     $[33] = lookups.erroredToolUseIDs;
@@ -199,7 +200,7 @@ export function AssistantToolUseMessage(t0) {
   const t8 = userFacingToolNameBackgroundColor ? "inverseText" : undefined;
   let t9;
   if ($[38] !== t8 || $[39] !== userFacingToolName || $[40] !== userFacingToolNameBackgroundColor) {
-    t9 = <Box flexShrink={0}><Text bold={true} wrap="truncate-end" backgroundColor={userFacingToolNameBackgroundColor} color={isMatrixTheme() ? '#00ff41' : t8}>{userFacingToolName}</Text></Box>;
+    t9 = <Box flexShrink={0}><Text bold={true} wrap="truncate-end" backgroundColor={userFacingToolNameBackgroundColor} color={isMatrixTheme() ? MATRIX_UI.toolName : t8}>{userFacingToolName}</Text></Box>;
     $[38] = t8;
     $[39] = userFacingToolName;
     $[40] = userFacingToolNameBackgroundColor;
