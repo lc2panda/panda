@@ -314,7 +314,7 @@ function _checkPendingNotifications(): ProactiveSuggestion | null {
     // BUG-4 fix: 不在此处立即标记已读，而是通过 _onAccepted 回调延迟到建议被采纳展示后
     return {
       type: 'pending-notifications',
-      message: `\u1F4EC} ${recent.length} 条未读通知: ${recent
+      message: `\u{1F4EC} ${recent.length} 条未读通知: ${recent
         .map((n: any) => n.title || (n.body || '').slice(0, 30))
         .join(', ')}`,
       priority: 'medium',

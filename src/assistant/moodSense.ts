@@ -143,10 +143,14 @@ export function updateMoodFromMessage(text: string): void {
 
   // LLM fallback: async, non-blocking — only when keyword match yielded neutral
   if (!detected && text.length > 20) {
+    const syncTimestamp = _lastUpdateTime
     analyzeMoodWithLLM(text).then(mood => {
       if (mood !== 'neutral') {
-        _currentMood = mood
-        _lastUpdateTime = Date.now()
+        // BUG-6 fix: 只在没有更新的同步检测结果时才写入异步结果
+        if (_lastUpdateTime <= syncTimestamp) {
+          _currentMood = mood
+          _lastUpdateTime = Date.now()
+        }
       }
     }).catch(() => {})
   }
