@@ -5026,7 +5026,7 @@ export function REPL({
             setIsMessageSelectorVisible(false);
             setMessageSelectorPreselect(undefined);
           }} />}
-                {("external" as string) === 'ant' && <DevBar />}
+                {(("external" as string) === 'ant' || process.env.PANDA_SHOW_DEVBAR === '1') && <DevBar />}
               </Box>
               {feature('BUDDY') && !(companionNarrow && isFullscreenEnvEnabled()) && companionVisible ? <CompanionSprite /> : null}
             </Box>} />
