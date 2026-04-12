@@ -22,7 +22,10 @@ interface WeatherCondition {
 
 async function fetchWeather(): Promise<{ current: WeatherCondition; forecast: WeatherCondition[] } | null> {
   try {
-    const resp = await fetch('https://wttr.in/?format=j1')
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10_000)
+    const resp = await fetch('https://wttr.in/?format=j1', { signal: controller.signal })
+    clearTimeout(timeout)
     if (!resp.ok) return null
     const data = await resp.json() as any
     const current = data.current_condition?.[0]

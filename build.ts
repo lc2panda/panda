@@ -58,8 +58,8 @@ const ENABLED_FLAGS = new Set([
     "HISTORY_PICKER",
     "HISTORY_SNIP",
     "HOOK_PROMPTS",
-    "IS_LIBC_GLIBC",
-    "IS_LIBC_MUSL",
+    // IS_LIBC_GLIBC and IS_LIBC_MUSL are mutually exclusive and platform-specific.
+    // Both disabled here; runtime detection in envDynamic.ts handles libc discovery.
     "KAIROS",
     "KAIROS_BRIEF",
     "KAIROS_CHANNELS",

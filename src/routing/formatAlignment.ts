@@ -302,12 +302,22 @@ export const openaiCompatAdapter: FormatAdapter = {
       }
     }
 
-    // Tool call delta
-    if (delta.tool_calls) {
-      return {
-        type: 'content_block_delta',
-        delta: { type: 'input_json_delta', partial_json: JSON.stringify(delta.tool_calls) },
+    // Tool call delta — emit one content_block_delta per tool call
+    if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
+      const toolCalls = delta.tool_calls as Record<string, unknown>[]
+      if (toolCalls.length === 1) {
+        return {
+          type: 'content_block_delta',
+          index: (toolCalls[0].index as number) ?? 0,
+          delta: { type: 'input_json_delta', partial_json: JSON.stringify(toolCalls[0].function ?? toolCalls[0]) },
+        }
       }
+      // Multiple tool calls in one delta — return array of events
+      return toolCalls.map((tc, i) => ({
+        type: 'content_block_delta',
+        index: (tc.index as number) ?? i,
+        delta: { type: 'input_json_delta', partial_json: JSON.stringify(tc.function ?? tc) },
+      }))
     }
 
     // Finish or usage-only chunk
@@ -319,9 +329,10 @@ export const openaiCompatAdapter: FormatAdapter = {
       }
     }
 
-    // OpenAI streams emit a final chunk with usage stats and empty choices
+    // OpenAI streams emit a final chunk with usage stats and empty/minimal delta
     const streamUsage = e.usage as Record<string, unknown> | undefined
-    if (streamUsage && (!choices || choices.length === 0 || !delta)) {
+    const isDeltaEmpty = !delta.content && !delta.tool_calls && !delta.role
+    if (streamUsage && isDeltaEmpty) {
       const sPromptDetails = streamUsage.prompt_tokens_details as Record<string, unknown> | undefined
       const sInputDetails = streamUsage.input_tokens_details as Record<string, unknown> | undefined
       const sCached =
