@@ -245,9 +245,16 @@ type: user
 export async function saveEpisodicMemory(sessionSummary: string, opts?: {
   tools?: string[]
   decisions?: string[]
+  turnCount?: number
+  sessionStartMs?: number
 }): Promise<string | null> {
   const memoryDir = getAutoMemPath()
   if (!memoryDir) return null
+
+  // 空会话不落盘：没有实质内容的 episode 只会成为空壳
+  if (!sessionSummary || sessionSummary.startsWith('Session ') && sessionSummary.endsWith(' ended.')) {
+    return null
+  }
 
   const now = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -258,8 +265,9 @@ export async function saveEpisodicMemory(sessionSummary: string, opts?: {
   const toolsList = opts?.tools ?? []
   const decisionsList = opts?.decisions ?? []
   const timestamp = now.getTime()
-  const turnCount = toolsList.length
-  const durationSec = Math.round((Date.now() - ((globalThis as any).__sessionStartMs || Date.now())) / 1000)
+  const turnCount = opts?.turnCount ?? 0
+  const startMs = opts?.sessionStartMs ?? (globalThis as any).__sessionStartMs
+  const durationSec = startMs ? Math.round((Date.now() - startMs) / 1000) : 0
 
   const frontmatter = [
     '---',

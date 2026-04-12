@@ -437,22 +437,26 @@ export async function gracefulShutdown(
   printResumeHint()
 
   // 保存情景记忆（含真实轮次摘要）
+  // 空会话（无 API 交互）不落盘，避免产生空壳 episode
   try {
     const { saveEpisodicMemory } = require('../memdir/memdir.js')
-    const sessionId = getSessionId()
-    let content = `Session ${sessionId} ended.`
-    let tools: string[] = []
     try {
       const { _getTurnSummaries } = require('../QueryEngine.js')
       const summaries = _getTurnSummaries?.() || []
       if (summaries.length > 0) {
-        tools = [...new Set(summaries.flatMap((s: any) => s.tools || []))]
-        content = summaries.map((s: any) =>
+        const tools = [...new Set(summaries.flatMap((s: any) => s.tools || []))]
+        const content = summaries.map((s: any) =>
           `- ${s.prompt || '(empty)'} → ${(s.tools || []).join(',')} [${s.success ? '✓' : '✗'}]`
         ).join('\n')
+        const sessionStartMs = summaries[0]?.timestamp || Date.now()
+        saveEpisodicMemory(content, {
+          tools,
+          turnCount: summaries.length,
+          sessionStartMs,
+        })
       }
+      // summaries.length === 0 → 用户未输入任何内容，不创建空壳 episode
     } catch {}
-    saveEpisodicMemory(content, { tools })
   } catch {}
 
   // Flush session data first — this is the most critical cleanup. If the
