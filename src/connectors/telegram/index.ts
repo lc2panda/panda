@@ -153,7 +153,46 @@ class TelegramConnector implements IMConnector {
 
   async getUnreadSummary(): Promise<UnreadSummary> {
     try {
-      const msgs = await this.getMessages({ limit: 100 })
+      // peek 模式：直接调 API，不推进 lastUpdateId offset
+      const params: Record<string, any> = {
+        limit: 100,
+        allowed_updates: ['message'],
+      }
+      if (this.lastUpdateId > 0) {
+        params.offset = this.lastUpdateId + 1
+      }
+
+      const resp = await this.tgApi('getUpdates', params)
+      if (!resp.ok) return emptyUnreadSummary()
+
+      const msgs: IMMessage[] = []
+      for (const update of (resp.result || [])) {
+        const msg = update.message
+        if (!msg) continue
+
+        const ts = (msg.date || 0) * 1000
+        const chatId = String(msg.chat?.id || '')
+        const content = msg.text || msg.caption || ''
+
+        msgs.push({
+          id: String(msg.message_id || ''),
+          platform: 'telegram',
+          channelId: chatId,
+          channelName: msg.chat?.title || msg.chat?.username || chatId,
+          senderId: String(msg.from?.id || ''),
+          senderName: [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || '',
+          content,
+          contentType: msg.text ? 'text' : 'file',
+          timestamp: ts,
+          isRead: false,
+          isMentioned: (msg.entities || []).some((e: any) => e.type === 'mention'),
+          threadId: msg.message_thread_id ? String(msg.message_thread_id) : undefined,
+          replyTo: msg.reply_to_message?.message_id ? String(msg.reply_to_message.message_id) : undefined,
+          attachments: this.extractAttachments(msg),
+          raw: update,
+        })
+      }
+
       const channelMap = new Map<string, { id: string; name: string; count: number; mention: boolean; lastTime: number }>()
       let mentionCount = 0
 
