@@ -189,8 +189,15 @@ function installHello2ccScripts(): string {
   for (const [relPath, content] of HELLO2CC_FILES) {
     const fullPath = join(dir, relPath)
     mkdirSync(dirname(fullPath), { recursive: true })
+    // Skip write if file content is unchanged (avoids antivirus scan delays on Windows)
+    try {
+      const existing = readFileSync(fullPath, 'utf-8')
+      if (existing === content) continue
+    } catch {
+      // File doesn't exist yet, proceed with write
+    }
     writeFileSync(fullPath, content, 'utf-8')
-    if (relPath.endsWith('.mjs')) {
+    if (relPath.endsWith('.mjs') && process.platform !== 'win32') {
       chmodSync(fullPath, 0o755)
     }
   }
@@ -231,7 +238,14 @@ function mergeHooksToSettings(scriptDir: string): void {
   }
 
   settings.hooks = { ...existingHooks, ...newHooks }
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+  try {
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
+  } catch (err) {
+    logForDebugging(
+      '[hello2cc] settings write failed (file locked?): ' + (err instanceof Error ? err.message : String(err)),
+      { level: 'warn' },
+    )
+  }
 }
 
 export function installHello2ccHooks(): void {

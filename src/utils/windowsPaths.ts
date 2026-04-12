@@ -49,6 +49,7 @@ function findExecutable(executable: string): string | null {
     const result = execSync_DEPRECATED(`where.exe ${executable}`, {
       stdio: 'pipe',
       encoding: 'utf8',
+      timeout: 5000,
     }).trim()
 
     // SECURITY: Filter out any results from the current directory
