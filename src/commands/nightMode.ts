@@ -35,7 +35,7 @@ const nightMode = {
             nightMode: { ...config, enabled: true },
           }))
           logEvent('tengu_night_mode_toggled', {
-            enabled: true as unknown as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            enabled: 'true' as unknown as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           })
           onDone('Night mode enabled. Proactive engine will activate during night hours (22:00-06:00).', { display: 'system' })
         } else if (args === 'off') {
@@ -44,7 +44,7 @@ const nightMode = {
             nightMode: { ...config, enabled: false },
           }))
           logEvent('tengu_night_mode_toggled', {
-            enabled: false as unknown as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+            enabled: 'false' as unknown as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           })
           onDone('Night mode disabled.', { display: 'system' })
         } else {

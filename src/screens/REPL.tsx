@@ -3563,7 +3563,7 @@ export function REPL({
     //   the visible input.
     // - Loading (queued): handlePromptSubmit enqueued + cleared input, then
     //   returned quickly. Restoring now places the stash back after the clear.
-    if ((isSlashCommand || isLoading) && stashedPrompt !== undefined) {
+    if ((isSlashCommand || queryGuard.getSnapshot() || isExternalLoading) && stashedPrompt !== undefined) {
       setInputValue(stashedPrompt.text);
       helpers.setCursorOffset(stashedPrompt.cursorOffset);
       setPastedContents(stashedPrompt.pastedContents);

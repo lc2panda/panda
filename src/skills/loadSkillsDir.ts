@@ -808,6 +808,8 @@ export function clearSkillCaches() {
   loadMarkdownFilesForSubdir.cache?.clear?.()
   conditionalSkills.clear()
   activatedConditionalSkillNames.clear()
+  dynamicSkillDirs.clear()
+  dynamicSkills.clear()
 }
 
 // Backwards-compatible aliases for tests

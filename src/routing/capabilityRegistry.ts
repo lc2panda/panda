@@ -285,7 +285,7 @@ class CapabilityRegistry {
 
     for (const [key, value] of Object.entries(minimums)) {
       const cap = capabilities[key as keyof ModelCapabilities]
-      if (typeof value === 'boolean' && cap !== value) return false
+      if (typeof value === 'boolean' && value === true && cap !== true) return false
       if (typeof value === 'number' && typeof cap === 'number' && cap < value) return false
     }
     return true

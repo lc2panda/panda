@@ -159,8 +159,8 @@ const featureFlagPlugin: BunPlugin = {
             // Replace MACRO defaults in cli.tsx with build-time values from package.json
             if (hasMacro) {
                 code = code.replace(/VERSION: "[\d.]+"/, `VERSION: "${PANDA_MACROS.VERSION}"`);
-                code = code.replace(/PACKAGE_URL: ""/, `PACKAGE_URL: "${PANDA_MACROS.PACKAGE_URL}"`);
-                code = code.replace(/NATIVE_PACKAGE_URL: ""/, `NATIVE_PACKAGE_URL: "${PANDA_MACROS.NATIVE_PACKAGE_URL}"`);
+                code = code.replace(/PACKAGE_URL: "[^"]*"/, `PACKAGE_URL: "${PANDA_MACROS.PACKAGE_URL}"`);
+                code = code.replace(/NATIVE_PACKAGE_URL: "[^"]*"/, `NATIVE_PACKAGE_URL: "${PANDA_MACROS.NATIVE_PACKAGE_URL}"`);
             }
 
             return {

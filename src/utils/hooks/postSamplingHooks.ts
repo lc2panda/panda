@@ -28,8 +28,12 @@ const postSamplingHooks: PostSamplingHook[] = []
  * Register a post-sampling hook that will be called after model sampling completes
  * This is an internal API not exposed through settings
  */
-export function registerPostSamplingHook(hook: PostSamplingHook): void {
+export function registerPostSamplingHook(hook: PostSamplingHook): () => void {
   postSamplingHooks.push(hook)
+  return () => {
+    const idx = postSamplingHooks.indexOf(hook)
+    if (idx !== -1) postSamplingHooks.splice(idx, 1)
+  }
 }
 
 /**
