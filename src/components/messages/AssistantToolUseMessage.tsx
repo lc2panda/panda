@@ -8,6 +8,7 @@ import { BLACK_CIRCLE } from '../../constants/figures.js';
 import { stringWidth } from '../../ink/stringWidth.js';
 import { Box, Text, useTheme } from '../../ink.js';
 import { useAppStateMaybeOutsideOfProvider } from '../../state/AppState.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
 import { findToolByName, type Tool, type ToolProgressData, type Tools } from '../../Tool.js';
 import type { ProgressMessage } from '../../types/message.js';
 import { useIsClassifierChecking } from '../../utils/classifierApprovalsHook.js';
@@ -198,7 +199,7 @@ export function AssistantToolUseMessage(t0) {
   const t8 = userFacingToolNameBackgroundColor ? "inverseText" : undefined;
   let t9;
   if ($[38] !== t8 || $[39] !== userFacingToolName || $[40] !== userFacingToolNameBackgroundColor) {
-    t9 = <Box flexShrink={0}><Text bold={true} wrap="truncate-end" backgroundColor={userFacingToolNameBackgroundColor} color={t8}>{userFacingToolName}</Text></Box>;
+    t9 = <Box flexShrink={0}><Text bold={true} wrap="truncate-end" backgroundColor={userFacingToolNameBackgroundColor} color={isMatrixTheme() ? '#00ff41' : t8}>{userFacingToolName}</Text></Box>;
     $[38] = t8;
     $[39] = userFacingToolName;
     $[40] = userFacingToolNameBackgroundColor;
