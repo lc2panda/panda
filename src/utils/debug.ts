@@ -46,6 +46,7 @@ export const isDebugMode = memoize((): boolean => {
     runtimeDebugEnabled ||
     isEnvTruthy(process.env.DEBUG) ||
     isEnvTruthy(process.env.DEBUG_SDK) ||
+    isEnvTruthy(process.env.PANDA_DEBUG) ||
     process.argv.includes('--debug') ||
     process.argv.includes('-d') ||
     isDebugToStdErr() ||

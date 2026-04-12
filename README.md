@@ -13,7 +13,7 @@
 
 | 版本 | 运行时 | 亮点 |
 |------|--------|-----|
-| v2.11.3 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 🎨 Matrix 主题黑客帝国风启动屏 · Hermes 完整度补齐 · 公开发版就绪 |
+| latest | Bun >= 1.2.0 / Node.js >= 18.0.0 | 🎨 Matrix 主题 · 103 主动推送场景 · 全面审查修复 · 公开发版就绪 |
 
 ---
 
@@ -618,7 +618,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 - **配置**: 编辑 `~/.pandacc/config/connectors.json`，详见 [1.4 配置参考 → connectors.json](#connectorsjson--im-平台连接器)
 - **关联场景**: 配置连接器后可启用 `im-unread-digest`、`im-daily-brief`、`im-calendar-sync`、`im-approval-alert`、`im-document-update`、`im-reverse-push` 等 6 个 IM 聚合场景
 
-### 3.8 微信全态势感知
+### 3.7 微信全态势感知
 
 微信用户每天面对大量群消息，超级助手提供全时间维度的态势感知：
 
@@ -662,7 +662,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 > 以上为推荐的最小启用集（8 个核心场景）。全部 14 个场景可按需逐一开启，详见 [1.4 配置参考 → proactive.json](#14-配置参考)。
 
-### 3.7 隐私铁律
+### 3.8 隐私铁律
 
 ```
 1. 全本地采集和索引 — 数据永不离开设备（除用户主动对话）
@@ -694,7 +694,7 @@ Panda 内置了 11 项治理能力。
 | **子 Agent 上下文注入**    | 每次 Agent 工具 spawn 子 agent                                                                 | 子 agent 自动获得 CLAUDE.md 核心规范（前 2500 字符） |
 | **能力优先调度**           | 未指定 `subagent_type` 的 Agent 调用                                                            | 搜索类→Explore agent，规划类→Plan agent       |
 | **任务分类引擎**           | 每轮对话首条用户消息                                                                                | 后台分类（`PANDA_DEBUG=1` 可见），为后续扩展预留       |
-| **进化写回**             | turnCount > 3 且有成功工具调用                                                                    | 调试日志记录工具名列表，预留经验沉淀入口                   |
+| **进化写回**             | turnCount > 3 且有成功工具调用                                                                    | 调试日志记录工具名列表（尚未接入经验沉淀管线，预留入口）       |
 
 ### 4.2 Patterns/Scars 经验记忆
 
@@ -867,8 +867,8 @@ query() 执行顺序：
 | 遥测拦截               | 1104 个 logEvent 调用点全部拦截                                             | 自动  |
 | API Body 脱敏        | `metadata` 中 device_id/session_id/account_uuid 替换为合规格式固定值；第三方完全不发送  | 自动  |
 | HTTP Header 脱敏     | X-Claude-Code-Session-Id 替换为固定 UUID；第三方不发送 x-app/session-id         | 自动  |
-| Datadog 禁用         | `trackDatadogEvent` + `initializeDatadog` 完全禁用                      | 自动  |
-| BigQuery 禁用        | `doExport` 完全禁用，不向 `api.anthropic.com/api/claude_code/metrics` 发送数据 | 自动  |
+| Datadog 拦截         | `trackDatadogEvent` + `initializeDatadog` 默认拦截（由 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 控制）                      | 自动  |
+| BigQuery 拦截        | `doExport` 默认拦截，不向 `api.anthropic.com/api/claude_code/metrics` 发送数据（由同一环境变量控制） | 自动  |
 | 1P Event Logger 脱敏 | userId/email/org 替换为固定脱敏值（`cc4all@gmail.com`）                       | 自动  |
 | GrowthBook 脱敏      | 用户属性 id/deviceID/sessionId 替换为固定值，移除 org/account/email              | 自动  |
 | UA 规范化             | 精简为 `claude-code/{version}`，不泄露设备信息                                 | 自动  |
@@ -1191,7 +1191,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 #### `/help`
 - **用法**: `/help`
 - **说明**: 显示交互式帮助界面，包含所有可用命令和快捷键
-- **实测**: ✅ 显示 Panda v2.6.9 帮助信息
+- **实测**: ✅ 显示帮助信息
 
 #### `/exit` (别名: `/quit`)
 - **用法**: `/exit`
@@ -1205,7 +1205,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 #### `/version`
 - **用法**: `/version`
 - **说明**: 显示当前版本和构建时间
-- **实测**: ✅ 输出 `2.5.7 (Panda)`
+- **实测**: ✅ 输出当前版本号
 
 #### `/status`
 - **用法**: `/status`
@@ -1759,7 +1759,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `KAIROS_CAPTURE` | `/capture` 快速捕获 | ✅ 已启用 |
 | `KAIROS_LEARN` | `/learn` 学习助理 | ✅ 已启用 |
 | `IM_CONNECTOR` | IM 平台连接器（6 平台） | ✅ 已启用 |
-| `PROACTIVE_SCENARIOS` | 主动推送 85 场景 | ✅ 已启用 |
+| `PROACTIVE_SCENARIOS` | 主动推送 103 场景 | ✅ 已启用 |
 | `NOTIFICATION_CENTER` | 系统通知中心感知 | ✅ 已启用 |
 
 ### 十七、快捷键速查
