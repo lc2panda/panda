@@ -1,7 +1,7 @@
 import { profileCheckpoint } from '../utils/startupProfiler.js'
 import '../bootstrap/state.js'
 import '../utils/config.js'
-import { existsSync, cpSync, copyFileSync } from 'fs'
+import { existsSync, cpSync, copyFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 import type { Attributes, MetricOptions } from '@opentelemetry/api'
@@ -64,7 +64,17 @@ function migrateFromClaude() {
   const oldCfg = join(homedir(), '.claude.json')
   const newCfg = join(homedir(), '.pandacc.json')
   if (existsSync(old) && !existsSync(neu)) {
-    try { cpSync(old, neu, { recursive: true }) } catch {}
+    try {
+      // Only migrate essential config files first (fast), defer bulk data
+      mkdirSync(neu, { recursive: true })
+      const essentials = ['settings.json', 'credentials.json', 'config', 'projects']
+      for (const item of essentials) {
+        const src = join(old, item)
+        if (existsSync(src)) {
+          try { cpSync(src, join(neu, item), { recursive: true }) } catch {}
+        }
+      }
+    } catch {}
   }
   if (existsSync(oldCfg) && !existsSync(newCfg)) {
     try { copyFileSync(oldCfg, newCfg) } catch {}
