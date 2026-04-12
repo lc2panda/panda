@@ -185,7 +185,7 @@ export function AssistantToolUseMessage(t0) {
   const t6 = stringWidth(userFacingToolName) + (shouldShowDot ? 2 : 0);
   let t7;
   if ($[31] !== isQueued || $[32] !== isResolved || $[33] !== lookups.erroredToolUseIDs || $[34] !== param.id || $[35] !== shouldAnimate || $[36] !== shouldShowDot) {
-    t7 = shouldShowDot && (isQueued ? <Box minWidth={2}><Text dimColor={isQueued}>{BLACK_CIRCLE}</Text></Box> : <ToolUseLoader shouldAnimate={shouldAnimate} isUnresolved={!isResolved} isError={lookups.erroredToolUseIDs.has(param.id)} />);
+    t7 = shouldShowDot && (isQueued ? <Box minWidth={2}><Text dimColor={isQueued} color={isMatrixTheme() ? '#00ff41' : undefined}>{BLACK_CIRCLE}</Text></Box> : <ToolUseLoader shouldAnimate={shouldAnimate} isUnresolved={!isResolved} isError={lookups.erroredToolUseIDs.has(param.id)} />);
     $[31] = isQueued;
     $[32] = isResolved;
     $[33] = lookups.erroredToolUseIDs;

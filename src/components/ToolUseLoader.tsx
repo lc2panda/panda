@@ -3,6 +3,7 @@ import React from 'react';
 import { BLACK_CIRCLE } from '../constants/figures.js';
 import { useBlink } from '../hooks/useBlink.js';
 import { Box, Text } from '../ink.js';
+import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
 type Props = {
   isError: boolean;
   isUnresolved: boolean;
@@ -16,11 +17,12 @@ export function ToolUseLoader(t0) {
     shouldAnimate
   } = t0;
   const [ref, isBlinking] = useBlink(shouldAnimate);
-  const color = isUnresolved ? undefined : isError ? "error" : "success";
+  const matrixGreen = isMatrixTheme() ? '#00ff41' : undefined;
+  const color = isUnresolved ? matrixGreen : isError ? "error" : (matrixGreen ?? "success");
   const t1 = !shouldAnimate || isBlinking || isError || !isUnresolved ? BLACK_CIRCLE : " ";
   let t2;
   if ($[0] !== color || $[1] !== isUnresolved || $[2] !== t1) {
-    t2 = <Text color={color} dimColor={isUnresolved}>{t1}</Text>;
+    t2 = <Text color={color} dimColor={isUnresolved && !matrixGreen}>{t1}</Text>;
     $[0] = color;
     $[1] = isUnresolved;
     $[2] = t1;
