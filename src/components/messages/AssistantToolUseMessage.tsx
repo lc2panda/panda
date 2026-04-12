@@ -9,7 +9,7 @@ import { stringWidth } from '../../ink/stringWidth.js';
 import { Box, Text, useTheme } from '../../ink.js';
 import { useAppStateMaybeOutsideOfProvider } from '../../state/AppState.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
-import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
+import { MATRIX_UI, MATRIX_SCALE } from '../MatrixTheme/matrixPalette.js';
 import { findToolByName, type Tool, type ToolProgressData, type Tools } from '../../Tool.js';
 import type { ProgressMessage } from '../../types/message.js';
 import { useIsClassifierChecking } from '../../utils/classifierApprovalsHook.js';
@@ -210,7 +210,7 @@ export function AssistantToolUseMessage(t0) {
   }
   let t10;
   if ($[42] !== renderedToolUseMessage) {
-    t10 = renderedToolUseMessage !== "" && <Box flexWrap="nowrap"><Text>({renderedToolUseMessage})</Text></Box>;
+    t10 = renderedToolUseMessage !== "" && <Box flexWrap="nowrap"><Text color={isMatrixTheme() ? MATRIX_SCALE.SHADOW : undefined}>({renderedToolUseMessage})</Text></Box>;
     $[42] = renderedToolUseMessage;
     $[43] = t10;
   } else {

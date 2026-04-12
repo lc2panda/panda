@@ -17,7 +17,7 @@ const teamMemSaved = feature('TEAMMEM') ? require('./teamMemSaved.js') as typeof
 import { getTurnCompletionVerbs, TURN_COMPLETION_VERBS } from '../../constants/turnCompletionVerbs.js';
 import { isZh } from '../../utils/i18n.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
-import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
+import { MATRIX_UI, MATRIX_SCALE } from '../MatrixTheme/matrixPalette.js';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import type { SystemMessage, SystemStopHookSummaryMessage, SystemBridgeStatusMessage, SystemTurnDurationMessage, SystemThinkingMessage, SystemMemorySavedMessage } from '../../types/message.js';
 import { SystemAPIErrorMessage } from './SystemAPIErrorMessage.js';
@@ -563,7 +563,7 @@ function TurnDurationMessage(t0) {
   const t5 = addMargin ? 1 : 0;
   let t6;
   if ($[8] === Symbol.for("react.memo_cache_sentinel")) {
-    t6 = <Box minWidth={2}><Text dimColor={true}>{TEARDROP_ASTERISK}</Text></Box>;
+    t6 = <Box minWidth={2}><Text dimColor={!isMatrixTheme()} color={isMatrixTheme() ? MATRIX_SCALE.NEON : undefined}>{isMatrixTheme() ? '⟩' : TEARDROP_ASTERISK}</Text></Box>;
     $[8] = t6;
   } else {
     t6 = $[8];

@@ -56,7 +56,7 @@ function PromptChar(t0) {
   let t1;
   if ($[0] !== color || $[1] !== isLoading) {
     t1 = matrixActive
-      ? <Text color={MATRIX_UI.prompt} dimColor={isLoading}>neo ▸ </Text>
+      ? <Text color={MATRIX_UI.prompt} dimColor={isLoading}>{isLoading ? 'neo ▪ ' : 'neo ▸ '}</Text>
       : <Text color={color} dimColor={isLoading}>{figures.pointer} </Text>;
     $[0] = color;
     $[1] = isLoading;

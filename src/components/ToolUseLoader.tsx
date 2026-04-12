@@ -4,7 +4,7 @@ import { BLACK_CIRCLE } from '../constants/figures.js';
 import { useBlink } from '../hooks/useBlink.js';
 import { Box, Text } from '../ink.js';
 import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
-import { MATRIX_UI } from './MatrixTheme/matrixPalette.js';
+import { MATRIX_UI, MATRIX_SCALE, MATRIX_STATUS } from './MatrixTheme/matrixPalette.js';
 type Props = {
   isError: boolean;
   isUnresolved: boolean;
@@ -18,12 +18,16 @@ export function ToolUseLoader(t0) {
     shouldAnimate
   } = t0;
   const [ref, isBlinking] = useBlink(shouldAnimate);
-  const matrixGreen = isMatrixTheme() ? MATRIX_UI.toolLoader : undefined;
-  const color = isUnresolved ? matrixGreen : isError ? "error" : (matrixGreen ?? "success");
+  const matrixActive = isMatrixTheme();
+  // Matrix theme: pulse between NEON/SHADOW for unresolved, BRIGHT for resolved, ERROR for errors
+  const matrixColor = matrixActive
+    ? (isError ? MATRIX_STATUS.ERROR : isUnresolved ? (isBlinking ? MATRIX_SCALE.NEON : MATRIX_SCALE.SHADOW) : MATRIX_SCALE.BRIGHT)
+    : undefined;
+  const color = matrixActive ? matrixColor : (isUnresolved ? undefined : isError ? "error" : "success");
   const t1 = !shouldAnimate || isBlinking || isError || !isUnresolved ? BLACK_CIRCLE : " ";
   let t2;
   if ($[0] !== color || $[1] !== isUnresolved || $[2] !== t1) {
-    t2 = <Text color={color} dimColor={isUnresolved && !matrixGreen}>{t1}</Text>;
+    t2 = <Text color={color} dimColor={isUnresolved && !matrixActive}>{t1}</Text>;
     $[0] = color;
     $[1] = isUnresolved;
     $[2] = t1;

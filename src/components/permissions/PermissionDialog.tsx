@@ -61,7 +61,7 @@ export function PermissionDialog(t0) {
   }
   let t6;
   if ($[11] !== color || $[12] !== t4 || $[13] !== t5) {
-    t6 = <Box flexDirection="column" borderStyle="round" borderColor={isMatrixTheme() ? MATRIX_UI.border : color} borderLeft={false} borderRight={false} borderBottom={false} marginTop={1}>{t4}{t5}</Box>;
+    t6 = <Box flexDirection="column" borderStyle={isMatrixTheme() ? 'bold' : 'round'} borderColor={isMatrixTheme() ? MATRIX_UI.border : color} borderLeft={false} borderRight={false} borderBottom={false} marginTop={1}>{t4}{t5}</Box>;
     $[11] = color;
     $[12] = t4;
     $[13] = t5;

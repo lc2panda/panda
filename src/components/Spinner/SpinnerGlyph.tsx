@@ -3,7 +3,7 @@ import * as React from 'react';
 import { Box, Text, useTheme } from '../../ink.js';
 import { getTheme, type Theme } from '../../utils/theme.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
-import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
+import { MATRIX_UI, MATRIX_SCALE } from '../MatrixTheme/matrixPalette.js';
 import { getDefaultCharacters, interpolateColor, parseRGB, toRGBColor } from './utils.js';
 const DEFAULT_CHARACTERS = getDefaultCharacters();
 const SPINNER_FRAMES = [...DEFAULT_CHARACTERS, ...[...DEFAULT_CHARACTERS].reverse()];
@@ -49,7 +49,10 @@ export function SpinnerGlyph(t0) {
       return <Box flexWrap="wrap" height={1} width={2}><Text color={MATRIX_GREEN} dimColor={isDim}>{REDUCED_MOTION_DOT}</Text></Box>;
     }
     const matrixChar = MATRIX_SPINNER_FRAMES[frame % MATRIX_SPINNER_FRAMES.length];
-    return <Box flexWrap="wrap" height={1} width={2}><Text color={MATRIX_GREEN}>{matrixChar}</Text></Box>;
+    // Pulse between NEON(G5) and BRIGHT(G6) for a breathing effect
+    const pulsePhase = Math.sin(frame * 0.15) * 0.5 + 0.5;
+    const pulseColor = pulsePhase > 0.5 ? MATRIX_SCALE.BRIGHT : MATRIX_SCALE.NEON;
+    return <Box flexWrap="wrap" height={1} width={2}><Text color={pulseColor}>{matrixChar}</Text></Box>;
   }
   if (reducedMotion) {
     const isDim = Math.floor(time / (REDUCED_MOTION_CYCLE_MS / 2)) % 2 === 1;
