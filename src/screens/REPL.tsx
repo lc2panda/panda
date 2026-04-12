@@ -2146,7 +2146,9 @@ export function REPL({
     }
     if (focusedInputDialog === 'tool-permission') {
       // Tool use confirm handles the abort signal itself
-      toolUseConfirmQueue[0]?.onAbort();
+      for (const item of toolUseConfirmQueue) {
+        item.onAbort();
+      }
       setToolUseConfirmQueue([]);
     } else if (focusedInputDialog === 'prompt') {
       // Reject all pending prompts and clear the queue
@@ -2344,14 +2346,16 @@ export function REPL({
       priority: 'medium'
     });
   }, [addNotification]);
-  if (SandboxManager.isSandboxingEnabled()) {
-    // If sandboxing is enabled (setting.sandbox is defined, initialise the manager)
-    SandboxManager.initialize(sandboxAskCallback).catch(err => {
-      // Initialization/validation failed - display error and exit
-      process.stderr.write(`\n❌ Sandbox Error: ${errorMessage(err)}\n`);
-      gracefulShutdownSync(1, 'other');
-    });
-  }
+  useEffect(() => {
+    if (SandboxManager.isSandboxingEnabled()) {
+      // If sandboxing is enabled (setting.sandbox is defined, initialise the manager)
+      SandboxManager.initialize(sandboxAskCallback).catch(err => {
+        // Initialization/validation failed - display error and exit
+        process.stderr.write(`\n❌ Sandbox Error: ${errorMessage(err)}\n`);
+        gracefulShutdownSync(1, 'other');
+      });
+    }
+  }, [sandboxAskCallback]);
   const setToolPermissionContext = useCallback((context: ToolPermissionContext, options?: {
     preserveMode?: boolean;
   }) => {
@@ -3906,7 +3910,7 @@ export function REPL({
       setPastedContents: () => {},
       setToolJSX,
       getToolUseContext,
-      messages,
+      messages: messagesRef.current,
       mainLoopModel,
       ideSelection,
       setUserInputOnProcessing,
