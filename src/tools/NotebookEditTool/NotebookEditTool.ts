@@ -389,6 +389,11 @@ export const NotebookEditTool = buildTool({
         }
       }
 
+      // Capture original cell type before any mutations (for reporting in replace mode)
+      const originalCellType = (cellIndex >= 0 && cellIndex < notebook.cells.length)
+        ? notebook.cells[cellIndex]?.cell_type
+        : undefined
+
       if (edit_mode === 'delete') {
         // Guard against TOCTOU: notebook may have changed between validateInput and call
         if (cellIndex < 0 || cellIndex >= notebook.cells.length) {
@@ -449,7 +454,7 @@ export const NotebookEditTool = buildTool({
       })
       const data = {
         new_source,
-        cell_type: cell_type ?? 'code',
+        cell_type: cell_type ?? originalCellType ?? 'code',
         language,
         edit_mode: edit_mode ?? 'replace',
         cell_id: new_cell_id || undefined,

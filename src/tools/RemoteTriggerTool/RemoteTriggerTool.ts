@@ -75,6 +75,24 @@ export const RemoteTriggerTool = buildTool({
   async prompt() {
     return PROMPT
   },
+  validateInput(input: Input) {
+    const { action, trigger_id, body } = input
+    if ((action === 'get' || action === 'update' || action === 'run') && !trigger_id) {
+      return {
+        result: false as const,
+        message: `'${action}' requires trigger_id`,
+        errorCode: 1,
+      }
+    }
+    if ((action === 'create' || action === 'update') && !body) {
+      return {
+        result: false as const,
+        message: `'${action}' requires body`,
+        errorCode: 2,
+      }
+    }
+    return { result: true as const }
+  },
   async call(input: Input, context: ToolUseContext) {
     await checkAndRefreshOAuthTokenIfNeeded()
     const accessToken = getClaudeAIOAuthTokens()?.accessToken
