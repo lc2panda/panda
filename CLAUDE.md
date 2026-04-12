@@ -85,9 +85,9 @@ echo "say hello" | bash scripts/dev.sh -p
 
 `feature('FLAG_NAME')` calls use `bun:bundle` (a Bun compile-time macro).
 
-- **Dev mode**: `scripts/dev.sh` passes all 92 `--feature=FLAG` arguments to Bun, enabling every flag at runtime.
+- **Dev mode**: `scripts/dev.sh` runs `bun run build.ts` (which compiles with all feature flags inlined as `true` via `ENABLED_FLAGS`) then executes `bun dist/cli.js`. It does **not** pass `--feature=FLAG` arguments at runtime.
 - **Build mode**: `build.ts` uses a BunPlugin `onLoad` hook that strips `bun:bundle` imports and inline-replaces each `feature('X')` call with `true` or `false` based on `ENABLED_FLAGS`. This preserves Bun's dead-code elimination for any flags intentionally left off.
-- **Adding a new flag**: Add to `ENABLED_FLAGS` in `build.ts` and `--feature=FLAG` in `scripts/dev.sh`.
+- **Adding a new flag**: Add to `ENABLED_FLAGS` in `build.ts`.
 
 All 92 flags discovered in source are currently enabled.
 

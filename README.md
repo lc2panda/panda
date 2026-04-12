@@ -80,11 +80,11 @@ panda auth login
 | --------- | ------------------------------------------ | ----------------- | ----------------------------------------------------------------------------------------- |
 | Anthropic | 原版 OAuth                                   | claude-sonnet-4-6 | [console.anthropic.com](https://console.anthropic.com)                                    |
 | DeepSeek  | api.deepseek.com/anthropic                 | deepseek-chat     | [platform.deepseek.com](https://platform.deepseek.com/api_keys)                           |
-| Kimi Code | api.kimi.com/coding                        | kimi-k2.5         | [kimi.com/code](https://www.kimi.com/code)                                                |
-| Qwen      | dashscope-intl.aliyuncs.com/apps/anthropic | qwen-plus         | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com/)                     |
-| MiniMax   | api.minimax.io/anthropic                   | MiniMax-M2.5      | [platform.minimax.io](https://platform.minimax.io)                                        |
-| GLM       | open.bigmodel.cn/api/anthropic             | glm-4             | [open.bigmodel.cn](https://open.bigmodel.cn/)                                             |
-| Volcano   | ark.cn-beijing.volces.com/api/coding       | ark-code-latest   | [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey) |
+| Kimi Code | api.kimi.com/coding                        | kimi-for-coding   | [kimi.com/code](https://www.kimi.com/code)                                                |
+| Qwen      | dashscope-intl.aliyuncs.com/apps/anthropic | qwen3.5-plus      | [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com/)                     |
+| MiniMax   | api.minimax.io/anthropic                   | minimax-m2.7      | [platform.minimax.io](https://platform.minimax.io)                                        |
+| GLM       | open.bigmodel.cn/api/anthropic             | glm-5.1           | [open.bigmodel.cn](https://open.bigmodel.cn/)                                             |
+| Volcano   | ark.cn-beijing.volces.com/api/coding       | doubao-seed-code  | [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey) |
 
 ### 1.4 配置参考
 
@@ -687,7 +687,7 @@ Panda 内置了 11 项治理能力。
 
 | 能力                   | 触发时机                                                                                      | 用户感知                                   |
 | -------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------- |
-| **危险命令拦截**           | AI 执行 `rm -rf /`、`git reset --hard`、`git push --force`、`chmod -R 777`、fork bomb 等 7 种危险模式 | 自动拦截，弹出 `⚠️ Dangerous: ...` 确认提示       |
+| **危险命令防御（双层）**      | AI 执行 `rm -rf /`、`git reset --hard`、`git push --force`、`chmod -R 777`、fork bomb 等 7 种危险模式 | **拦截层**（bashSecurity + pathValidation）：匹配危险模式后阻断执行，弹出确认提示；**警告层**（destructiveCommandWarning）：对高风险但非致命操作追加 `⚠️ Dangerous: ...` 信息性警告 |
 | **Completion Guard** | AI 纯文本声称"任务已完成"但无工具调用或测试证据                                                                | 自动要求补充验证证据（最多 2 次）                     |
 | **Finding Closure**  | AI 声称完成但回复中含未关闭的 TODO/FIXME/HACK                                                          | 自动要求先关闭所有 findings                     |
 | **Anti-Slop 审查**     | AI 回复过度 emoji（≥8种）、重复段落、或超长空洞文本                                                           | 自动要求精简，给出代码/路径                         |
@@ -728,7 +728,7 @@ EOF
 ```
 用户输入 → 任务分类 → AI 响应
                         │
-                        ├─ BashTool → 危险命令拦截 → ⚠️ 确认
+                        ├─ BashTool → bashSecurity 拦截 → ⚠️ 确认 → destructiveCommandWarning 警告
                         ├─ AgentTool → 能力优先调度 → 自动选型
                         │              └─ 子Agent上下文注入 → CLAUDE.md
                         └─ 纯文本回复
@@ -780,7 +780,7 @@ EOF
 └─────────────────────────────────────────────────────────────────┘
 
 ╔═════════════════════════════════════════════════════════════════╗
-║      Feature Flag 系 统 (89 个全开 + 31 GrowthBook tengu flags)  ║
+║      Feature Flag 系 统 (92 个全开 + 31 GrowthBook tengu flags)  ║
 ╚═════════════════════════════════════════════════════════════════╝
 ```
 

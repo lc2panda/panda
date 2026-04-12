@@ -98,6 +98,8 @@ const BASH_SECURITY_CHECK_IDS = {
   BACKSLASH_ESCAPED_OPERATORS: 21,
   COMMENT_QUOTE_DESYNC: 22,
   QUOTED_NEWLINE: 23,
+  FORK_BOMB: 24,
+  CHMOD_RECURSIVE_777: 25,
 } as const
 
 type ValidationContext = {
@@ -843,6 +845,113 @@ function validateDangerousVariables(
   return { behavior: 'passthrough', message: 'No dangerous variables' }
 }
 
+/**
+ * Detects fork bomb patterns that can crash the system by recursively spawning
+ * processes until resources are exhausted.
+ *
+ * Detected variants:
+ * - Classic bash: `:(){:|:&};:` and named variants like `bomb(){ bomb|bomb& };bomb`
+ * - Loop-based: `while true; do ... & done` with recursive function definitions
+ * - Perl: `perl -e 'fork while fork'`
+ * - Python: `python -c 'import os; [os.fork() ...]'`
+ */
+function validateForkBomb(context: ValidationContext): PermissionResult {
+  const { originalCommand } = context
+
+  // Fork bomb patterns to detect (checked against the raw command)
+  const FORK_BOMB_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
+    // Classic bash fork bomb: :(){:|:&};: (with whitespace variations)
+    // Matches single-char function name like : or . followed by () { ... | ... & }
+    {
+      pattern: /[a-zA-Z_.:]\s*\(\s*\)\s*\{[^}]*\|[^}]*&\s*\}\s*;/,
+      description: 'bash fork bomb (function recursion with pipe and background)',
+    },
+    // Named function fork bomb: bomb(){ bomb|bomb& };bomb
+    {
+      pattern: /(\w+)\s*\(\s*\)\s*\{[^}]*\1[^}]*\|[^}]*\1[^}]*&\s*\}/,
+      description: 'named fork bomb (self-referencing function with pipe and background)',
+    },
+    // Perl fork bomb: perl -e 'fork while fork' or similar
+    {
+      pattern: /perl\s+.*fork\s+while\s+fork/,
+      description: 'Perl fork bomb',
+    },
+    // Python fork bomb: os.fork() in a loop
+    {
+      pattern: /python[23]?\s+.*os\.fork\s*\(\s*\)/,
+      description: 'Python fork bomb',
+    },
+    // Bash while-true fork: while true; do ... fork/recursion ... & done
+    {
+      pattern: /while\s+true\s*;\s*do\s+[^;]*\(\s*\)\s*\{[^}]*\|[^}]*&\s*\}[^;]*;\s*:\s*&\s*done/,
+      description: 'loop-based fork bomb',
+    },
+  ]
+
+  for (const { pattern, description } of FORK_BOMB_PATTERNS) {
+    if (pattern.test(originalCommand)) {
+      logEvent('tengu_bash_security_check_triggered', {
+        checkId: BASH_SECURITY_CHECK_IDS.FORK_BOMB,
+        subId: 1,
+      })
+      return {
+        behavior: 'ask',
+        message: `Command appears to be a fork bomb (${description}). This will crash the system by exhausting process resources`,
+      }
+    }
+  }
+
+  return { behavior: 'passthrough', message: 'No fork bomb detected' }
+}
+
+/**
+ * Detects recursive chmod 777 patterns that grant full read/write/execute
+ * permissions to all users on entire directory trees — a severe security risk.
+ *
+ * Detected variants:
+ * - `chmod -R 777 /path`
+ * - `chmod 777 -R /path`
+ * - `chmod -R a+rwx /path` (equivalent to 777)
+ */
+function validateChmodRecursive777(
+  context: ValidationContext,
+): PermissionResult {
+  const { originalCommand } = context
+
+  const CHMOD_777_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
+    // chmod -R 777 or chmod --recursive 777
+    {
+      pattern: /chmod\s+(?:-[a-zA-Z]*R[a-zA-Z]*|--recursive)\s+777\b/,
+      description: 'chmod -R 777',
+    },
+    // chmod 777 -R (flag after mode)
+    {
+      pattern: /chmod\s+777\s+(?:-[a-zA-Z]*R[a-zA-Z]*|--recursive)\b/,
+      description: 'chmod 777 -R',
+    },
+    // chmod -R a+rwx (equivalent to 777)
+    {
+      pattern: /chmod\s+(?:-[a-zA-Z]*R[a-zA-Z]*|--recursive)\s+a\+rwx\b/,
+      description: 'chmod -R a+rwx (equivalent to 777)',
+    },
+  ]
+
+  for (const { pattern, description } of CHMOD_777_PATTERNS) {
+    if (pattern.test(originalCommand)) {
+      logEvent('tengu_bash_security_check_triggered', {
+        checkId: BASH_SECURITY_CHECK_IDS.CHMOD_RECURSIVE_777,
+        subId: 1,
+      })
+      return {
+        behavior: 'ask',
+        message: `Command contains ${description} which recursively grants full permissions to all users — a severe security risk`,
+      }
+    }
+  }
+
+  return { behavior: 'passthrough', message: 'No recursive chmod 777 detected' }
+}
+
 function validateDangerousPatterns(
   context: ValidationContext,
 ): PermissionResult {
@@ -1573,7 +1682,6 @@ function hasBackslashEscapedWhitespace(command: string): boolean {
 
     if (char === "'" && !inDoubleQuote) {
       inSingleQuote = !inSingleQuote
-      continue
     }
   }
 
@@ -1686,7 +1794,6 @@ function hasBackslashEscapedOperator(command: string): boolean {
     }
     if (char === '"' && !inSingleQuote) {
       inDoubleQuote = !inDoubleQuote
-      continue
     }
   }
 
@@ -2248,6 +2355,7 @@ function validateZshDangerousCommands(
 // so an attacker can use them to slip metacharacters past our checks while
 // bash still executes them (e.g., "echo safe\x00; rm -rf /").
 // eslint-disable-next-line no-control-regex
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional — detects hidden control chars used by attackers
 const CONTROL_CHAR_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/
 
 /**
@@ -2365,6 +2473,8 @@ export function bashCommandIsSafe_DEPRECATED(
     validateIFSInjection,
     validateProcEnvironAccess,
     validateDangerousPatterns,
+    validateForkBomb,
+    validateChmodRecursive777,
     validateRedirections,
     validateBackslashEscapedWhitespace,
     validateBackslashEscapedOperators,
@@ -2558,6 +2668,8 @@ export async function bashCommandIsSafeAsync_DEPRECATED(
     validateIFSInjection,
     validateProcEnvironAccess,
     validateDangerousPatterns,
+    validateForkBomb,
+    validateChmodRecursive777,
     validateRedirections,
     validateBackslashEscapedWhitespace,
     validateBackslashEscapedOperators,

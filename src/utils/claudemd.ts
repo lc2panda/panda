@@ -46,7 +46,11 @@ import {
   getOriginalCwd,
 } from '../bootstrap/state.js'
 import { truncateEntrypointContent } from '../memdir/memdir.js'
-import { getAutoMemEntrypoint, isAutoMemoryEnabled } from '../memdir/paths.js'
+import {
+  getAutoMemEntrypoint,
+  getAutoMemPath,
+  isAutoMemoryEnabled,
+} from '../memdir/paths.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import {
   getCurrentProjectConfig,
@@ -1045,6 +1049,47 @@ export const getMemoryFiles = memoize(
         if (!processedPaths.has(normalizedPath)) {
           processedPaths.add(normalizedPath)
           result.push(memdirEntry)
+        }
+      }
+    }
+
+    // Patterns & Scars — structured learning files under the auto-memory
+    // directory. Scanned from both the project-level memory dir and the
+    // local .pandacc/memory/ directory. Each .md file is loaded as AutoMem
+    // so it appears in the system context alongside MEMORY.md content.
+    if (isAutoMemoryEnabled()) {
+      const autoMemDir = getAutoMemPath()
+      const patternsScarsSearchDirs = [
+        join(autoMemDir, 'patterns'),
+        join(autoMemDir, 'scars'),
+      ]
+      // Also check project-local .pandacc/memory/ patterns & scars
+      const localMemPatterns = join(getOriginalCwd(), '.pandacc', 'memory', 'patterns')
+      const localMemScars = join(getOriginalCwd(), '.pandacc', 'memory', 'scars')
+      if (normalizePathForComparison(localMemPatterns) !== normalizePathForComparison(join(autoMemDir, 'patterns'))) {
+        patternsScarsSearchDirs.push(localMemPatterns)
+      }
+      if (normalizePathForComparison(localMemScars) !== normalizePathForComparison(join(autoMemDir, 'scars'))) {
+        patternsScarsSearchDirs.push(localMemScars)
+      }
+
+      for (const dir of patternsScarsSearchDirs) {
+        try {
+          const fs = getFsImplementation()
+          const entries = await fs.readdir(dir)
+          for (const entry of entries) {
+            if (!entry.isFile() || !entry.name.endsWith('.md')) continue
+            const filePath = join(dir, entry.name)
+            const normalizedFilePath = normalizePathForComparison(filePath)
+            if (processedPaths.has(normalizedFilePath)) continue
+            const { info } = await safelyReadMemoryFileAsync(filePath, 'AutoMem')
+            if (info && info.content.trim()) {
+              processedPaths.add(normalizedFilePath)
+              result.push(info)
+            }
+          }
+        } catch {
+          // Directory doesn't exist or unreadable — skip silently
         }
       }
     }
