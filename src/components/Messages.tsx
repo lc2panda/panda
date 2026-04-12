@@ -626,21 +626,34 @@ const MessagesImpl = ({
     const rawRow = <MessageRow key={k_0} message={msg_8} isUserContinuation={isUserContinuation} hasContentAfter={hasContentAfter} tools={tools} commands={commands} verbose={verbose || isItemExpanded(msg_8) || cursor?.expanded === true && index === selectedIdx} inProgressToolUseIDs={inProgressToolUseIDs} streamingToolUseIDs={streamingToolUseIDs} screen={screen} canAnimate={canAnimate} onOpenRateLimitOptions={onOpenRateLimitOptions} lastThinkingBlockId={lastThinkingBlockId} latestBashOutputUUID={latestBashOutputUUID} columns={columns} isLoading={isLoading} lookups={lookups_0} />;
     // v2.11.3: Matrix 主题不再包装消息区。原先每条 user/assistant 加绿框
     // 在截图反馈中被判定为"视觉负担"——整个对话区被堆满绿框影响阅读。
-    // Matrix 感改由 PromptInput 绿色边框 + Spinner 绿色字符 + 启动屏字符雨
-    // 三层提供，消息区保持默认清爽留白。
-    const row = rawRow;
+    // v2.11.4: 改用轻量前缀符号 + 消息间绿色细分隔线提供 Matrix 沉浸感。
+    const matrixPrefix = isMatrixTheme() && (msg_8.type === 'user' || msg_8.type === 'assistant')
+      ? <Text color="#00ff41">{msg_8.type === 'user' ? '▸ ' : '◉ '}</Text>
+      : null;
+    const row = matrixPrefix
+      ? <Box flexDirection="row" alignItems="flex-start">{matrixPrefix}{rawRow}</Box>
+      : rawRow;
+
+    // Matrix 主题: 在 user/assistant 消息之间插入绿色细分隔线
+    const matrixSeparator = isMatrixTheme()
+      && index > 0
+      && (msg_8.type === 'user' || msg_8.type === 'assistant')
+      && (prevType === 'user' || prevType === 'assistant')
+      ? <Text key={`matrix-sep-${index}`} color="#00ff41" dimColor>{'─'.repeat(Math.min(columns, 80))}</Text>
+      : null;
 
     // Per-row Provider — only 2 rows re-render on selection change.
     // Wrapped BEFORE divider branch so both return paths get it.
     const wrapped = <MessageActionsSelectedContext.Provider key={k_0} value={index === selectedIdx}>
         {row}
       </MessageActionsSelectedContext.Provider>;
+    const wrappedWithSeparator = matrixSeparator ? [matrixSeparator, wrapped] : wrapped;
     if (unseenDivider && index === dividerBeforeIndex) {
       return [<Box key="unseen-divider" marginTop={1}>
           <Divider title={`${unseenDivider.count} new ${plural(unseenDivider.count, 'message')}`} width={columns} color="inactive" />
-        </Box>, wrapped];
+        </Box>, ...(Array.isArray(wrappedWithSeparator) ? wrappedWithSeparator : [wrappedWithSeparator])];
     }
-    return wrapped;
+    return wrappedWithSeparator;
   };
 
   // Search indexing: for tool_result messages, look up the Tool and use

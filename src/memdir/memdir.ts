@@ -1,7 +1,7 @@
 import { feature } from 'bun:bundle'
 import { join, relative } from 'path'
 import { readFileSync, readdirSync, statSync, unlinkSync, writeFileSync, mkdirSync, renameSync, copyFileSync, existsSync } from 'fs'
-import { access, writeFile, readFile, appendFile, mkdir } from 'fs/promises'
+import { access, writeFile, readFile, appendFile, mkdir, stat } from 'fs/promises'
 import { homedir, tmpdir } from 'os'
 import { getFsImplementation } from '../utils/fsOperations.js'
 import { getAutoMemPath, isAutoMemoryEnabled } from './paths.js'
@@ -2023,11 +2023,26 @@ export async function recordBehavior(
   const memoryDir = getAutoMemPath()
   if (!memoryDir) return
 
+  const habitsPath = join(memoryDir, 'procedural', 'habits.md')
   const entry = `- ${new Date().toISOString()}: ${action} (${Object.entries(context).map(([k, v]) => `${k}=${v}`).join(', ')})\n`
 
   try {
     await mkdir(join(memoryDir, 'procedural'), { recursive: true })
-    await appendFile(join(memoryDir, 'procedural', 'habits.md'), entry)
+
+    // 检查行数上限，超过500行截断保留最新300行
+    try {
+      const stats = await stat(habitsPath)
+      if (stats.size > 100_000) {
+        const content = await readFile(habitsPath, 'utf-8')
+        const lines = content.split('\n')
+        if (lines.length > 500) {
+          const trimmed = lines.slice(-300).join('\n')
+          await writeFile(habitsPath, trimmed)
+        }
+      }
+    } catch {} // 文件不存在时忽略
+
+    await appendFile(habitsPath, entry)
   } catch {}
 }
 

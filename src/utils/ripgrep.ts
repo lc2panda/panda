@@ -1,5 +1,6 @@
 import type { ChildProcess, ExecFileException } from 'child_process'
 import { execFile, spawn } from 'child_process'
+import { existsSync } from 'fs'
 import memoize from 'lodash-es/memoize.js'
 import { homedir } from 'os'
 import * as path from 'path'
@@ -29,12 +30,12 @@ type RipgrepConfig = {
 }
 
 const getRipgrepConfig = memoize((): RipgrepConfig => {
-  const userWantsSystemRipgrep = isEnvDefinedFalsy(
-    process.env.USE_BUILTIN_RIPGREP,
-  )
+  const forceBuiltin = process.env.USE_BUILTIN_RIPGREP
+  const preferSystem =
+    isEnvDefinedFalsy(process.env.USE_BUILTIN_RIPGREP) || !forceBuiltin
 
-  // Try system ripgrep if user wants it
-  if (userWantsSystemRipgrep) {
+  // Try system ripgrep first (unless user explicitly wants builtin)
+  if (preferSystem) {
     const { cmd: systemPath } = findExecutable('rg', [])
     if (systemPath !== 'rg') {
       // SECURITY: Use command name 'rg' instead of systemPath to prevent PATH hijacking
@@ -55,13 +56,19 @@ const getRipgrepConfig = memoize((): RipgrepConfig => {
     }
   }
 
+  // Vendored binary — only use if it actually exists on disk
   const rgRoot = path.resolve(__dirname, 'vendor', 'ripgrep')
-  const command =
+  const vendorBin =
     process.platform === 'win32'
       ? path.resolve(rgRoot, `${process.arch}-win32`, 'rg.exe')
       : path.resolve(rgRoot, `${process.arch}-${process.platform}`, 'rg')
 
-  return { mode: 'builtin', command, args: [] }
+  if (existsSync(vendorBin)) {
+    return { mode: 'builtin', command: vendorBin, args: [] }
+  }
+
+  // Final fallback: try system rg anyway (will ENOENT at call time if not found)
+  return { mode: 'system', command: 'rg', args: [] }
 })
 
 export function ripgrepCommand(): {
