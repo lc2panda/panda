@@ -8,6 +8,7 @@ import { getTeammateColor } from 'src/utils/teammate.js';
 import type { Theme } from 'src/utils/theme.js';
 import { isAgentSwarmsEnabled } from '../../utils/agentSwarmsEnabled.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 type Props = {
   mode: PromptInputMode;
   isLoading: boolean;
@@ -51,11 +52,11 @@ function PromptChar(t0) {
   } = t0;
   const teammateColor = themeColor;
   const matrixActive = isMatrixTheme();
-  const color = matrixActive ? '#00ff41' : (teammateColor ?? (false ? "subtle" : undefined));
+  const color = matrixActive ? MATRIX_UI.prompt : (teammateColor ?? (false ? "subtle" : undefined));
   let t1;
   if ($[0] !== color || $[1] !== isLoading) {
     t1 = matrixActive
-      ? <Text color="#00ff41" dimColor={isLoading}>neo ▸ </Text>
+      ? <Text color={MATRIX_UI.prompt} dimColor={isLoading}>neo ▸ </Text>
       : <Text color={color} dimColor={isLoading}>{figures.pointer} </Text>;
     $[0] = color;
     $[1] = isLoading;

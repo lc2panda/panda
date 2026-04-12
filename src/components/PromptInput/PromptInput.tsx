@@ -92,6 +92,7 @@ import { writeToMailbox } from '../../utils/teammateMailbox.js';
 import type { TextHighlight } from '../../utils/textHighlighting.js';
 import type { Theme } from '../../utils/theme.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 import { findThinkingTriggerPositions, getRainbowColor, isUltrathinkEnabled } from '../../utils/thinking.js';
 import { findTokenBudgetPositions } from '../../utils/tokenBudget.js';
 import { findUltraplanTriggerPositions, findUltrareviewTriggerPositions } from '../../utils/ultraplan/keyword.js';
@@ -2219,7 +2220,7 @@ function PromptInput({
     // ThemedBox.borderColor also accepts raw Color strings, so a #hex
     // passes through fine — cast keeps the signature stable.
     if (isMatrixTheme()) {
-      return '#00ff41' as unknown as keyof Theme;
+      return MATRIX_UI.border as unknown as keyof Theme;
     }
     const modeColors: Record<string, keyof Theme> = {
       bash: 'bashBorder'

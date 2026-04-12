@@ -38,6 +38,7 @@ import { LogoV2 } from './LogoV2/LogoV2.js';
 import { StreamingMarkdown } from './Markdown.js';
 import { hasContentAfterIndex, MessageRow } from './MessageRow.js';
 import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from './MatrixTheme/matrixPalette.js';
 import { InVirtualListContext, type MessageActionsNav, MessageActionsSelectedContext, type MessageActionsState } from './messageActions.js';
 import { AssistantThinkingMessage } from './messages/AssistantThinkingMessage.js';
 import { isNullRenderingAttachment } from './messages/nullRenderingAttachments.js';
@@ -631,7 +632,7 @@ const MessagesImpl = ({
     const isRoleMsg = msg_8.type === 'user' || msg_8.type === 'assistant';
     const roleChanged = isRoleMsg && prevType !== msg_8.type;
     const matrixPrefix = isMatrixTheme() && isRoleMsg && roleChanged
-      ? <Text color="#00ff41">{msg_8.type === 'user' ? '▸ ' : '◉ '}</Text>
+      ? <Text color={msg_8.type === 'user' ? MATRIX_UI.userMark : MATRIX_UI.assistantMark}>{msg_8.type === 'user' ? '▸ ' : '◉ '}</Text>
       : null;
     const row = matrixPrefix
       ? <Box flexDirection="row" alignItems="flex-start">{matrixPrefix}{rawRow}</Box>
@@ -646,7 +647,7 @@ const MessagesImpl = ({
       </MessageActionsSelectedContext.Provider>;
     if (unseenDivider && index === dividerBeforeIndex) {
       return [<Box key="unseen-divider" marginTop={1}>
-          <Divider title={`${unseenDivider.count} new ${plural(unseenDivider.count, 'message')}`} width={columns} color={isMatrixTheme() ? '#006420' as any : 'inactive'} />
+          <Divider title={`${unseenDivider.count} new ${plural(unseenDivider.count, 'message')}`} width={columns} color={isMatrixTheme() ? MATRIX_UI.divider as any : 'inactive'} />
         </Box>, wrapped];
     }
     return wrapped;

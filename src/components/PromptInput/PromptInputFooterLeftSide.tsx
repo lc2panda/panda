@@ -42,6 +42,7 @@ import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js';
 import { getPlatform } from '../../utils/platform.js';
 import { PrBadge } from '../PrBadge.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 
 // Dead code elimination: conditional import for proactive mode
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -375,7 +376,7 @@ function ModeIndicator({
   // Get hint parts separately for potential second-line rendering
   const hintParts = showHint ? getSpinnerHintParts(isLoading, escShortcut, todosShortcut, killAgentsShortcut, hasTaskItems, expandedView, hasAnyInProcessTeammates, hasRunningAgentTasks, isKillAgentsConfirmShowing) : [];
   if (isViewingCompletedTeammate) {
-    parts.push(<Text dimColor color={isMatrixTheme() ? '#006420' : undefined} key="esc-return">
+    parts.push(<Text dimColor color={isMatrixTheme() ? MATRIX_UI.hint : undefined} key="esc-return">
         <KeyboardShortcutHint shortcut={escShortcut} action="return to team lead" />
       </Text>);
   } else if ((feature('PROACTIVE') || feature('KAIROS')) && hasNextTick) {
@@ -408,7 +409,7 @@ function ModeIndicator({
   // below still treat "pill present" as non-empty.
   const tasksPart = hasBackgroundTasks && !hasTeammatePills && !shouldHideTasksFooter(tasks, showSpinnerTree) ? <BackgroundTaskStatus tasksSelected={tasksSelected} isViewingTeammate={isViewingTeammate} teammateFooterIndex={teammateFooterIndex} isLeaderIdle={!isLoading} onOpenDialog={onOpenTasksDialog} /> : null;
   if (parts.length === 0 && !tasksPart && !modePart && showHint) {
-    parts.push(<Text dimColor color={isMatrixTheme() ? '#006420' : undefined} key="shortcuts-hint">
+    parts.push(<Text dimColor color={isMatrixTheme() ? MATRIX_UI.hint : undefined} key="shortcuts-hint">
         ? for shortcuts
       </Text>);
   }
@@ -444,12 +445,12 @@ function ModeIndicator({
         </Byline>
       </Text>);
   } else if (feature('VOICE_MODE') && parts.length > 0 && showHint && voiceEnabled && voiceState === 'idle' && hintParts.length === 0 && voiceHintUnderCap) {
-    parts.push(<Text dimColor color={isMatrixTheme() ? '#006420' : undefined} key="voice-hint">
+    parts.push(<Text dimColor color={isMatrixTheme() ? MATRIX_UI.hint : undefined} key="voice-hint">
         hold {voiceKeyShortcut} to speak
       </Text>);
   }
   if ((tasksPart || hasCoordinatorTasks) && showHint && !hasTeams) {
-    parts.push(<Text dimColor color={isMatrixTheme() ? '#006420' : undefined} key="manage-tasks">
+    parts.push(<Text dimColor color={isMatrixTheme() ? MATRIX_UI.hint : undefined} key="manage-tasks">
         {tasksSelected ? <KeyboardShortcutHint shortcut="Enter" action="view tasks" /> : <KeyboardShortcutHint shortcut="↓" action="manage" />}
       </Text>);
   }
@@ -504,7 +505,7 @@ function getSpinnerHintParts(isLoading: boolean, escShortcut: string, todosShort
   // Show the toggle hint only when there are task items to display or
   // teammates to cycle to
   const showToggleHint = hasTaskItems || hasTeammates;
-  const matrixHintColor = isMatrixTheme() ? '#006420' : undefined;
+  const matrixHintColor = isMatrixTheme() ? MATRIX_UI.hint : undefined;
   return [...(isLoading ? [<Text dimColor color={matrixHintColor} key="esc">
             <KeyboardShortcutHint shortcut={escShortcut} action="interrupt" />
           </Text>] : []), ...(!isLoading && hasRunningAgentTasks && !isKillAgentsConfirmShowing ? [<Text dimColor color={matrixHintColor} key="kill-agents">

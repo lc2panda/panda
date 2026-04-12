@@ -17,6 +17,7 @@ const teamMemSaved = feature('TEAMMEM') ? require('./teamMemSaved.js') as typeof
 import { getTurnCompletionVerbs, TURN_COMPLETION_VERBS } from '../../constants/turnCompletionVerbs.js';
 import { isZh } from '../../utils/i18n.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import type { SystemMessage, SystemStopHookSummaryMessage, SystemBridgeStatusMessage, SystemTurnDurationMessage, SystemThinkingMessage, SystemMemorySavedMessage } from '../../types/message.js';
 import { SystemAPIErrorMessage } from './SystemAPIErrorMessage.js';
@@ -79,7 +80,7 @@ export function SystemTextMessage(t0) {
     }
     let t3;
     if ($[7] !== message.content) {
-      t3 = <Text dimColor={true} color={isMatrixTheme() ? '#006420' : undefined}>{message.content}</Text>;
+      t3 = <Text dimColor={true} color={isMatrixTheme() ? MATRIX_UI.systemMsg : undefined}>{message.content}</Text>;
       $[7] = message.content;
       $[8] = t3;
     } else {
@@ -437,7 +438,7 @@ function SystemTextMessageInner(t0) {
     color: colorProp,
     dimColor
   } = t0;
-  const color = isMatrixTheme() && dimColor && !colorProp ? '#006420' : colorProp;
+  const color = isMatrixTheme() && dimColor && !colorProp ? MATRIX_UI.systemMsg : colorProp;
   const {
     columns
   } = useTerminalSize();
@@ -571,7 +572,7 @@ function TurnDurationMessage(t0) {
   const t8 = backgroundTaskSummary && ` \u00B7 ${backgroundTaskSummary} ${isZh() ? '仍在运行' : 'still running'}`;
   let t9;
   if ($[9] !== budgetSuffix || $[10] !== t7 || $[11] !== t8) {
-    t9 = <Text dimColor={true} color={isMatrixTheme() ? '#006420' : undefined}>{t7}{budgetSuffix}{t8}</Text>;
+    t9 = <Text dimColor={true} color={isMatrixTheme() ? MATRIX_UI.systemMsg : undefined}>{t7}{budgetSuffix}{t8}</Text>;
     $[9] = budgetSuffix;
     $[10] = t7;
     $[11] = t8;
