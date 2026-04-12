@@ -326,7 +326,7 @@ const wechatDailySituational: SmartCronTask = {
       const mentions: { channelName: string; senderName: string; content: string; time: string }[] = []
       for (const msg of messages) {
         for (const nick of nicknames) {
-          if (msg.content.includes(`@${nick}`) || msg.content.includes(nick)) {
+          if (msg.content.includes(`@${nick}`)) {
             mentions.push({
               channelName: msg.channelName,
               senderName: msg.senderName,

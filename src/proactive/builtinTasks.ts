@@ -36,6 +36,23 @@ import { getWechatSituationalTasks } from './tasks/wechatSituational.js'
 
 const HOME = homedir()
 
+// Bug fix: 日历提醒去重 — 记录已通知的 eventTitle+startDate 组合
+const _calendarNotifiedSet = new Set<string>()
+let _calendarNotifiedLastClean = Date.now()
+const CALENDAR_DEDUP_TTL = 24 * 60 * 60 * 1000 // 24 小时后自动清理
+
+function _calendarDedup(key: string): boolean {
+  // 先清理过期记录
+  const now = Date.now()
+  if (now - _calendarNotifiedLastClean > CALENDAR_DEDUP_TTL) {
+    _calendarNotifiedSet.clear()
+    _calendarNotifiedLastClean = now
+  }
+  if (_calendarNotifiedSet.has(key)) return true
+  _calendarNotifiedSet.add(key)
+  return false
+}
+
 function canRun(): boolean {
   return isProactiveActive() || isNightModeActive()
 }
@@ -282,6 +299,7 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     },
   },
   // ─── 日历事件主动提醒 ───
+  // 去重：记录已通知的 eventTitle+startDate，防止重叠窗口重复通知
   {
     id: 'calendar-reminder',
     description: '日历事件提醒 · Calendar event reminder',
@@ -320,6 +338,12 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           // 提前 30 分钟和 10 分钟各提醒一次
           if ((minutesBefore > 8 && minutesBefore <= 30) ||
               (minutesBefore > 0 && minutesBefore <= 10)) {
+            // 去重：同一事件同一窗口不重复通知
+            const dedupKey = `${evt.title}|${evt.startDate}|${minutesBefore <= 10 ? '10min' : '30min'}`
+            if (_calendarDedup(dedupKey)) {
+              logForDebugging(`[builtinTasks] calendar-reminder: skipped duplicate "${evt.title}"`)
+              continue
+            }
             const { pushNotification } = await import('../assistant/sense.js')
             const timeLabel = minutesBefore <= 10
               ? `${Math.round(minutesBefore)} 分钟后`

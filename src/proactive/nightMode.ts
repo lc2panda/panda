@@ -170,9 +170,9 @@ export async function runNightTasks(): Promise<void> {
     }
 
     logForDebugging('[proactive] orchestrator complete')
+    _lastOrchestratorRun = Date.now()
   } finally {
     _isRunning = false
-    _lastOrchestratorRun = Date.now()
   }
 }
 
