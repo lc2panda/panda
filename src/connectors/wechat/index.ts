@@ -709,6 +709,8 @@ class WechatLocalDBConnector implements IMConnector {
       return existsSync(dst)
     } catch (e) {
       logForDebugging(`[wechat-localdb] 解密失败 ${src}: ${(e as Error).message}`)
+      // 清理可能残留的不完整明文 DB 文件
+      try { const { unlinkSync } = require('fs'); unlinkSync(dst) } catch {}
       return false
     }
   }

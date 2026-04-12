@@ -340,7 +340,15 @@ export async function loadRecentEpisodes(n: number = 3): Promise<string> {
     for (const { f } of sorted) {
       try {
         const content = readFileSync(join(episodesDir, f), 'utf-8')
-        const lines = content.split('\n').slice(0, 8).join('\n')
+        // 跳过 YAML frontmatter（--- 分隔的元数据块）
+        let bodyContent = content
+        if (content.startsWith('---')) {
+          const secondDash = content.indexOf('---', 3)
+          if (secondDash !== -1) {
+            bodyContent = content.slice(secondDash + 3).trimStart()
+          }
+        }
+        const lines = bodyContent.split('\n').slice(0, 8).join('\n')
         summaries.push(`### ${f.replace('.md', '')}\n${lines}`)
       } catch {}
     }
@@ -1098,7 +1106,7 @@ async function _extractUserFeatures(messages: readonly any[], memoryDir: string)
       '',
       '## 基础信息',
       `- 语言偏好: ${langPref}`,
-      `- 时区: ${Intl.DateTimeFormat().resolvedOptions().timeZone} (UTC${new Date().getTimezoneOffset() <= 0 ? '+' : '-'}${String(Math.abs(Math.floor(new Date().getTimezoneOffset() / 60))).padStart(2, '0')}:${String(Math.abs(new Date().getTimezoneOffset() % 60)).padStart(2, '0')})`,
+      `- 时区: ${Intl.DateTimeFormat().resolvedOptions().timeZone} (UTC${new Date().getTimezoneOffset() <= 0 ? '+' : '-'}${String(Math.abs(Math.trunc(new Date().getTimezoneOffset() / 60))).padStart(2, '0')}:${String(Math.abs(new Date().getTimezoneOffset() % 60)).padStart(2, '0')})`,
       '',
       '## 工作模式',
       `- 活跃时段: ${hourStr}-${hourStr}`,

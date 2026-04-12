@@ -26,7 +26,7 @@ export const call: LocalCommandCall = async (args) => {
   if (arg === 'off' || arg === 'none') {
     saveGlobalConfig(current => ({
       ...current,
-      persona: undefined,
+      persona: { ...current.persona, active: undefined },
     }))
     return { type: 'text', value: 'Persona 已关闭' }
   }

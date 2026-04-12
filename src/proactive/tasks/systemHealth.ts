@@ -4,6 +4,7 @@
 
 import type { ProactiveTask } from '../taskRegistry.js'
 import { getDiskInfo, getMemoryInfo, checkNetwork, IS_WIN } from '../platform.js'
+import { platform as osPlatform } from 'os'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { pushNotification } from '../../assistant/sense.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -63,7 +64,11 @@ function getTopMemoryProcesses(count: number = 3): string[] {
       return out.trim().split('\n').filter(Boolean).slice(2) // 跳过表头
     }
     // macOS / Linux
-    const out = execSync(`ps aux --sort=-%mem 2>/dev/null | head -${count + 1} || ps aux -m 2>/dev/null | head -${count + 1}`, {
+    const isMac = osPlatform() === 'darwin'
+    const cmd = isMac
+      ? `ps aux -m | head -${count + 1}`
+      : `ps aux --sort=-%mem | head -${count + 1}`
+    const out = execSync(cmd, {
       encoding: 'utf-8',
       timeout: 5000,
     })
