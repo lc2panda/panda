@@ -66,12 +66,17 @@ interface SmartCronTask extends ProactiveTask {
   skipIf?: () => boolean
 }
 
+/**
+ * 安全获取最近交互时间。失败时返回 Date.now()（视为"刚活跃"），
+ * 使依赖 idle 判断的任务（dream-consolidate 等）跳过而非误执行。
+ * 返回 0 会导致 idle 值约 56 年，触发不该执行的定时任务。
+ */
 function getLastInteractionTimeSafe(): number {
   try {
     const { getLastInteractionTime } = require('../bootstrap/state.js') as typeof import('../bootstrap/state.js')
     return getLastInteractionTime()
   } catch {
-    return 0
+    return Date.now()
   }
 }
 

@@ -118,6 +118,11 @@ class WecomAPIConnector implements IMConnector {
   }
 
   async sendMessage(target: string, content: string): Promise<{ messageId: string }> {
+    const agentId = this.config?.agentId
+    if (!agentId) {
+      logForDebugging('[wechat-wecom] sendMessage 失败: agentId 未配置，消息无法发送')
+      throw new Error('企微 agentId 未配置，无法发送消息。请在 connectors.json 中设置 wechat.agentId')
+    }
     try {
       await this.ensureToken()
       const resp = await fetch(`https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=${this.accessToken}`, {
@@ -126,7 +131,7 @@ class WecomAPIConnector implements IMConnector {
         body: JSON.stringify({
           touser: target,
           msgtype: 'text',
-          agentid: this.config?.agentId || '',
+          agentid: agentId,
           text: { content },
         }),
       })
@@ -428,7 +433,6 @@ class WechatLocalDBConnector implements IMConnector {
         })
 
         const totalUnread = channels.reduce((sum: number, ch: any) => sum + ch.unreadCount, 0)
-        db.close()
 
         return {
           platform: 'wechat',

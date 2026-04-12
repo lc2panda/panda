@@ -17,7 +17,7 @@ const proactive = {
         onDone: LocalJSXCommandOnDone,
         context: LocalJSXCommandContext,
       ): Promise<React.ReactNode> {
-        const proactiveModule = require('../proactive/index.js') as typeof import('../proactive/index.js')
+        const proactiveModule = await import('../proactive/index.js') as typeof import('../proactive/index.js')
         const isActive = proactiveModule.isProactiveActive()
 
         if (isActive) {

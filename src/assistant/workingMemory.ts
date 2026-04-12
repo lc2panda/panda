@@ -51,6 +51,16 @@ function isExpired(entry: WorkingMemoryEntry): boolean {
 
 function evictIfNeeded(): void {
   const entries = load()
+
+  // 先清理所有过期条目（惰性清理：永不被读取的 key 也能在写入时回收）
+  const now = Date.now()
+  for (const [k, e] of entries) {
+    if (now - e.updatedAt > TTL_MS) {
+      entries.delete(k)
+    }
+  }
+
+  // 再按 LRU 淘汰超出上限的条目
   if (entries.size <= MAX_ENTRIES) return
   const sorted = Array.from(entries.entries()).sort(
     (a, b) => a[1].updatedAt - b[1].updatedAt,

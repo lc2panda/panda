@@ -4,6 +4,7 @@
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
 import { getGlobalConfig } from '../utils/config.js'
+import { getProactiveConfig } from './proactiveConfig.js'
 import { getEnabledTasks } from './taskRegistry.js'
 import { safeExecute } from './safeExecutor.js'
 import { logForDebugging } from '../utils/debug.js'
@@ -82,8 +83,11 @@ function _pruneExecMap(): void {
 }
 
 export function isNightTime(): boolean {
+  const config = getProactiveConfig()
+  const startHour = config.lateNightStartHour  // default 23
+  const endHour = config.lateNightEndHour      // default 5
   const hour = new Date().getHours()
-  return hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR
+  return hour >= startHour || hour < endHour
 }
 
 export function getNightModeConfig(): NightModeConfig {
@@ -193,9 +197,10 @@ export function getNextNightTickAt(): number | null {
       : now.getTime()
   }
 
-  // Daytime: compute next 22:00
+  // Daytime: compute next start hour from config
+  const config = getProactiveConfig()
   const next = new Date(now)
-  next.setHours(NIGHT_START_HOUR, 0, 0, 0)
+  next.setHours(config.lateNightStartHour, 0, 0, 0)
   if (next.getTime() <= now.getTime()) {
     next.setDate(next.getDate() + 1)
   }

@@ -1260,15 +1260,6 @@ function _searchMemoryFTS5(query: string, memoryDir: string, files: string[], to
   // 未来若切换到持久化 SQLite，请在此处调用 checkAndRecoverSQLite(dbPath)
   // —— integrity check 逻辑已在 src/memdir/sqliteIntegrity.ts 就位。
   const dbPath = ':memory:'
-  if (dbPath !== ':memory:') {
-    try {
-      const { checkAndRecoverSQLite } = require('./sqliteIntegrity.js')
-      const result = checkAndRecoverSQLite(dbPath)
-      if (!result.ok && result.recovered) {
-        logForDebugging(`[memdir] SQLite ${dbPath} corruption detected, backed up. Errors: ${result.errors.join(', ')}`)
-      }
-    } catch {}
-  }
   const db = new Database(dbPath)
 
   // 创建 FTS5 虚拟表，unicode61 分词器支持中英文

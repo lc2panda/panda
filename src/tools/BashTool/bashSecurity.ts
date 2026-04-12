@@ -854,6 +854,8 @@ function validateDangerousVariables(
  * - Loop-based: `while true; do ... & done` with recursive function definitions
  * - Perl: `perl -e 'fork while fork'`
  * - Python: `python -c 'import os; [os.fork() ...]'`
+ * - Node.js: `node -e "require('child_process').fork(__filename)"`
+ * - Bash -c wrapper: `bash -c ":(){ :|:& };:"`
  */
 function validateForkBomb(context: ValidationContext): PermissionResult {
   const { originalCommand } = context
@@ -886,6 +888,16 @@ function validateForkBomb(context: ValidationContext): PermissionResult {
       pattern: /while\s+true\s*;\s*do\s+[^;]*\(\s*\)\s*\{[^}]*\|[^}]*&\s*\}[^;]*;\s*:\s*&\s*done/,
       description: 'loop-based fork bomb',
     },
+    // Node.js fork bomb: node -e "require('child_process').fork(__filename)"
+    {
+      pattern: /node\s+(-e|--eval)\s+.*fork\s*\(/,
+      description: 'Node.js fork bomb via child_process.fork()',
+    },
+    // Bash -c wrapper for fork bomb: bash -c ":(){ :|:& };:"
+    {
+      pattern: /bash\s+-c\s+.*\(\)\s*\{.*\|.*&/,
+      description: 'bash -c fork bomb wrapper',
+    },
   ]
 
   for (const { pattern, description } of FORK_BOMB_PATTERNS) {
@@ -912,6 +924,8 @@ function validateForkBomb(context: ValidationContext): PermissionResult {
  * - `chmod -R 777 /path`
  * - `chmod 777 -R /path`
  * - `chmod -R a+rwx /path` (equivalent to 777)
+ * - `find / -exec chmod 777 {} \;`
+ * - `chmod -R 0777 /path` (octal prefix variant)
  */
 function validateChmodRecursive777(
   context: ValidationContext,
@@ -933,6 +947,16 @@ function validateChmodRecursive777(
     {
       pattern: /chmod\s+(?:-[a-zA-Z]*R[a-zA-Z]*|--recursive)\s+a\+rwx\b/,
       description: 'chmod -R a+rwx (equivalent to 777)',
+    },
+    // find ... -exec chmod 777 (with optional octal prefix 0)
+    {
+      pattern: /find\s+.*-exec\s+chmod\s+0?777/,
+      description: 'find -exec chmod 777',
+    },
+    // chmod -R 0777 (octal prefix variant)
+    {
+      pattern: /chmod\s+(?:-[a-zA-Z]*R[a-zA-Z]*|--recursive)\s+0777\b/,
+      description: 'chmod -R 0777 (octal prefix)',
     },
   ]
 

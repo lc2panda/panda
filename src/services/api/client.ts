@@ -87,6 +87,9 @@ function createStderrLogger(): ClientOptions['logger'] {
   }
 }
 
+// Privacy-safe session ID: random per process launch, not traceable to user
+const PRIVACY_SESSION_ID = randomUUID()
+
 export async function getAnthropicClient({
   apiKey,
   maxRetries,
@@ -161,7 +164,7 @@ export async function getAnthropicClient({
     : {
         'x-app': 'cli',
         'User-Agent': getUserAgent(),
-        'X-Claude-Code-Session-Id': 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
+        'X-Claude-Code-Session-Id': PRIVACY_SESSION_ID,
         ...customHeaders,
         ...(containerId
           ? { 'x-claude-remote-container-id': containerId }

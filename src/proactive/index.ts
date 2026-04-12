@@ -32,8 +32,9 @@ export function activateProactive(_source?: string): void {
   _active = true
   // 首次激活时确保所有 ~/.pandacc/ 子目录存在
   try {
-    const { ensurePandaccDirs } = require('./platform.js') as typeof import('./platform.js')
-    ensurePandaccDirs()
+    void import('./platform.js')
+      .then(({ ensurePandaccDirs }) => ensurePandaccDirs())
+      .catch(() => {})
   } catch {}
   for (const task of BUILTIN_TASKS) {
     registerTask(task)
@@ -52,6 +53,11 @@ export function deactivateProactive(): void {
   if (!_active) return
   _active = false
   _paused = false
+  // Notify assistant module to clear ownership flag if it was tracking proactive
+  try {
+    const { clearProactiveOwnership } = require('../assistant/index.js') as typeof import('../assistant/index.js')
+    clearProactiveOwnership()
+  } catch {}
   _notifySubscribers()
 }
 

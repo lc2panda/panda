@@ -17,17 +17,18 @@ const assistant = {
         onDone: LocalJSXCommandOnDone,
         context: LocalJSXCommandContext,
       ): Promise<React.ReactNode> {
-        const assistantModule = require('../../assistant/index.js') as typeof import('../../assistant/index.js')
+        const assistantModule = await import('../../assistant/index.js') as typeof import('../../assistant/index.js')
         const isActive = assistantModule.isAssistantMode()
 
         if (isActive) {
+          assistantModule.deactivateAssistant()
           logEvent('tengu_assistant_toggled', {
             enabled: false,
             source:
               'slash_command' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           })
           onDone(
-            'Assistant mode is currently active. It cannot be disabled mid-session — restart without --assistant to use normal mode.',
+            'Assistant mode deactivated.',
             { display: 'system' },
           )
         } else {

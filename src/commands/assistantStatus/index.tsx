@@ -195,13 +195,9 @@ async function collectStatus(): Promise<StatusSnapshot> {
   }
 }
 
-function formatRelativeTime(d: Date): string {
-  const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000))
-  if (mins < 1) return '刚刚'
-  if (mins < 60) return `${mins} 分钟前`
-  const hours = Math.round(mins / 60)
-  if (hours < 24) return `${hours} 小时前`
-  return `${Math.round(hours / 24)} 天前`
+function formatAbsoluteTime(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 function padRight(s: string, width: number): string {
@@ -249,7 +245,7 @@ function renderStatusText(snapshot: StatusSnapshot): string {
     lines.push('  (暂无记录 — 可能 panda 刚启动，或定时器尚未触发)')
   } else {
     for (const e of snapshot.recentExecutions.slice(0, 12)) {
-      lines.push(`  · ${padRight(e.taskId, 30)} ${formatRelativeTime(e.ts)}`)
+      lines.push(`  · ${padRight(e.taskId, 30)} ${formatAbsoluteTime(e.ts)}`)
     }
     if (snapshot.recentExecutions.length > 12) {
       lines.push(`  … +${snapshot.recentExecutions.length - 12} more`)

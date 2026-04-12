@@ -14,6 +14,9 @@ import {
   commitCollapse,
   extractText,
 } from './operations.js'
+import { getContextWindowForModel } from '../../utils/context.js'
+import { getRuntimeMainLoopModel } from '../../utils/model/model.js'
+import { getSdkBetas } from '../../bootstrap/state.js'
 import { getLastSnapshot } from './persist.js'
 
 export { projectView } from './operations.js'
@@ -99,9 +102,15 @@ export const applyCollapsesIfNeeded: (
 
   health.totalSpawns++
 
-  // 估算当前 token
+  // 估算当前 token — 从模型实际上下文窗口获取，避免硬编码
   const totalTokens = estimateTotalTokens(messages)
-  const contextWindow = 200_000 // 默认上下文窗口
+  let contextWindow: number
+  try {
+    const model = getRuntimeMainLoopModel({})
+    contextWindow = getContextWindowForModel(model, getSdkBetas())
+  } catch {
+    contextWindow = 200_000 // fallback：无法获取模型信息时使用保守默认值
+  }
   const threshold = contextWindow * 0.6 // 60%
 
   if (totalTokens < threshold) {

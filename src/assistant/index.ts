@@ -14,6 +14,11 @@ let _forced = false
 let _activationPath: string | undefined
 let _assistantOwnedProactive = false
 
+/** Called by proactive module when proactive is deactivated externally (e.g. /proactive off). */
+export function clearProactiveOwnership(): void {
+  _assistantOwnedProactive = false
+}
+
 export function isAssistantMode(): boolean {
   return _forced || getKairosActive()
 }
