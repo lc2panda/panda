@@ -19,5 +19,5 @@ export function getTimeSense() {
                 ? 'evening'
                 : 'night'
 
-  return { hour, dayOfWeek, isWeekend, isWorkHours, period, timestamp: now.toISOString() }
+  return { hour, dayOfWeek, isWeekend, isWorkHours, period, timestamp: now.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }
 }

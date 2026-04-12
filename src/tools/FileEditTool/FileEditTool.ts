@@ -503,7 +503,9 @@ export const FileEditTool = buildTool({
           `[boundedMemory] ${absoluteFilePath} 压缩 ${result.check.currentChars} → ${result.check.maxChars} 字符（超出 ${result.check.excessChars}）`,
         )
       }
-    } catch {}
+    } catch (e) {
+      logForDebugging(`[boundedMemory] enforceBounded failed for ${absoluteFilePath}: ${e}`)
+    }
 
     // 5. Write to disk
     writeTextContent(absoluteFilePath, finalContent, encoding, endings)

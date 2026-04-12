@@ -41,9 +41,40 @@ export function resetCollapseState(): void {
  * 估算单条消息的 token 数（纯本地，不调 API）。
  * 粗略估算：英文约 4 chars/token，中文约 2 chars/token。
  * 取保守值 3 chars/token（偏高估，宁可早折叠）。
+ * base64 图片数据使用 6 chars/token（base64 编码膨胀 33%，API 有专门的图片 token 计算）。
  */
 export function estimateTokens(message: Message): number {
-  const text = JSON.stringify(message.message?.content ?? '')
+  const content = message.message?.content
+  if (!content) return 0
+
+  // 对数组内容逐块估算，区分 image/base64 数据
+  if (Array.isArray(content)) {
+    let total = 0
+    for (const block of content) {
+      const b = block as Record<string, unknown>
+      if (b.type === 'image' && b.source && typeof (b.source as any).data === 'string') {
+        // base64 图片块：用更宽松的系数
+        total += Math.ceil(((b.source as any).data as string).length / 6)
+      } else {
+        total += Math.ceil(JSON.stringify(b).length / 3)
+      }
+    }
+    return total
+  }
+
+  const text = JSON.stringify(content)
+  // 检测内联 base64 data URL
+  if (text.includes('data:image/') && text.includes(';base64,')) {
+    // 分离 base64 段和普通文本分别估算
+    const base64Matches = text.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/g) || []
+    let base64Chars = 0
+    for (const m of base64Matches) {
+      base64Chars += m.length
+    }
+    const nonBase64Chars = text.length - base64Chars
+    return Math.ceil(nonBase64Chars / 3) + Math.ceil(base64Chars / 6)
+  }
+
   return Math.ceil(text.length / 3)
 }
 
@@ -181,8 +212,18 @@ function assessMessageRisk(msg: Message): number {
         // Agent 调用中等风险
         if (name === 'Agent') return 0.5
       }
-      // tool_result 块
-      if (b.type === 'tool_result') return 0.3
+      // tool_result 块：检查关联的 tool_use 名称以区分风险
+      if (b.type === 'tool_result') {
+        const toolUseId = b.tool_use_id as string | undefined
+        if (toolUseId) {
+          // 在同一消息的其他块或前序 content 块中查找对应的 tool_use
+          const toolName = findToolNameForResult(msg, toolUseId)
+          if (toolName && ['Edit', 'Write', 'FileEdit', 'FileWrite', 'NotebookEdit'].includes(toolName)) {
+            return 0.7 // 文件变更的结果包含重要上下文（diff、路径）
+          }
+        }
+        return 0.3
+      }
     }
   }
 
@@ -192,6 +233,23 @@ function assessMessageRisk(msg: Message): number {
   if (textContent.length < 500) return 0.3
 
   return 0.5
+}
+
+/**
+ * 在消息的 content 块中查找 tool_use_id 对应的工具名称。
+ * tool_result 和 tool_use 块可能出现在同一 content 数组中，
+ * 也可能在相邻消息中——此函数仅查找同消息内的 tool_use 块。
+ */
+function findToolNameForResult(msg: Message, toolUseId: string): string | null {
+  const content = msg.message?.content
+  if (!Array.isArray(content)) return null
+  for (const block of content) {
+    const b = block as Record<string, unknown>
+    if (b.type === 'tool_use' && b.id === toolUseId && typeof b.name === 'string') {
+      return b.name
+    }
+  }
+  return null
 }
 
 /**
@@ -279,11 +337,11 @@ export function commitCollapse(
   const collapseId = `cc-${String(++collapseIdCounter).padStart(4, '0')}`
 
   const summaryPlaceholder: Message = {
-    type: 'assistant' as const,
+    type: 'system' as const,
     uuid: `collapse-${collapseId}` as any,
     isMeta: true,
     message: {
-      role: 'assistant',
+      role: 'system',
       content: [
         {
           type: 'text' as const,

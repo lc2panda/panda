@@ -1891,6 +1891,11 @@ function checkCompletionGuard(
   if (!textContent) return null
 
   // 检查是否包含完成声明关键词
+  // 仅检查最后 2 句话，避免正常讨论中提到 "all done" 等词误触发
+  // （如 "when the user says all done" 不应触发）
+  const allSentences = textContent.split(/[。.!！?\n]/).filter(s => s.trim().length > 0)
+  const lastTwoSentences = allSentences.slice(-2).join(' ')
+
   const completionPatterns = [
     /已(?:全部)?完成/,
     /任务完成/,
@@ -1901,7 +1906,7 @@ function checkCompletionGuard(
     /工作.*完毕/,
   ]
 
-  const hasCompletionClaim = completionPatterns.some(p => p.test(textContent))
+  const hasCompletionClaim = completionPatterns.some(p => p.test(lastTwoSentences))
   if (!hasCompletionClaim) return null
 
   // Finding Closure 检查：是否有未关闭的发现

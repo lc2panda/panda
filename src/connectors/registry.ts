@@ -15,6 +15,8 @@ class ConnectorRegistry {
   private factories = new Map<ConnectorPlatform, ConnectorFactory>()
   private instances = new Map<ConnectorPlatform, IMConnector>()
   private healthCheckInterval: ReturnType<typeof setInterval> | null = null
+  /** 并发控制：正在连接中的平台集合，防止重复连接 */
+  private _connectingSet = new Set<ConnectorPlatform>()
 
   /**
    * 注册 Connector 工厂。内置平台在模块加载时自动注册，
@@ -111,9 +113,16 @@ class ConnectorRegistry {
     const config = getConnectorConfig(platform)
     if (!config) return false
 
-    await this.disconnect(platform)
+    // 并发控制：拒绝对同一平台的重复连接请求
+    if (this._connectingSet.has(platform)) {
+      logForDebugging(`[registry] ${platform}: connect rejected — already connecting`)
+      return false
+    }
 
+    this._connectingSet.add(platform)
     try {
+      await this.disconnect(platform)
+
       const connector = factory.create()
       const resolvedConfig = await this.resolveSecrets(config)
       await connector.initialize(resolvedConfig)
@@ -122,6 +131,8 @@ class ConnectorRegistry {
     } catch (e) {
       logForDebugging(`[registry] ${platform}: connect failed: ${(e as Error).message}`)
       return false
+    } finally {
+      this._connectingSet.delete(platform)
     }
   }
 
@@ -168,14 +179,24 @@ class ConnectorRegistry {
     const resolved = { ...config }
     for (const [key, value] of Object.entries(resolved)) {
       if (typeof value === 'string' && value.startsWith('keychain:')) {
-        (resolved as any)[key] = await resolveSecret(value)
+        try {
+          (resolved as any)[key] = await resolveSecret(value)
+        } catch (e) {
+          logForDebugging(`[registry] resolveSecret failed for key "${key}": ${(e as Error).message}`)
+          ;(resolved as any)[key] = ''
+        }
       }
     }
     if (resolved.mcpEnv) {
       const resolvedEnv = { ...resolved.mcpEnv }
       for (const [key, value] of Object.entries(resolvedEnv)) {
         if (value.startsWith('keychain:')) {
-          resolvedEnv[key] = await resolveSecret(value)
+          try {
+            resolvedEnv[key] = await resolveSecret(value)
+          } catch (e) {
+            logForDebugging(`[registry] resolveSecret failed for mcpEnv key "${key}": ${(e as Error).message}`)
+            resolvedEnv[key] = ''
+          }
         }
       }
       resolved.mcpEnv = resolvedEnv

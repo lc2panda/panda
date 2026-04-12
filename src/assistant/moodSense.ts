@@ -54,7 +54,9 @@ function detectMoodFromText(text: string): Mood | null {
   if (KEYWORDS.frustrated.some(kw => lower.includes(kw))) return 'frustrated'
 
   // Focused: long message with code blocks or technical patterns
-  const hasCodeBlock = text.includes('```') || text.includes('    ')
+  // Require actual code keywords to avoid false positives on plain long text
+  const CODE_KEYWORDS = /\b(const|let|var|function|import|export|def|class|return|if|else|for|while|switch|case|try|catch|async|await|interface|type|struct|enum|module|package|require|include|void|int|string|bool|null|undefined|true|false|=>|::|->)\b/
+  const hasCodeBlock = text.includes('```') || (text.includes('    ') && CODE_KEYWORDS.test(text))
   const isLong = text.length > 300
   if (hasCodeBlock && isLong) return 'focused'
 

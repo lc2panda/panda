@@ -4,6 +4,7 @@
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
 import { logForDebugging } from '../utils/debug.js'
+import { randomUUID } from 'crypto'
 
 // ─────────────────────────────────────────────────────────────
 // 1. Format Adapter Interface
@@ -226,7 +227,7 @@ export const openaiCompatAdapter: FormatAdapter = {
         const fn = tc.function as Record<string, unknown>
         contentBlocks.push({
           type: 'tool_use',
-          id: tc.id ?? `toolu_${Date.now()}`,
+          id: tc.id ?? `toolu_${randomUUID()}`,
           name: fn?.name,
           input: typeof fn?.arguments === 'string'
             ? safeParseJSON(fn.arguments)
