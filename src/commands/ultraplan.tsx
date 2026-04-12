@@ -1,3 +1,8 @@
+// Input: 用户需求描述 + 当前代码库上下文
+// Output: 结构化任务计划（步骤分解 + 依赖图 + 验证点）
+// Pos: commands/ ultraplan 命令，高级规划模式入口
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { readFileSync } from 'fs';
 import { REMOTE_CONTROL_DISCONNECTED_MSG } from '../bridge/types.js';
 import type { Command } from '../commands.js';

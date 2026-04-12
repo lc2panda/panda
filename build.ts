@@ -1,3 +1,8 @@
+// Input: src/entrypoints/cli.tsx + feature flags 配置
+// Output: dist/ 目录（编译后的 JS bundle，flags 内联替换）
+// Pos: 项目根目录构建脚本，bun build 入口
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { readdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import type { BunPlugin } from "bun";

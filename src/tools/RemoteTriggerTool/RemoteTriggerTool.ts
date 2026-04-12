@@ -1,3 +1,8 @@
+// Input: 远程触发配置（URL + OAuth + payload）
+// Output: HTTP 响应结果（状态码 + body）
+// Pos: tools/RemoteTriggerTool/ 远程 API 触发工具，需 OAuth 认证
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import axios from 'axios'
 import { z } from 'zod/v4'
 import { getOauthConfig } from '../../constants/oauth.js'

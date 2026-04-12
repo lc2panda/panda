@@ -1,3 +1,8 @@
+// Input: 文件路径 + old_string + new_string（精确替换）
+// Output: 修改后的文件 + diff 预览 + 诊断追踪
+// Pos: tools/FileEditTool/ 文件精确编辑工具，核心写操作之一
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { dirname, isAbsolute, sep } from 'path'
 import { logEvent } from 'src/services/analytics/index.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'

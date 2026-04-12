@@ -1,3 +1,8 @@
+// Input: notebook 文件路径 + cell 索引 + 编辑内容
+// Output: 修改后的 .ipynb 文件（原子写入）
+// Pos: tools/NotebookEditTool/ Jupyter notebook 编辑工具
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { feature } from 'bun:bundle'
 import { extname, isAbsolute, resolve } from 'path'
 import {

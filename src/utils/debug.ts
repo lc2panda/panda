@@ -1,3 +1,8 @@
+// Input: 调试消息字符串 + 会话 ID
+// Output: 写入 ~/.pandacc/debug/ 日志文件（含 symlink latest）
+// Pos: utils/ 全局调试日志，被几乎所有模块的 logForDebugging 引用
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { appendFile, mkdir, symlink, unlink } from 'fs/promises'
 import memoize from 'lodash-es/memoize.js'
 import { dirname, join } from 'path'

@@ -1,4 +1,8 @@
 #!/usr/bin/env bun
+// Input: CLI 参数 + 环境变量 + feature flags
+// Output: 启动 REPL 交互界面或 pipe 模式输出
+// Pos: entrypoints/ 真正入口，注入 polyfill 后交给 main.tsx
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 // bun:bundle feature() — dev mode uses `bun --feature=FLAG` to enable flags;
 // build mode uses BunPlugin inline replacement (see build.ts).
 import { feature } from 'bun:bundle';

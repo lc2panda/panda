@@ -1,3 +1,8 @@
+// Input: 项目目录层级 + ~/.pandacc/ 用户目录
+// Output: 合并后的 CLAUDE.md 内容（按优先级叠加）
+// Pos: utils/ 配置加载核心，被 context.ts 调用构建系统提示
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 /**
  * Files are loaded in the following order:
  *

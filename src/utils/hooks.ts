@@ -1,3 +1,7 @@
+// Input: 用户定义的 hook 配置（shell 命令 + 触发点）
+// Output: hook 执行结果（stdout/stderr/exitCode）
+// Pos: utils/ 生命周期 hook 系统，被 query/tool 调用链在各阶段触发
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 /**
  * Hooks are user-defined shell commands that can be executed at various points

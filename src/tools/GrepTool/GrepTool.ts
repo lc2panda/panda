@@ -1,3 +1,8 @@
+// Input: 正则模式 + 搜索路径 + glob/type 过滤器
+// Output: 匹配行内容 / 文件路径列表 / 匹配计数
+// Pos: tools/GrepTool/ 基于 ripgrep 的代码搜索工具
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { z } from 'zod/v4'
 import type { ValidationResult } from '../../Tool.js'
 import { buildTool, type ToolDef } from '../../Tool.js'

@@ -1,3 +1,8 @@
+// Input: hello2cc 脚本模板 + 安装目标路径
+// Output: 安装/更新 hello2cc 快捷启动脚本到 ~/.local/bin
+// Pos: utils/ 安装器，首次启动或升级时被 init.ts 调用
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'fs'
 import { join, dirname } from 'path'
 import { homedir } from 'os'
