@@ -2822,6 +2822,17 @@ async function* executeHooks({
   }
 
   let permissionBehavior: PermissionResult['behavior'] | undefined
+  // Deferred permission yield state: when the aggregated behavior is 'allow'
+  // (non-restrictive), we defer yielding until all hooks have completed to
+  // prevent consumers from acting on an intermediate 'allow' that a slower
+  // hook may later override with 'deny' or 'ask'.  Restrictive behaviors
+  // ('deny', 'ask') are yielded immediately so consumers can block early.
+  let deferredPermissionYield: {
+    permissionBehavior: typeof permissionBehavior
+    hookPermissionDecisionReason: string | undefined
+    hookSource: string | undefined
+    updatedInput: Record<string, unknown> | undefined
+  } | undefined
 
   // Run all hooks in parallel and wait for all to complete
   for await (const result of all(hookPromises)) {
@@ -2930,6 +2941,10 @@ async function* executeHooks({
     }
 
     // Yield permission behavior and updatedInput if provided (from allow or ask behavior)
+    // Safety: only yield restrictive decisions (deny/ask) immediately so
+    // consumers can block early.  Non-restrictive 'allow' is deferred until
+    // all hooks have finished to prevent a fast 'allow' from being consumed
+    // before a slow 'deny'/'ask' arrives.
     if (permissionBehavior !== undefined) {
       const updatedInput =
         result.updatedInput &&
@@ -2942,11 +2957,24 @@ async function* executeHooks({
           `Hook ${hookEvent} (${getHookDisplayText(result.hook)}) modified tool input keys: [${Object.keys(updatedInput).join(', ')}]`,
         )
       }
-      yield {
-        permissionBehavior,
-        hookPermissionDecisionReason: result.hookPermissionDecisionReason,
-        hookSource: matchingHooks.find(m => m.hook === result.hook)?.hookSource,
-        updatedInput,
+
+      if (permissionBehavior === 'deny' || permissionBehavior === 'ask') {
+        // Restrictive — yield immediately; clear any deferred allow
+        deferredPermissionYield = undefined
+        yield {
+          permissionBehavior,
+          hookPermissionDecisionReason: result.hookPermissionDecisionReason,
+          hookSource: matchingHooks.find(m => m.hook === result.hook)?.hookSource,
+          updatedInput,
+        }
+      } else {
+        // 'allow' — defer until all hooks complete
+        deferredPermissionYield = {
+          permissionBehavior,
+          hookPermissionDecisionReason: result.hookPermissionDecisionReason,
+          hookSource: matchingHooks.find(m => m.hook === result.hook)?.hookSource,
+          updatedInput,
+        }
       }
     }
 
@@ -3009,6 +3037,12 @@ async function* executeHooks({
         }
       }
     }
+  }
+
+  // After all hooks have completed, yield any deferred 'allow' permission.
+  // This ensures a fast 'allow' is never consumed before a slow 'deny'/'ask'.
+  if (deferredPermissionYield) {
+    yield deferredPermissionYield
   }
 
   const totalDurationMs = Date.now() - batchStartTime
