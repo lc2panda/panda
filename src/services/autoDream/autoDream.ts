@@ -12,6 +12,7 @@
 
 import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
 import { join } from 'path'
+import { readdirSync, readFileSync, statSync } from 'fs'
 import { writeFile, mkdir } from 'fs/promises'
 import type { REPLHookContext } from '../../utils/hooks/postSamplingHooks.js'
 import {
@@ -348,7 +349,7 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
   // Phase 1: Harvest — 扫描当日数据 + 数据连接器
   const episodes = join(memoryDir, 'episodes')
   const todayEpisodes = scanMdFiles(episodes).filter((f: string) => f.includes(dateStr))
-  if (todayEpisodes.length === 0 && scanMdFiles(memoryDir).length < 3) return null
+  if (scanMdFiles(memoryDir).length === 0) return null
 
   sections.push('## Harvest')
   sections.push(`- 会话记录: ${todayEpisodes.length} 个`)
@@ -380,19 +381,15 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
 
   // 读取最近 7 天的情景记忆
   try {
-    const { readdirSync, readFileSync: readFileSyncFs, statSync } = require('fs')
-    const { join: joinPath } = require('path')
-    const { homedir } = require('os')
-
-    const episodesDir = joinPath(homedir(), '.pandacc', 'auto_memory', 'episodes')
+    const episodesDir = join(memoryDir, 'episodes')
     const cutoff = Date.now() - 7 * 86400000
     const recentEpisodes = readdirSync(episodesDir)
       .filter((f: string) => f.endsWith('.md'))
-      .map((f: string) => ({ name: f, path: joinPath(episodesDir, f), mtime: statSync(joinPath(episodesDir, f)).mtimeMs }))
+      .map((f: string) => ({ name: f, path: join(episodesDir, f), mtime: statSync(join(episodesDir, f)).mtimeMs }))
       .filter((f: { mtime: number }) => f.mtime > cutoff)
       .sort((a: { mtime: number }, b: { mtime: number }) => b.mtime - a.mtime)
       .slice(0, 10)
-      .map((f: { path: string }) => (readFileSyncFs(f.path, 'utf-8') as string).slice(0, 500))
+      .map((f: { path: string }) => (readFileSync(f.path, 'utf-8') as string).slice(0, 500))
 
     if (recentEpisodes.length > 0) {
       sections.push('\n## Recent Episodes (last 7 days)')
@@ -420,7 +417,6 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
   sections.push(`- 失败教训: ${scars.length} 条`)
 
   // 重复主题检测
-  const { readFileSync } = require('fs')
   const titleFreq = new Map<string, number>()
   for (const f of allFiles.slice(0, 100)) {
     try {
