@@ -464,7 +464,7 @@ export default {
   name: 'ultraplan',
   description: `~10–30 min · Panda on the web drafts an advanced plan you can edit and approve. See ${CCR_TERMS_URL} · 深度计划：生成可编辑审批的高级方案`,
   argumentHint: '<prompt>',
-  isEnabled: () => ("external" as string) === 'ant',
+  isEnabled: () => true,
   load: () => Promise.resolve({
     call
   })

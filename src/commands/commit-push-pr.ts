@@ -8,7 +8,7 @@ import { executeShellCommandsInPrompt } from '../utils/promptShellExecution.js'
 import { getUndercoverInstructions, isUndercover } from '../utils/undercover.js'
 
 const ALLOWED_TOOLS = [
-  'Bash(git checkout --branch:*)',
+  'Bash(git switch -c:*)',
   'Bash(git checkout -b:*)',
   'Bash(git add:*)',
   'Bash(git status:*)',
