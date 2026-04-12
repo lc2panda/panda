@@ -384,12 +384,16 @@ export const NotebookEditTool = buildTool({
       ) {
         if (edit_mode === 'insert') {
           new_cell_id = Math.random().toString(36).substring(2, 15)
-        } else if (cell_id !== null) {
+        } else if (cell_id != null) {
           new_cell_id = cell_id
         }
       }
 
       if (edit_mode === 'delete') {
+        // Guard against TOCTOU: notebook may have changed between validateInput and call
+        if (cellIndex < 0 || cellIndex >= notebook.cells.length) {
+          throw new Error(`Cell not found at index ${cellIndex}`)
+        }
         // Delete the specified cell
         notebook.cells.splice(cellIndex, 1)
       } else if (edit_mode === 'insert') {
@@ -415,7 +419,10 @@ export const NotebookEditTool = buildTool({
         notebook.cells.splice(cellIndex, 0, new_cell)
       } else {
         // Find the specified cell
-        const targetCell = notebook.cells[cellIndex]! // validateInput ensures cell_number is in bounds
+        const targetCell = notebook.cells[cellIndex]
+        if (!targetCell) {
+          throw new Error(`Target cell not found at index ${cellIndex}`)
+        }
         targetCell.source = new_source
         if (targetCell.cell_type === 'code') {
           // Reset execution count and clear outputs since cell was modified
