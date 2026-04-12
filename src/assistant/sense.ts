@@ -263,7 +263,7 @@ function _pushToChannels(notification: PandaNotification): void {
   try {
     if (notification.type === 'warning' || notification.type === 'action') {
       const { setWorkingMemory, getWorkingMemory } = require('./workingMemory.js')
-      const existing = (() => { try { const v = getWorkingMemory('im-reverse-push-queue'); return Array.isArray(v) ? v : [] } catch { return [] } })()
+      const existing = (() => { try { const v = getWorkingMemory('im-reverse-push-queue'); if (!v) return []; const parsed = typeof v === 'string' ? JSON.parse(v) : v; return Array.isArray(parsed) ? parsed : [] } catch { return [] } })()
       existing.push({
         platform: 'all',
         target: 'default',

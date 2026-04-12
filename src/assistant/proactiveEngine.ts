@@ -20,6 +20,8 @@ export interface ProactiveSuggestion {
   priority: 'low' | 'medium' | 'high'
   message: string
   source: string // 触发来源
+  /** 延迟副作用：建议被采纳展示后执行的回调（如标记通知已读） */
+  _onAccepted?: () => void
 }
 
 // 频率限制：同类型建议 1 小时内最多推送 1 次（TTL Map，防止内存泄漏）
@@ -71,6 +73,13 @@ export async function checkProactiveSuggestions(context: {
     _emittedTypes.set(key, now)
     return true
   })
+
+  // BUG-4 fix: 只对通过频率限制的建议执行延迟副作用（如标记通知已读）
+  for (const s of filtered) {
+    if (s._onAccepted) {
+      s._onAccepted()
+    }
+  }
 
   return filtered
 }
@@ -302,14 +311,15 @@ function _checkPendingNotifications(): ProactiveSuggestion | null {
     if (unseen.length === 0) return null
     // 被动层限制最多展示最近 3 条，避免消息爆量
     const recent = unseen.slice(-3)
-    markNotificationsSeen(recent)
+    // BUG-4 fix: 不在此处立即标记已读，而是通过 _onAccepted 回调延迟到建议被采纳展示后
     return {
       type: 'pending-notifications',
-      message: `\u{1F4EC} ${recent.length} 条未读通知: ${recent
+      message: `\u1F4EC} ${recent.length} 条未读通知: ${recent
         .map((n: any) => n.title || (n.body || '').slice(0, 30))
         .join(', ')}`,
       priority: 'medium',
       source: 'pending_notifications',
+      _onAccepted: () => markNotificationsSeen(recent),
     }
   } catch {
     return null
@@ -334,12 +344,13 @@ function _checkLLMInsight(context: { messages: readonly any[]; turnCount: number
 
     // 1. 分析对话模式
     const recentMessages = context.messages.slice(-10)
-    const userMessages = recentMessages.filter((m: any) => m.type === 'user' || m.role === 'user')
+    const userMessages = recentMessages.filter((m: any) => m.type === 'user')
 
     // 检测重复提问模式（用户可能卡住了）
     if (userMessages.length >= 3) {
       const lastThree = userMessages.slice(-3).map((m: any) => {
-        const text = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+        const c = m.message?.content
+        const text = typeof c === 'string' ? c : (c ? JSON.stringify(c) : '')
         return text.slice(0, 50).toLowerCase()
       })
       // 简单相似度：共同词比例
@@ -357,8 +368,9 @@ function _checkLLMInsight(context: { messages: readonly any[]; turnCount: number
     const toolUses = recentMessages
       .filter((m: any) => m.type === 'assistant')
       .flatMap((m: any) => {
-        if (!Array.isArray(m.content)) return []
-        return m.content.filter((b: any) => b.type === 'tool_use').map((b: any) => b.name)
+        const c = m.message?.content
+        if (!Array.isArray(c)) return []
+        return c.filter((b: any) => b.type === 'tool_use').map((b: any) => b.name)
       })
 
     const hasAgent = toolUses.some((t: string) => t === 'Agent' || t === 'agent')
@@ -373,8 +385,9 @@ function _checkLLMInsight(context: { messages: readonly any[]; turnCount: number
     const errorCount = recentMessages
       .filter((m: any) => m.type === 'assistant')
       .flatMap((m: any) => {
-        if (!Array.isArray(m.content)) return []
-        return m.content.filter((b: any) => b.type === 'tool_result' && b.is_error)
+        const c = m.message?.content
+        if (!Array.isArray(c)) return []
+        return c.filter((b: any) => b.type === 'tool_result' && b.is_error)
       }).length
 
     if (errorCount >= 3) {
