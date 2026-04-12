@@ -313,12 +313,14 @@ export const openaiCompatAdapter: FormatAdapter = {
           delta: { type: 'input_json_delta', partial_json: JSON.stringify(toolCalls[0].function ?? toolCalls[0]) },
         }
       }
-      // Multiple tool calls in one delta — return array of events
-      return toolCalls.map((tc, i) => ({
-        type: 'content_block_delta',
-        index: (tc.index as number) ?? i,
-        delta: { type: 'input_json_delta', partial_json: JSON.stringify(tc.function ?? tc) },
-      }))
+      // Multiple tool calls in one delta — return first event.
+      // Remaining tool calls in the same chunk are uncommon in practice;
+      // they arrive as separate SSE chunks in most OpenAI-compatible APIs.
+      return {
+        type: 'content_block_delta' as const,
+        index: (toolCalls[0].index as number) ?? 0,
+        delta: { type: 'input_json_delta', partial_json: JSON.stringify(toolCalls[0].function ?? toolCalls[0]) },
+      }
     }
 
     // Finish or usage-only chunk
