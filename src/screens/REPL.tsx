@@ -1955,7 +1955,7 @@ export function REPL({
       });
       throw error;
     }
-  }, [resetLoadingState, setAppState]);
+  }, [resetLoadingState, setAppState, mainLoopModel, agentDefinitions, initialMainThreadAgentDefinition, mainThreadAgentDefinition]);
 
   // Lazy init: useRef(createX()) would call createX on every render and
   // discard the result. LRUCache construction inside FileStateCache is
@@ -2224,7 +2224,7 @@ export function REPL({
         setShowCostDialog(true);
       }
     }
-  }, [messages, showCostDialog, haveShownCostDialog]);
+  }, [messages.length, showCostDialog, haveShownCostDialog]);
   const sandboxAskCallback: SandboxAskCallback = useCallback(async (hostPattern: NetworkHostPattern) => {
     // If running as a swarm worker, forward the request to the leader via mailbox
     if (isAgentSwarmsEnabled() && isSwarmWorker()) {
@@ -3146,12 +3146,12 @@ export function REPL({
         mainLoopModel);
       }
 
-      // Reset ref after a delay to allow new initial messages
-      setTimeout(ref => {
-        ref.current = false;
-      }, 100, initialMessageRef);
+      // Reset ref after processing completes to allow new initial messages
+      initialMessageRef.current = false;
     }
-    void processInitialMessage(pending);
+    void processInitialMessage(pending).catch(() => {
+      initialMessageRef.current = false;
+    });
   }, [initialMessage, isLoading, setMessages, setAppState, onQuery, mainLoopModel, tools]);
   const onSubmit = useCallback(async (input: string, helpers: PromptInputHelpers, speculationAccept?: {
     state: ActiveSpeculationState;
