@@ -23,7 +23,7 @@ interface ChannelServerEntry {
  */
 interface ChannelReplyContext {
   user_id: string
-  context_token: string
+  chat_id: string
   /** 最后更新时间（ms） */
   updated: number
 }
@@ -80,7 +80,7 @@ export function unregisterChannelServer(serverName: string): void {
 }
 
 /**
- * 保存 inbound 消息的 reply context（从 meta 中提取 user_id + context_token）。
+ * 保存 inbound 消息的 reply context（从 meta 中提取 user_id + chat_id）。
  * 由 print.ts 在收到 channel notification 时调用。
  */
 export function saveChannelContext(
@@ -89,13 +89,13 @@ export function saveChannelContext(
 ): void {
   if (!meta) return
   const userId = meta.user_id || meta.from_user_id
-  const contextToken = meta.context_token
-  if (!userId || !contextToken) return
+  const chatId = meta.chat_id || meta.context_token
+  if (!userId || !chatId) return
 
   const channel = extractChannelName(serverName)
   _contexts.set(channel, {
     user_id: userId,
-    context_token: contextToken,
+    chat_id: chatId,
     updated: Date.now(),
   })
 }
@@ -124,7 +124,7 @@ export function pushViaChannelMCP(title: string, body: string): void {
         name: toolName,
         arguments: {
           user_id: ctx.user_id,
-          context_token: ctx.context_token,
+          chat_id: ctx.chat_id,
           text: message,
         },
       }).catch(() => {
