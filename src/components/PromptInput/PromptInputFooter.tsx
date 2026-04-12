@@ -148,21 +148,11 @@ function PromptInputFooter({
       <Box flexDirection={isNarrow ? 'column' : 'row'} justifyContent={isNarrow ? 'flex-start' : 'space-between'} paddingX={2} gap={isNarrow ? 0 : 1}>
         <Box flexDirection="column" flexShrink={isNarrow ? 0 : 1}>
           {mode === 'prompt' && !isShort && !exitMessage.show && !isPasting && statusLineShouldDisplay(settings) && <StatusLine messagesRef={messagesRef} lastAssistantMessageId={lastAssistantMessageId} vimMode={vimMode} />}
-          {showMatrixFooter && <Box><Text color={MATRIX_UI.footerInfo}>{
-            (() => {
-              const parts: string[] = []
-              if (matrixModel) {
-                // 简化模型名：去掉日期后缀
-                const short = String(matrixModel).replace(/-\d{8}$/, '')
-                parts.push(short)
-              }
-              if (matrixUsage) {
-                const total = matrixUsage.input_tokens + matrixUsage.output_tokens
-                parts.push(total > 1000 ? `${(total / 1000).toFixed(1)}k ctx` : `${total} ctx`)
-              }
-              return parts.join(' · ') || 'matrix'
-            })()
-          }</Text></Box>}
+          {showMatrixFooter && <Box>
+            <Text color={MATRIX_SCALE.SHADOW}>▐ </Text>
+            {matrixModel && <Text color={MATRIX_SCALE.NEON}>{String(matrixModel).replace(/-\d{8}$/, '')}</Text>}
+            {matrixUsage && <Text color={MATRIX_SCALE.SHADOW}>{matrixModel ? ' · ' : ''}{(() => { const total = matrixUsage.input_tokens + matrixUsage.output_tokens; return total > 1000 ? `${(total / 1000).toFixed(1)}k ctx` : `${total} ctx`; })()}</Text>}
+          </Box>}
           <PromptInputFooterLeftSide exitMessage={exitMessage} vimMode={vimMode} mode={mode} toolPermissionContext={toolPermissionContext} suppressHint={suppressHint} isLoading={isLoading} tasksSelected={pillSelected} teamsSelected={teamsSelected} teammateFooterIndex={teammateFooterIndex} tmuxSelected={tmuxSelected} isPasting={isPasting} isSearching={isSearching} historyQuery={historyQuery} setHistoryQuery={setHistoryQuery} historyFailedMatch={historyFailedMatch} onOpenTasksDialog={onOpenTasksDialog} />
         </Box>
         <Box flexShrink={1} gap={1}>
