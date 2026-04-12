@@ -11,6 +11,7 @@ import type {
   SerializedMessage,
   TranscriptMessage,
 } from '../../types/logs.js'
+import { localDateStr } from '../../utils/date.js'
 import { parseJSONL } from '../../utils/json.js'
 import {
   getProjectDir,
@@ -257,7 +258,7 @@ export async function call(
     })
 
     const forkLog: LogOption = {
-      date: now.toISOString().split('T')[0]!,
+      date: localDateStr(now),
       messages: serializedMessages,
       fullPath: forkPath,
       value: now.getTime(),

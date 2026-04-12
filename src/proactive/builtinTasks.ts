@@ -6,6 +6,7 @@
 import type { ProactiveTask } from './taskRegistry.js'
 import { isProactiveActive } from './index.js'
 import { isNightModeActive } from './nightMode.js'
+import { localDateStr } from '../utils/date.js'
 import { logForDebugging } from '../utils/debug.js'
 import { platform } from 'os'
 import { execSync } from 'child_process'
@@ -228,7 +229,7 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
         })
 
         if (recentDreams.length > 0) {
-          const summaryLines: string[] = [`# 周报汇总 — ${new Date().toISOString().split('T')[0]}\n`]
+          const summaryLines: string[] = [`# 周报汇总 — ${localDateStr()}\n`]
           summaryLines.push(`本周 ${recentDreams.length} 份 DeepDream 报告:\n`)
           for (const f of recentDreams) {
             try {
@@ -242,7 +243,7 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
             } catch {}
           }
           await mkdir(join(memoryDir, 'working'), { recursive: true })
-          writeFileSync(join(memoryDir, 'working', `weekly_summary_${new Date().toISOString().split('T')[0]}.md`), summaryLines.join('\n'), 'utf-8')
+          writeFileSync(join(memoryDir, 'working', `weekly_summary_${localDateStr()}.md`), summaryLines.join('\n'), 'utf-8')
 
           try {
             const { pushNotification } = await import('../assistant/sense.js')

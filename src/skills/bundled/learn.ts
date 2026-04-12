@@ -2,6 +2,7 @@
 // Output: flashcards, review session, or learning plan in markdown
 // Pos: bundled skill — learning assistance entry point
 import { getOriginalCwd } from '../../bootstrap/state.js'
+import { localDateStr } from '../../utils/date.js'
 import { registerBundledSkill } from '../bundledSkills.js'
 
 export function registerLearnSkill(): void {
@@ -28,7 +29,7 @@ export function registerLearnSkill(): void {
             },
           ]
         }
-        const todayStr = new Date().toISOString().slice(0, 10)
+        const todayStr = localDateStr()
         const prompt = `你正在执行 /learn from 命令。
 
 任务：从文件中提取知识点并生成闪卡。

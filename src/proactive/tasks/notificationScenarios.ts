@@ -4,6 +4,7 @@
 
 import { pushNotification } from '../../assistant/sense.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
+import { localDateStr } from '../../utils/date.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { IS_MAC, IS_WIN, HOME } from '../platform.js'
 
@@ -242,7 +243,7 @@ const notificationDigest: SmartCronTask = {
         byApp.get(name)!.push(n)
       }
 
-      const today = new Date().toISOString().split('T')[0]
+      const today = localDateStr()
       const lines: string[] = [`# 通知简报 — ${today}\n`]
       lines.push(`过去 24 小时收到 ${notifications.length} 条通知：\n`)
 
@@ -382,7 +383,7 @@ const notificationStats: SmartCronTask = {
         appCounts.set(name, (appCounts.get(name) || 0) + 1)
       }
 
-      const today = new Date().toISOString().split('T')[0]
+      const today = localDateStr()
       const statsDir = join(HOME, '.pandacc', 'data', 'notification-stats')
       mkdirSync(statsDir, { recursive: true })
 
@@ -396,7 +397,7 @@ const notificationStats: SmartCronTask = {
       writeFileSync(join(statsDir, `${today}.json`), JSON.stringify(todayStats, null, 2), 'utf-8')
 
       // 与昨日对比
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+      const yesterday = localDateStr(new Date(Date.now() - 86400000))
       const yesterdayPath = join(statsDir, `${yesterday}.json`)
       let anomalies: string[] = []
 

@@ -16,6 +16,7 @@ import { dirname, join } from 'path'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import { logEvent } from '../services/analytics/index.js'
 import { registerCleanup } from '../utils/cleanupRegistry.js'
+import { localDateStr } from '../utils/date.js'
 import { logForDebugging } from '../utils/debug.js'
 import { getClaudeConfigHomeDir } from '../utils/envUtils.js'
 import { errorMessage, isENOENT } from '../utils/errors.js'
@@ -81,7 +82,7 @@ let lastCustomBindingsLogDate: string | null = null
  * This lets us estimate the percentage of users who customize their keybindings.
  */
 function logCustomBindingsLoadedOncePerDay(userBindingCount: number): void {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localDateStr()
   if (lastCustomBindingsLogDate === today) return
   lastCustomBindingsLogDate = today
   logEvent('tengu_custom_keybindings_loaded', {
