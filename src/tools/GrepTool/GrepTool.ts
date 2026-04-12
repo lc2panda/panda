@@ -455,7 +455,10 @@ export const GrepTool = buildTool({
 
       const finalLines = limitedResults.map(line => {
         // Lines have format: /absolute/path:line_content or /absolute/path:num:content
-        const colonIndex = line.indexOf(':')
+        // On Windows, ripgrep outputs paths like C:\file.txt:42:match — the first
+        // colon belongs to the drive letter, so skip past it.
+        const searchFrom = /^[A-Za-z]:\\/.test(line) ? 2 : 0
+        const colonIndex = line.indexOf(':', searchFrom)
         if (colonIndex > 0) {
           const filePath = line.substring(0, colonIndex)
           const rest = line.substring(colonIndex)
