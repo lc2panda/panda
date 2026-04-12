@@ -82,8 +82,8 @@ export function isDomainExcluded(domain: string, config: PrivacyConfig): boolean
   for (const pattern of config.excludeBrowserDomains) {
     if (globToRegex(pattern).test(lower)) return true
     // 额外检查子域名：如 pattern 为 "**.gov"，确保 "www.irs.gov" 也能匹配
-    // 对不含 ** 的 pattern，尝试在前面加 **. 匹配子域名
-    if (!pattern.startsWith('**') && !pattern.startsWith('*.*.')) {
+    // BUG-8 fix: 只对含通配符 * 的 pattern 执行子域名补丁，精确域名（如 bank.com）不升级
+    if (pattern.includes('*') && !pattern.startsWith('**') && !pattern.startsWith('*.*.')) {
       const subPattern = '**.' + pattern.replace(/^\*\./, '')
       if (globToRegex(subPattern).test(lower)) return true
     }

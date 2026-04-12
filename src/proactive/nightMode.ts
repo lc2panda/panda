@@ -26,8 +26,6 @@ const DEFAULT_NIGHT_MODE: NightModeConfig = {
   briefingTime: '0 6 * * *',
 }
 
-const NIGHT_START_HOUR = 22
-const NIGHT_END_HOUR = 6
 const TASK_INTERVAL_MS = 5 * 60 * 1000 // 5 min between tasks
 
 let _lastOrchestratorRun = 0
@@ -184,7 +182,7 @@ export async function runNightTasks(): Promise<void> {
  * Compute the next time a night task should fire.
  * - If night mode is disabled: null
  * - If currently night time: next tick is TASK_INTERVAL_MS from last run
- * - If daytime: next tick at NIGHT_START_HOUR:00 today or tomorrow
+ * - If daytime: next tick at config.lateNightStartHour:00 today or tomorrow
  */
 export function getNextNightTickAt(): number | null {
   if (!isNightModeEnabled()) return null
