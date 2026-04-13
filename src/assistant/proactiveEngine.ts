@@ -49,6 +49,8 @@ export async function checkProactiveSuggestions(context: {
     () => _checkPendingNotifications(),
     () => _checkHabitDeviation(),
     () => _checkLLMInsight(context),
+    () => _checkTimeAwareGreeting(context),
+    () => _checkTaskProgressStall(context),
   ]
 
   for (const checker of checkers) {
@@ -419,6 +421,129 @@ function _checkLLMInsight(context: { messages: readonly any[]; turnCount: number
         message: '🤖 长对话建议 — 考虑用 Agent 委派子任务，或 /plan 规划后再执行。',
         priority: 'low',
         source: 'llm_insight_no_delegation',
+      }
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
+// ─── 检查器 9: 时间感知问候（Her 式：用户回到对话时的温暖问候） ───
+
+let _lastUserActivityTime = Date.now()
+const GREETING_GAP_MS = 30 * 60 * 1000 // 30 分钟无互动算"回来了"
+let _greetingSentToday = false
+
+function _checkTimeAwareGreeting(context: {
+  messages: readonly any[]
+  sessionStartTime: number
+}): ProactiveSuggestion | null {
+  try {
+    const now = Date.now()
+    const hour = new Date().getHours()
+
+    // 每天只问候一次
+    const today = new Date().toDateString()
+    const lastDay = new Date(_lastUserActivityTime).toDateString()
+    if (today !== lastDay) _greetingSentToday = false
+
+    // 获取最后一条用户消息时间
+    const userMsgs = context.messages.filter((m: any) => m.type === 'user')
+    if (userMsgs.length < 2) {
+      _lastUserActivityTime = now
+      return null
+    }
+
+    // 计算上一次互动到现在的间隔
+    const gap = now - _lastUserActivityTime
+    _lastUserActivityTime = now
+
+    if (gap < GREETING_GAP_MS || _greetingSentToday) return null
+
+    _greetingSentToday = true
+
+    // 时间感知的问候语
+    let greeting: string
+    if (hour >= 5 && hour < 9) {
+      greeting = '🌅 早上好，新的一天开始了。'
+    } else if (hour >= 9 && hour < 12) {
+      greeting = '☀️ 上午好，欢迎回来。'
+    } else if (hour >= 12 && hour < 14) {
+      greeting = '🍱 中午好，记得吃午餐。'
+    } else if (hour >= 14 && hour < 18) {
+      greeting = '☕ 下午好，继续加油。'
+    } else if (hour >= 18 && hour < 22) {
+      greeting = '🌆 晚上好，今天辛苦了。'
+    } else {
+      greeting = '🌙 深夜了，注意休息。'
+    }
+
+    const gapMin = Math.round(gap / 60000)
+    const gapStr = gapMin >= 60 ? `${Math.round(gapMin / 60)} 小时` : `${gapMin} 分钟`
+
+    return {
+      type: 'tip',
+      priority: 'low',
+      message: `${greeting} 距上次互动已过 ${gapStr}。`,
+      source: 'time_aware_greeting',
+    }
+  } catch {
+    return null
+  }
+}
+
+// ─── 检查器 10: 任务进度感知（Her 式：检测可能的卡顿并温和建议） ───
+
+function _checkTaskProgressStall(context: {
+  messages: readonly any[]
+  turnCount: number
+  sessionStartTime: number
+}): ProactiveSuggestion | null {
+  try {
+    if (context.turnCount < 8) return null
+
+    const { execSync } = require('child_process')
+
+    // 检查最近 1 小时内的 commit 数量
+    let recentCommits = 0
+    try {
+      const result = execSync('git log --since="1 hour ago" --oneline', {
+        encoding: 'utf-8',
+        timeout: 3000,
+      })
+      recentCommits = result.split('\n').filter(Boolean).length
+    } catch {
+      return null // 非 git 仓库或命令失败
+    }
+
+    // 如果 1 小时内 0 commit 但对话回合 > 8，可能卡住了
+    if (recentCommits === 0 && context.turnCount > 8) {
+      // 检查最近消息中是否有错误信号
+      const recentMsgs = context.messages.slice(-6)
+      const hasErrors = recentMsgs.some((m: any) => {
+        if (m.type !== 'assistant') return false
+        const content = m.message?.content
+        if (!Array.isArray(content)) return false
+        return content.some((b: any) => b.type === 'tool_result' && b.is_error)
+      })
+
+      if (hasErrors) {
+        return {
+          type: 'insight',
+          priority: 'medium',
+          message: '🤔 1 小时内零提交且有执行错误 — 是否遇到瓶颈？试试 /plan 重新梳理，或 Agent 并行探索不同方案。',
+          source: 'task_progress_stall_with_errors',
+        }
+      }
+
+      // 无错误但长时间无 commit
+      return {
+        type: 'tip',
+        priority: 'low',
+        message: '💡 对话较长但暂无新提交 — 考虑阶段性 git commit 保存进度，方便回滚。',
+        source: 'task_progress_stall_no_commit',
       }
     }
 
