@@ -51,6 +51,7 @@ import {
   getOriginalCwd,
 } from '../bootstrap/state.js'
 import { truncateEntrypointContent } from '../memdir/memdir.js'
+import { stripPrivateContent } from '../memdir/memoryTypes.js'
 import {
   getAutoMemEntrypoint,
   getAutoMemPath,
@@ -431,7 +432,9 @@ function parseMemoryFileContent(
   // Truncate MEMORY.md entrypoints to the line AND byte caps
   let finalContent = strippedContent
   if (type === 'AutoMem' || type === 'TeamMem') {
-    finalContent = truncateEntrypointContent(strippedContent).content
+    // B9: Hard-filter <private>...</private> tags before any further processing
+    finalContent = stripPrivateContent(finalContent)
+    finalContent = truncateEntrypointContent(finalContent).content
   }
 
   // Covers frontmatter strip, HTML comment strip, and MEMORY.md truncation
