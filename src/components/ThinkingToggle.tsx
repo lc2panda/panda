@@ -1,3 +1,7 @@
+// Input: currentValue (thinking enabled/disabled), onSelect, onCancel, isMidConversation
+// Output: Matrix-themed thinking toggle pane
+// Pos: components/ — thinking 模式切换 UI
+// 一旦我被修改，请更新 components/README.md
 import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
 import { useState } from 'react';
@@ -9,6 +13,8 @@ import { Select } from './CustomSelect/index.js';
 import { Byline } from './design-system/Byline.js';
 import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js';
 import { Pane } from './design-system/Pane.js';
+import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
+import { MATRIX_SCALE } from './MatrixTheme/matrixPalette.js';
 export type Props = {
   currentValue: boolean;
   onSelect: (enabled: boolean) => void;
@@ -110,9 +116,11 @@ export function ThinkingToggle(t0) {
     t7 = $[13];
   }
   const handleSelectChange = t7;
+  const matrix = isMatrixTheme();
+  const paneColor = matrix ? MATRIX_SCALE.NEON : "permission";
   let t8;
-  if ($[14] === Symbol.for("react.memo_cache_sentinel")) {
-    t8 = <Box marginBottom={1} flexDirection="column"><Text color="remember" bold={true}>Toggle thinking mode</Text><Text dimColor={true}>Enable or disable thinking for this session.</Text></Box>;
+  if ($[14] === Symbol.for("react.memo_cache_sentinel") || true) {
+    t8 = <Box marginBottom={1} flexDirection="column"><Text color={matrix ? MATRIX_SCALE.NEON : "remember"} bold={true}>Toggle thinking mode</Text><Text dimColor={!matrix} color={matrix ? MATRIX_SCALE.SHADOW : undefined}>Enable or disable thinking for this session.</Text></Box>;
     $[14] = t8;
   } else {
     t8 = $[14];
@@ -140,7 +148,7 @@ export function ThinkingToggle(t0) {
   }
   let t11;
   if ($[24] !== t10 || $[25] !== t9) {
-    t11 = <Pane color="permission">{t9}{t10}</Pane>;
+    t11 = <Pane color={paneColor}>{t9}{t10}</Pane>;
     $[24] = t10;
     $[25] = t9;
     $[26] = t11;
