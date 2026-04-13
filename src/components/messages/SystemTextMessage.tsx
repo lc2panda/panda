@@ -17,7 +17,7 @@ const teamMemSaved = feature('TEAMMEM') ? require('./teamMemSaved.js') as typeof
 import { getTurnCompletionVerbs, TURN_COMPLETION_VERBS } from '../../constants/turnCompletionVerbs.js';
 import { isZh } from '../../utils/i18n.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
-import { MATRIX_UI, MATRIX_SCALE } from '../MatrixTheme/matrixPalette.js';
+import { MATRIX_UI, MATRIX_SCALE, MATRIX_STATUS } from '../MatrixTheme/matrixPalette.js';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import type { SystemMessage, SystemStopHookSummaryMessage, SystemBridgeStatusMessage, SystemTurnDurationMessage, SystemThinkingMessage, SystemMemorySavedMessage } from '../../types/message.js';
 import { SystemAPIErrorMessage } from './SystemAPIErrorMessage.js';
@@ -99,12 +99,13 @@ export function SystemTextMessage(t0) {
     return t4;
   }
   if (message.subtype === "agents_killed") {
+    const _isMatrix_ak = isMatrixTheme();
     const t1 = addMargin ? 1 : 0;
     let t2;
     let t3;
     if ($[13] === Symbol.for("react.memo_cache_sentinel")) {
-      t2 = <Box minWidth={2}><Text color="error">{BLACK_CIRCLE}</Text></Box>;
-      t3 = <Text dimColor={true}>All background agents stopped</Text>;
+      t2 = <Box minWidth={2}><Text color={_isMatrix_ak ? MATRIX_STATUS.ERROR : "error"}>{BLACK_CIRCLE}</Text></Box>;
+      t3 = <Text dimColor={true} color={_isMatrix_ak ? MATRIX_UI.systemMsg : undefined}>All background agents stopped</Text>;
       $[13] = t2;
       $[14] = t3;
     } else {
@@ -160,12 +161,13 @@ export function SystemTextMessage(t0) {
     return t3;
   }
   if (message.subtype === "permission_retry") {
+    const _isMatrix_pr = isMatrixTheme();
     const t1 = addMargin ? 1 : 0;
     let t2;
     let t3;
     if ($[27] === Symbol.for("react.memo_cache_sentinel")) {
-      t2 = <Text dimColor={true}>{TEARDROP_ASTERISK} </Text>;
-      t3 = <Text>Allowed </Text>;
+      t2 = <Text dimColor={true} color={_isMatrix_pr ? MATRIX_UI.systemMsg : undefined}>{TEARDROP_ASTERISK} </Text>;
+      t3 = <Text color={_isMatrix_pr ? MATRIX_UI.systemMsg : undefined}>Allowed </Text>;
       $[27] = t2;
       $[28] = t3;
     } else {
@@ -330,7 +332,7 @@ function StopHookSummaryMessage(t0) {
   const t3 = addMargin ? 1 : 0;
   let t4;
   if ($[16] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = <Box minWidth={2}><Text>{BLACK_CIRCLE}</Text></Box>;
+    t4 = <Box minWidth={2}><Text color={isMatrixTheme() ? MATRIX_UI.systemMsg : undefined}>{BLACK_CIRCLE}</Text></Box>;
     $[16] = t4;
   } else {
     t4 = $[16];
@@ -501,6 +503,7 @@ function TurnDurationMessage(t0) {
     message,
     addMargin
   } = t0;
+  const _isMatrix = isMatrixTheme();
   const bg = useSelectedMessageBg();
   const [verb] = useState(_temp4);
   const store = useAppStateStore();
@@ -563,7 +566,7 @@ function TurnDurationMessage(t0) {
   const t5 = addMargin ? 1 : 0;
   let t6;
   if ($[8] === Symbol.for("react.memo_cache_sentinel")) {
-    t6 = <Box minWidth={2}><Text dimColor={!isMatrixTheme()} color={isMatrixTheme() ? MATRIX_SCALE.NEON : undefined}>{isMatrixTheme() ? '⟩' : TEARDROP_ASTERISK}</Text></Box>;
+    t6 = <Box minWidth={2}><Text dimColor={!_isMatrix} color={_isMatrix ? MATRIX_SCALE.NEON : undefined}>{_isMatrix ? '⟩' : TEARDROP_ASTERISK}</Text></Box>;
     $[8] = t6;
   } else {
     t6 = $[8];
@@ -572,7 +575,7 @@ function TurnDurationMessage(t0) {
   const t8 = backgroundTaskSummary && ` \u00B7 ${backgroundTaskSummary} ${isZh() ? '仍在运行' : 'still running'}`;
   let t9;
   if ($[9] !== budgetSuffix || $[10] !== t7 || $[11] !== t8) {
-    t9 = <Text dimColor={true} color={isMatrixTheme() ? MATRIX_UI.systemMsg : undefined}>{t7}{budgetSuffix}{t8}</Text>;
+    t9 = <Text dimColor={true} color={_isMatrix ? MATRIX_UI.systemMsg : undefined}>{t7}{budgetSuffix}{t8}</Text>;
     $[9] = budgetSuffix;
     $[10] = t7;
     $[11] = t8;

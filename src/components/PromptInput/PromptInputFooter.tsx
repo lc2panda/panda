@@ -123,7 +123,7 @@ function PromptInputFooter({
   const pillSelected = tasksSelected && (coordinatorTaskCount === 0 || coordinatorTaskIndex < 0);
 
   // Matrix footer: show model + context info when StatusLine is not configured
-  const matrixModel = isMatrixTheme() ? useMainLoopModel() : null;
+  const matrixModel = useMainLoopModel();
   const matrixUsage = isMatrixTheme() ? getCurrentUsage(messages) : null;
   const showMatrixFooter = isMatrixTheme() && !statusLineShouldDisplay(settings) && mode === 'prompt' && !isShort && !exitMessage.show && !isPasting;
 
@@ -150,7 +150,7 @@ function PromptInputFooter({
           {mode === 'prompt' && !isShort && !exitMessage.show && !isPasting && statusLineShouldDisplay(settings) && <StatusLine messagesRef={messagesRef} lastAssistantMessageId={lastAssistantMessageId} vimMode={vimMode} />}
           {showMatrixFooter && <Box>
             <Text color={MATRIX_SCALE.SHADOW}>▐ </Text>
-            {matrixModel && <Text color={MATRIX_SCALE.NEON}>{String(matrixModel).replace(/-\d{8}$/, '')}</Text>}
+            {isMatrixTheme() && matrixModel && <Text color={MATRIX_SCALE.NEON}>{String(matrixModel).replace(/-\d{8}$/, '')}</Text>}
             {matrixUsage && <Text color={MATRIX_SCALE.SHADOW}>{matrixModel ? ' · ' : ''}{(() => { const total = matrixUsage.input_tokens + matrixUsage.output_tokens; return total > 1000 ? `${(total / 1000).toFixed(1)}k ctx` : `${total} ctx`; })()}</Text>}
           </Box>}
           <PromptInputFooterLeftSide exitMessage={exitMessage} vimMode={vimMode} mode={mode} toolPermissionContext={toolPermissionContext} suppressHint={suppressHint} isLoading={isLoading} tasksSelected={pillSelected} teamsSelected={teamsSelected} teammateFooterIndex={teammateFooterIndex} tmuxSelected={tmuxSelected} isPasting={isPasting} isSearching={isSearching} historyQuery={historyQuery} setHistoryQuery={setHistoryQuery} historyFailedMatch={historyFailedMatch} onOpenTasksDialog={onOpenTasksDialog} />
