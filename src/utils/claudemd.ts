@@ -84,6 +84,7 @@ import {
 } from './hooks.js'
 import type { MemoryType } from './memory/types.js'
 import { expandPath } from './path.js'
+import { buildProgressiveIndex } from './progressiveMemory.js'
 import { pathInWorkingPath } from './permissions/filesystem.js'
 import { isSettingSourceEnabled } from './settings/constants.js'
 import { getInitialSettings } from './settings/settings.js'
@@ -1279,30 +1280,58 @@ export const getClaudeMds = (
     false,
   )
 
+  // B5: Progressive Memory Disclosure — separate AutoMem files for indexing
+  const autoMemFiles: MemoryFileInfo[] = []
+  const otherFiles: MemoryFileInfo[] = []
+
   for (const file of memoryFiles) {
     if (filter && !filter(file.type)) continue
     if (skipProjectLevel && (file.type === 'Project' || file.type === 'Local'))
       continue
-    if (file.content) {
-      const description =
-        file.type === 'Project'
-          ? ' (project instructions, checked into the codebase)'
-          : file.type === 'Local'
-            ? " (user's private project instructions, not checked in)"
-            : feature('TEAMMEM') && file.type === 'TeamMem'
-              ? ' (shared team memory, synced across the organization)'
-              : file.type === 'AutoMem'
-                ? " (user's auto-memory, persists across conversations)"
-                : " (user's private global instructions for all projects)"
+    if (!file.content) continue
+    if (file.type === 'AutoMem') {
+      autoMemFiles.push(file)
+    } else {
+      otherFiles.push(file)
+    }
+  }
 
-      const content = file.content.trim()
-      if (feature('TEAMMEM') && file.type === 'TeamMem') {
-        memories.push(
-          `Contents of ${file.path}${description}:\n\n<team-memory-content source="shared">\n${content}\n</team-memory-content>`,
-        )
-      } else {
-        memories.push(`Contents of ${file.path}${description}:\n\n${content}`)
-      }
+  // Process non-AutoMem files normally (full injection)
+  for (const file of otherFiles) {
+    const description =
+      file.type === 'Project'
+        ? ' (project instructions, checked into the codebase)'
+        : file.type === 'Local'
+          ? " (user's private project instructions, not checked in)"
+          : feature('TEAMMEM') && file.type === 'TeamMem'
+            ? ' (shared team memory, synced across the organization)'
+            : " (user's private global instructions for all projects)"
+
+    const content = file.content.trim()
+    if (feature('TEAMMEM') && file.type === 'TeamMem') {
+      memories.push(
+        `Contents of ${file.path}${description}:\n\n<team-memory-content source="shared">\n${content}\n</team-memory-content>`,
+      )
+    } else {
+      memories.push(`Contents of ${file.path}${description}:\n\n${content}`)
+    }
+  }
+
+  // B5: Progressive disclosure for AutoMem files
+  if (autoMemFiles.length > 0) {
+    const progressive = buildProgressiveIndex(autoMemFiles)
+    const description = " (user's auto-memory, persists across conversations)"
+
+    // Full injection for entrypoint files (MEMORY.md — it IS the index)
+    for (const file of progressive.fullInjectionFiles) {
+      memories.push(
+        `Contents of ${file.path}${description}:\n\n${file.content.trim()}`,
+      )
+    }
+
+    // Index-only injection for detail files (patterns, scars, etc.)
+    if (progressive.indexContent) {
+      memories.push(progressive.indexContent)
     }
   }
 

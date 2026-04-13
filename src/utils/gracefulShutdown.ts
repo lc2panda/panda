@@ -449,11 +449,11 @@ export async function gracefulShutdown(
           `- ${s.prompt || '(empty)'} → ${(s.tools || []).join(',')} [${s.success ? '✓' : '✗'}]`
         ).join('\n')
         const sessionStartMs = summaries[0]?.timestamp || Date.now()
-        saveEpisodicMemory(content, {
+        void saveEpisodicMemory(content, {
           tools,
           turnCount: summaries.length,
           sessionStartMs,
-        })
+        }).catch((e: Error) => console.warn('[memory] saveEpisodicMemory error:', e.message))
       }
       // summaries.length === 0 → 用户未输入任何内容，不创建空壳 episode
     } catch {}
