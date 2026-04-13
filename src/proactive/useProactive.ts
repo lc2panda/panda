@@ -3,7 +3,7 @@ import {
   isProactiveActive,
   isProactivePaused,
 } from './index.js'
-import { isNightModeActive, runNightTasks } from './nightMode.js'
+import { isNightModeActive, runScheduledTasks } from './nightMode.js'
 
 type UseProactiveOptions = {
   isLoading: boolean
@@ -22,7 +22,7 @@ const TICK_INTERVAL_MS = 5 * 60 * 1000
 function _runTickIfEligible(): void {
   if (isProactivePaused()) return
   if (!isProactiveActive() && !isNightModeActive()) return
-  void runNightTasks().catch(() => {})
+  void runScheduledTasks().catch(() => {})
 }
 
 export function useProactive(_options: UseProactiveOptions): void {

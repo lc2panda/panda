@@ -154,6 +154,20 @@ const HIGH_PRIVACY_SCENARIOS = new Set([
  * 所有 id 必须与 src/proactive/tasks/*.ts 中的真实 task id 对齐（已核对）。
  */
 const DEFAULT_ON_SAFE_SCENARIOS = new Set<string>([
+  // ── builtinTasks.ts core tasks (must be here for catchup to work) ──
+  'morning-brief',
+  'dream-consolidate',
+  'code-health',
+  'memory-decay',
+  'memory-index-rebuild',
+  'working-memory-cleanup',
+  'dream-report-summary',
+  'prospective-scan',
+  'profile-stale-reminder',
+  'file-organizer',
+  'clipboard-poll',
+  'calendar-reminder',
+  'git-uncommitted-reminder',
   // systemHealth.ts — 系统健康
   'disk-space-alert',
   'memory-pressure-alert',
