@@ -43,6 +43,8 @@ export function buildConsolidationPrompt(
 
 You are performing a dream — a reflective pass over your memory files. Synthesize what you've learned recently into durable, well-organized memories so that future sessions can orient quickly.
 
+**Privacy Rule:** Any content wrapped in \`<!-- private -->...<!-- /private -->\` or \`<private>...</private>\` tags must NOT be extracted, consolidated, or referenced as memory. Skip those sections entirely.
+
 Memory directory: \`${memoryRoot}\`
 ${DIR_EXISTS_GUIDANCE}
 
