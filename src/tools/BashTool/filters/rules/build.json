@@ -1,0 +1,12 @@
+[
+  {
+    "command": ["tsc", "tsc --noEmit", "tsc -b"],
+    "description": "Keep only errors and final status from TypeScript compiler",
+    "minOutputLines": 10,
+    "rules": [
+      { "match": "^\\s*error TS\\d+", "action": "keep" },
+      { "match": "^Found \\d+ error", "action": "keep" },
+      { "match": "^\\s*warning TS\\d+", "action": "truncate", "params": { "maxLines": 10 } }
+    ]
+  }
+]

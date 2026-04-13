@@ -1,0 +1,13 @@
+[
+  {
+    "command": ["jest", "vitest", "bun test"],
+    "description": "Keep test summary and failures only",
+    "minOutputLines": 20,
+    "rules": [
+      { "match": "^\\s*(PASS|FAIL|Tests:|Test Suites:|Snapshots:|Time:)", "action": "keep" },
+      { "match": "^\\s*✓|^\\s*✗|^\\s*●", "action": "keep" },
+      { "match": "^\\s*FAIL", "action": "keep" },
+      { "match": "^\\s*Expected|^\\s*Received|^\\s*at ", "action": "keep" }
+    ]
+  }
+]

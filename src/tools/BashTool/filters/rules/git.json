@@ -1,0 +1,18 @@
+[
+  {
+    "command": ["git status"],
+    "description": "Remove help text from git status",
+    "rules": [
+      { "match": "^\\s+\\(use \"git", "action": "remove" },
+      { "match": "^\\s+\\(all conflicts", "action": "remove" }
+    ]
+  },
+  {
+    "command": ["git log"],
+    "description": "Truncate long git log output",
+    "minOutputLines": 30,
+    "rules": [
+      { "match": "^commit [a-f0-9]{40}", "action": "truncate", "params": { "maxLines": 50 } }
+    ]
+  }
+]

@@ -1,0 +1,18 @@
+[
+  {
+    "command": ["ls -la", "ls -l"],
+    "description": "Remove total line and group by extension for large listings",
+    "minOutputLines": 50,
+    "rules": [
+      { "match": "^total \\d+", "action": "remove" }
+    ]
+  },
+  {
+    "command": ["du", "du -sh", "du -h"],
+    "description": "Truncate large disk usage output",
+    "minOutputLines": 30,
+    "rules": [
+      { "match": ".*", "action": "truncate", "params": { "maxLines": 30 } }
+    ]
+  }
+]
