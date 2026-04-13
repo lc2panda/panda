@@ -47,6 +47,7 @@ import { userFacingName as fileEditUserFacingName } from '../FileEditTool/UI.js'
 import { trackGitOperations } from '../shared/gitOperationTracking.js';
 import { bashToolHasPermission, commandHasAnyCd, matchWildcardPattern, permissionRuleExtractPrefix } from './bashPermissions.js';
 import { interpretCommandResult } from './commandSemantics.js';
+import { compressBashOutput } from './outputCompressor.js';
 import { getDefaultTimeoutMs, getMaxTimeoutMs, getSimplePrompt } from './prompt.js';
 import { checkReadOnlyConstraints } from './readOnlyValidation.js';
 import { parseSedEditCommand } from './sedEditParser.js';
@@ -295,7 +296,10 @@ const outputSchema = lazySchema(() => z.object({
   noOutputExpected: z.boolean().optional().describe('Whether the command is expected to produce no output on success'),
   structuredContent: z.array(z.any()).optional().describe('Structured content blocks'),
   persistedOutputPath: z.string().optional().describe('Path to the persisted full output in tool-results dir (set when output is too large for inline)'),
-  persistedOutputSize: z.number().optional().describe('Total size of the output in bytes (set when output is too large for inline)')
+  persistedOutputSize: z.number().optional().describe('Total size of the output in bytes (set when output is too large for inline)'),
+  compressedStdoutForLLM: z.string().optional().describe('Compressed stdout for LLM consumption (original preserved in stdout for UI)'),
+  compressionStrategy: z.string().optional().describe('Name of the compression strategy applied'),
+  compressionSavedPercent: z.number().optional().describe('Percentage of tokens saved by compression'),
 }));
 type OutputSchema = ReturnType<typeof outputSchema>;
 export type Out = z.infer<OutputSchema>;
@@ -567,7 +571,10 @@ export const BashTool = buildTool({
     assistantAutoBackgrounded,
     structuredContent,
     persistedOutputPath,
-    persistedOutputSize
+    persistedOutputSize,
+    compressedStdoutForLLM,
+    compressionStrategy,
+    compressionSavedPercent,
   }, toolUseID): ToolResultBlockParam {
     // Handle structured content
     if (structuredContent && structuredContent.length > 0) {
@@ -583,17 +590,27 @@ export const BashTool = buildTool({
       const block = buildImageToolResult(stdout, toolUseID);
       if (block) return block;
     }
-    let processedStdout = stdout;
-    if (stdout) {
+
+    // ── Use compressed output for LLM if available ──
+    // compressedStdoutForLLM is set by the compression layer when savings
+    // exceed the threshold. The UI already rendered the full stdout.
+    let processedStdout = compressedStdoutForLLM ?? stdout;
+    if (processedStdout) {
       // Replace any leading newlines or lines with only whitespace
-      processedStdout = stdout.replace(/^(\s*\n)+/, '');
+      processedStdout = processedStdout.replace(/^(\s*\n)+/, '');
       // Still trim the end as before
       processedStdout = processedStdout.trimEnd();
     }
 
-    // For large output that was persisted to disk, build <persisted-output>
-    // message for the model. The UI never sees this — it uses data.stdout.
-    if (persistedOutputPath) {
+    // If we used compression AND there's a persisted original, append a
+    // reference so the LLM knows it can Read the full output if needed.
+    if (compressedStdoutForLLM && persistedOutputPath) {
+      processedStdout += `\n[Full output: ${persistedOutputPath}]`;
+    }
+
+    // For large output that was persisted to disk (without compression),
+    // build <persisted-output> message for the model.
+    if (persistedOutputPath && !compressedStdoutForLLM) {
       const preview = generatePreview(processedStdout, PREVIEW_SIZE_BYTES);
       processedStdout = buildLargeToolResultMessage({
         filepath: persistedOutputPath,
@@ -819,6 +836,41 @@ export const BashTool = buildTool({
       persistedOutputPath,
       persistedOutputSize
     };
+
+    // ── Output compression for LLM token savings ──
+    // Only compress non-image text output. The UI always sees the original
+    // stdout (data.stdout). If compression yields >20% savings, attach
+    // the compressed variant; mapToolResultToToolResultBlockParam will
+    // prefer it when building the API payload.
+    if (!isImage && !data.backgroundTaskId) {
+      const compressionResult = compressBashOutput(
+        input.command,
+        compressedStdout,
+        stderrForShellReset,
+        result.code,
+      );
+      if (compressionResult) {
+        // If output was large enough to persist, ensure original is on disk
+        // so the LLM can Read it if needed. Reuse existing persistence if
+        // already saved; otherwise persist now.
+        if (!persistedOutputPath && compressionResult.savedPercent > 0.3) {
+          try {
+            await ensureToolResultsDir();
+            const taskId = result.outputTaskId || toolUseId || `compress-${Date.now()}`;
+            const dest = getToolResultPath(taskId, false);
+            const { writeFile } = await import('fs/promises');
+            await writeFile(dest, compressedStdout, 'utf-8');
+            data.persistedOutputPath = dest;
+            data.persistedOutputSize = compressedStdout.length;
+          } catch {
+            // Non-critical — compressed output still usable without backup
+          }
+        }
+        data.compressedStdoutForLLM = compressionResult.compressed;
+        data.compressionStrategy = compressionResult.strategy;
+        data.compressionSavedPercent = compressionResult.savedPercent;
+      }
+    }
     return {
       data
     };

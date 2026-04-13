@@ -1,4 +1,5 @@
 - `BashTool.tsx` — Bash命令执行工具主实现
+- `outputCompressor.ts` — BashTool输出智能压缩（LLM token节省），支持10种命令策略 + 通用fallback
 - `bashCommandHelpers.ts`, `bashPermissions.ts`, `bashSecurity.ts`, `commandSemantics.ts` — 命令辅助、权限、安全与语义分析
 - `sedEditParser.ts`, `sedValidation.ts`, `pathValidation.ts`, `modeValidation.ts`, `readOnlyValidation.ts` — sed解析与各类校验
 - `shouldUseSandbox.ts`, `destructiveCommandWarning.ts`, `commentLabel.ts`, `toolName.ts`, `utils.ts` — 沙箱判定、危险命令警告、工具函数
