@@ -381,12 +381,41 @@ export const getUserContext = memoize(
       }
     } catch {}
 
+    // B7: inject recent session summaries (up to 3, ≤1000 chars total)
+    let sessionSummaryContext: string | null = null
+    try {
+      const { join } = require('path')
+      const { readdirSync, readFileSync } = require('fs')
+      const { getAutoMemPath } = require('./memdir/paths.js')
+      const memDir = getAutoMemPath()
+      if (memDir) {
+        const workingDir = join(memDir, 'working')
+        const files = readdirSync(workingDir)
+          .filter((f: string) => f.startsWith('session-summary-') && f.endsWith('.md'))
+          .sort()
+          .reverse()
+          .slice(0, 3)
+        if (files.length > 0) {
+          const summaries = files.map((f: string) => {
+            const content = readFileSync(join(workingDir, f), 'utf-8')
+            // Strip frontmatter
+            const body = content.replace(/^---[\s\S]*?---\n*/, '').trim()
+            return body
+          })
+          const joined = summaries.join('\n---\n')
+          // Budget: ≤1000 chars
+          sessionSummaryContext = `## 最近会话摘要\n${joined}`.slice(0, 1000)
+        }
+      }
+    } catch {}
+
     return {
       ...(claudeMd && { claudeMd }),
       currentDate: `Today's date is ${getLocalISODate()}. ${timeAwareness}`,
       ...(personaContext && { personaContext }),
       ...(workingMemoryContext && { workingMemoryContext }),
       ...(morningBriefContext && { morningBriefContext }),
+      ...(sessionSummaryContext && { sessionSummaryContext }),
       ...(thirdPartyGuidance && { thirdPartyGuidance }),
     }
   },

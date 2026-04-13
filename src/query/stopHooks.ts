@@ -50,6 +50,7 @@ const jobClassifierModule = feature('TEMPLATES')
 
 import type { QuerySource } from '../constants/querySource.js'
 import { executeAutoDream } from '../services/autoDream/autoDream.js'
+import { executeSessionSummary } from '../services/sessionSummary/sessionSummary.js'
 import { executePromptSuggestion } from '../services/PromptSuggestion/promptSuggestion.js'
 import { isBareMode, isEnvDefinedFalsy } from '../utils/envUtils.js'
 import {
@@ -153,6 +154,9 @@ export async function* handleStopHooks(
     }
     if (!toolUseContext.agentId) {
       void executeAutoDream(stopHookContext, toolUseContext.appendSystemMessage)
+
+      // B7: 会话自动摘要 — fire-and-forget
+      void executeSessionSummary(stopHookContext).catch(() => {})
 
       // SA-P0-02: 用户画像自动维护（异步，不阻塞）
       try {
