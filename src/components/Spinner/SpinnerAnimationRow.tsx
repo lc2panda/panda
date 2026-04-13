@@ -33,6 +33,17 @@ const THINKING_INACTIVE_SHIMMER = {
   g: 185,
   b: 185
 };
+// Matrix theme: green-tinted thinking shimmer (SHADOW → BASE)
+const THINKING_INACTIVE_MATRIX = {
+  r: 9,
+  g: 140,
+  b: 18
+};
+const THINKING_INACTIVE_SHIMMER_MATRIX = {
+  r: 11,
+  g: 191,
+  b: 24
+};
 const THINKING_DELAY_MS = 3000;
 const THINKING_GLOW_PERIOD_S = 2;
 export type SpinnerAnimationRowProps = {
@@ -206,7 +217,10 @@ export function SpinnerAnimationRow({
   // second useAnimationFrame(50) subscription.
   const thinkingElapsedSec = (time - THINKING_DELAY_MS) / 1000;
   const thinkingOpacity = time < THINKING_DELAY_MS ? 0 : (Math.sin(thinkingElapsedSec * Math.PI * 2 / THINKING_GLOW_PERIOD_S) + 1) / 2;
-  const thinkingShimmerColor = toRGBColor(interpolateColor(THINKING_INACTIVE, THINKING_INACTIVE_SHIMMER, thinkingOpacity));
+  const _isMatrixSpinner = isMatrixTheme();
+  const thinkingBase = _isMatrixSpinner ? THINKING_INACTIVE_MATRIX : THINKING_INACTIVE;
+  const thinkingPeak = _isMatrixSpinner ? THINKING_INACTIVE_SHIMMER_MATRIX : THINKING_INACTIVE_SHIMMER;
+  const thinkingShimmerColor = toRGBColor(interpolateColor(thinkingBase, thinkingPeak, thinkingOpacity));
 
   // === Build status parts ===
   const parts = [...(spinnerSuffix ? [<Text dimColor key="suffix">

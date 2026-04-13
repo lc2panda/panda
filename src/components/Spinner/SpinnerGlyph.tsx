@@ -49,9 +49,16 @@ export function SpinnerGlyph(t0) {
       return <Box flexWrap="wrap" height={1} width={2}><Text color={MATRIX_GREEN} dimColor={isDim}>{REDUCED_MOTION_DOT}</Text></Box>;
     }
     const matrixChar = MATRIX_SPINNER_FRAMES[frame % MATRIX_SPINNER_FRAMES.length];
-    // Pulse between NEON(G5) and BRIGHT(G6) for a breathing effect
+    // Smooth pulse: interpolate SHADOW → NEON → BRIGHT based on continuous sine phase
     const pulsePhase = Math.sin(frame * 0.15) * 0.5 + 0.5;
-    const pulseColor = pulsePhase > 0.5 ? MATRIX_SCALE.BRIGHT : MATRIX_SCALE.NEON;
+    const SHADOW_RGB = { r: 9, g: 140, b: 18 };
+    const NEON_RGB = { r: 13, g: 242, b: 22 };
+    const BRIGHT_RGB = { r: 60, g: 248, b: 62 };
+    // 0→0.5: SHADOW→NEON, 0.5→1: NEON→BRIGHT
+    const pulseRGB = pulsePhase <= 0.5
+      ? interpolateColor(SHADOW_RGB, NEON_RGB, pulsePhase * 2)
+      : interpolateColor(NEON_RGB, BRIGHT_RGB, (pulsePhase - 0.5) * 2);
+    const pulseColor = toRGBColor(pulseRGB);
     return <Box flexWrap="wrap" height={1} width={2}><Text color={pulseColor}>{matrixChar}</Text></Box>;
   }
   if (reducedMotion) {
