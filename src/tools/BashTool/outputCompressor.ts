@@ -4,6 +4,7 @@
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
 import { splitCommand_DEPRECATED } from '../../utils/bash/commands.js'
+import { loadFilters, applyFilters } from './filters/index.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -722,6 +723,24 @@ export function compressBashOutput(
   // Don't compress empty stdout (stderr-only outputs are already small)
   if (!stdout.trim()) return null
 
+  // --- Layer 1: Declarative JSON filter rules (extensible, user-overridable) ---
+  try {
+    const filters = loadFilters()
+    const filtered = applyFilters(command, stdout, filters)
+    if (filtered !== null) {
+      let compressed = filtered
+      if (stderr && stderr.trim()) {
+        compressed += `\n[stderr]: ${stderr.trim()}`
+      }
+      const cr = buildResult(compressed, stdout, 'declarative-filter')
+      if (cr) return cr
+      // Declarative filter matched but saving < threshold — fall through
+    }
+  } catch {
+    // Filter engine error — fall through to hardcoded strategies
+  }
+
+  // --- Layer 2: Hardcoded command-specific strategies (fallback) ---
   // Try command-specific strategies
   for (const strategy of strategies) {
     const result = strategy(command, stdout, stderr, exitCode)

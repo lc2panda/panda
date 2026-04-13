@@ -1,0 +1,14 @@
+[
+  {
+    "command": ["npm install", "bun install", "yarn install", "pnpm install"],
+    "description": "Remove download progress and resolution details",
+    "rules": [
+      { "match": "^npm http", "action": "remove" },
+      { "match": "^npm warn", "action": "truncate", "params": { "maxLines": 5 } },
+      { "match": "^\\s*\\d+ packages are looking", "action": "remove" },
+      { "match": "^\\s*bun install v", "action": "keep" },
+      { "match": "^\\s*\\d+ packages installed", "action": "keep" },
+      { "match": "^\\s*Resolving\\.\\.\\.", "action": "remove" }
+    ]
+  }
+]
