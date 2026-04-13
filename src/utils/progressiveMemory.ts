@@ -17,6 +17,7 @@
  */
 
 import type { MemoryFileInfo } from './claudemd.js'
+import { stripPrivateContent } from '../memdir/memoryTypes.js'
 
 const ENTRYPOINT_FILENAME = 'MEMORY.md'
 
@@ -106,6 +107,8 @@ export function buildProgressiveIndex(
   const indexedFiles: MemoryFileInfo[] = []
 
   for (const file of autoMemFiles) {
+    // B9: Hard-filter private content before index classification
+    file.content = stripPrivateContent(file.content)
     if (isEntrypointFile(file)) {
       fullInjectionFiles.push(file)
     } else {
