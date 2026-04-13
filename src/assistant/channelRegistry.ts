@@ -23,7 +23,7 @@ interface ChannelServerEntry {
  */
 interface ChannelReplyContext {
   user_id: string
-  chat_id: string
+  context_token: string
   /** 最后更新时间（ms） */
   updated: number
 }
@@ -34,10 +34,10 @@ const _servers = new Map<string, ChannelServerEntry>()
 // channel 名 → 最近 reply context
 const _contexts = new Map<string, ChannelReplyContext>()
 
-// reply 工具名映射
+// reply 工具名映射（MCP server 使用 unprefixed 名称）
 const REPLY_TOOL_MAP: Record<string, string> = {
-  wechat: 'mcp__plugin_wechat_wechat__reply',
-  feishu: 'mcp__plugin_feishu_feishu__reply',
+  wechat: 'reply',
+  feishu: 'reply',
 }
 
 /** context 最大有效期：24 小时 */
@@ -80,8 +80,11 @@ export function unregisterChannelServer(serverName: string): void {
 }
 
 /**
- * 保存 inbound 消息的 reply context（从 meta 中提取 user_id + chat_id）。
+ * 保存 inbound 消息的 reply context（从 meta 中提取 user_id + context_token/chat_id）。
  * 由 print.ts 在收到 channel notification 时调用。
+ *
+ * WeChat meta 字段：{ user_id, context_token, ts }
+ * Feishu  meta 字段：{ user_id, chat_id, ts }
  */
 export function saveChannelContext(
   serverName: string,
@@ -89,13 +92,14 @@ export function saveChannelContext(
 ): void {
   if (!meta) return
   const userId = meta.user_id || meta.from_user_id
-  const chatId = meta.chat_id || meta.context_token
-  if (!userId || !chatId) return
+  // WeChat uses context_token, Feishu uses chat_id — normalize to context_token
+  const contextToken = meta.context_token || meta.chat_id
+  if (!userId || !contextToken) return
 
   const channel = extractChannelName(serverName)
   _contexts.set(channel, {
     user_id: userId,
-    chat_id: chatId,
+    context_token: contextToken,
     updated: Date.now(),
   })
 }
@@ -103,6 +107,9 @@ export function saveChannelContext(
 /**
  * 通过已注册的 channel MCP server 推送通知。
  * 遍历所有已注册 server，使用最近的 context 调用 reply 工具。
+ *
+ * WeChat reply tool 参数：{ user_id, context_token, text }
+ * Feishu  reply tool 参数：{ user_id, chat_id, text }
  * 全程 try/catch，不抛出异常。
  */
 export function pushViaChannelMCP(title: string, body: string): void {
@@ -119,14 +126,22 @@ export function pushViaChannelMCP(title: string, body: string): void {
       const toolName = REPLY_TOOL_MAP[channel]
       if (!toolName) continue
 
+      // 构造正确的参数名：WeChat → context_token, Feishu → chat_id
+      const args: Record<string, string> = {
+        user_id: ctx.user_id,
+        text: message,
+      }
+      if (channel === 'wechat') {
+        args.context_token = ctx.context_token
+      } else {
+        // Feishu and other channels use chat_id
+        args.chat_id = ctx.context_token
+      }
+
       // 异步调用 MCP reply 工具，不 await（避免阻塞推送管道）
       void server.client.callTool({
         name: toolName,
-        arguments: {
-          user_id: ctx.user_id,
-          chat_id: ctx.chat_id,
-          text: message,
-        },
+        arguments: args,
       }).catch(() => {
         // 静默降级——推送失败不影响主流程
       })
