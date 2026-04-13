@@ -141,7 +141,7 @@ function parseGrepContentOutput(output: string): GrepFileGroup[] | null {
 
   for (const line of lines) {
     // ripgrep content mode: "filepath:linenum:content" or "filepath-linenum-content"
-    const match = line.match(/^(.+?)[:\-](\d+)[:\-]/)
+    const match = line.match(/^(.+?)[:|-](\d+)[:|-]/)
     if (match) {
       const file = match[1]
       if (!current || current.file !== file) {
@@ -149,11 +149,8 @@ function parseGrepContentOutput(output: string): GrepFileGroup[] | null {
         groups.push(current)
       }
       current.matches.push(line)
-    } else if (line.startsWith('--')) {
-      // separator between file groups in ripgrep
-      continue
-    } else if (line.trim() === '') {
-      continue
+    } else if (line.startsWith('--') || line.trim() === '') {
+      // separator or blank line — skip
     } else if (current) {
       // Context line without file prefix (continuation)
       current.matches.push(line)
