@@ -134,22 +134,22 @@ export const MATRIX_UI = {
   toolName:       MATRIX_SCALE.BRIGHT,    // bold tool-use name (G6)
   toolLoader:     MATRIX_SCALE.NEON,      // blinking dot / loader (G5)
 
-  // Thinking
+  // Thinking (WCAG: body text upgraded to BASE G4 — 6.7:1 AA ✅)
   thinking:       MATRIX_SCALE.NEON,      // "∴ Thinking" label (G5)
-  thinkingBody:   MATRIX_SCALE.SHADOW,    // thinking content body (G3)
+  thinkingBody:   MATRIX_SCALE.BASE,      // thinking content body (G4 — was G3)
 
-  // Spinner
+  // Spinner (WCAG: body text upgraded to BASE G4)
   spinner:        MATRIX_SCALE.NEON,      // braille spinner glyph (G5)
-  spinnerMsg:     MATRIX_SCALE.SHADOW,    // spinner message text (G3)
+  spinnerMsg:     MATRIX_SCALE.BASE,      // spinner message text (G4 — was G3)
 
-  // Footer & hints
-  hint:           MATRIX_SCALE.SHADOW,    // "? for shortcuts" etc. (G3)
-  statusLine:     MATRIX_SCALE.SHADOW,    // status bar text (G3)
-  footerInfo:     MATRIX_SCALE.SHADOW,    // model · context info (G3)
+  // Footer & hints (WCAG: decorative hint/divider stay G3; info text → G4)
+  hint:           MATRIX_SCALE.SHADOW,    // "? for shortcuts" etc. (G3 — decorative)
+  statusLine:     MATRIX_SCALE.BASE,      // status bar text (G4 — was G3)
+  footerInfo:     MATRIX_SCALE.BASE,      // model · context info (G4 — was G3)
 
-  // System messages
-  systemMsg:      MATRIX_SCALE.SHADOW,    // system text dimColor (G3)
-  divider:        MATRIX_SCALE.SHADOW,    // message dividers (G3)
+  // System messages (WCAG: body text → G4; divider stays G3 decorative)
+  systemMsg:      MATRIX_SCALE.BASE,      // system text dimColor (G4 — was G3)
+  divider:        MATRIX_SCALE.SHADOW,    // message dividers (G3 — decorative)
 
   // Chat chrome
   userMark:       MATRIX_SCALE.NEON,      // user message indicator "▸" (G5)
@@ -160,4 +160,33 @@ export const MATRIX_UI = {
   warning:        MATRIX_STATUS.WARNING,
   success:        MATRIX_STATUS.SUCCESS,
   info:           MATRIX_STATUS.INFO,
+
+  // ── Diff view (Scheme A — brightness-layered) ───────────────────
+  diffAdded:        MATRIX_SCALE.BRIGHT,    // '#3CF83E' — added line foreground
+  diffRemoved:      '#FF4040',              // red — removed line foreground
+  diffChanged:      '#C8E020',              // yellow-green — changed line foreground
+  diffContext:       MATRIX_SCALE.SHADOW,   // '#098C12' — context line foreground
+  diffHunkHeader:   MATRIX_SCALE.NEON,      // '#0DF216' — hunk header
+  diffAddedBg:      '#001A00',              // deep dark green — added line bg
+  diffRemovedBg:    '#1A0000',              // deep dark red — removed line bg
+  diffChangedBg:    '#0D0D00',              // deep dark yellow — changed line bg
+  diffAddedEmph:    MATRIX_SCALE.FLASH,     // '#9CFB9D' — added word highlight
+  diffRemovedEmph:  '#FF8080',              // light red — removed word highlight
+  diffChangedEmph:  '#E0FF40',              // light yellow-green — changed word highlight
+  diffAddedEmphBg:  '#003300',              // added word highlight bg
+  diffRemovedEmphBg:'#330000',              // removed word highlight bg
+
+  // ── Progress bar ────────────────────────────────────────────────
+  progressFill:     MATRIX_SCALE.NEON,      // '#0DF216'
+  progressEmpty:    MATRIX_SCALE.DEEP,      // '#064E0B'
+
+  // ── Dialog / Pane ───────────────────────────────────────────────
+  dialogTitle:      MATRIX_SCALE.NEON,      // '#0DF216'
+  dialogBorder:     MATRIX_SCALE.SHADOW,    // '#098C12'
+
+  // ── Selection highlight ─────────────────────────────────────────
+  selectHighlight:  MATRIX_SCALE.BRIGHT,    // '#3CF83E'
+
+  // ── Pane divider character ──────────────────────────────────────
+  paneChar:         '━',                    // Matrix-style heavy divider
 } as const

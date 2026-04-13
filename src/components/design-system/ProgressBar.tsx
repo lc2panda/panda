@@ -2,6 +2,8 @@ import { c as _c } from "react/compiler-runtime";
 import React from 'react';
 import { Text } from '../../ink.js';
 import type { Theme } from '../../utils/theme.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 type Props = {
   /**
    * How much progress to display, between 0 and 1 inclusive
@@ -29,9 +31,12 @@ export function ProgressBar(t0) {
   const {
     ratio: inputRatio,
     width,
-    fillColor,
-    emptyColor
+    fillColor: fillColorProp,
+    emptyColor: emptyColorProp
   } = t0;
+  const _isMatrix = isMatrixTheme();
+  const fillColor = fillColorProp === undefined && _isMatrix ? MATRIX_UI.progressFill as any : fillColorProp;
+  const emptyColor = emptyColorProp === undefined && _isMatrix ? MATRIX_UI.progressEmpty as any : emptyColorProp;
   const ratio = Math.min(1, Math.max(0, inputRatio));
   const whole = Math.floor(ratio * width);
   let t1;

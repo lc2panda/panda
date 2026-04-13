@@ -2,6 +2,8 @@ import { c as _c } from "react/compiler-runtime";
 import figures from 'figures';
 import React from 'react';
 import { Text } from '../../ink.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_STATUS, MATRIX_SCALE } from '../MatrixTheme/matrixPalette.js';
 type Status = 'success' | 'error' | 'warning' | 'info' | 'pending' | 'loading';
 type Props = {
   /**
@@ -69,6 +71,15 @@ const STATUS_CONFIG: Record<Status, {
  *   Waiting for response
  * </Text>
  */
+const MATRIX_STATUS_COLORS: Record<Status, string | undefined> = {
+  success:  MATRIX_STATUS.SUCCESS,   // '#3CF83E'
+  error:    MATRIX_STATUS.ERROR,     // '#FF4040'
+  warning:  MATRIX_STATUS.WARNING,   // '#C8E020'
+  info:     MATRIX_SCALE.NEON,       // '#0DF216'
+  pending:  MATRIX_SCALE.SHADOW,     // '#098C12'
+  loading:  MATRIX_SCALE.SHADOW,     // '#098C12'
+};
+
 export function StatusIcon(t0) {
   const $ = _c(5);
   const {
@@ -77,12 +88,14 @@ export function StatusIcon(t0) {
   } = t0;
   const withSpace = t1 === undefined ? false : t1;
   const config = STATUS_CONFIG[status];
-  const t2 = !config.color;
+  const _isMatrix = isMatrixTheme();
+  const resolvedColor = _isMatrix ? MATRIX_STATUS_COLORS[status] as any : config.color;
+  const t2 = !resolvedColor;
   const t3 = withSpace && " ";
   let t4;
-  if ($[0] !== config.color || $[1] !== config.icon || $[2] !== t2 || $[3] !== t3) {
-    t4 = <Text color={config.color} dimColor={t2}>{config.icon}{t3}</Text>;
-    $[0] = config.color;
+  if ($[0] !== resolvedColor || $[1] !== config.icon || $[2] !== t2 || $[3] !== t3) {
+    t4 = <Text color={resolvedColor} dimColor={t2}>{config.icon}{t3}</Text>;
+    $[0] = resolvedColor;
     $[1] = config.icon;
     $[2] = t2;
     $[3] = t3;
