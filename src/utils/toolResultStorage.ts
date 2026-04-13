@@ -22,6 +22,7 @@ import { formatFileSize } from './format.js'
 import { logError } from './log.js'
 import { getProjectDir } from './sessionStorage.js'
 import { jsonStringify } from './slowOperations.js'
+import { compressToolOutput } from './toolOutputCompressor.js'
 
 // Subdirectory name for tool results within a session
 export const TOOL_RESULTS_SUBDIR = 'tool-results'
@@ -218,8 +219,12 @@ export async function processToolResultBlock<T>(
     toolUseResult,
     toolUseID,
   )
+
+  // B3: Apply tool output compression for Read/Grep/Glob before persistence check
+  const compressedBlock = maybeCompressToolOutput(toolResultBlock, tool.name)
+
   return maybePersistLargeToolResult(
-    toolResultBlock,
+    compressedBlock,
     tool.name,
     getPersistenceThreshold(tool.name, tool.maxResultSizeChars),
   )
@@ -262,6 +267,43 @@ export function isToolResultContentEmpty(
       'text' in block &&
       (typeof block.text !== 'string' || block.text.trim() === ''),
   )
+}
+
+/**
+ * B3: Apply tool output compression for Read/Grep/Glob tools.
+ * Compresses text content in tool results before persistence check,
+ * reducing token usage for large tool outputs.
+ * Returns the original block if no compression was applied.
+ */
+function maybeCompressToolOutput(
+  toolResultBlock: ToolResultBlockParam,
+  toolName: string,
+): ToolResultBlockParam {
+  // Only compress known tool types
+  if (toolName !== 'Read' && toolName !== 'Grep' && toolName !== 'Glob') {
+    return toolResultBlock
+  }
+
+  const content = toolResultBlock.content
+  if (!content || typeof content !== 'string') {
+    return toolResultBlock
+  }
+
+  // Skip already-compacted or empty content
+  if (content.startsWith(PERSISTED_OUTPUT_TAG)) {
+    return toolResultBlock
+  }
+
+  const result = compressToolOutput(toolName, content)
+  if (!result) {
+    return toolResultBlock
+  }
+
+  logForDebugging(
+    `B3: Compressed ${toolName} output from ${result.originalSize} to ${result.compressedSize} chars (${(result.savedPercent * 100).toFixed(0)}% saved)`,
+  )
+
+  return { ...toolResultBlock, content: result.compressed }
 }
 
 /**
