@@ -48,6 +48,13 @@ export function ThemeProvider({
   const [themeSetting, setThemeSetting] = useState(initialState ?? defaultInitialTheme);
   const [previewTheme, setPreviewTheme] = useState<ThemeSetting | null>(null);
 
+  // Sync PANDA_THEME env var on mount for Matrix detection
+  useEffect(() => {
+    if (themeSetting === 'matrix') {
+      process.env.PANDA_THEME = 'matrix';
+    }
+  }, []); // run once on mount
+
   // Track terminal theme for 'auto' resolution. Seeds from $COLORFGBG (or
   // 'dark' if unset); the OSC 11 watcher corrects it on first poll.
   const [systemTheme, setSystemTheme] = useState<SystemTheme>(() => (initialState ?? themeSetting) === 'auto' ? getSystemThemeName() : 'dark');
@@ -84,6 +91,12 @@ export function ThemeProvider({
     setThemeSetting: (newSetting: ThemeSetting) => {
       setThemeSetting(newSetting);
       setPreviewTheme(null);
+      // Matrix: sync env var so isMatrixTheme() / color-diff-napi detect it
+      if (newSetting === 'matrix') {
+        process.env.PANDA_THEME = 'matrix';
+      } else if (process.env.PANDA_THEME === 'matrix') {
+        delete process.env.PANDA_THEME;
+      }
       // Switching to 'auto' restarts the watcher (activeSetting dep), whose
       // first poll fires immediately. Seed from the cache so the OSC
       // round-trip doesn't flash the wrong palette.
@@ -94,6 +107,12 @@ export function ThemeProvider({
     },
     setPreviewTheme: (newSetting_0: ThemeSetting) => {
       setPreviewTheme(newSetting_0);
+      // Matrix: sync env var for preview
+      if (newSetting_0 === 'matrix') {
+        process.env.PANDA_THEME = 'matrix';
+      } else if (process.env.PANDA_THEME === 'matrix') {
+        delete process.env.PANDA_THEME;
+      }
       if (newSetting_0 === 'auto') {
         setSystemTheme(getSystemThemeName());
       }
@@ -108,6 +127,12 @@ export function ThemeProvider({
     cancelPreview: () => {
       if (previewTheme !== null) {
         setPreviewTheme(null);
+        // Restore env var to match the saved theme (not the preview)
+        if (themeSetting === 'matrix') {
+          process.env.PANDA_THEME = 'matrix';
+        } else if (process.env.PANDA_THEME === 'matrix') {
+          delete process.env.PANDA_THEME;
+        }
       }
     },
     currentTheme

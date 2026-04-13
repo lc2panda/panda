@@ -131,6 +131,9 @@ export function ThemePicker(t0) {
     }, {
       label: "Light mode (ANSI colors only)",
       value: "light-ansi"
+    }, {
+      label: "🟢 Matrix (green phosphor)",
+      value: "matrix"
     }];
     $[7] = t10;
   } else {
