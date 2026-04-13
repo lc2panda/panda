@@ -1445,6 +1445,7 @@ export const connectToServer = memoize(
               }
 
               // Wait for graceful shutdown with rapid escalation (total 500ms to keep CLI responsive)
+              // biome-ignore lint/suspicious/noAsyncPromiseExecutor: pre-existing decompiled pattern — safe here as resolve is only called once
               await new Promise<void>(async resolve => {
                 let resolved = false
 
@@ -2276,6 +2277,33 @@ export async function getMcpToolsCommandsAndResources(
     ([_, config]) => !isLocalMcpServer(config),
   )
 
+  // --- Per-cwd mutex for local servers ---
+  // When multiple stdio servers share the same working directory (cwd),
+  // concurrent `bun install` in that directory can clash on symlink creation
+  // in node_modules/.bin/ (EEXIST). We serialize startup for servers that
+  // share a cwd while keeping different-cwd servers fully concurrent.
+  // The effective cwd is derived from CLAUDE_PLUGIN_ROOT in the server's env,
+  // falling back to --cwd args, then to process.cwd().
+  const cwdLocks = new Map<string, Promise<void>>()
+
+  function getEffectiveCwd(config: ScopedMcpServerConfig): string {
+    if (config.type === 'stdio' || !config.type) {
+      const stdioConfig = config as McpStdioServerConfig
+      // 1. Check env CLAUDE_PLUGIN_ROOT
+      if (stdioConfig.env?.CLAUDE_PLUGIN_ROOT) {
+        return stdioConfig.env.CLAUDE_PLUGIN_ROOT
+      }
+      // 2. Check --cwd arg
+      const args = stdioConfig.args ?? []
+      const cwdIdx = args.indexOf('--cwd')
+      if (cwdIdx !== -1 && cwdIdx + 1 < args.length) {
+        return args[cwdIdx + 1]
+      }
+    }
+    // 3. Fallback to current process cwd
+    return process.cwd()
+  }
+
   const serverStats = {
     totalServers,
     stdioCount,
@@ -2391,14 +2419,33 @@ export async function getMcpToolsCommandsAndResources(
     }
   }
 
+  // Wrap processServer for local servers: serialize servers sharing the same
+  // cwd to prevent concurrent `bun install` EEXIST crashes on symlinks.
+  const processLocalServer = async (
+    entry: [string, ScopedMcpServerConfig],
+  ): Promise<void> => {
+    const cwd = getEffectiveCwd(entry[1])
+    // Chain this server's startup after any prior server with the same cwd.
+    // Different cwds run concurrently (independent promise chains).
+    const prev = cwdLocks.get(cwd) ?? Promise.resolve()
+    const current = prev.then(
+      () => processServer(entry),
+      // If a prior server in the chain failed, still start this one
+      () => processServer(entry),
+    )
+    cwdLocks.set(cwd, current)
+    return current
+  }
+
   // Process both groups concurrently, each with their own concurrency limits:
-  // - Local servers (stdio/sdk): lower concurrency to avoid process spawning resource contention
+  // - Local servers (stdio/sdk): lower concurrency to avoid process spawning resource contention;
+  //   additionally serialized per-cwd to avoid concurrent bun install symlink races
   // - Remote servers: higher concurrency since they're just network connections
   await Promise.all([
     processBatched(
       localServers,
       getMcpServerConnectionBatchSize(),
-      processServer,
+      processLocalServer,
     ),
     processBatched(
       remoteServers,
