@@ -46,6 +46,12 @@ import { NOTEBOOK_EDIT_TOOL_NAME } from '../../tools/NotebookEditTool/constants.
 import { POWERSHELL_TOOL_NAME } from '../../tools/PowerShellTool/toolName.js'
 import { parseGitCommitId } from '../../tools/shared/gitOperationTracking.js'
 import {
+  OBSERVABLE_TOOLS,
+  recordToolObservation,
+  summarizeInput,
+  summarizeOutput,
+} from '../toolObserver/toolObserver.js'
+import {
   isDeferredTool,
   TOOL_SEARCH_TOOL_NAME,
 } from '../../tools/ToolSearchTool/prompt.js'
@@ -1655,6 +1661,25 @@ async function checkPermissionsAndCallTool(
       'success',
       durationMs,
     )
+
+    // B6: 工具执行观察记录 — fire-and-forget
+    if (OBSERVABLE_TOOLS.has(tool.name)) {
+      const outputStr = toolOutput && typeof toolOutput === 'object'
+        ? ('stdout' in toolOutput ? String((toolOutput as any).stdout || '') : JSON.stringify(toolOutput).slice(0, 300))
+        : String(toolOutput ?? '')
+      void recordToolObservation({
+        ts: new Date().toISOString(),
+        tool: tool.name,
+        inputSummary: summarizeInput(tool.name, processedInput),
+        outputSummary: summarizeOutput(tool.name, outputStr),
+        exitCode: tool.name === 'Bash' && toolOutput && typeof toolOutput === 'object' && 'exitCode' in toolOutput
+          ? (toolOutput as any).exitCode
+          : undefined,
+        durationMs,
+        hadError: false,
+      }).catch(() => {})
+    }
+
     return resultingMessages
   } catch (error) {
     const durationMs = Date.now() - startTime
@@ -1791,6 +1816,18 @@ async function checkPermissionsAndCallTool(
       durationMs,
       isInterrupt ? undefined : errorMessage(error),
     )
+
+    // B6: 工具执行观察记录（失败路径） — fire-and-forget
+    if (OBSERVABLE_TOOLS.has(tool.name) && !isInterrupt) {
+      void recordToolObservation({
+        ts: new Date().toISOString(),
+        tool: tool.name,
+        inputSummary: summarizeInput(tool.name, processedInput),
+        outputSummary: summarizeOutput(tool.name, content.slice(0, 200)),
+        durationMs,
+        hadError: true,
+      }).catch(() => {})
+    }
 
     return [
       {

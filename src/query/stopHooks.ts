@@ -52,6 +52,7 @@ import type { QuerySource } from '../constants/querySource.js'
 import { executeAutoDream } from '../services/autoDream/autoDream.js'
 import { executeSessionSummary } from '../services/sessionSummary/sessionSummary.js'
 import { executePromptSuggestion } from '../services/PromptSuggestion/promptSuggestion.js'
+import { getSessionStats, formatStatsForDisplay } from '../tools/BashTool/compressionStats.js'
 import { isBareMode, isEnvDefinedFalsy } from '../utils/envUtils.js'
 import {
   createCacheSafeParams,
@@ -150,18 +151,21 @@ export async function* handleStopHooks(
       void extractMemoriesModule!.executeExtractMemories(
         stopHookContext,
         toolUseContext.appendSystemMessage,
-      )
+      ).catch(e => logForDebugging(`[memory] extractMemories error: ${errorMessage(e)}`))
     }
     if (!toolUseContext.agentId) {
       void executeAutoDream(stopHookContext, toolUseContext.appendSystemMessage)
+        .catch(e => logForDebugging(`[memory] autoDream error: ${errorMessage(e)}`))
 
       // B7: 会话自动摘要 — fire-and-forget
-      void executeSessionSummary(stopHookContext).catch(() => {})
+      void executeSessionSummary(stopHookContext)
+        .catch(e => logForDebugging(`[memory] sessionSummary error: ${errorMessage(e)}`))
 
       // SA-P0-02: 用户画像自动维护（异步，不阻塞）
       try {
         const { updateUserProfile } = require('../memdir/memdir.js') as typeof import('../memdir/memdir.js')
         void updateUserProfile(stopHookContext.messages)
+          .catch(e => logForDebugging(`[memory] updateUserProfile error: ${(e as Error).message}`))
       } catch {}
 
       // SA-P4: 行为模式记录（异步，不阻塞）
@@ -188,7 +192,18 @@ export async function* handleStopHooks(
           if (suggestions.length > 0 && toolUseContext.appendSystemMessage) {
             toolUseContext.appendSystemMessage(formatSuggestionsAsSystemMessage(suggestions))
           }
-        }).catch(() => {})
+        }).catch(e => logForDebugging(`[memory] proactiveSuggestions error: ${(e as Error).message}`))
+      } catch {}
+
+      // B4: Token 节省统计 — 会话结束时输出压缩统计摘要
+      try {
+        const stats = getSessionStats()
+        if (stats.compressionCount > 0) {
+          const display = formatStatsForDisplay()
+          if (display) {
+            console.error(display)
+          }
+        }
       } catch {}
 
       // H4 Hermes — skill self-learning cycle. If SkillTool.call() stashed a
@@ -217,7 +232,7 @@ export async function* handleStopHooks(
                     : JSON.stringify(m.message?.content || ''),
               }))
             const { runLearningCycle } = require('../skills/learning/index.js') as typeof import('../skills/learning/index.js')
-            void runLearningCycle(exec, followup).catch(() => {})
+            void runLearningCycle(exec, followup).catch(e => logForDebugging(`[memory] learningCycle error: ${(e as Error).message}`))
           } catch {}
           // Consume once — always clear, even on parse failure
           try { deleteWorkingMemory('last-skill-execution') } catch {}
