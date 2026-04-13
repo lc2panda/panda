@@ -8,6 +8,8 @@ import { ConfigurableShortcutHint } from '../ConfigurableShortcutHint.js';
 import { Byline } from './Byline.js';
 import { KeyboardShortcutHint } from './KeyboardShortcutHint.js';
 import { Pane } from './Pane.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 type DialogProps = {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -66,8 +68,10 @@ export function Dialog(t0) {
   }
   const defaultInputGuide = t4;
   let t5;
-  if ($[5] !== color || $[6] !== title) {
-    t5 = <Text bold={true} color={color}>{title}</Text>;
+  const _matrixTitle = isMatrixTheme();
+  if ($[5] !== color || $[6] !== title || _matrixTitle) {
+    const titleColor = _matrixTitle ? MATRIX_UI.dialogTitle as any : color;
+    t5 = <Text bold={true} color={titleColor}>{title}</Text>;
     $[5] = color;
     $[6] = title;
     $[7] = t5;
@@ -124,9 +128,12 @@ export function Dialog(t0) {
   if (hideBorder) {
     return content;
   }
+  const _isMatrix = isMatrixTheme();
   let t11;
-  if ($[24] !== color || $[25] !== content) {
-    t11 = <Pane color={color}>{content}</Pane>;
+  if ($[24] !== color || $[25] !== content || _isMatrix) {
+    t11 = _isMatrix
+      ? <Pane color={MATRIX_UI.dialogBorder as any}>{content}</Pane>
+      : <Pane color={color}>{content}</Pane>;
     $[24] = color;
     $[25] = content;
     $[26] = t11;

@@ -4,6 +4,8 @@ import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import { stringWidth } from '../../ink/stringWidth.js';
 import { Ansi, Text } from '../../ink.js';
 import type { Theme } from '../../utils/theme.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 type DividerProps = {
   /**
    * Width of the divider in characters.
@@ -67,13 +69,15 @@ export function Divider(t0) {
   const $ = _c(21);
   const {
     width,
-    color,
+    color: colorProp,
     char: t1,
     padding: t2,
     title
   } = t0;
-  const char = t1 === undefined ? "\u2500" : t1;
+  const _isMatrix = isMatrixTheme();
+  const char = t1 === undefined ? (_isMatrix ? "\u2501" : "\u2500") : t1;
   const padding = t2 === undefined ? 0 : t2;
+  const color = colorProp === undefined && _isMatrix ? MATRIX_UI.divider as any : colorProp;
   const {
     columns: terminalWidth
   } = useTerminalSize();
