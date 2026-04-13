@@ -228,9 +228,19 @@ if (cliContent.startsWith("#!/usr/bin/env bun")) {
     await writeFile(cliPath, `#!/usr/bin/env node\n${cliContent}`);
 }
 
-// Step 5: Copy vendored ripgrep binary if available
+// Step 6: Copy vendored ripgrep binary if available
 // The source can be: (a) repo-local vendor/, (b) original claude-code vendor/
 const { cpSync, existsSync, chmodSync } = await import("fs");
+
+// Step 5: Copy Node.js-compatible launcher for npm global installs
+// When npm installs globally, it creates .cmd/.ps1 wrappers that invoke `node`,
+// but dist/cli.js is built with target:"bun" and uses Bun APIs. The launcher
+// detects the runtime and re-execs with bun if needed.
+const launcherSrc = join(import.meta.dir, "src", "entrypoints", "launcher.cjs");
+const launcherDest = join(outdir, "launcher.cjs");
+if (existsSync(launcherSrc)) {
+    cpSync(launcherSrc, launcherDest);
+}
 const rgSourceCandidates = [
     join("vendor", "ripgrep"),  // repo-local
     join(import.meta.dir, "node_modules", "@anthropic-ai", "claude-code", "vendor", "ripgrep"),
