@@ -1,4 +1,5 @@
 import { registerBundledSkill } from '../bundledSkills.js'
+import { getTimeZone } from 'src/utils/intl.js'
 
 export function registerRemindSkill(): void {
   registerBundledSkill({
@@ -26,7 +27,7 @@ User input: "${args}"
 
 - If the user input is empty or unclear, ask them what they want to be reminded about and when
 - Always confirm the interpreted time before creating the cron job
-- Use Asia/Singapore timezone (+08:00) for time interpretation
+- Use the device's local timezone (${getTimeZone()}) for time interpretation
 - Present confirmation in Chinese (中文)`
 
       return [{ type: 'text', text: prompt }]
