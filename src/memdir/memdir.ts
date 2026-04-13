@@ -1451,15 +1451,19 @@ export async function decayAndPruneMemories(memoryDir: string): Promise<{ decaye
 // SA-P1-02: 晨间简报引擎
 // ═══════════════════════════════════════════════════════════════════
 
-export async function generateMorningBrief(): Promise<void> {
+export async function generateMorningBrief(): Promise<string> {
   const memoryDir = getAutoMemPath()
-  if (!memoryDir) return
+  if (!memoryDir) return ''
 
   const dateStr = localDateStr()
   const briefPath = join(memoryDir, 'working', `morning_brief_${dateStr}.md`)
 
-  // 避免重复生成
-  try { await access(briefPath); return } catch {}
+  // 如果今天已经生成过，直接返回已有内容（支持推送重试）
+  try {
+    await access(briefPath)
+    const existing = await readFile(briefPath, 'utf-8')
+    return existing
+  } catch {}
 
   const sections: string[] = [`# 晨间简报 — ${dateStr}\n`]
 
@@ -1596,6 +1600,8 @@ export async function generateMorningBrief(): Promise<void> {
       channel: 'all',
     })
   } catch {}
+
+  return sections.join('\n')
 }
 
 // ═══════════════════════════════════════════════════════════════════
