@@ -6,6 +6,8 @@ export const GREP_TOOL_NAME = 'Grep'
 export function getDescription(): string {
   return `A powerful search tool built on ripgrep
 
+  IMPORTANT: Use head_limit parameter to limit results. Default limit is 250. For exploratory searches, start with a small head_limit (e.g., 20) and increase if needed.
+
   Usage:
   - ALWAYS use ${GREP_TOOL_NAME} for search tasks. NEVER invoke \`grep\` or \`rg\` as a ${BASH_TOOL_NAME} command. The ${GREP_TOOL_NAME} tool has been optimized for correct permissions and access.
   - Supports full regex syntax (e.g., "log.*Error", "function\\s+\\w+")

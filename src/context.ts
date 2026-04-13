@@ -16,6 +16,7 @@ import { isBareMode, isEnvTruthy } from './utils/envUtils.js'
 import { execFileNoThrow } from './utils/execFileNoThrow.js'
 import { getBranch, getDefaultBranch, getIsGit, gitExe } from './utils/git.js'
 import { shouldIncludeGitInstructions } from './utils/gitSettings.js'
+import { allocateBudget } from './utils/contextBudget.js'
 import { logError } from './utils/log.js'
 import { isThirdPartyProvider } from './utils/model/providers.js'
 
@@ -409,13 +410,25 @@ export const getUserContext = memoize(
       }
     } catch {}
 
+    // B11: Apply token budget to context injection fields.
+    // claudeMd, currentDate, personaContext, thirdPartyGuidance are kept as-is
+    // (critical for correctness). Budget applied to memory/summary fields.
+    const budgetableContents: Record<string, string> = {}
+    if (sessionSummaryContext) budgetableContents.sessionSummary = sessionSummaryContext
+    if (workingMemoryContext) budgetableContents.workingMemory = workingMemoryContext
+    if (morningBriefContext) budgetableContents.morningBrief = morningBriefContext
+
+    const budgeted = Object.keys(budgetableContents).length > 0
+      ? allocateBudget(budgetableContents)
+      : budgetableContents
+
     return {
       ...(claudeMd && { claudeMd }),
       currentDate: `Today's date is ${getLocalISODate()}. ${timeAwareness}`,
       ...(personaContext && { personaContext }),
-      ...(workingMemoryContext && { workingMemoryContext }),
-      ...(morningBriefContext && { morningBriefContext }),
-      ...(sessionSummaryContext && { sessionSummaryContext }),
+      ...(budgeted.workingMemory && { workingMemoryContext: budgeted.workingMemory }),
+      ...(budgeted.morningBrief && { morningBriefContext: budgeted.morningBrief }),
+      ...(budgeted.sessionSummary && { sessionSummaryContext: budgeted.sessionSummary }),
       ...(thirdPartyGuidance && { thirdPartyGuidance }),
     }
   },

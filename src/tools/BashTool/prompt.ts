@@ -358,6 +358,8 @@ export function getSimplePrompt(): string {
     '',
     `IMPORTANT: Avoid using this tool to run ${avoidCommands} commands, unless explicitly instructed or after you have verified that a dedicated tool cannot accomplish your task. Instead, use the appropriate dedicated tool as this will provide a much better experience for the user:`,
     '',
+    `IMPORTANT: Prefer dedicated tools (${FILE_READ_TOOL_NAME}, ${GREP_TOOL_NAME}, ${GLOB_TOOL_NAME}) over shell commands for file operations. Shell commands bypass output compression optimizations.`,
+    '',
     ...prependBullets(toolPreferenceItems),
     `While the ${BASH_TOOL_NAME} tool can do similar things, it’s better to use the built-in tools as they provide a better user experience and make it easier to review tool calls and give permission.`,
     '',
