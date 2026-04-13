@@ -102,10 +102,11 @@ export function isNightModeActive(): boolean {
 }
 
 /**
- * Run all enabled tasks whose condition passes, sequentially with error
- * isolation. Each task failure is logged but does not block subsequent tasks.
+ * Run all enabled tasks whose cron matches and condition passes, sequentially
+ * with error isolation. Despite the legacy name, this runs ALL scheduled tasks
+ * (not just night-time ones).
  */
-export async function runNightTasks(): Promise<void> {
+export async function runScheduledTasks(): Promise<void> {
   _pruneExecMap()
   const now = Date.now()
   if (now - _lastOrchestratorRun < TASK_INTERVAL_MS) {
@@ -177,6 +178,9 @@ export async function runNightTasks(): Promise<void> {
     _isRunning = false
   }
 }
+
+/** @deprecated Use runScheduledTasks() — kept for backward compat */
+export const runNightTasks = runScheduledTasks
 
 /**
  * Compute the next time a night task should fire.

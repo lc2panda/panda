@@ -73,7 +73,8 @@ interface SmartCronTask extends ProactiveTask {
  */
 function getLastInteractionTimeSafe(): number {
   try {
-    const { getLastInteractionTime } = require('../bootstrap/state.js') as typeof import('../bootstrap/state.js')
+    const { getLastInteractionTime } =
+      require('../bootstrap/state.js') as typeof import('../bootstrap/state.js')
     return getLastInteractionTime()
   } catch {
     return Date.now()
@@ -87,19 +88,25 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '0 22 * * *',
     priority: 'normal',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — cron already gates timing; canRun blocked catchup
     skipIf: () => {
       // 用户 15 分钟内有操作→延后
       const idle = (Date.now() - getLastInteractionTimeSafe()) / 60000
       return idle < 15
     },
     action: async () => {
-      logForDebugging('[builtinTasks] dream-consolidate: executing autoDream pipeline')
+      logForDebugging(
+        '[builtinTasks] dream-consolidate: executing autoDream pipeline',
+      )
       try {
-        const { executeAutoDreamStandalone } = await import('../services/autoDream/autoDream.js')
+        const { executeAutoDreamStandalone } = await import(
+          '../services/autoDream/autoDream.js'
+        )
         await executeAutoDreamStandalone()
       } catch (e) {
-        logForDebugging(`[builtinTasks] dream-consolidate failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] dream-consolidate failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -109,14 +116,18 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '0 7 * * *',
     priority: 'normal',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — cron already gates timing; canRun blocked catchup
     action: async () => {
-      logForDebugging('[builtinTasks] morning-brief: generating morning briefing')
+      logForDebugging(
+        '[builtinTasks] morning-brief: generating morning briefing',
+      )
       try {
         const { generateMorningBrief } = await import('../memdir/memdir.js')
         await generateMorningBrief()
       } catch (e) {
-        logForDebugging(`[builtinTasks] morning-brief failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] morning-brief failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -126,21 +137,30 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '0 */4 * * *',
     priority: 'low',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — cron already gates timing
     skipIf: () => {
       const idle = (Date.now() - getLastInteractionTimeSafe()) / 60000
       return idle < 30
     },
     action: async () => {
-      logForDebugging('[builtinTasks] file-organizer: scanning Downloads for classification')
+      logForDebugging(
+        '[builtinTasks] file-organizer: scanning Downloads for classification',
+      )
       // dry-run only — just log classification suggestions
       try {
         const { organizeDirectory } = await import('../memdir/memdir.js')
         const homedir = require('os').homedir()
-        const suggestions = organizeDirectory(require('path').join(homedir, 'Downloads'), true)
-        logForDebugging(`[builtinTasks] file-organizer: ${suggestions.length} files could be organized`)
+        const suggestions = organizeDirectory(
+          require('path').join(homedir, 'Downloads'),
+          true,
+        )
+        logForDebugging(
+          `[builtinTasks] file-organizer: ${suggestions.length} files could be organized`,
+        )
       } catch (e) {
-        logForDebugging(`[builtinTasks] file-organizer failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] file-organizer failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -150,7 +170,7 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '30 22 * * *',
     priority: 'normal',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — cron already gates timing
     action: async () => {
       logForDebugging('[builtinTasks] memory-decay: running Ebbinghaus decay')
       try {
@@ -158,9 +178,13 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
         const { getAutoMemPath } = await import('../memdir/paths.js')
         const memoryDir = getAutoMemPath()
         const result = await decayAndPruneMemories(memoryDir)
-        logForDebugging(`[builtinTasks] memory-decay: decayed=${result.decayed} pruned=${result.pruned}`)
+        logForDebugging(
+          `[builtinTasks] memory-decay: decayed=${result.decayed} pruned=${result.pruned}`,
+        )
       } catch (e) {
-        logForDebugging(`[builtinTasks] memory-decay failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] memory-decay failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -170,20 +194,29 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '0 23 * * *',
     priority: 'low',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — cron already gates timing
     action: async () => {
       logForDebugging('[builtinTasks] code-health: running build check')
       try {
         const { execSync } = require('child_process')
-        const output = execSync('bun run build 2>&1 || true', { encoding: 'utf-8', timeout: 60000 })
+        const output = execSync('bun run build 2>&1 || true', {
+          encoding: 'utf-8',
+          timeout: 60000,
+        })
         const hasError = /error/i.test(output) && !/0 errors/i.test(output)
-        logForDebugging(`[builtinTasks] code-health: build ${hasError ? 'FAILED' : 'OK'}`)
+        logForDebugging(
+          `[builtinTasks] code-health: build ${hasError ? 'FAILED' : 'OK'}`,
+        )
         if (hasError) {
-          const { setWorkingMemory } = await import('../assistant/workingMemory.js')
+          const { setWorkingMemory } = await import(
+            '../assistant/workingMemory.js'
+          )
           setWorkingMemory('code-health-failed', output.slice(-500))
         }
       } catch (e) {
-        logForDebugging(`[builtinTasks] code-health failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] code-health failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -193,19 +226,27 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '0 3 * * *',
     priority: 'low',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — cron already gates timing
     action: async () => {
-      logForDebugging('[builtinTasks] memory-index-rebuild: rebuilding search index')
+      logForDebugging(
+        '[builtinTasks] memory-index-rebuild: rebuilding search index',
+      )
       try {
-        const { scanMdFiles, searchMemory } = await import('../memdir/memdir.js')
+        const { scanMdFiles, searchMemory } = await import(
+          '../memdir/memdir.js'
+        )
         const { getAutoMemPath } = await import('../memdir/paths.js')
         const memoryDir = getAutoMemPath()
         const files = scanMdFiles(memoryDir)
         // 预热搜索：对常见关键词执行一次搜索以验证索引完整性
         searchMemory('project', memoryDir, 1)
-        logForDebugging(`[builtinTasks] memory-index-rebuild: indexed ${files.length} files`)
+        logForDebugging(
+          `[builtinTasks] memory-index-rebuild: indexed ${files.length} files`,
+        )
       } catch (e) {
-        logForDebugging(`[builtinTasks] memory-index-rebuild failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] memory-index-rebuild failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -215,9 +256,11 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '0 6 * * *',
     priority: 'low',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — cron already gates timing
     action: async () => {
-      logForDebugging('[builtinTasks] working-memory-cleanup: purging stale working memory')
+      logForDebugging(
+        '[builtinTasks] working-memory-cleanup: purging stale working memory',
+      )
       try {
         const { getAutoMemPath } = await import('../memdir/paths.js')
         const { readdirSync, unlinkSync, statSync } = require('fs')
@@ -237,10 +280,14 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
               }
             } catch {}
           }
-          logForDebugging(`[builtinTasks] working-memory-cleanup: removed ${cleaned} stale files`)
+          logForDebugging(
+            `[builtinTasks] working-memory-cleanup: removed ${cleaned} stale files`,
+          )
         } catch {}
       } catch (e) {
-        logForDebugging(`[builtinTasks] working-memory-cleanup failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] working-memory-cleanup failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -250,9 +297,11 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '0 8 * * 1',
     priority: 'low',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — cron already gates timing
     action: async () => {
-      logForDebugging('[builtinTasks] dream-report-summary: generating weekly dream summary')
+      logForDebugging(
+        '[builtinTasks] dream-report-summary: generating weekly dream summary',
+      )
       try {
         const { scanMdFiles } = await import('../memdir/memdir.js')
         const { getAutoMemPath } = await import('../memdir/paths.js')
@@ -278,14 +327,21 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
               const content = readFileSync(f, 'utf-8') as string
               const dateName = f.split('/').pop()?.replace('.md', '') || ''
               // 提取每份报告的关键数据行
-              const keyLines = content.split('\n').filter((l: string) => l.startsWith('- ')).slice(0, 5)
+              const keyLines = content
+                .split('\n')
+                .filter((l: string) => l.startsWith('- '))
+                .slice(0, 5)
               summaryLines.push(`## ${dateName}`)
               summaryLines.push(keyLines.join('\n'))
               summaryLines.push('')
             } catch {}
           }
           await mkdir(join(memoryDir, 'working'), { recursive: true })
-          writeFileSync(join(memoryDir, 'working', `weekly_summary_${localDateStr()}.md`), summaryLines.join('\n'), 'utf-8')
+          writeFileSync(
+            join(memoryDir, 'working', `weekly_summary_${localDateStr()}.md`),
+            summaryLines.join('\n'),
+            'utf-8',
+          )
 
           try {
             const { pushNotification } = await import('../assistant/sense.js')
@@ -297,9 +353,13 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
             })
           } catch {}
         }
-        logForDebugging(`[builtinTasks] dream-report-summary: summarized ${recentDreams.length} of ${dreams.length} reports`)
+        logForDebugging(
+          `[builtinTasks] dream-report-summary: summarized ${recentDreams.length} of ${dreams.length} reports`,
+        )
       } catch (e) {
-        logForDebugging(`[builtinTasks] dream-report-summary failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] dream-report-summary failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -313,7 +373,9 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     enabled: true,
     condition: () => true, // 始终启用，不依赖 proactive 模式
     action: async () => {
-      logForDebugging('[builtinTasks] calendar-reminder: scanning upcoming events')
+      logForDebugging(
+        '[builtinTasks] calendar-reminder: scanning upcoming events',
+      )
       try {
         const { readCalendarEvents } = await import('../memdir/memdir.js')
         const events = await readCalendarEvents(1) // 未来 1 天
@@ -341,18 +403,23 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           const minutesBefore = (evtTime - now) / 60000
 
           // 提前 30 分钟和 10 分钟各提醒一次
-          if ((minutesBefore > 8 && minutesBefore <= 30) ||
-              (minutesBefore > 0 && minutesBefore <= 10)) {
+          if (
+            (minutesBefore > 8 && minutesBefore <= 30) ||
+            (minutesBefore > 0 && minutesBefore <= 10)
+          ) {
             // 去重：同一事件同一窗口不重复通知
             const dedupKey = `${evt.title}|${evt.startDate}|${minutesBefore <= 10 ? '10min' : '30min'}`
             if (_calendarDedup(dedupKey)) {
-              logForDebugging(`[builtinTasks] calendar-reminder: skipped duplicate "${evt.title}"`)
+              logForDebugging(
+                `[builtinTasks] calendar-reminder: skipped duplicate "${evt.title}"`,
+              )
               continue
             }
             const { pushNotification } = await import('../assistant/sense.js')
-            const timeLabel = minutesBefore <= 10
-              ? `${Math.round(minutesBefore)} 分钟后`
-              : `${Math.round(minutesBefore)} 分钟后`
+            const timeLabel =
+              minutesBefore <= 10
+                ? `${Math.round(minutesBefore)} 分钟后`
+                : `${Math.round(minutesBefore)} 分钟后`
             const body = `${timeLabel}：${evt.title}${evt.location ? ` @ ${evt.location}` : ''}`
 
             // 系统通知（macOS）
@@ -365,7 +432,9 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
 
             // 同时记录到工作记忆，下次对话时模型可见
             try {
-              const { setWorkingMemory } = await import('../assistant/workingMemory.js')
+              const { setWorkingMemory } = await import(
+                '../assistant/workingMemory.js'
+              )
               setWorkingMemory(`calendar-upcoming-${evt.title.slice(0, 20)}`, {
                 title: evt.title,
                 startDate: evt.startDate,
@@ -374,11 +443,15 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
               })
             } catch {}
 
-            logForDebugging(`[builtinTasks] calendar-reminder: notified "${evt.title}" in ${Math.round(minutesBefore)}min`)
+            logForDebugging(
+              `[builtinTasks] calendar-reminder: notified "${evt.title}" in ${Math.round(minutesBefore)}min`,
+            )
           }
         }
       } catch (e) {
-        logForDebugging(`[builtinTasks] calendar-reminder failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] calendar-reminder failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -394,11 +467,17 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
       logForDebugging('[builtinTasks] git-uncommitted-reminder: checking')
       try {
         const { execSync } = require('child_process')
-        const status = execSync('git status --porcelain', { encoding: 'utf-8', timeout: 3000 })
+        const status = execSync('git status --porcelain', {
+          encoding: 'utf-8',
+          timeout: 3000,
+        })
         const changedFiles = status.split('\n').filter(Boolean).length
         if (changedFiles === 0) return
 
-        const lastCommitTime = execSync('git log -1 --format=%ct', { encoding: 'utf-8', timeout: 3000 }).trim()
+        const lastCommitTime = execSync('git log -1 --format=%ct', {
+          encoding: 'utf-8',
+          timeout: 3000,
+        }).trim()
         const elapsed = Date.now() - parseInt(lastCommitTime, 10) * 1000
         const threeHours = 3 * 60 * 60 * 1000
 
@@ -412,7 +491,9 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           })
         }
       } catch (e) {
-        logForDebugging(`[builtinTasks] git-uncommitted-reminder failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] git-uncommitted-reminder failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -423,7 +504,7 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '0 9 * * *', // 每天早上 9 点检查一次
     priority: 'low',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — cron already gates timing
     action: async () => {
       logForDebugging('[builtinTasks] profile-stale-reminder: checking')
       try {
@@ -445,7 +526,9 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           })
         }
       } catch (e) {
-        logForDebugging(`[builtinTasks] profile-stale-reminder failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] profile-stale-reminder failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -456,13 +539,17 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '0 20 * * *',
     priority: 'normal',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — cron already gates timing
     action: async () => {
-      logForDebugging('[builtinTasks] prospective-scan: scanning upcoming events and deadlines')
+      logForDebugging(
+        '[builtinTasks] prospective-scan: scanning upcoming events and deadlines',
+      )
       const parts: string[] = []
       // 读取倒计时事件
       try {
-        const countdowns = JSON.parse(readFileSync(join(HOME, '.pandacc/config/countdowns.json'), 'utf-8'))
+        const countdowns = JSON.parse(
+          readFileSync(join(HOME, '.pandacc/config/countdowns.json'), 'utf-8'),
+        )
         if (Array.isArray(countdowns) && countdowns.length > 0) {
           const upcoming = countdowns.filter((c: any) => {
             const diff = (new Date(c.date).getTime() - Date.now()) / 86400000
@@ -471,7 +558,9 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           if (upcoming.length > 0) {
             parts.push('## 即将到来的事件')
             upcoming.forEach((c: any) => {
-              const days = Math.ceil((new Date(c.date).getTime() - Date.now()) / 86400000)
+              const days = Math.ceil(
+                (new Date(c.date).getTime() - Date.now()) / 86400000,
+              )
               parts.push(`- ${c.name}: ${days}天后 (${c.date})`)
             })
           }
@@ -480,13 +569,19 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
       // 读取日历 (macOS)
       try {
         if (platform() === 'darwin') {
-          const cal = execSync(`osascript -e 'tell application "Calendar" to get summary of (every event of every calendar whose start date > (current date) and start date < ((current date) + 3 * days))' 2>/dev/null`, { encoding: 'utf-8', timeout: 5000 }).trim()
+          const cal = execSync(
+            `osascript -e 'tell application "Calendar" to get summary of (every event of every calendar whose start date > (current date) and start date < ((current date) + 3 * days))' 2>/dev/null`,
+            { encoding: 'utf-8', timeout: 5000 },
+          ).trim()
           if (cal) parts.push('## 日历事件\n' + cal)
         }
       } catch {}
       // 读取 TODO
       try {
-        const todoOut = execSync('grep -r "TODO\\|FIXME" . --include="*.ts" --include="*.tsx" -l 2>/dev/null | head -5', { encoding: 'utf-8', timeout: 5000, cwd: process.cwd() }).trim()
+        const todoOut = execSync(
+          'grep -r "TODO\\|FIXME" . --include="*.ts" --include="*.tsx" -l 2>/dev/null | head -5',
+          { encoding: 'utf-8', timeout: 5000, cwd: process.cwd() },
+        ).trim()
         if (todoOut) parts.push(`## 待办文件\n${todoOut}`)
       } catch {}
 
@@ -494,7 +589,9 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
         try {
           const { saveProspectiveMemory } = await import('../memdir/memdir.js')
           saveProspectiveMemory(parts.join('\n\n'))
-          logForDebugging(`[builtinTasks] prospective-scan: completed with ${parts.length} data sources`)
+          logForDebugging(
+            `[builtinTasks] prospective-scan: completed with ${parts.length} data sources`,
+          )
 
           try {
             const { pushNotification } = await import('../assistant/sense.js')
@@ -507,10 +604,14 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
             })
           } catch {}
         } catch (e) {
-          logForDebugging(`[builtinTasks] prospective-scan save failed: ${(e as Error).message}`)
+          logForDebugging(
+            `[builtinTasks] prospective-scan save failed: ${(e as Error).message}`,
+          )
         }
       } else {
-        logForDebugging('[builtinTasks] prospective-scan: no prospective items found')
+        logForDebugging(
+          '[builtinTasks] prospective-scan: no prospective items found',
+        )
       }
     },
   },
@@ -520,16 +621,20 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '*/2 * * * *',
     priority: 'low',
     enabled: true,
-    condition: canRun,
+    condition: () => true, // Always run — frequent cron handles timing
     skipIf: () => {
       // 用户最近 30 分钟无任何操作 → 跳过（避免后台无意义抓取）
       const idle = (Date.now() - getLastInteractionTimeSafe()) / 60000
       return idle > 30
     },
     action: async () => {
-      logForDebugging('[builtinTasks] clipboard-poll: capturing clipboard snapshot')
+      logForDebugging(
+        '[builtinTasks] clipboard-poll: capturing clipboard snapshot',
+      )
       try {
-        const { captureClipboard, isSensitiveClipboardContent } = await import('../memdir/memdir.js')
+        const { captureClipboard, isSensitiveClipboardContent } = await import(
+          '../memdir/memdir.js'
+        )
         const snapshot = await captureClipboard()
         if (!snapshot) return
         // 双重脱敏：captureClipboard 已过滤一层，此处再用扩展模式兜底
@@ -538,14 +643,18 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           return
         }
         // 写入 working memory（后台采集，不推送通知）
-        const { setWorkingMemory } = await import('../assistant/workingMemory.js')
+        const { setWorkingMemory } = await import(
+          '../assistant/workingMemory.js'
+        )
         const payload = JSON.stringify({
           content: snapshot.slice(0, 500),
           timestamp: Date.now(),
         })
         setWorkingMemory('clipboard-recent', payload)
       } catch (e) {
-        logForDebugging(`[builtinTasks] clipboard-poll failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[builtinTasks] clipboard-poll failed: ${(e as Error).message}`,
+        )
       }
     },
   },
@@ -592,7 +701,9 @@ function loadScenarioModules(): SmartCronTask[] {
         extra.push(...tasks)
       }
     } catch (e) {
-      logForDebugging(`[builtinTasks] 场景模块 ${name} 加载失败: ${(e as Error).message}`)
+      logForDebugging(
+        `[builtinTasks] 场景模块 ${name} 加载失败: ${(e as Error).message}`,
+      )
     }
   }
   logForDebugging(`[builtinTasks] 场景模块加载完成：${extra.length} 个扩展任务`)
@@ -600,7 +711,10 @@ function loadScenarioModules(): SmartCronTask[] {
 }
 
 // 合并核心任务 + 场景模块
-const ALL_TASKS: SmartCronTask[] = [...SMART_CRON_TASKS, ...loadScenarioModules()]
+const ALL_TASKS: SmartCronTask[] = [
+  ...SMART_CRON_TASKS,
+  ...loadScenarioModules(),
+]
 
 // 导出兼容 ProactiveTask[] 接口（skipIf 在 action 中内部处理）
 export const BUILTIN_TASKS: ProactiveTask[] = ALL_TASKS.map(task => ({
@@ -612,7 +726,9 @@ export const BUILTIN_TASKS: ProactiveTask[] = ALL_TASKS.map(task => ({
   action: async () => {
     // Smart skip 检查
     if (task.skipIf?.()) {
-      logForDebugging(`[builtinTasks] ${task.id}: skipped (skipIf condition met)`)
+      logForDebugging(
+        `[builtinTasks] ${task.id}: skipped (skipIf condition met)`,
+      )
       throw new Error('__SKIPPED__') // 标记为跳过，nightMode 不更新 _taskLastExecMap
     }
     await task.action()
