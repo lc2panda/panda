@@ -1,6 +1,6 @@
 {
   "name": "@lc2panda/panda-code",
-  "version": "2.17.2",
+  "version": "2.17.3",
   "description": "AI terminal assistant — multi-provider, privacy-first, cross-platform",
   "main": "dist/cli.js",
   "type": "module",
@@ -30,8 +30,8 @@
     "node": ">=18.0.0"
   },
   "bin": {
-    "panda": "dist/cli.js",
-    "claude-js": "dist/cli.js"
+    "panda": "dist/launcher.cjs",
+    "claude-js": "dist/launcher.cjs"
   },
   "workspaces": [
     "packages/*",
