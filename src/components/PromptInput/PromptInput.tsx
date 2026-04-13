@@ -189,6 +189,9 @@ type Props = {
     start: number;
     end: number;
   } | null;
+  /** Scroll handle for space-to-bottom: when scrolled away from bottom,
+   *  space jumps to bottom instead of typing into the prompt. */
+  scrollRef?: React.RefObject<import('../../ink/components/ScrollBox.js').ScrollBoxHandle | null>;
 };
 
 // Bottom slot has maxHeight="50%"; reserve lines for footer, border, status.
@@ -236,7 +239,8 @@ function PromptInput({
   hasSuppressedDialogs,
   isLocalJSXCommandActive = false,
   insertTextRef,
-  voiceInterimRange
+  voiceInterimRange,
+  scrollRef
 }: Props): React.ReactNode {
   const mainLoopModel = useMainLoopModel();
   // A local-jsx command (e.g., /mcp while agent is running) renders a full-
@@ -1242,11 +1246,25 @@ function PromptInput({
     }
   }
   const lazySpaceInputFilter = useCallback((input: string, key: Key): string => {
+    // Space-to-bottom: when scrolled away from bottom in fullscreen mode,
+    // space jumps to bottom instead of typing. This must happen here (in
+    // inputFilter) because BaseTextInput's useInput registers before
+    // ScrollKeybindingHandler's in the EventEmitter listener array (child
+    // effects fire before parent effects), so stopImmediatePropagation in
+    // ScrollKeybindingHandler can't prevent BaseTextInput from consuming
+    // the space character.
+    if (input === ' ' && !key.ctrl && !key.meta && !key.shift) {
+      const s = scrollRef?.current;
+      if (s && !s.isSticky()) {
+        s.scrollToBottom();
+        return '';
+      }
+    }
     if (!pendingSpaceAfterPillRef.current) return input;
     pendingSpaceAfterPillRef.current = false;
     if (isNonSpacePrintable(input, key)) return ' ' + input;
     return input;
-  }, []);
+  }, [scrollRef]);
   function insertTextAtCursor(text: string) {
     // Push current state to buffer before inserting
     pushToBuffer(input, cursorOffset, pastedContents);
