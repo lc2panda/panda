@@ -8,6 +8,9 @@
       { "match": "^\\s*\\d+ packages are looking", "action": "remove" },
       { "match": "^\\s*bun install v", "action": "keep" },
       { "match": "^\\s*\\d+ packages installed", "action": "keep" },
+      { "match": "^\\s*added \\d+ packages", "action": "keep" },
+      { "match": "^\\s*removed \\d+ packages", "action": "keep" },
+      { "match": "^\\s*up to date", "action": "keep" },
       { "match": "^\\s*Resolving\\.\\.\\.", "action": "remove" }
     ]
   }
