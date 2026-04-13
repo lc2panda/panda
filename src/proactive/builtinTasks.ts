@@ -123,7 +123,17 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
       )
       try {
         const { generateMorningBrief } = await import('../memdir/memdir.js')
-        await generateMorningBrief()
+        const content = await generateMorningBrief()
+        if (content) {
+          logForDebugging(`[builtinTasks] morning-brief: generated ${content.length} chars`)
+          // 额外通过 IM 推送（sense.ts 的 pushNotification 已在 generateMorningBrief 内调用，
+          // 这里补一个 channel push 确保到达微信等 IM 通道）
+          try {
+            const { pushViaChannelMCP } = await import('../assistant/channelRegistry.js')
+            const lines = content.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 8)
+            pushViaChannelMCP('📋 晨间简报', lines.join('\n'))
+          } catch {}
+        }
       } catch (e) {
         logForDebugging(
           `[builtinTasks] morning-brief failed: ${(e as Error).message}`,
