@@ -593,6 +593,19 @@ export function ScrollKeybindingHandler({
   // The selection:copy keybinding (ctrl+shift+c / cmd+c) registers above
   // via useKeybindings and consumes its event before reaching here.
   useInput((input_0, key_0, event_0) => {
+    // Space-to-bottom: in fullscreen mode (not modal/transcript), space jumps
+    // to bottom when scrolled away. When already at bottom, falls through to
+    // PromptInput so space types normally. Transcript mode uses modalPagerAction
+    // (space = fullPageDown) via the other useInput above.
+    if (input_0 === ' ' && !key_0.ctrl && !key_0.meta && !isModal) {
+      const s = scrollRef.current;
+      if (s && !s.isSticky()) {
+        s.scrollToBottom();
+        onScroll?.(true, s);
+        event_0.stopImmediatePropagation();
+        return;
+      }
+    }
     if (!selection.hasSelection()) return;
     if (key_0.escape) {
       selection.clearSelection();
