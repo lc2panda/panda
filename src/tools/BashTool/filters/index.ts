@@ -126,11 +126,43 @@ export function applyFilters(
   const minLines = filter.minOutputLines ?? 10
   if (outputLines.length < minLines) return null
 
-  // Execute rules sequentially
+  // Execute rules with two-pass semantics:
+  // Pass 1: collect 'keep'-marked lines (always preserved)
+  // Pass 2: apply remove/group/truncate/dedup on remaining lines
+  // Final: merge keep-marked + surviving lines (preserving original order)
+  const keepIndices = new Set<number>()
+  const keepRules = filter.rules.filter(r => r.action === 'keep')
+  const otherRules = filter.rules.filter(r => r.action !== 'keep')
+
+  // Mark lines that match any 'keep' rule — these always survive
+  for (const rule of keepRules) {
+    const regex = compileRegex(rule.match)
+    if (!regex) continue
+    for (let i = 0; i < outputLines.length; i++) {
+      if (regex.test(outputLines[i])) {
+        keepIndices.add(i)
+      }
+    }
+  }
+
+  // Apply non-keep rules sequentially on all lines
   let resultLines = [...outputLines]
-  for (const rule of filter.rules) {
+  for (const rule of otherRules) {
     resultLines = executeRule(rule, resultLines)
   }
+
+  // Re-inject any keep-marked lines that were accidentally removed
+  const resultSet = new Set(resultLines)
+  for (const idx of keepIndices) {
+    const line = outputLines[idx]
+    if (!resultSet.has(line)) {
+      resultLines.push(line)
+    }
+  }
+
+  // Safety net: if rules produced empty output, return null (fall through to next layer)
+  const trimmed = resultLines.join('\n').trim()
+  if (!trimmed) return null
 
   return resultLines.join('\n')
 }

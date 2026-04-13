@@ -788,7 +788,7 @@ function _compressBashOutputInner(
   try {
     const filters = loadFilters()
     const filtered = applyFilters(command, stdout, filters)
-    if (filtered !== null) {
+    if (filtered !== null && filtered.trim().length > 0) {
       let compressed = filtered
       if (stderr && stderr.trim()) {
         compressed += `\n[stderr]: ${stderr.trim()}`
