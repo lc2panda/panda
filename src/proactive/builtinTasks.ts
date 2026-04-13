@@ -103,6 +103,16 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           '../services/autoDream/autoDream.js'
         )
         await executeAutoDreamStandalone()
+        // Push notification after successful dream consolidation
+        try {
+          const { pushNotification } = await import('../assistant/sense.js')
+          pushNotification({
+            type: 'action',
+            title: '🌙 DeepDream 记忆整合完成',
+            body: '今日会话已整合到长期记忆。晨间简报将基于此次整合结果生成。',
+            channel: 'all',
+          })
+        } catch {}
       } catch (e) {
         logForDebugging(
           `[builtinTasks] dream-consolidate failed: ${(e as Error).message}`,

@@ -17,5 +17,10 @@ export function isAutoDreamEnabled(): boolean {
     'tengu_onyx_plover',
     null,
   )
+  // Panda: default to true when GrowthBook returns null (no remote config).
+  // Original upstream defaulted to false, gating on AB-test rollout.
+  // Panda ships DeepDream enabled for all users — it's a core super-assistant
+  // feature for memory consolidation.
+  if (gb === null || gb === undefined) return true
   return gb?.enabled === true
 }
