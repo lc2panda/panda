@@ -286,10 +286,41 @@ const ANSI_SCOPES: Record<string, Color> = {
   meta: ansiIdx(8),
 }
 
+// Matrix phosphor green scope palette — all green shades at different luminance
+// to maintain the monochromatic aesthetic while preserving semantic distinction.
+// H=108° S=90% with L% varying per token role.
+const MATRIX_SCOPES: Record<string, Color> = {
+  keyword: rgb(60, 248, 62),      // #3CF83E BRIGHT — keywords stand out
+  _storage: rgb(108, 250, 110),   // #6CFA6E GLOW — storage types
+  built_in: rgb(13, 242, 22),     // #0DF216 NEON — builtins
+  type: rgb(108, 250, 110),       // #6CFA6E GLOW — type names
+  literal: rgb(156, 251, 157),    // #9CFB9D FLASH — literals
+  number: rgb(156, 251, 157),     // #9CFB9D FLASH — numbers
+  string: rgb(200, 224, 32),      // #C8E020 yellow-green — strings
+  title: rgb(60, 248, 62),        // #3CF83E BRIGHT — function/class names
+  'title.function': rgb(60, 248, 62),
+  'title.class': rgb(108, 250, 110),
+  'title.class.inherited': rgb(108, 250, 110),
+  params: rgb(13, 242, 22),       // #0DF216 NEON — parameters
+  comment: rgb(6, 78, 11),        // #064E0B DEEP — comments dim
+  meta: rgb(6, 78, 11),           // #064E0B DEEP — meta dim
+  attr: rgb(11, 191, 24),         // #0BBF18 BASE — attributes
+  attribute: rgb(11, 191, 24),
+  variable: rgb(13, 242, 22),     // #0DF216 NEON — variables
+  'variable.language': rgb(9, 140, 18), // #098C12 SHADOW — special vars
+  property: rgb(11, 191, 24),     // #0BBF18 BASE — properties
+  operator: rgb(60, 248, 62),     // #3CF83E BRIGHT — operators
+  punctuation: rgb(9, 140, 18),   // #098C12 SHADOW — punctuation
+  symbol: rgb(156, 251, 157),     // #9CFB9D FLASH — symbols
+  regexp: rgb(200, 224, 32),      // #C8E020 yellow-green — regex
+  subst: rgb(13, 242, 22),        // #0DF216 NEON — substitution
+}
+
 function buildTheme(themeName: string, mode: ColorMode): Theme {
   const isDark = themeName.includes('dark')
   const isAnsi = themeName.includes('ansi')
   const isDaltonized = themeName.includes('daltonized')
+  const isMatrix = process.env.PANDA_THEME === 'matrix'
   const tc = mode === 'truecolor'
 
   if (isAnsi) {
@@ -303,6 +334,21 @@ function buildTheme(themeName: string, mode: ColorMode): Theme {
       foreground: ansiIdx(7),
       background: DEFAULT_BG,
       scopes: ANSI_SCOPES,
+    }
+  }
+
+  // Matrix theme — green phosphor aesthetic with syntax highlighting
+  if (isMatrix) {
+    return {
+      addLine: tc ? rgb(0, 26, 0) : ansiIdx(22),        // #001A00 dark green bg
+      addWord: tc ? rgb(0, 51, 0) : ansiIdx(28),         // #003300 word-level added bg
+      addDecoration: rgb(60, 248, 62),                    // #3CF83E BRIGHT — added fg
+      deleteLine: tc ? rgb(26, 0, 0) : ansiIdx(52),      // #1A0000 dark red bg
+      deleteWord: tc ? rgb(51, 0, 0) : ansiIdx(88),      // #330000 word-level removed bg
+      deleteDecoration: rgb(255, 64, 64),                 // #FF4040 red — removed fg
+      foreground: rgb(13, 242, 22),                       // #0DF216 NEON — default text
+      background: DEFAULT_BG,
+      scopes: MATRIX_SCOPES,
     }
   }
 

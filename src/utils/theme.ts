@@ -1,5 +1,7 @@
 import chalk, { Chalk } from 'chalk'
 import { env } from './env.js'
+import { isMatrixTheme } from '../components/MatrixTheme/isMatrixTheme.js'
+import { MATRIX_SCALE, MATRIX_STATUS, MATRIX_UI } from '../components/MatrixTheme/matrixPalette.js'
 
 export type Theme = {
   autoAccept: string
@@ -95,6 +97,7 @@ export const THEME_NAMES = [
   'dark-daltonized',
   'light-ansi',
   'dark-ansi',
+  'matrix',
 ] as const
 
 /** A renderable theme. Always resolvable to a concrete color palette. */
@@ -595,7 +598,93 @@ const darkDaltonizedTheme: Theme = {
   rainbow_violet_shimmer: 'rgb(230,180,210)',
 }
 
+/**
+ * Matrix theme — full green phosphor palette (H=108° S=90%)
+ * Dark background with green-on-black aesthetic
+ */
+const matrixTheme: Theme = {
+  autoAccept: MATRIX_SCALE.BRIGHT,             // #3CF83E
+  bashBorder: MATRIX_SCALE.NEON,               // #0DF216
+  claude: MATRIX_SCALE.NEON,                   // #0DF216 — brand accent → Matrix green
+  claudeShimmer: MATRIX_SCALE.BRIGHT,          // #3CF83E
+  claudeBlue_FOR_SYSTEM_SPINNER: MATRIX_SCALE.NEON,
+  claudeBlueShimmer_FOR_SYSTEM_SPINNER: MATRIX_SCALE.BRIGHT,
+  permission: MATRIX_SCALE.NEON,               // #0DF216
+  permissionShimmer: MATRIX_SCALE.BRIGHT,
+  planMode: MATRIX_SCALE.SHADOW,               // #098C12
+  ide: MATRIX_SCALE.SHADOW,
+  promptBorder: MATRIX_SCALE.SHADOW,           // #098C12
+  promptBorderShimmer: MATRIX_SCALE.NEON,
+  text: MATRIX_SCALE.NEON,                     // #0DF216 — primary text
+  inverseText: '#000000',
+  inactive: MATRIX_SCALE.SHADOW,               // #098C12
+  inactiveShimmer: MATRIX_SCALE.BASE,
+  subtle: MATRIX_SCALE.SHADOW,                 // #098C12 — secondary text
+  suggestion: MATRIX_SCALE.SHADOW,             // #098C12
+  remember: MATRIX_SCALE.NEON,                 // #0DF216
+  background: '#000000',
+  success: MATRIX_SCALE.BRIGHT,                // #3CF83E
+  error: MATRIX_STATUS.ERROR,                  // #FF4040
+  warning: MATRIX_STATUS.WARNING,              // #C8E020
+  merged: MATRIX_SCALE.BRIGHT,
+  warningShimmer: '#D8F030',
+  // Diff colors — green-red contrast on black
+  diffAdded: '#001A00',                        // very dark green bg
+  diffRemoved: '#1A0000',                      // very dark red bg
+  diffAddedDimmed: '#000D00',
+  diffRemovedDimmed: '#0D0000',
+  diffAddedWord: '#003300',                    // word-level added bg
+  diffRemovedWord: '#330000',                  // word-level removed bg
+  // Agent colors — all green shades
+  red_FOR_SUBAGENTS_ONLY: MATRIX_STATUS.ERROR,
+  blue_FOR_SUBAGENTS_ONLY: MATRIX_SCALE.NEON,
+  green_FOR_SUBAGENTS_ONLY: MATRIX_SCALE.BRIGHT,
+  yellow_FOR_SUBAGENTS_ONLY: MATRIX_STATUS.WARNING,
+  purple_FOR_SUBAGENTS_ONLY: MATRIX_SCALE.GLOW,
+  orange_FOR_SUBAGENTS_ONLY: MATRIX_STATUS.WARNING,
+  pink_FOR_SUBAGENTS_ONLY: MATRIX_SCALE.FLASH,
+  cyan_FOR_SUBAGENTS_ONLY: MATRIX_SCALE.NEON,
+  // Grove colors
+  professionalBlue: MATRIX_SCALE.SHADOW,
+  // Chrome colors
+  chromeYellow: MATRIX_STATUS.WARNING,
+  // TUI V2 colors
+  clawd_body: MATRIX_SCALE.NEON,
+  clawd_background: '#000000',
+  userMessageBackground: '#0A1A0A',            // very dark green tint
+  userMessageBackgroundHover: '#0F250F',
+  messageActionsBackground: '#0A1A0A',
+  selectionBg: '#003300',                      // dark green selection
+  bashMessageBackgroundColor: '#050D05',
+  memoryBackgroundColor: '#0A1A0A',
+  rate_limit_fill: MATRIX_SCALE.NEON,
+  rate_limit_empty: MATRIX_SCALE.DEEP,
+  fastMode: MATRIX_SCALE.BRIGHT,
+  fastModeShimmer: MATRIX_SCALE.GLOW,
+  briefLabelYou: MATRIX_SCALE.BRIGHT,
+  briefLabelClaude: MATRIX_SCALE.NEON,
+  // Rainbow → all green shades
+  rainbow_red: MATRIX_SCALE.BRIGHT,
+  rainbow_orange: MATRIX_SCALE.GLOW,
+  rainbow_yellow: MATRIX_STATUS.WARNING,
+  rainbow_green: MATRIX_SCALE.NEON,
+  rainbow_blue: MATRIX_SCALE.BASE,
+  rainbow_indigo: MATRIX_SCALE.SHADOW,
+  rainbow_violet: MATRIX_SCALE.FLASH,
+  rainbow_red_shimmer: MATRIX_SCALE.GLOW,
+  rainbow_orange_shimmer: MATRIX_SCALE.BRIGHT,
+  rainbow_yellow_shimmer: '#D8F030',
+  rainbow_green_shimmer: MATRIX_SCALE.BRIGHT,
+  rainbow_blue_shimmer: MATRIX_SCALE.NEON,
+  rainbow_indigo_shimmer: MATRIX_SCALE.BASE,
+  rainbow_violet_shimmer: MATRIX_SCALE.GLOW,
+}
+
 export function getTheme(themeName: ThemeName): Theme {
+  // Matrix override: when PANDA_THEME=matrix, always return matrixTheme
+  if (isMatrixTheme()) {
+    return matrixTheme
+  }
   switch (themeName) {
     case 'light':
       return lightTheme
@@ -607,6 +696,8 @@ export function getTheme(themeName: ThemeName): Theme {
       return lightDaltonizedTheme
     case 'dark-daltonized':
       return darkDaltonizedTheme
+    case 'matrix':
+      return matrixTheme
     default:
       return darkTheme
   }
