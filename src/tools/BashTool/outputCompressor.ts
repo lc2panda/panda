@@ -5,6 +5,7 @@
 
 import { splitCommand_DEPRECATED } from '../../utils/bash/commands.js'
 import { loadFilters, applyFilters } from './filters/index.js'
+import { recordCompression } from './compressionStats.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -709,9 +710,32 @@ const strategies: StrategyFn[] = [
  * Returns a CompressionResult if compression is worthwhile (>20% saving),
  * or null if the output should be sent as-is.
  *
- * This is a pure function with no side effects.
+ * This function records compression stats as a side effect (B4).
  */
 export function compressBashOutput(
+  command: string,
+  stdout: string,
+  stderr: string,
+  exitCode: number,
+): CompressionResult | null {
+  const result = _compressBashOutputInner(command, stdout, stderr, exitCode)
+
+  // B4: Record compression stats when compression is applied
+  if (result) {
+    recordCompression({
+      command,
+      originalChars: result.originalSize,
+      compressedChars: result.compressedSize,
+      savedChars: result.originalSize - result.compressedSize,
+      savedPercent: result.savedPercent,
+      strategy: result.strategy,
+    })
+  }
+
+  return result
+}
+
+function _compressBashOutputInner(
   command: string,
   stdout: string,
   stderr: string,
