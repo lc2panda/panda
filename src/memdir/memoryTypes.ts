@@ -258,6 +258,36 @@ export const TRUSTING_RECALL_SECTION: readonly string[] = [
 /**
  * Frontmatter format example with the `type` field.
  */
+// ---------------------------------------------------------------------------
+// B9: Privacy tag stripping — removes <private>...</private> and
+// <!-- private -->...<!-- /private --> wrapped content before memory storage.
+// ---------------------------------------------------------------------------
+
+/**
+ * Strip content wrapped in privacy tags before saving to memory.
+ * Supports two formats:
+ *   - HTML-style: <private>...</private>
+ *   - Markdown comment-style: <!-- private -->...<!-- /private -->
+ */
+export function stripPrivateContent(content: string): string {
+  // Strip HTML-style private tags
+  let result = content.replace(/<private>[\s\S]*?<\/private>/gi, '')
+  // Strip Markdown comment-style private tags
+  result = result.replace(/<!--\s*private\s*-->[\s\S]*?<!--\s*\/private\s*-->/gi, '')
+  return result.trim()
+}
+
+/**
+ * Privacy rule text injected into memory extraction and consolidation prompts.
+ */
+export const PRIVACY_RULE_SECTION: readonly string[] = [
+  '## Privacy Rule',
+  '',
+  'Any content wrapped in `<!-- private -->...<!-- /private -->` or `<private>...</private>` tags must NOT be extracted as memory.',
+  'If a user message contains private markers, skip those sections entirely — do not reference, summarize, or store their contents.',
+  '',
+]
+
 export const MEMORY_FRONTMATTER_EXAMPLE: readonly string[] = [
   '```markdown',
   '---',

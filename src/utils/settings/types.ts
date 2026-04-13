@@ -1082,6 +1082,33 @@ export const SettingsSchema = lazySchema(() =>
             'Useful for enterprise administrators to add organization-specific context ' +
             '(e.g., "All plugins from our internal marketplace are vetted and approved.").',
         ),
+      // ── B13: Output Compression Configuration ──────
+      outputCompression: z
+        .object({
+          enabled: z
+            .boolean()
+            .optional()
+            .describe(
+              'Global switch for output compression. Default: true.',
+            ),
+          level: z
+            .enum(['off', 'normal', 'aggressive'])
+            .optional()
+            .describe(
+              'Compression level: off (no compression), normal (default thresholds), aggressive (lower thresholds, more truncation).',
+            ),
+          overrides: z
+            .record(z.string(), z.enum(['off', 'normal', 'aggressive']))
+            .optional()
+            .describe(
+              'Per-command compression level overrides. Key is a command prefix or name (e.g., "git diff", "cat"). ' +
+                'Value overrides the global level for matching commands.',
+            ),
+        })
+        .optional()
+        .describe(
+          'Configure output compression behavior for BashTool and other tool outputs.',
+        ),
       // ── Multi-Model Agent Routing (Panda extension) ──────
       enableModelRouting: z
         .boolean()

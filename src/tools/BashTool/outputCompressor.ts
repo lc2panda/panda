@@ -6,6 +6,8 @@
 import { splitCommand_DEPRECATED } from '../../utils/bash/commands.js'
 import { loadFilters, applyFilters } from './filters/index.js'
 import { recordCompression } from './compressionStats.js'
+import { getCompressionConfig, type OutputCompressionConfig } from './compressionConfig.js'
+import { parseCommandOutput, formatParsedOutput } from './parsers/index.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -711,6 +713,7 @@ const strategies: StrategyFn[] = [
  * or null if the output should be sent as-is.
  *
  * This function records compression stats as a side effect (B4).
+ * Respects outputCompression settings from user/project config (B13).
  */
 export function compressBashOutput(
   command: string,
@@ -718,7 +721,12 @@ export function compressBashOutput(
   stderr: string,
   exitCode: number,
 ): CompressionResult | null {
-  const result = _compressBashOutputInner(command, stdout, stderr, exitCode)
+  // B13: Check compression configuration before processing
+  const config = getCompressionConfig()
+  const effectiveLevel = resolveCompressionLevel(config, command)
+  if (effectiveLevel === 'off') return null
+
+  const result = _compressBashOutputInner(command, stdout, stderr, exitCode, effectiveLevel)
 
   // B4: Record compression stats when compression is applied
   if (result) {
@@ -735,14 +743,43 @@ export function compressBashOutput(
   return result
 }
 
+/**
+ * Resolve effective compression level for a given command, considering
+ * per-command overrides and global settings.
+ */
+function resolveCompressionLevel(
+  config: OutputCompressionConfig,
+  command: string,
+): 'off' | 'normal' | 'aggressive' {
+  // Global kill switch
+  if (config.enabled === false) return 'off'
+  if (config.level === 'off') return 'off'
+
+  // Per-command overrides: match against command prefix
+  if (config.overrides) {
+    for (const [pattern, level] of Object.entries(config.overrides)) {
+      if (command.trim().startsWith(pattern) || command.includes(pattern)) {
+        return level
+      }
+    }
+  }
+
+  return config.level ?? 'normal'
+}
+
 function _compressBashOutputInner(
   command: string,
   stdout: string,
   stderr: string,
   exitCode: number,
+  level: 'normal' | 'aggressive' = 'normal',
 ): CompressionResult | null {
-  // Don't compress small outputs
-  if (stdout.length < MIN_COMPRESS_SIZE) return null
+  // B13: Aggressive mode uses lower thresholds
+  const minSize = level === 'aggressive' ? 200 : MIN_COMPRESS_SIZE
+  const savingThreshold = level === 'aggressive' ? 0.10 : SAVING_THRESHOLD
+
+  // Don't compress small outputs (threshold varies by compression level)
+  if (stdout.length < minSize) return null
 
   // Don't compress empty stdout (stderr-only outputs are already small)
   if (!stdout.trim()) return null
@@ -756,12 +793,28 @@ function _compressBashOutputInner(
       if (stderr && stderr.trim()) {
         compressed += `\n[stderr]: ${stderr.trim()}`
       }
-      const cr = buildResult(compressed, stdout, 'declarative-filter')
+      const cr = buildResult(compressed, stdout, 'declarative-filter', savingThreshold)
       if (cr) return cr
       // Declarative filter matched but saving < threshold — fall through
     }
   } catch {
     // Filter engine error — fall through to hardcoded strategies
+  }
+
+  // --- Layer 1.5: Structured parser (B10 — between declarative and hardcoded) ---
+  try {
+    const parsed = parseCommandOutput(command, stdout, stderr)
+    if (parsed) {
+      let compressed = formatParsedOutput(parsed)
+      if (stderr && stderr.trim() && parsed.errors.length === 0) {
+        compressed += `\n[stderr]: ${stderr.trim()}`
+      }
+      const cr = buildResult(compressed, stdout, `parser-${parsed.summary.split(':')[0]?.trim() || 'unknown'}`, savingThreshold)
+      if (cr) return cr
+      // Parser matched but saving < threshold — fall through
+    }
+  } catch {
+    // Parser error — fall through to hardcoded strategies
   }
 
   // --- Layer 2: Hardcoded command-specific strategies (fallback) ---
@@ -774,7 +827,7 @@ function _compressBashOutputInner(
       if (stderr && stderr.trim()) {
         compressed += `\n[stderr]: ${stderr.trim()}`
       }
-      const cr = buildResult(compressed, stdout, result.name)
+      const cr = buildResult(compressed, stdout, result.name, savingThreshold)
       if (cr) return cr
       // Strategy matched but saving < threshold — fall through to generic
       break
@@ -784,10 +837,10 @@ function _compressBashOutputInner(
   // Generic fallback
   if (stdout.length < 2000) {
     const compressed = lightCompress(stdout)
-    return buildResult(compressed, stdout, 'light-compress')
+    return buildResult(compressed, stdout, 'light-compress', savingThreshold)
   }
 
   // Heavy truncation for large output
   const compressed = truncateHeadTail(stdout, 800, 400)
-  return buildResult(compressed, stdout, 'head-tail-truncate')
+  return buildResult(compressed, stdout, 'head-tail-truncate', savingThreshold)
 }
