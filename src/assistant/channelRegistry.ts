@@ -53,6 +53,12 @@ const MAX_PENDING = 50
 /** pending 消息最大有效期：1 小时 */
 const PENDING_TTL_MS = 3_600_000
 
+/** 磁盘 context 文件路径映射 */
+const PERSISTED_CONTEXT_FILES: Record<string, string> = {
+  wechat: 'channels/wechat/context-tokens.json',
+  feishu: 'channels/feishu/user-chat-map.json',
+}
+
 // reply 工具名映射（MCP server 使用 unprefixed 名称）
 const REPLY_TOOL_MAP: Record<string, string> = {
   wechat: 'reply',
@@ -127,6 +133,62 @@ export function saveChannelContext(
 }
 
 /**
+ * 从磁盘加载持久化的 channel context（fallback）。
+ * WeChat: ~/.pandacc/channels/wechat/context-tokens.json → { "user_id": "context_token" }
+ * Feishu: ~/.pandacc/channels/feishu/user-chat-map.json  → { "user_id": "chat_id" }
+ *
+ * 加载成功后写入 _contexts 缓存，下次不再读磁盘。
+ * 全程 try/catch，失败返回 null。
+ */
+function _loadPersistedContext(channel: string): ChannelReplyContext | null {
+  try {
+    const relPath = PERSISTED_CONTEXT_FILES[channel]
+    if (!relPath) return null
+
+    const { readFileSync, statSync } = require('fs')
+    const { join } = require('path')
+    const { homedir } = require('os')
+    const filePath = join(homedir(), '.pandacc', relPath)
+
+    const stat = statSync(filePath)
+    const mtime = stat.mtimeMs
+
+    // 超过 CONTEXT_TTL_MS 的磁盘 context 视为过期
+    if (Date.now() - mtime > CONTEXT_TTL_MS) {
+      logForDebugging(
+        `[channelRegistry] Persisted context for ${channel} expired (mtime ${new Date(mtime).toISOString()})`,
+      )
+      return null
+    }
+
+    const raw = JSON.parse(readFileSync(filePath, 'utf-8')) as Record<string, string>
+    const entries = Object.entries(raw)
+    if (entries.length === 0) return null
+
+    const [userId, token] = entries[0]
+    if (!userId || !token) return null
+
+    const ctx: ChannelReplyContext = {
+      user_id: userId,
+      context_token: token,
+      updated: mtime,
+    }
+
+    // 写入内存缓存，下次不再读磁盘
+    _contexts.set(channel, ctx)
+    logForDebugging(
+      `[channelRegistry] Loaded persisted context for ${channel}: user=${userId.slice(0, 12)}...`,
+    )
+    return ctx
+  } catch (e) {
+    logForDebugging(
+      `[channelRegistry] Failed to load persisted context for ${channel}: ${(e as Error)?.message || e}`,
+    )
+    return null
+  }
+}
+
+/**
  * 通过已注册的 channel MCP server 推送通知。
  * 遍历所有已注册 server，使用最近的 context 调用 reply 工具。
  *
@@ -143,8 +205,11 @@ export function pushViaChannelMCP(title: string, body: string): void {
 
   for (const [channel, server] of _servers) {
     try {
-      const ctx = _contexts.get(channel)
-      if (!ctx) continue
+      let ctx = _contexts.get(channel)
+      if (!ctx) {
+        ctx = _loadPersistedContext(channel)
+        if (!ctx) continue
+      }
 
       // 检查 context 是否过期
       if (Date.now() - ctx.updated > CONTEXT_TTL_MS) continue
@@ -199,7 +264,10 @@ function _flushPending(channel: string): void {
   if (_pendingMessages.length === 0) return
 
   const server = _servers.get(channel)
-  const ctx = _contexts.get(channel)
+  let ctx = _contexts.get(channel)
+  if (!ctx) {
+    ctx = _loadPersistedContext(channel)
+  }
   if (!server || !ctx) return
 
   const toolName = REPLY_TOOL_MAP[channel]
