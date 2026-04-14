@@ -4,6 +4,7 @@ import { Text } from '../ink.js';
 import type { ValidationError } from '../utils/settings/validation.js';
 import { Select } from './CustomSelect/index.js';
 import { Dialog } from './design-system/Dialog.js';
+import { isZh } from '../utils/i18n.js';
 import { ValidationErrorsList } from './ValidationErrorsList.js';
 type Props = {
   settingsErrors: ValidationError[];
@@ -76,7 +77,7 @@ export function InvalidSettingsDialog(t0) {
   }
   let t6;
   if ($[9] !== onExit || $[10] !== t2 || $[11] !== t5) {
-    t6 = <Dialog title="Settings Error" onCancel={onExit} color="warning">{t2}{t3}{t5}</Dialog>;
+    t6 = <Dialog title={isZh() ? "设置错误" : "Settings Error"} onCancel={onExit} color="warning">{t2}{t3}{t5}</Dialog>;
     $[9] = onExit;
     $[10] = t2;
     $[11] = t5;

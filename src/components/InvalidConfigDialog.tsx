@@ -9,6 +9,7 @@ import { jsonStringify, writeFileSync_DEPRECATED } from '../utils/slowOperations
 import type { ThemeName } from '../utils/theme.js';
 import { Select } from './CustomSelect/index.js';
 import { Dialog } from './design-system/Dialog.js';
+import { isZh } from '../utils/i18n.js';
 interface InvalidConfigHandlerProps {
   error: ConfigParseError;
 }
@@ -81,10 +82,10 @@ function InvalidConfigDialog(t0) {
   let t6;
   if ($[11] === Symbol.for("react.memo_cache_sentinel")) {
     t6 = [{
-      label: "Exit and fix manually",
+      label: isZh() ? "退出并手动修复" : "Exit and fix manually",
       value: "exit"
     }, {
-      label: "Reset with default configuration",
+      label: isZh() ? "重置为默认配置" : "Reset with default configuration",
       value: "reset"
     }];
     $[11] = t6;
@@ -102,7 +103,7 @@ function InvalidConfigDialog(t0) {
   }
   let t8;
   if ($[15] !== onExit || $[16] !== t4 || $[17] !== t7) {
-    t8 = <Dialog title="Configuration Error" color="error" onCancel={onExit}>{t4}{t7}</Dialog>;
+    t8 = <Dialog title={isZh() ? "配置错误" : "Configuration Error"} color="error" onCancel={onExit}>{t4}{t7}</Dialog>;
     $[15] = onExit;
     $[16] = t4;
     $[17] = t7;

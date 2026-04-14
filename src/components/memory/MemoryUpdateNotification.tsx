@@ -3,6 +3,7 @@ import { homedir } from 'os';
 import { relative } from 'path';
 import React from 'react';
 import { Box, Text } from '../../ink.js';
+import { isZh } from '../../utils/i18n.js';
 import { getCwd } from '../../utils/cwd.js';
 export function getRelativeMemoryPath(path: string): string {
   const homeDir = homedir();
@@ -34,7 +35,7 @@ export function MemoryUpdateNotification(t0) {
   const displayPath = t1;
   let t2;
   if ($[2] !== displayPath) {
-    t2 = <Box flexDirection="column" flexGrow={1}><Text color="text">Memory updated in {displayPath} · /memory to edit</Text></Box>;
+    t2 = <Box flexDirection="column" flexGrow={1}><Text color="text">{isZh() ? `记忆已更新于 ${displayPath} · /memory 编辑` : `Memory updated in ${displayPath} · /memory to edit`}</Text></Box>;
     $[2] = displayPath;
     $[3] = t2;
   } else {

@@ -4,6 +4,7 @@ import { Text } from '../ink.js';
 import { saveGlobalConfig } from '../utils/config.js';
 import { Select } from './CustomSelect/index.js';
 import { Dialog } from './design-system/Dialog.js';
+import { isZh } from '../utils/i18n.js';
 type Props = {
   customApiKeyTruncated: string;
   onDone(approved: boolean): void;
@@ -75,7 +76,7 @@ export function ApproveApiKey(t0) {
   }
   let t5;
   if ($[8] === Symbol.for("react.memo_cache_sentinel")) {
-    t5 = <Text>Do you want to use this API key?</Text>;
+    t5 = <Text>{isZh() ? '要使用此 API 密钥吗？' : 'Do you want to use this API key?'}</Text>;
     $[8] = t5;
   } else {
     t5 = $[8];
@@ -83,7 +84,7 @@ export function ApproveApiKey(t0) {
   let t6;
   if ($[9] === Symbol.for("react.memo_cache_sentinel")) {
     t6 = {
-      label: "Yes",
+      label: isZh() ? "是" : "Yes",
       value: "yes"
     };
     $[9] = t6;
@@ -93,7 +94,7 @@ export function ApproveApiKey(t0) {
   let t7;
   if ($[10] === Symbol.for("react.memo_cache_sentinel")) {
     t7 = [t6, {
-      label: <Text>No (<Text bold={true}>recommended</Text>)</Text>,
+      label: <Text>{isZh() ? '否' : 'No'} (<Text bold={true}>{isZh() ? '推荐' : 'recommended'}</Text>)</Text>,
       value: "no"
     }];
     $[10] = t7;
@@ -110,7 +111,7 @@ export function ApproveApiKey(t0) {
   }
   let t9;
   if ($[13] !== t2 || $[14] !== t4 || $[15] !== t8) {
-    t9 = <Dialog title="Detected a custom API key in your environment" color="warning" onCancel={t2}>{t4}{t5}{t8}</Dialog>;
+    t9 = <Dialog title={isZh() ? "检测到环境中的自定义 API 密钥" : "Detected a custom API key in your environment"} color="warning" onCancel={t2}>{t4}{t5}{t8}</Dialog>;
     $[13] = t2;
     $[14] = t4;
     $[15] = t8;
