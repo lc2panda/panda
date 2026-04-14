@@ -174,6 +174,22 @@ export async function runScheduledTasks(): Promise<void> {
 
     logForDebugging('[proactive] orchestrator complete')
     _lastOrchestratorRun = Date.now()
+
+    // Catchup: 补跑今天应执行但被 cron 窗口跳过的任务
+    // 解决系统休眠/唤醒导致 setInterval tick 跳过 cron 窗口的问题
+    try {
+      const { runCatchup } = await import('./catchupRunner.js')
+      const caughtUp = await runCatchup(tasks)
+      if (caughtUp.length > 0) {
+        for (const id of caughtUp) {
+          _taskLastExecMap.set(id, Date.now())
+        }
+        _saveExecHistory()
+        logForDebugging(`[proactive] catchup recovered ${caughtUp.length} missed task(s): ${caughtUp.join(', ')}`)
+      }
+    } catch (e) {
+      logForDebugging(`[proactive] catchup failed: ${(e as Error).message}`)
+    }
   } finally {
     _isRunning = false
   }
