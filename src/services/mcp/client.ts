@@ -989,7 +989,7 @@ export const connectToServer = memoize(
           name: 'claude-code',
           title: 'Panda',
           version: MACRO.VERSION ?? 'unknown',
-          description: "Anthropic's agentic coding tool",
+          description: "PandaAI's agentic coding tool",
           websiteUrl: PRODUCT_URL,
         },
         {
@@ -3336,7 +3336,7 @@ export async function setupSdkMcpClients(
           name: 'claude-code',
           title: 'Panda',
           version: MACRO.VERSION ?? 'unknown',
-          description: "Anthropic's agentic coding tool",
+          description: "PandaAI's agentic coding tool",
           websiteUrl: PRODUCT_URL,
         },
         {
