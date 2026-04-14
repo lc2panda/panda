@@ -8,6 +8,10 @@ import { useEffect, useState } from 'react'
 import { Box, Text, useInput } from '../../ink.js'
 import { MatrixCharRain } from './MatrixCharRain.js'
 import { MATRIX_SCALE } from './matrixPalette.js'
+import { getMatrixWindowsDefaults } from '../../utils/terminalCapability.js'
+
+// Windows 低能力终端降级参数
+const _winDefaults = getMatrixWindowsDefaults()
 
 interface MatrixBootSequenceProps {
   cols: number
@@ -63,9 +67,15 @@ export function MatrixBootSequence({
   const [typedChars, setTypedChars] = useState(0)
   const [cursorVisible, setCursorVisible] = useState(true)
 
+  // rain 阶段时长：低能力终端缩短以减少渲染压力
+  const rainDurationMs = _winDefaults ? 300 : 500
+  const logoDurationMs = _winDefaults ? 1500 : 2000
+  const bootCharSet = _winDefaults?.charSet ?? 'mixed'
+  const bootFps = _winDefaults?.fps ?? 30
+
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('logo'), 500)
-    const t2 = setTimeout(() => setPhase('wakeup'), 2000)
+    const t1 = setTimeout(() => setPhase('logo'), rainDurationMs)
+    const t2 = setTimeout(() => setPhase('wakeup'), logoDurationMs)
     return () => {
       clearTimeout(t1)
       clearTimeout(t2)
@@ -125,11 +135,11 @@ export function MatrixBootSequence({
       <MatrixCharRain
         rows={3}
         cols={cols}
-        density={0.4}
-        fps={30}
-        charSet="mixed"
+        density={_winDefaults?.density ?? 0.4}
+        fps={bootFps}
+        charSet={bootCharSet}
         headLength={4}
-        tailLength={5}
+        tailLength={_winDefaults?.tailLength ?? 5}
       />
       <Box flexDirection="column" alignItems="center" paddingY={1}>
         {showLogo && (
@@ -156,11 +166,11 @@ export function MatrixBootSequence({
       <MatrixCharRain
         rows={3}
         cols={cols}
-        density={0.4}
-        fps={30}
-        charSet="mixed"
+        density={_winDefaults?.density ?? 0.4}
+        fps={bootFps}
+        charSet={bootCharSet}
         headLength={4}
-        tailLength={5}
+        tailLength={_winDefaults?.tailLength ?? 5}
       />
       <Box>
         <Text color={MATRIX_SCALE.SHADOW}>

@@ -44,7 +44,7 @@ const assistant = {
               'slash_command' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
           })
           onDone(
-            'Assistant mode activated. Claude will operate as an always-on assistant with proactive capabilities.',
+            'Assistant mode activated. Panda will operate as an always-on assistant with proactive capabilities.',
             { display: 'system' },
           )
         }
