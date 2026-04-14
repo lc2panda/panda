@@ -143,7 +143,7 @@ export const CronCreateTool = buildTool({
   mapToolResultToToolResultBlockParam(output, toolUseID) {
     const where = output.durable
       ? 'Persisted to .pandacc/scheduled_tasks.json'
-      : 'Session-only (not written to disk, dies when Claude exits)'
+      : 'Session-only (not written to disk, dies when Panda exits)'
     return {
       tool_use_id: toolUseID,
       type: 'tool_result',
