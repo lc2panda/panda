@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { Box, Text, useTheme } from '../../../ink.js';
 import { WebFetchTool } from '../../../tools/WebFetchTool/WebFetchTool.js';
 import { shouldShowAlwaysAllowOptions } from '../../../utils/permissions/permissionsLoader.js';
+import { isZh } from '../../../utils/i18n.js';
 import { type OptionWithDescription, Select } from '../../CustomSelect/select.js';
 import { type UnaryEvent, usePermissionRequestLogging } from '../hooks.js';
 import { PermissionDialog } from '../PermissionDialog.js';
@@ -245,7 +246,7 @@ export function WebFetchPermissionRequest(t0) {
   }
   let t15;
   if ($[37] !== t14 || $[38] !== t9 || $[39] !== workerBadge) {
-    t15 = <PermissionDialog title="Fetch" workerBadge={workerBadge}>{t9}{t14}</PermissionDialog>;
+    t15 = <PermissionDialog title={isZh() ? "网络请求" : "Fetch"} workerBadge={workerBadge}>{t9}{t14}</PermissionDialog>;
     $[37] = t14;
     $[38] = t9;
     $[39] = workerBadge;

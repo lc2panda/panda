@@ -6,6 +6,7 @@ import { sanitizeToolNameForAnalytics } from '../../services/analytics/metadata.
 import { env } from '../../utils/env.js';
 import { shouldShowAlwaysAllowOptions } from '../../utils/permissions/permissionsLoader.js';
 import { truncateToLines } from '../../utils/stringUtils.js';
+import { isZh } from '../../utils/i18n.js';
 import { logUnaryEvent } from '../../utils/unaryLogging.js';
 import { type UnaryEvent, usePermissionRequestLogging } from './hooks.js';
 import { PermissionDialog } from './PermissionDialog.js';
@@ -320,7 +321,7 @@ export function FallbackPermissionRequest(t0) {
   }
   let t20;
   if ($[54] !== t16 || $[55] !== t19 || $[56] !== workerBadge) {
-    t20 = <PermissionDialog title="Tool use" workerBadge={workerBadge}>{t16}{t19}</PermissionDialog>;
+    t20 = <PermissionDialog title={isZh() ? "工具使用" : "Tool use"} workerBadge={workerBadge}>{t16}{t19}</PermissionDialog>;
     $[54] = t16;
     $[55] = t19;
     $[56] = workerBadge;

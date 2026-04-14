@@ -2,6 +2,7 @@ import { c as _c } from "react/compiler-runtime";
 import React from 'react';
 import { Box, Text } from '../ink.js';
 import { formatTokens } from '../utils/format.js';
+import { isZh } from '../utils/i18n.js';
 import { Select } from './CustomSelect/index.js';
 import { Dialog } from './design-system/Dialog.js';
 type IdleReturnAction = 'continue' | 'clear' | 'dismiss' | 'never';
@@ -35,7 +36,7 @@ export function IdleReturnDialog(t0) {
     t2 = $[3];
   }
   const formattedTokens = t2;
-  const t3 = `You've been away ${formattedIdle} and this conversation is ${formattedTokens} tokens.`;
+  const t3 = isZh() ? `你已离开 ${formattedIdle}，当前对话已使用 ${formattedTokens} tokens。` : `You've been away ${formattedIdle} and this conversation is ${formattedTokens} tokens.`;
   let t4;
   if ($[4] !== onDone) {
     t4 = () => onDone("dismiss");
@@ -46,7 +47,7 @@ export function IdleReturnDialog(t0) {
   }
   let t5;
   if ($[6] === Symbol.for("react.memo_cache_sentinel")) {
-    t5 = <Box flexDirection="column"><Text>If this is a new task, clearing context will save usage and be faster.</Text></Box>;
+    t5 = <Box flexDirection="column"><Text>{isZh() ? '如果这是新任务，清除上下文可以节省用量并加快响应。' : 'If this is a new task, clearing context will save usage and be faster.'}</Text></Box>;
     $[6] = t5;
   } else {
     t5 = $[6];
@@ -55,7 +56,7 @@ export function IdleReturnDialog(t0) {
   if ($[7] === Symbol.for("react.memo_cache_sentinel")) {
     t6 = {
       value: "continue" as const,
-      label: "Continue this conversation"
+      label: isZh() ? "继续当前对话" : "Continue this conversation"
     };
     $[7] = t6;
   } else {
@@ -65,7 +66,7 @@ export function IdleReturnDialog(t0) {
   if ($[8] === Symbol.for("react.memo_cache_sentinel")) {
     t7 = {
       value: "clear" as const,
-      label: "Send message as a new conversation"
+      label: isZh() ? "作为新对话发送" : "Send message as a new conversation"
     };
     $[8] = t7;
   } else {
@@ -75,7 +76,7 @@ export function IdleReturnDialog(t0) {
   if ($[9] === Symbol.for("react.memo_cache_sentinel")) {
     t8 = [t6, t7, {
       value: "never" as const,
-      label: "Don't ask me again"
+      label: isZh() ? "不再提醒" : "Don't ask me again"
     }];
     $[9] = t8;
   } else {
