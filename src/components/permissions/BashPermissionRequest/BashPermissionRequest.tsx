@@ -432,7 +432,7 @@ function BashPermissionRequestInner({
             {toolUseConfirm.classifierMatchedRule}
             {'"'}
           </Text>}
-      </Text> : toolUseConfirm.classifierCheckInProgress ? <ClassifierCheckingSubtitle /> : classifierWasChecking ? <Text dimColor>Requires manual approval</Text> : undefined : undefined;
+      </Text> : toolUseConfirm.classifierCheckInProgress ? <ClassifierCheckingSubtitle /> : classifierWasChecking ? <Text dimColor>{isZh() ? "需要手动批准" : "Requires manual approval"}</Text> : undefined : undefined;
   return <PermissionDialog workerBadge={workerBadge} title={sandboxingEnabled_0 && !isSandboxed_0 ? (isZh() ? 'Bash 命令（无沙盒）' : 'Bash command (unsandboxed)') : (isZh() ? 'Bash 命令' : 'Bash command')} subtitle={classifierSubtitle}>
       <Box flexDirection="column" paddingX={2} paddingY={1}>
         <Text dimColor={explainerState.visible}>

@@ -116,7 +116,7 @@ export function ExportDialog({
     context: 'Settings',
     isActive: showFilenameInput
   });
-  return <Dialog title={isZh() ? "导出对话" : "Export Conversation"} subtitle="Select export method:" color="permission" onCancel={handleCancel} inputGuide={renderInputGuide} isCancelActive={!showFilenameInput}>
+  return <Dialog title={isZh() ? "导出对话" : "Export Conversation"} subtitle={isZh() ? "选择导出方式：" : "Select export method:"} color="permission" onCancel={handleCancel} inputGuide={renderInputGuide} isCancelActive={!showFilenameInput}>
       {!showFilenameInput ? <Select options={options} onChange={handleSelectOption} onCancel={handleCancel} /> : <Box flexDirection="column">
           <Text>{isZh() ? '输入文件名:' : 'Enter filename:'}</Text>
           <Box flexDirection="row" gap={1} marginTop={1}>

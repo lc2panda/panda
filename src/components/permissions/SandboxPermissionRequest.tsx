@@ -4,6 +4,7 @@ import { Box, Text } from 'src/ink.js';
 import { type NetworkHostPattern, shouldAllowManagedSandboxDomainsOnly } from 'src/utils/sandbox/sandbox-adapter.js';
 import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from '../../services/analytics/index.js';
 import { Select } from '../CustomSelect/select.js';
+import { isZh } from '../../utils/i18n.js';
 import { PermissionDialog } from './PermissionDialog.js';
 export type SandboxPermissionRequestProps = {
   hostPattern: NetworkHostPattern;
@@ -151,7 +152,7 @@ export function SandboxPermissionRequest(t0) {
   }
   let t13;
   if ($[19] !== t12 || $[20] !== t9) {
-    t13 = <PermissionDialog title="Network request outside of sandbox"><Box flexDirection="column" paddingX={2} paddingY={1}>{t9}{t10}{t12}</Box></PermissionDialog>;
+    t13 = <PermissionDialog title={isZh() ? "沙盒外的网络请求" : "Network request outside of sandbox"}><Box flexDirection="column" paddingX={2} paddingY={1}>{t9}{t10}{t12}</Box></PermissionDialog>;
     $[19] = t12;
     $[20] = t9;
     $[21] = t13;

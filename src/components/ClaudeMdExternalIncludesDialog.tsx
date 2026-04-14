@@ -6,6 +6,7 @@ import type { ExternalClaudeMdInclude } from '../utils/claudemd.js';
 import { saveCurrentProjectConfig } from '../utils/config.js';
 import { Select } from './CustomSelect/index.js';
 import { Dialog } from './design-system/Dialog.js';
+import { isZh } from '../utils/i18n.js';
 type Props = {
   onDone(): void;
   isStandaloneDialog?: boolean;
@@ -59,7 +60,7 @@ export function ClaudeMdExternalIncludesDialog(t0) {
   const t5 = !isStandaloneDialog;
   let t6;
   if ($[5] === Symbol.for("react.memo_cache_sentinel")) {
-    t6 = <Text>This project's CLAUDE.md imports files outside the current working directory. Never allow this for third-party repositories.</Text>;
+    t6 = <Text>{isZh() ? '此项目的 CLAUDE.md 导入了工作目录外的文件。请勿对第三方仓库允许此操作。' : "This project's CLAUDE.md imports files outside the current working directory. Never allow this for third-party repositories."}</Text>;
     $[5] = t6;
   } else {
     t6 = $[5];
@@ -74,7 +75,7 @@ export function ClaudeMdExternalIncludesDialog(t0) {
   }
   let t8;
   if ($[8] === Symbol.for("react.memo_cache_sentinel")) {
-    t8 = <Text dimColor={true}>Important: Only use Panda with files you trust. Accessing untrusted files may pose security risks{" "}<Link url="https://code.claude.com/docs/en/security" />{" "}</Text>;
+    t8 = <Text dimColor={true}>{isZh() ? '重要：仅在可信文件中使用 Panda。访问不受信的文件可能存在安全风险 ' : 'Important: Only use Panda with files you trust. Accessing untrusted files may pose security risks '}<Link url="https://code.claude.com/docs/en/security" />{" "}</Text>;
     $[8] = t8;
   } else {
     t8 = $[8];
@@ -82,10 +83,10 @@ export function ClaudeMdExternalIncludesDialog(t0) {
   let t9;
   if ($[9] === Symbol.for("react.memo_cache_sentinel")) {
     t9 = [{
-      label: "Yes, allow external imports",
+      label: isZh() ? "是，允许外部导入" : "Yes, allow external imports",
       value: "yes"
     }, {
-      label: "No, disable external imports",
+      label: isZh() ? "否，禁用外部导入" : "No, disable external imports",
       value: "no"
     }];
     $[9] = t9;
@@ -102,7 +103,7 @@ export function ClaudeMdExternalIncludesDialog(t0) {
   }
   let t11;
   if ($[12] !== handleEscape || $[13] !== t10 || $[14] !== t4 || $[15] !== t5 || $[16] !== t7) {
-    t11 = <Dialog title="Allow external CLAUDE.md file imports?" color="warning" onCancel={handleEscape} hideBorder={t4} hideInputGuide={t5}>{t6}{t7}{t8}{t10}</Dialog>;
+    t11 = <Dialog title={isZh() ? "允许导入外部 CLAUDE.md 文件？" : "Allow external CLAUDE.md file imports?"} color="warning" onCancel={handleEscape} hideBorder={t4} hideInputGuide={t5}>{t6}{t7}{t8}{t10}</Dialog>;
     $[12] = handleEscape;
     $[13] = t10;
     $[14] = t4;

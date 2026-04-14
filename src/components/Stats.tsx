@@ -47,9 +47,9 @@ type StatsResult = {
   type: 'empty';
 };
 const DATE_RANGE_LABELS: Record<StatsDateRange, string> = {
-  '7d': 'Last 7 days',
-  '30d': 'Last 30 days',
-  all: 'All time'
+  '7d': isZh() ? '最近 7 天' : 'Last 7 days',
+  '30d': isZh() ? '最近 30 天' : 'Last 30 days',
+  all: isZh() ? '全部时间' : 'All time'
 };
 const DATE_RANGE_ORDER: StatsDateRange[] = ['all', '7d', '30d'];
 function getNextDateRange(current: StatsDateRange): StatsDateRange {
@@ -73,7 +73,7 @@ function createAllTimeStatsPromise(): Promise<StatsResult> {
       data
     };
   }).catch((err): StatsResult => {
-    const message = err instanceof Error ? err.message : 'Failed to load stats';
+    const message = err instanceof Error ? err.message : (isZh() ? '加载统计失败' : 'Failed to load stats');
     return {
       type: 'error',
       message

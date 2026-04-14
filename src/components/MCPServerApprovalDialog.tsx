@@ -5,6 +5,7 @@ import { getSettings_DEPRECATED, updateSettingsForSource } from '../utils/settin
 import { Select } from './CustomSelect/index.js';
 import { Dialog } from './design-system/Dialog.js';
 import { MCPServerDialogCopy } from './MCPServerDialogCopy.js';
+import { isZh } from '../utils/i18n.js';
 type Props = {
   serverName: string;
   onDone(): void;
@@ -79,13 +80,13 @@ export function MCPServerApprovalDialog(t0) {
   let t5;
   if ($[6] === Symbol.for("react.memo_cache_sentinel")) {
     t5 = [{
-      label: "Use this and all future MCP servers in this project",
+      label: isZh() ? "使用此服务器及本项目未来的所有 MCP 服务器" : "Use this and all future MCP servers in this project",
       value: "yes_all"
     }, {
-      label: "Use this MCP server",
+      label: isZh() ? "使用此 MCP 服务器" : "Use this MCP server",
       value: "yes"
     }, {
-      label: "Continue without using this MCP server",
+      label: isZh() ? "不使用此 MCP 服务器继续" : "Continue without using this MCP server",
       value: "no"
     }];
     $[6] = t5;

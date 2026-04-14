@@ -51,7 +51,7 @@ export function BypassPermissionsModeDialog(t0) {
   const handleEscape = _temp2;
   let t3;
   if ($[3] === Symbol.for("react.memo_cache_sentinel")) {
-    t3 = <Box flexDirection="column" gap={1}><Text>{isZh() ? "在跳过权限模式下，Panda 不会在运行潜在危险命令前征求你的同意。" : "In Bypass Permissions mode, Panda will not ask for your approval before running potentially dangerous commands."}<Newline />This mode should only be used in a sandboxed container/VM that has restricted internet access and can easily be restored if damaged.</Text><Text>By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode.</Text><Link url="https://code.claude.com/docs/en/security" /></Box>;
+    t3 = <Box flexDirection="column" gap={1}><Text>{isZh() ? "在跳过权限模式下，Panda 不会在运行潜在危险命令前征求你的同意。" : "In Bypass Permissions mode, Panda will not ask for your approval before running potentially dangerous commands."}<Newline />{isZh() ? "此模式仅应在具有受限网络访问且可轻松恢复的沙盒容器/虚拟机中使用。" : "This mode should only be used in a sandboxed container/VM that has restricted internet access and can easily be restored if damaged."}</Text><Text>{isZh() ? "继续即表示你接受在跳过权限模式下运行时所有操作的全部责任。" : "By proceeding, you accept all responsibility for actions taken while running in Bypass Permissions mode."}</Text><Link url="https://code.claude.com/docs/en/security" /></Box>;
     $[3] = t3;
   } else {
     t3 = $[3];
@@ -71,7 +71,7 @@ export function BypassPermissionsModeDialog(t0) {
   }
   let t5;
   if ($[5] !== onChange) {
-    t5 = <Dialog title="WARNING: Panda running in Bypass Permissions mode" color="error" onCancel={handleEscape}>{t3}<Select options={t4} onChange={value_0 => onChange(value_0 as 'accept' | 'decline')} /></Dialog>;
+    t5 = <Dialog title={isZh() ? "警告：Panda 正在跳过权限模式下运行" : "WARNING: Panda running in Bypass Permissions mode"} color="error" onCancel={handleEscape}>{t3}<Select options={t4} onChange={value_0 => onChange(value_0 as 'accept' | 'decline')} /></Dialog>;
     $[5] = onChange;
     $[6] = t5;
   } else {

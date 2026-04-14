@@ -9,6 +9,7 @@ import { isAnthropicAuthEnabled } from '../utils/auth.js';
 import { normalizeApiKeyForConfig } from '../utils/authPortable.js';
 import { getCustomApiKeyStatus } from '../utils/config.js';
 import { env } from '../utils/env.js';
+import { isZh } from '../utils/i18n.js';
 import { isRunningOnHomespace } from '../utils/envUtils.js';
 import { PreflightStep } from '../utils/preflightChecks.js';
 import type { ThemeSetting } from '../utils/theme.js';
@@ -63,7 +64,7 @@ export function Onboarding({
     />
     </Box>;
   const securityStep = <Box flexDirection="column" gap={1} paddingLeft={1}>
-      <Text bold>Security notes:</Text>
+      <Text bold>{isZh() ? '安全须知：' : 'Security notes:'}</Text>
       <Box flexDirection="column" width={70}>
         {/**
          * OrderedList misnumbers items when rendering conditionally,
@@ -71,20 +72,20 @@ export function Onboarding({
          */}
         <OrderedList>
           <OrderedList.Item>
-            <Text>Claude can make mistakes</Text>
+            <Text>{isZh() ? 'Panda 可能出错' : 'Panda can make mistakes'}</Text>
             <Text dimColor wrap="wrap">
-              You should always review Claude&apos;s responses, especially when
+              {isZh() ? '请始终审查 Panda 的回复，尤其是执行代码时。' : <>You should always review Panda&apos;s responses, especially when
               <Newline />
-              running code.
+              running code.</>}
               <Newline />
             </Text>
           </OrderedList.Item>
           <OrderedList.Item>
             <Text>
-              Due to prompt injection risks, only use it with code you trust
+              {isZh() ? '由于提示注入风险，请仅在可信代码中使用' : 'Due to prompt injection risks, only use it with code you trust'}
             </Text>
             <Text dimColor wrap="wrap">
-              For more details see:
+              {isZh() ? '更多详情请见：' : 'For more details see:'}
               <Newline />
               <Link url="https://code.claude.com/docs/en/security" />
             </Text>
@@ -146,19 +147,19 @@ export function Onboarding({
     steps.push({
       id: 'terminal-setup',
       component: <Box flexDirection="column" gap={1} paddingLeft={1}>
-          <Text bold>Use Panda&apos;s terminal setup?</Text>
+          <Text bold>{isZh() ? '使用 Panda 的终端配置？' : <>Use Panda&apos;s terminal setup?</>}</Text>
           <Box flexDirection="column" width={70} gap={1}>
             <Text>
-              For the optimal coding experience, enable the recommended settings
+              {isZh() ? '为获得最佳编码体验，请为终端启用推荐设置：' : <>For the optimal coding experience, enable the recommended settings
               <Newline />
-              for your terminal:{' '}
+              for your terminal:</>}{' '}
               {env.terminal === 'Apple_Terminal' ? 'Option+Enter for newlines and visual bell' : 'Shift+Enter for newlines'}
             </Text>
             <Select options={[{
-            label: 'Yes, use recommended settings',
+            label: isZh() ? '是，使用推荐设置' : 'Yes, use recommended settings',
             value: 'install'
           }, {
-            label: 'No, maybe later with /terminal-setup',
+            label: isZh() ? '否，稍后用 /terminal-setup' : 'No, maybe later with /terminal-setup',
             value: 'no'
           }]} onChange={value => {
             if (value === 'install') {
@@ -169,7 +170,7 @@ export function Onboarding({
             }
           }} onCancel={() => goToNextStep()} />
             <Text dimColor>
-              {exitState.pending ? <>Press {exitState.keyName} again to exit</> : <>Enter to confirm · Esc to skip</>}
+              {exitState.pending ? <>Press {exitState.keyName} again to exit</> : <>{isZh() ? 'Enter 确认 · Esc 跳过' : 'Enter to confirm · Esc to skip'}</>}
             </Text>
           </Box>
         </Box>
