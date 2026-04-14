@@ -599,31 +599,33 @@ const darkDaltonizedTheme: Theme = {
 }
 
 /**
- * Matrix theme — full green phosphor palette (H=108° S=90%)
- * Dark background with green-on-black aesthetic
+ * Matrix theme — authentic phosphor green palette (H≈120° S≈75%)
+ * Dark background with green-on-black CRT aesthetic.
+ * Layered contrast: BRIGHT (G6) for emphasis, NEON (G5) for primary,
+ * BASE (G4) for body text, SHADOW (G3) for hints/borders.
  */
 const matrixTheme: Theme = {
-  autoAccept: MATRIX_SCALE.BRIGHT,             // #3CF83E
-  bashBorder: MATRIX_SCALE.NEON,               // #0DF216
-  claude: MATRIX_SCALE.NEON,                   // #0DF216 — brand accent → Matrix green
-  claudeShimmer: MATRIX_SCALE.BRIGHT,          // #3CF83E
+  autoAccept: MATRIX_SCALE.BRIGHT,             // #33BB33
+  bashBorder: MATRIX_SCALE.SHADOW,             // #107010 — border降级，不与正文争抢
+  claude: MATRIX_SCALE.BRIGHT,                 // #33BB33 — brand accent brighter than body text
+  claudeShimmer: MATRIX_SCALE.GLOW,            // #40CC40
   claudeBlue_FOR_SYSTEM_SPINNER: MATRIX_SCALE.NEON,
   claudeBlueShimmer_FOR_SYSTEM_SPINNER: MATRIX_SCALE.BRIGHT,
-  permission: MATRIX_SCALE.NEON,               // #0DF216
-  permissionShimmer: MATRIX_SCALE.BRIGHT,
-  planMode: MATRIX_SCALE.SHADOW,               // #098C12
+  permission: MATRIX_SCALE.BRIGHT,             // #33BB33 — 权限提示突出
+  permissionShimmer: MATRIX_SCALE.GLOW,
+  planMode: MATRIX_SCALE.SHADOW,               // #107010
   ide: MATRIX_SCALE.SHADOW,
-  promptBorder: MATRIX_SCALE.SHADOW,           // #098C12
+  promptBorder: MATRIX_SCALE.SHADOW,           // #107010
   promptBorderShimmer: MATRIX_SCALE.NEON,
-  text: MATRIX_SCALE.NEON,                     // #0DF216 — primary text
+  text: MATRIX_SCALE.BASE,                     // #1A8A1A — 正文降一档，柔和磷光绿
   inverseText: '#000000',
-  inactive: MATRIX_SCALE.SHADOW,               // #098C12
+  inactive: MATRIX_SCALE.SHADOW,               // #107010
   inactiveShimmer: MATRIX_SCALE.BASE,
-  subtle: MATRIX_SCALE.SHADOW,                 // #098C12 — secondary text
-  suggestion: MATRIX_SCALE.SHADOW,             // #098C12
-  remember: MATRIX_SCALE.NEON,                 // #0DF216
+  subtle: MATRIX_SCALE.SHADOW,                 // #107010 — secondary text
+  suggestion: MATRIX_SCALE.BRIGHT,             // #33BB33 — 选中项亮于未选中项（修复反转）
+  remember: MATRIX_SCALE.BASE,                 // #1A8A1A — 记忆标记中等亮度
   background: '#000000',
-  success: MATRIX_SCALE.BRIGHT,                // #3CF83E
+  success: MATRIX_SCALE.BRIGHT,                // #33BB33
   error: MATRIX_STATUS.ERROR,                  // #FF4040
   warning: MATRIX_STATUS.WARNING,              // #C8E020
   merged: MATRIX_SCALE.BRIGHT,
@@ -651,18 +653,18 @@ const matrixTheme: Theme = {
   // TUI V2 colors
   clawd_body: MATRIX_SCALE.NEON,
   clawd_background: '#000000',
-  userMessageBackground: '#0A1A0A',            // very dark green tint
+  userMessageBackground: '#0D1F0D',            // 稍亮，区分消息区
   userMessageBackgroundHover: '#0F250F',
-  messageActionsBackground: '#0A1A0A',
+  messageActionsBackground: '#061206',         // 更暗，与用户消息区分
   selectionBg: '#003300',                      // dark green selection
-  bashMessageBackgroundColor: '#050D05',
-  memoryBackgroundColor: '#0A1A0A',
+  bashMessageBackgroundColor: '#081008',       // 微调
+  memoryBackgroundColor: '#0A160A',            // 偏暖绿，区分记忆区
   rate_limit_fill: MATRIX_SCALE.NEON,
   rate_limit_empty: MATRIX_SCALE.DEEP,
   fastMode: MATRIX_SCALE.BRIGHT,
   fastModeShimmer: MATRIX_SCALE.GLOW,
-  briefLabelYou: MATRIX_SCALE.BRIGHT,
-  briefLabelClaude: MATRIX_SCALE.NEON,
+  briefLabelYou: MATRIX_SCALE.BASE,            // #1A8A1A — You 中亮度
+  briefLabelClaude: MATRIX_SCALE.GLOW,         // #40CC40 — 拉大与 You 的差距
   // Rainbow → all green shades
   rainbow_red: MATRIX_SCALE.BRIGHT,
   rainbow_orange: MATRIX_SCALE.GLOW,

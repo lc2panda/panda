@@ -5,7 +5,7 @@
 
 /**
  * Matrix 经典绿色梯度（白绿 → 中绿 → 暗绿 → 黑）
- * 基于 Rezmason/matrix 经典版 HSL(108°, 90%, L%) 色相
+ * 基于原版 Matrix 电影 phosphor CRT 色调 HSL(≈120°, ≈75%, L%)
  * age 范围：0 (最新) → 1 (最老/消散)
  */
 export interface RGB {
@@ -14,11 +14,12 @@ export interface RGB {
   b: number
 }
 
-// H=108° S=90% 色相体系（Rezmason 标准，比常见的 #00FF41 H=135° 更接近原版 phosphor 绿）
-const HEAD: RGB = { r: 156, g: 251, b: 157 } // G8 flash — 雨头极亮
-const MID: RGB = { r: 13, g: 242, b: 22 }    // G5 matrix — 经典绿
-const TAIL: RGB = { r: 6, g: 78, b: 11 }     // G2 deep — 暗绿
-const FADE: RGB = { r: 1, g: 13, b: 1 }      // G0 ghost — 消散
+// H≈120° S≈75% 磷光绿色系（调制自原版 Matrix 电影 phosphor CRT 绿，
+// 比 Rezmason H=108° S=90% 更柔和，长时间阅读不刺眼）
+const HEAD: RGB = { r: 112, g: 221, b: 112 } // G8 flash — 雨头极亮（柔化）
+const MID: RGB = { r: 32, g: 160, b: 32 }    // G5 neon — 主要绿（降饱和降亮）
+const TAIL: RGB = { r: 10, g: 74, b: 10 }    // G2 deep — 暗绿
+const FADE: RGB = { r: 2, g: 18, b: 2 }      // G0 ghost — 消散
 
 /**
  * 按 age 插值返回 RGB。age ∈ [0, 1]。
@@ -28,7 +29,7 @@ const FADE: RGB = { r: 1, g: 13, b: 1 }      // G0 ghost — 消散
  * 0.35-0.60: MID_DIM → TAIL (暗化 → 暗绿)
  * 0.60-1.0: TAIL → FADE  (暗绿 → 消散，缓慢衰减)
  */
-const MID_DIM: RGB = { r: 9, g: 140, b: 18 } // G3 shadow — 中间过渡色
+const MID_DIM: RGB = { r: 16, g: 112, b: 16 } // G3 shadow — 中间过渡色（磷光衰减）
 
 export function getColorByAge(age: number): RGB {
   const a = Math.max(0, Math.min(1, age))
@@ -74,40 +75,39 @@ export const MATRIX_COLORS = {
   FADE_HEX: toHex(FADE),
 }
 
-// ─── Extended Matrix UI color scale (12 stops, H=108° S=90%) ────────
-// Based on Rezmason/matrix classic palette (HSL hue 108°, saturation 90%).
-// H=108° is more accurate to the original film's phosphor green than the
-// commonly-used #00FF41 (H=135°). Each stop's contrast ratio against
-// #000000 is noted for WCAG compliance.
+// ─── Extended Matrix UI color scale (12 stops, H≈120° S≈75%) ───────
+// Retuned from Rezmason H=108° S=90% to authentic Matrix film phosphor
+// green (H≈120°, S≈70-80%). Softer, less saturated — CRT phosphor glow
+// rather than LED neon. Contrast ratios against #000000 noted for WCAG.
 //
 // Alpha research ref: monitor/20260412-香草Matrix主题精细化.md
 
 export const MATRIX_SCALE = {
   // ── Extreme bright (rare use) ──
-  BLOOM:   '#F0FFF0',  // G11 — 20.3:1 — pure white-green phosphor peak
-  CURSOR:  '#E0FEE1',  // G10 — 19.3:1 — rain head cursor
-  WHITE:   '#C8FDC9',  // G9  — 17.9:1 — extreme highlight
-  FLASH:   '#9CFB9D',  // G8  — 15.5:1 — rain head flash
+  BLOOM:   '#E8FFE8',  // G11 — ~20:1 — pure white-green phosphor peak
+  CURSOR:  '#C0F0C0',  // G10 — ~17:1 — rain head cursor
+  WHITE:   '#A0E8A0',  // G9  — ~15:1 — extreme highlight
+  FLASH:   '#70DD70',  // G8  — ~11:1 — rain head flash
   // ── High brightness ──
-  GLOW:    '#6CFA6E',  // G7  — 13.0:1 — rain head glow area
-  BRIGHT:  '#3CF83E',  // G6  — 10.8:1 — highlights, tool names
+  GLOW:    '#40CC40',  // G7  —  ~9:1 — rain head glow area
+  BRIGHT:  '#33BB33',  // G6  —  ~7:1 — highlights, tool names, selection
   // ── Core readable range ──
-  NEON:    '#0DF216',  // G5  —  9.1:1 — classic Matrix green (prompt, emphasis)
-  BASE:    '#0BBF18',  // G4  —  6.7:1 — body text base (AA ✅)
+  NEON:    '#20A020',  // G5  —  ~5:1 — prompt, emphasis (AA normal ✅)
+  BASE:    '#1A8A1A',  // G4  — ~4.2:1 — body text base (AA large ✅)
   // ── Dim / secondary ──
-  SHADOW:  '#098C12',  // G3  —  4.3:1 — secondary text, gutter (AA large ✅)
-  DEEP:    '#064E0B',  // G2  —  2.2:1 — rain tail, background layer
+  SHADOW:  '#107010',  // G3  — ~2.8:1 — secondary text, gutter (decorative)
+  DEEP:    '#0A4A0A',  // G2  — ~1.6:1 — rain tail, background layer
   // ── Near-invisible ──
-  ABYSS:   '#031A03',  // G1  —  1.2:1 — extreme fade
-  GHOST:   '#010D01',  // G0  —  1.1:1 — vanished
+  ABYSS:   '#052505',  // G1  — ~1.2:1 — extreme fade
+  GHOST:   '#021202',  // G0  — ~1.1:1 — vanished
 } as const
 
 // Status colors — Matrix-themed but distinguishable
 export const MATRIX_STATUS = {
   ERROR:   '#FF4040',  // Red — breaks green palette to signal danger (5.2:1)
   WARNING: '#C8E020',  // Yellow-green — retains green base (12.0:1)
-  SUCCESS: '#3CF83E',  // G6 bright — positive signal
-  INFO:    '#0DF216',  // G5 neon — standard info
+  SUCCESS: '#33BB33',  // G6 bright — positive signal (matches new scale)
+  INFO:    '#20A020',  // G5 neon — standard info (matches new scale)
 } as const
 
 // ─── Semantic UI mapping ────────────────────────────────────────────
@@ -123,37 +123,37 @@ export const MATRIX_UI = {
   promptDim:      MATRIX_SCALE.SHADOW,    // prompt when loading (G3)
 
   // Message gutter
-  gutter:         MATRIX_SCALE.SHADOW,    // "╎" response prefix (G3)
-  gutterDot:      MATRIX_SCALE.NEON,      // ● dot for queued tools (G5)
+  gutter:         MATRIX_SCALE.DEEP,      // "╎" response prefix (G2 — subtle decoration)
+  gutterDot:      MATRIX_SCALE.BRIGHT,    // ● dot for queued tools (G6 — stands out)
 
   // Borders & dialogs
-  border:         MATRIX_SCALE.NEON,      // PermissionDialog border (G5)
-  borderDim:      MATRIX_SCALE.SHADOW,    // secondary borders (G3)
+  border:         MATRIX_SCALE.SHADOW,    // PermissionDialog border (G3 — doesn't compete w/ text)
+  borderDim:      MATRIX_SCALE.DEEP,      // secondary borders (G2)
 
   // Tool names & loader
   toolName:       MATRIX_SCALE.BRIGHT,    // bold tool-use name (G6)
   toolLoader:     MATRIX_SCALE.NEON,      // blinking dot / loader (G5)
 
-  // Thinking (WCAG: body text upgraded to BASE G4 — 6.7:1 AA ✅)
+  // Thinking (body text at BASE G4 for comfortable reading)
   thinking:       MATRIX_SCALE.NEON,      // "∴ Thinking" label (G5)
-  thinkingBody:   MATRIX_SCALE.BASE,      // thinking content body (G4 — was G3)
+  thinkingBody:   MATRIX_SCALE.BASE,      // thinking content body (G4)
 
-  // Spinner (WCAG: body text upgraded to BASE G4)
+  // Spinner (body text at BASE G4)
   spinner:        MATRIX_SCALE.NEON,      // braille spinner glyph (G5)
-  spinnerMsg:     MATRIX_SCALE.BASE,      // spinner message text (G4 — was G3)
+  spinnerMsg:     MATRIX_SCALE.BASE,      // spinner message text (G4)
 
-  // Footer & hints (WCAG: decorative hint/divider stay G3; info text → G4)
+  // Footer & hints (decorative hint/divider stay G3; info text → G4)
   hint:           MATRIX_SCALE.SHADOW,    // "? for shortcuts" etc. (G3 — decorative)
-  statusLine:     MATRIX_SCALE.BASE,      // status bar text (G4 — was G3)
-  footerInfo:     MATRIX_SCALE.BASE,      // model · context info (G4 — was G3)
+  statusLine:     MATRIX_SCALE.BASE,      // status bar text (G4)
+  footerInfo:     MATRIX_SCALE.BASE,      // model · context info (G4)
 
-  // System messages (WCAG: body text → G4; divider stays G3 decorative)
-  systemMsg:      MATRIX_SCALE.BASE,      // system text dimColor (G4 — was G3)
+  // System messages (body text → G4; divider stays G3 decorative)
+  systemMsg:      MATRIX_SCALE.BASE,      // system text dimColor (G4)
   divider:        MATRIX_SCALE.SHADOW,    // message dividers (G3 — decorative)
 
-  // Chat chrome
-  userMark:       MATRIX_SCALE.NEON,      // user message indicator "▸" (G5)
-  assistantMark:  MATRIX_SCALE.NEON,      // assistant indicator "◉" (G5)
+  // Chat chrome — differentiated marks for user vs assistant
+  userMark:       MATRIX_SCALE.BRIGHT,    // user message indicator "▸" (G6 — brighter)
+  assistantMark:  MATRIX_SCALE.BASE,      // assistant indicator "◉" (G4 — softer)
 
   // Status
   error:          MATRIX_STATUS.ERROR,
@@ -185,7 +185,7 @@ export const MATRIX_UI = {
   dialogBorder:     MATRIX_SCALE.SHADOW,    // '#098C12'
 
   // ── Selection highlight ─────────────────────────────────────────
-  selectHighlight:  MATRIX_SCALE.BRIGHT,    // '#3CF83E'
+  selectHighlight:  MATRIX_SCALE.FLASH,    // '#70DD70' — strong contrast for selections
 
   // ── Pane divider character ──────────────────────────────────────
   paneChar:         '━',                    // Matrix-style heavy divider
