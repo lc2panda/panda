@@ -13,7 +13,7 @@
 
 | 版本 | 运行时 | 亮点 |
 |------|--------|-----|
-| 2.14.0 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 🎨 Matrix 主题 · 103 主动推送场景 · 全面审查修复 · 公开发版就绪 |
+| 2.18.1 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 🐼 品牌重塑 · 🎨 Matrix 磷光绿重调 · 🌐 UI 汉化 · 🪟 Windows 终端适配 |
 
 ---
 
@@ -1329,12 +1329,21 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 **启用方式**（env 变量 opt-in，不影响默认主题）：
 
 ```bash
-# 一次性启用
+# macOS / Linux — 一次性启用
 PANDA_THEME=matrix panda
 
-# 或写入 shell config 永久启用
+# macOS / Linux — 写入 shell config 永久启用
 echo 'export PANDA_THEME=matrix' >> ~/.zshrc   # zsh
 echo 'export PANDA_THEME=matrix' >> ~/.bashrc  # bash
+
+# Windows — 一次性启用
+set PANDA_THEME=matrix && panda
+
+# Windows — 永久启用（PowerShell）
+[System.Environment]::SetEnvironmentVariable('PANDA_THEME', 'matrix', 'User')
+
+# Windows — 永久启用（cmd.exe）
+setx PANDA_THEME matrix
 ```
 
 **视觉元素**：
@@ -1352,13 +1361,33 @@ echo 'export PANDA_THEME=matrix' >> ~/.bashrc  # bash
 **关闭主题**：
 
 ```bash
+# macOS / Linux
 unset PANDA_THEME          # 当前 shell
 PANDA_THEME= panda          # 仅本次启动
+
+# Windows (cmd.exe)
+set PANDA_THEME= && panda
+
+# Windows (PowerShell)
+$env:PANDA_THEME = ''; panda
 ```
 
 **设计哲学**：Matrix 感由三层极轻装饰提供（启动屏冲击 + 输入框常驻识别 + Spinner 动态识别），对话内容区保持与默认主题完全相同的阅读体验，实现"酷炫 ≠ 干扰阅读"的平衡。
 
 **零回归**：默认仍是 `dark` / `light` 主题，必须显式 `PANDA_THEME=matrix` 才启用。关闭后所有 UI 字节等价默认主题。
+
+##### 🪟 Windows 终端适配（v2.18.0+）
+
+Panda 自动检测 Windows 终端类型并适配渲染能力：
+
+| 终端 | True Color | Unicode | 字符雨 | 检测方式 |
+|------|:---:|:---:|--------|----------|
+| **Windows Terminal** | ✅ | ✅ | 完整体验（片假名+符号） | `WT_SESSION` 环境变量 |
+| **VS Code 集成终端** | ✅ | ✅ | 完整体验 | `TERM_PROGRAM=vscode` |
+| **Git Bash / mintty** | ✅ | ✅ | 完整体验 | `TERM_PROGRAM=mintty` 或 `MSYSTEM` |
+| **conhost** (cmd.exe / 旧版 PS) | ⚠️ | ❌ | 自动降级：ASCII 字符集、15fps、低密度 | fallback |
+
+> **推荐**：Windows 用户使用 [Windows Terminal](https://aka.ms/terminal) 以获得最佳体验。conhost 下字符雨会自动切换为 ASCII 模式避免乱码。
 
 #### `/color`
 - **用法**: `/color <color|default>`
