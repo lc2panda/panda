@@ -54,7 +54,7 @@ export const TerminalCaptureTool = buildTool({
   async prompt() {
     return `Capture the recent terminal output. Returns the last N lines from the terminal scrollback buffer.
 
-Use this when you need to see what the user is looking at in their terminal, or to capture output from a command they ran outside of Claude.
+Use this when you need to see what the user is looking at in their terminal, or to capture output from a command they ran outside of Panda.
 
 Default: last 50 lines. Max: 500 lines.`
   },

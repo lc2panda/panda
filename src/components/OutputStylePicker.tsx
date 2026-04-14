@@ -10,7 +10,7 @@ import { Select } from './CustomSelect/select.js';
 import { Dialog } from './design-system/Dialog.js';
 import { isZh } from '../utils/i18n.js';
 const DEFAULT_OUTPUT_STYLE_LABEL = 'Default';
-const DEFAULT_OUTPUT_STYLE_DESCRIPTION = 'Claude completes coding tasks efficiently and provides concise responses';
+const DEFAULT_OUTPUT_STYLE_DESCRIPTION = 'Panda completes coding tasks efficiently and provides concise responses';
 function mapConfigsToOptions(styles: {
   [styleName: string]: OutputStyleConfig | null;
 }): OptionWithDescription[] {

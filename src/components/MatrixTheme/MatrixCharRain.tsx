@@ -9,6 +9,10 @@ import { Box, Text } from '../../ink.js'
 import { useAnimationFrame } from '../../ink/hooks/use-animation-frame.js'
 import { type CharSet, pickChar } from './matrixCharSets.js'
 import { ageToHex } from './matrixPalette.js'
+import { getMatrixWindowsDefaults } from '../../utils/terminalCapability.js'
+
+// Windows 低能力终端降级参数（模块级缓存，只检测一次）
+const _winDefaults = getMatrixWindowsDefaults()
 
 // ─── 深度层定义 ─────────────────────────────────────────────
 // 3 层深度制造视觉空间感（基于 Rezmason/matrix 异步滚动模型）
@@ -88,10 +92,10 @@ export function MatrixCharRain(props: MatrixCharRainProps): React.ReactNode {
   const {
     rows,
     cols,
-    density = 0.25,
-    fps = 20,
-    charSet = 'mixed',
-    tailLength = 8,
+    density = _winDefaults?.density ?? 0.25,
+    fps = _winDefaults?.fps ?? 20,
+    charSet = _winDefaults?.charSet ?? 'mixed',
+    tailLength = _winDefaults?.tailLength ?? 8,
   } = props
 
   // useRef 持久化每列状态，每帧更新

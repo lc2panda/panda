@@ -134,12 +134,12 @@ function getNotificationMessage(toolUseConfirm: ToolUseConfirm): string {
     return 'Panda wants to enter plan mode';
   }
   if (feature('REVIEW_ARTIFACT') && toolUseConfirm.tool === ReviewArtifactTool) {
-    return 'Claude needs your approval for a review artifact';
+    return 'Panda needs your approval for a review artifact';
   }
   if (!toolName || toolName.trim() === '') {
     return 'Panda needs your attention';
   }
-  return `Claude needs your permission to use ${toolName}`;
+  return `Panda needs your permission to use ${toolName}`;
 }
 
 // TODO: Move this to Tool.renderPermissionRequest
