@@ -8,6 +8,7 @@ import { use, useEffect, useState } from 'react';
 import { getOriginalCwd } from '../../bootstrap/state.js';
 import { useExitOnCtrlCDWithKeybindings } from '../../hooks/useExitOnCtrlCDWithKeybindings.js';
 import { Box, Text } from '../../ink.js';
+import { isZh } from '../../utils/i18n.js';
 import { useKeybinding } from '../../keybindings/useKeybinding.js';
 import { getAutoMemPath, isAutoMemoryEnabled } from '../../memdir/paths.js';
 import { logEvent } from '../../services/analytics/index.js';
@@ -115,7 +116,7 @@ export function MemoryFileSelector(t0) {
     let t1;
     if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
       t1 = {
-        label: "Open auto-memory folder",
+        label: isZh() ? "打开自动记忆文件夹" : "Open auto-memory folder",
         value: `${OPEN_FOLDER_PREFIX}${getAutoMemPath()}`,
         description: ""
       };
@@ -128,7 +129,7 @@ export function MemoryFileSelector(t0) {
       let t2;
       if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
         t2 = {
-          label: "Open team memory folder",
+          label: isZh() ? "打开团队记忆文件夹" : "Open team memory folder",
           value: `${OPEN_FOLDER_PREFIX}${teamMemPaths.getTeamMemPath()}`,
           description: ""
         };
@@ -341,7 +342,7 @@ export function MemoryFileSelector(t0) {
   }
   let t18;
   if ($[35] !== autoDreamOn || $[36] !== dreamStatus || $[37] !== focusedToggle || $[38] !== isDreamRunning || $[39] !== showDreamRow) {
-    t18 = showDreamRow && <ListItem isFocused={focusedToggle === 1} styled={false}><Text color={focusedToggle === 1 ? "suggestion" : undefined}>Auto-dream: {autoDreamOn ? "on" : "off"}{dreamStatus && <Text dimColor={true}> · {dreamStatus}</Text>}{!isDreamRunning && autoDreamOn && <Text dimColor={true}> · /dream to run</Text>}</Text></ListItem>;
+    t18 = showDreamRow && <ListItem isFocused={focusedToggle === 1} styled={false}><Text color={focusedToggle === 1 ? "suggestion" : undefined}>{isZh() ? '自动整理' : 'Auto-dream'}: {autoDreamOn ? (isZh() ? "开" : "on") : (isZh() ? "关" : "off")}{dreamStatus && <Text dimColor={true}> · {dreamStatus}</Text>}{!isDreamRunning && autoDreamOn && <Text dimColor={true}> · /dream {isZh() ? '运行' : 'to run'}</Text>}</Text></ListItem>;
     $[35] = autoDreamOn;
     $[36] = dreamStatus;
     $[37] = focusedToggle;

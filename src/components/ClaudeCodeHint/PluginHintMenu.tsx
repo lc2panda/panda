@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Box, Text } from '../../ink.js';
+import { isZh } from '../../utils/i18n.js';
 import { Select } from '../CustomSelect/select.js';
 import { PermissionDialog } from '../permissions/PermissionDialog.js';
 type Props = {
@@ -44,10 +45,10 @@ export function PluginHintMenu({
     label: 'No',
     value: 'no'
   }, {
-    label: "No, and don't show plugin installation hints again",
+    label: isZh() ? "否，且不再显示插件安装提示" : "No, and don't show plugin installation hints again",
     value: 'disable'
   }];
-  return <PermissionDialog title="Plugin Recommendation">
+  return <PermissionDialog title={isZh() ? "插件推荐" : "Plugin Recommendation"}>
       <Box flexDirection="column" paddingX={2} paddingY={1}>
         <Box marginBottom={1}>
           <Text dimColor>

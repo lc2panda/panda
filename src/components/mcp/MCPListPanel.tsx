@@ -3,6 +3,7 @@ import figures from 'figures';
 import React, { useCallback, useState } from 'react';
 import type { CommandResultDisplay } from '../../commands.js';
 import { Box, color, Link, Text, useTheme } from '../../ink.js';
+import { isZh } from '../../utils/i18n.js';
 import { useKeybindings } from '../../keybindings/useKeybinding.js';
 import type { ConfigScope } from '../../services/mcp/types.js';
 import { describeMcpConfigFilePath } from '../../services/mcp/utils.js';
@@ -310,7 +311,7 @@ export function MCPListPanel(t0) {
       } else {
         if (server_3.client.type === "connected") {
           statusIcon = color("success", theme)(figures.tick);
-          statusText = "connected";
+          statusText = isZh() ? "已连接" : "connected";
         } else {
           if (server_3.client.type === "pending") {
             statusIcon = color("inactive", theme)(figures.radioOff);

@@ -81,7 +81,7 @@ export function OutputStylePicker(t0) {
   const t6 = !isStandaloneCommand;
   let t7;
   if ($[5] === Symbol.for("react.memo_cache_sentinel")) {
-    t7 = <Box marginTop={1}><Text dimColor={true}>This changes how Panda communicates with you</Text></Box>;
+    t7 = <Box marginTop={1}><Text dimColor={true}>{isZh() ? '这将改变 Panda 与你的交流方式' : 'This changes how Panda communicates with you'}</Text></Box>;
     $[5] = t7;
   } else {
     t7 = $[5];
@@ -99,7 +99,7 @@ export function OutputStylePicker(t0) {
   }
   let t9;
   if ($[11] !== onCancel || $[12] !== t5 || $[13] !== t6 || $[14] !== t8) {
-    t9 = <Dialog title="Preferred output style" onCancel={onCancel} hideInputGuide={t5} hideBorder={t6}>{t8}</Dialog>;
+    t9 = <Dialog title={isZh() ? "首选输出风格" : "Preferred output style"} onCancel={onCancel} hideInputGuide={t5} hideBorder={t6}>{t8}</Dialog>;
     $[11] = onCancel;
     $[12] = t5;
     $[13] = t6;

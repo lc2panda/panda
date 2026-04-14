@@ -8,6 +8,7 @@ import { SelectMulti } from './CustomSelect/SelectMulti.js';
 import { Byline } from './design-system/Byline.js';
 import { Dialog } from './design-system/Dialog.js';
 import { KeyboardShortcutHint } from './design-system/KeyboardShortcutHint.js';
+import { isZh } from '../utils/i18n.js';
 type WorkflowOption = {
   value: Workflow;
   label: string;
@@ -102,7 +103,7 @@ export function WorkflowMultiselectDialog(t0) {
   }
   let t7;
   if ($[9] !== showError) {
-    t7 = showError && <Box><Text color="error">You must select at least one workflow to continue</Text></Box>;
+    t7 = showError && <Box><Text color="error">{isZh() ? '请至少选择一个工作流以继续' : 'You must select at least one workflow to continue'}</Text></Box>;
     $[9] = showError;
     $[10] = t7;
   } else {

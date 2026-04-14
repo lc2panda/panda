@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Box, Text } from '../../ink.js';
+import { isZh } from '../../utils/i18n.js';
 import { Select } from '../CustomSelect/select.js';
 import { PermissionDialog } from '../permissions/PermissionDialog.js';
 type Props = {
@@ -57,7 +58,7 @@ export function LspRecommendationMenu({
     label: 'Disable all LSP recommendations',
     value: 'disable'
   }];
-  return <PermissionDialog title="LSP Plugin Recommendation">
+  return <PermissionDialog title={isZh() ? "LSP 插件推荐" : "LSP Plugin Recommendation"}>
       <Box flexDirection="column" paddingX={2} paddingY={1}>
         <Box marginBottom={1}>
           <Text dimColor>
