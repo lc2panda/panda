@@ -1,12 +1,18 @@
 import { getGlobalConfig } from './config.js'
 
 export function t(en: string, zh: string): string {
-  const lang = getGlobalConfig().language
-  return lang === 'zh' ? zh : en
+  return isZh() ? zh : en
 }
 
 export function getLang(): string {
-  return getGlobalConfig().language || 'en'
+  try {
+    return getGlobalConfig().language || 'en'
+  } catch {
+    // Config not yet initialized (module-level calls before bootstrap).
+    // Fall back to system locale detection.
+    const lang = process.env.LANG || process.env.LANGUAGE || process.env.LC_ALL || ''
+    return lang.startsWith('zh') ? 'zh' : 'en'
+  }
 }
 
 export function isZh(): boolean {
