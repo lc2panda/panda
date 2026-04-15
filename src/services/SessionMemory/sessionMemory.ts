@@ -321,6 +321,7 @@ const extractSessionMemory = sequential(async function (
     canUseTool: createMemoryFileCanUseTool(memoryPath),
     querySource: 'session_memory',
     forkLabel: 'session_memory',
+    skipCacheWrite: true, // fire-and-forget memory update — unique context per run
     overrides: { readFileState: setupContext.readFileState },
   })
 

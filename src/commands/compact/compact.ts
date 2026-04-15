@@ -62,6 +62,7 @@ export const call: LocalCommandCall = async (args, context) => {
       )
       if (sessionMemoryResult) {
         getUserContext.cache.clear?.()
+        getSystemContext.cache.clear?.()
         runPostCompactCleanup()
         // Reset cache read baseline so the post-compact drop isn't flagged
         // as a break. compactConversation does this internally; SM-compact doesn't.
@@ -116,6 +117,7 @@ export const call: LocalCommandCall = async (args, context) => {
     suppressCompactWarning()
 
     getUserContext.cache.clear?.()
+    getSystemContext.cache.clear?.()
     runPostCompactCleanup()
 
     return {
@@ -202,6 +204,7 @@ async function compactViaReactive(
     runPostCompactCleanup()
     suppressCompactWarning()
     getUserContext.cache.clear?.()
+    getSystemContext.cache.clear?.()
 
     // reactiveCompactOnPromptTooLong runs PostCompact hooks but not PreCompact
     // — both callers (here and tryReactiveCompact) run PreCompact outside so

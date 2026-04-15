@@ -1,7 +1,7 @@
 import { feature } from 'bun:bundle'
 import type { QuerySource } from '../../constants/querySource.js'
 import { clearSystemPromptSections } from '../../constants/systemPromptSections.js'
-import { getUserContext } from '../../context.js'
+import { getSystemContext, getUserContext } from '../../context.js'
 import { clearSpeculativeChecks } from '../../tools/BashTool/bashPermissions.js'
 import { clearClassifierApprovals } from '../../utils/classifierApprovals.js'
 import { resetGetMemoryFilesCache } from '../../utils/claudemd.js'
@@ -57,6 +57,7 @@ export function runPostCompactCleanup(querySource?: QuerySource): void {
     // auto-compact and reactive-compact did not — this centralizes the
     // clear so all compaction paths behave consistently.
     getUserContext.cache.clear?.()
+    getSystemContext.cache.clear?.()
     resetGetMemoryFilesCache('compact')
   }
   clearSystemPromptSections()

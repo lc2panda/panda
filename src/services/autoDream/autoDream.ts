@@ -237,6 +237,7 @@ ${sessionIds.map(id => `- ${id}`).join('\n')}`
         querySource: 'auto_dream',
         forkLabel: 'auto_dream',
         skipTranscript: true,
+        skipCacheWrite: true, // fire-and-forget dream — unique context per run
         overrides: { abortController },
         onMessage: makeDreamProgressWatcher(taskId, setAppState),
       })

@@ -116,6 +116,7 @@ export function startAgentSummarization(
         forkLabel: 'agent_summary',
         overrides: { abortController: summaryAbortController },
         skipTranscript: true,
+        skipCacheWrite: true, // fire-and-forget summary — no future reads from this prefix
       })
 
       if (stopped) return

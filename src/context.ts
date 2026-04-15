@@ -301,6 +301,79 @@ export const getSystemContext = memoize(
       ? getSystemPromptInjection()
       : null
 
+    // --- Dynamic user context fields (moved here from getUserContext) ---
+    // These fields change frequently (on compact, per-turn, etc.) and were
+    // previously injected into messages[0], breaking the entire messages-layer
+    // cache prefix on every change.  By placing them in the system prompt's
+    // dynamic segment (after SYSTEM_PROMPT_DYNAMIC_BOUNDARY), they only
+    // invalidate the system-prompt dynamic block, leaving the static prefix
+    // and the messages-layer prefix intact.
+    const personaContext = getPersonaContext()
+
+    let workingMemoryContext: string | null = null
+    try {
+      const { getAllWorkingMemory } = require('./assistant/workingMemory.js')
+      const wm = getAllWorkingMemory()
+      if (wm && wm.length > 0) {
+        const wmSummary = wm.slice(0, 10).map((e: { key: string; value: string }) => `- ${e.key}: ${e.value}`).join('\n')
+        workingMemoryContext = `[Working Memory]\n${wmSummary}`
+      }
+    } catch {}
+
+    let morningBriefContext: string | null = null
+    try {
+      const hour = new Date().getHours()
+      if (hour >= 7 && hour < 10) {
+        const { join } = require('path')
+        const { readFileSync, existsSync } = require('fs')
+        const { getAutoMemPath } = require('./memdir/paths.js')
+        const memDir = getAutoMemPath()
+        if (memDir) {
+          const today = getLocalISODate()
+          const briefPath = join(memDir, 'working', `morning_brief_${today}.md`)
+          if (existsSync(briefPath)) {
+            const brief = readFileSync(briefPath, 'utf-8').slice(0, 1000)
+            morningBriefContext = `[今日晨报]\n${brief}`
+          }
+        }
+      }
+    } catch {}
+
+    let sessionSummaryContext: string | null = null
+    try {
+      const { join } = require('path')
+      const { readdirSync, readFileSync } = require('fs')
+      const { getAutoMemPath } = require('./memdir/paths.js')
+      const memDir = getAutoMemPath()
+      if (memDir) {
+        const workingDir = join(memDir, 'working')
+        const files = readdirSync(workingDir)
+          .filter((f: string) => f.startsWith('session-summary-') && f.endsWith('.md'))
+          .sort()
+          .reverse()
+          .slice(0, 3)
+        if (files.length > 0) {
+          const summaries = files.map((f: string) => {
+            const content = readFileSync(join(workingDir, f), 'utf-8')
+            const body = content.replace(/^---[\s\S]*?---\n*/, '').trim()
+            return body
+          })
+          const joined = summaries.join('\n---\n')
+          sessionSummaryContext = `## 最近会话摘要\n${joined}`.slice(0, 1000)
+        }
+      }
+    } catch {}
+
+    // B11: Apply token budget to dynamic context fields
+    const budgetableContents: Record<string, string> = {}
+    if (sessionSummaryContext) budgetableContents.sessionSummary = sessionSummaryContext
+    if (workingMemoryContext) budgetableContents.workingMemory = workingMemoryContext
+    if (morningBriefContext) budgetableContents.morningBrief = morningBriefContext
+
+    const budgeted = Object.keys(budgetableContents).length > 0
+      ? allocateBudget(budgetableContents)
+      : budgetableContents
+
     logForDiagnosticsNoPII('info', 'system_context_completed', {
       duration_ms: Date.now() - startTime,
       has_git_status: gitStatus !== null,
@@ -314,6 +387,10 @@ export const getSystemContext = memoize(
             cacheBreaker: `[CACHE_BREAKER: ${injection}]`,
           }
         : {}),
+      ...(personaContext && { personaContext }),
+      ...(budgeted.workingMemory && { workingMemoryContext: budgeted.workingMemory }),
+      ...(budgeted.morningBrief && { morningBriefContext: budgeted.morningBrief }),
+      ...(budgeted.sessionSummary && { sessionSummaryContext: budgeted.sessionSummary }),
     }
   },
 )
@@ -351,87 +428,17 @@ export const getUserContext = memoize(
     })
 
     const timeAwareness = getTimeAwareness()
-    const personaContext = getPersonaContext()
     const thirdPartyGuidance = getThirdPartyModelGuidance()
 
-    // Panda: inject working memory into system context
-    let workingMemoryContext: string | null = null
-    try {
-      const { getAllWorkingMemory } = require('./assistant/workingMemory.js')
-      const wm = getAllWorkingMemory()
-      if (wm && wm.length > 0) {
-        const wmSummary = wm.slice(0, 10).map((e: { key: string; value: string }) => `- ${e.key}: ${e.value}`).join('\n')
-        workingMemoryContext = `[Working Memory]\n${wmSummary}`
-      }
-    } catch {}
-
-    // Panda: inject morning brief for first conversation of the day (07:00-10:00)
-    let morningBriefContext: string | null = null
-    try {
-      const hour = new Date().getHours()
-      if (hour >= 7 && hour < 10) {
-        const { join } = require('path')
-        const { readFileSync, existsSync } = require('fs')
-        const { getAutoMemPath } = require('./memdir/paths.js')
-        const memDir = getAutoMemPath()
-        if (memDir) {
-          const today = getLocalISODate()
-          const briefPath = join(memDir, 'working', `morning_brief_${today}.md`)
-          if (existsSync(briefPath)) {
-            const brief = readFileSync(briefPath, 'utf-8').slice(0, 1000)
-            morningBriefContext = `[今日晨报]\n${brief}`
-          }
-        }
-      }
-    } catch {}
-
-    // B7: inject recent session summaries (up to 3, ≤1000 chars total)
-    let sessionSummaryContext: string | null = null
-    try {
-      const { join } = require('path')
-      const { readdirSync, readFileSync } = require('fs')
-      const { getAutoMemPath } = require('./memdir/paths.js')
-      const memDir = getAutoMemPath()
-      if (memDir) {
-        const workingDir = join(memDir, 'working')
-        const files = readdirSync(workingDir)
-          .filter((f: string) => f.startsWith('session-summary-') && f.endsWith('.md'))
-          .sort()
-          .reverse()
-          .slice(0, 3)
-        if (files.length > 0) {
-          const summaries = files.map((f: string) => {
-            const content = readFileSync(join(workingDir, f), 'utf-8')
-            // Strip frontmatter
-            const body = content.replace(/^---[\s\S]*?---\n*/, '').trim()
-            return body
-          })
-          const joined = summaries.join('\n---\n')
-          // Budget: ≤1000 chars
-          sessionSummaryContext = `## 最近会话摘要\n${joined}`.slice(0, 1000)
-        }
-      }
-    } catch {}
-
-    // B11: Apply token budget to context injection fields.
-    // claudeMd, currentDate, personaContext, thirdPartyGuidance are kept as-is
-    // (critical for correctness). Budget applied to memory/summary fields.
-    const budgetableContents: Record<string, string> = {}
-    if (sessionSummaryContext) budgetableContents.sessionSummary = sessionSummaryContext
-    if (workingMemoryContext) budgetableContents.workingMemory = workingMemoryContext
-    if (morningBriefContext) budgetableContents.morningBrief = morningBriefContext
-
-    const budgeted = Object.keys(budgetableContents).length > 0
-      ? allocateBudget(budgetableContents)
-      : budgetableContents
+    // NOTE: Dynamic fields (personaContext, workingMemoryContext,
+    // sessionSummaryContext, morningBriefContext) have been moved to
+    // getSystemContext() so they land in the system prompt's dynamic
+    // segment (after BOUNDARY). This keeps messages[0] quasi-static,
+    // preserving the messages-layer cache prefix across compactions.
 
     return {
       ...(claudeMd && { claudeMd }),
       currentDate: `Today's date is ${getLocalISODate()}. ${timeAwareness}`,
-      ...(personaContext && { personaContext }),
-      ...(budgeted.workingMemory && { workingMemoryContext: budgeted.workingMemory }),
-      ...(budgeted.morningBrief && { morningBriefContext: budgeted.morningBrief }),
-      ...(budgeted.sessionSummary && { sessionSummaryContext: budgeted.sessionSummary }),
       ...(thirdPartyGuidance && { thirdPartyGuidance }),
     }
   },

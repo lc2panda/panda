@@ -421,6 +421,7 @@ export function initExtractMemories(): void {
         // The extractMemories subagent does not need to record to transcript.
         // Doing so can create race conditions with the main thread.
         skipTranscript: true,
+        skipCacheWrite: true, // fire-and-forget extraction — unique context per run
         // Well-behaved extractions complete in 2-4 turns (read → write).
         // A hard cap prevents verification rabbit-holes from burning turns.
         maxTurns: 5,
