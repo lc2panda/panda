@@ -114,6 +114,7 @@ export function startAgentSummarization(
         canUseTool,
         querySource: 'agent_summary',
         forkLabel: 'agent_summary',
+        maxTurns: 3, // Summary should complete in 1-2 turns
         overrides: { abortController: summaryAbortController },
         skipTranscript: true,
         skipCacheWrite: true, // fire-and-forget summary — no future reads from this prefix

@@ -322,6 +322,7 @@ export async function generateSuggestion(
     canUseTool,
     querySource: 'prompt_suggestion',
     forkLabel: 'prompt_suggestion',
+    maxTurns: 3, // Suggestion should complete in 1-2 turns
     overrides: {
       abortController,
     },

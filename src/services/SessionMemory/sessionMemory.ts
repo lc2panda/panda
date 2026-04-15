@@ -332,6 +332,7 @@ const extractSessionMemory = sequential(async function (
     querySource: 'session_memory',
     forkLabel: 'session_memory',
     skipCacheWrite: true, // fire-and-forget memory update — unique context per run
+    maxTurns: 10, // Hard cap — prevents runaway loop (observed 231 iterations in 1fbecad7)
     overrides: { readFileState: setupContext.readFileState },
   })
 
@@ -440,6 +441,7 @@ export async function manuallyExtractSessionMemory(
       canUseTool: createMemoryFileCanUseTool(memoryPath),
       querySource: 'session_memory',
       forkLabel: 'session_memory_manual',
+      maxTurns: 10, // Hard cap — prevents runaway loop
       overrides: { readFileState: setupContext.readFileState },
     })
 
