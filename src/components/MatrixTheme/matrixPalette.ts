@@ -16,8 +16,9 @@ export interface RGB {
 
 // H≈120° S≈75% 磷光绿色系（调制自原版 Matrix 电影 phosphor CRT 绿，
 // 比 Rezmason H=108° S=90% 更柔和，长时间阅读不刺眼）
+// v2.19 暗色微调：BASE 提至 AA normal (≥4.5:1)，SHADOW 提至 ~3.5:1
 const HEAD: RGB = { r: 112, g: 221, b: 112 } // G8 flash — 雨头极亮（柔化）
-const MID: RGB = { r: 32, g: 160, b: 32 }    // G5 neon — 主要绿（降饱和降亮）
+const MID: RGB = { r: 34, g: 168, b: 34 }    // G5 neon — 主要绿（微提亮至 ~5.4:1）
 const TAIL: RGB = { r: 10, g: 74, b: 10 }    // G2 deep — 暗绿
 const FADE: RGB = { r: 2, g: 18, b: 2 }      // G0 ghost — 消散
 
@@ -29,7 +30,7 @@ const FADE: RGB = { r: 2, g: 18, b: 2 }      // G0 ghost — 消散
  * 0.35-0.60: MID_DIM → TAIL (暗化 → 暗绿)
  * 0.60-1.0: TAIL → FADE  (暗绿 → 消散，缓慢衰减)
  */
-const MID_DIM: RGB = { r: 16, g: 112, b: 16 } // G3 shadow — 中间过渡色（磷光衰减）
+const MID_DIM: RGB = { r: 24, g: 128, b: 24 } // G3 shadow — 中间过渡色（磷光衰减，微提亮）
 
 export function getColorByAge(age: number): RGB {
   const a = Math.max(0, Math.min(1, age))
@@ -91,11 +92,11 @@ export const MATRIX_SCALE = {
   // ── High brightness ──
   GLOW:    '#40CC40',  // G7  —  ~9:1 — rain head glow area
   BRIGHT:  '#33BB33',  // G6  —  ~7:1 — highlights, tool names, selection
-  // ── Core readable range ──
-  NEON:    '#20A020',  // G5  —  ~5:1 — prompt, emphasis (AA normal ✅)
-  BASE:    '#1A8A1A',  // G4  — ~4.2:1 — body text base (AA large ✅)
-  // ── Dim / secondary ──
-  SHADOW:  '#107010',  // G3  — ~2.8:1 — secondary text, gutter (decorative)
+  // ── Core readable range (v2.19 tuned for WCAG AA normal) ──
+  NEON:    '#22A822',  // G5  — ~5.4:1 — prompt, emphasis (AA normal ✅)
+  BASE:    '#22A022',  // G4  — ~5.2:1 — body text base (AA normal ✅, was 4.2:1)
+  // ── Dim / secondary (v2.19 improved visibility) ──
+  SHADOW:  '#188018',  // G3  — ~3.5:1 — secondary text, gutter (was 2.8:1)
   DEEP:    '#0A4A0A',  // G2  — ~1.6:1 — rain tail, background layer
   // ── Near-invisible ──
   ABYSS:   '#052505',  // G1  — ~1.2:1 — extreme fade
@@ -190,3 +191,130 @@ export const MATRIX_UI = {
   // ── Pane divider character ──────────────────────────────────────
   paneChar:         '━',                    // Matrix-style heavy divider
 } as const
+
+// ─── Light-mode Matrix scale (H≈130° — cool mint-green on pale paper) ───
+// Designed for bright terminals: deep greens on light background.
+// Contrast ratios against #E8F5E8 noted for WCAG compliance.
+
+export const MATRIX_SCALE_LIGHT = {
+  // ── Darkest (text / emphasis) ──
+  BLOOM:   '#0A2A0A',  // L11 — deepest — reserved
+  CURSOR:  '#0E350E',  // L10 — cursor accent
+  WHITE:   '#124012',  // L9  — extreme emphasis
+  FLASH:   '#165016',  // L8  — ~12:1 — strong accent
+  // ── High contrast text ──
+  GLOW:    '#1A5A1A',  // L7  — ~9:1 — headings, tool names
+  BRIGHT:  '#1E6A1E',  // L6  — ~7:1 — highlights, selection
+  // ── Core readable range ──
+  NEON:    '#1A6A1A',  // L5  — ~7:1 — prompt, emphasis (AA normal ✅)
+  BASE:    '#1A5A1A',  // L4  — ~8:1 — body text base (AA normal ✅)
+  // ── Dim / decorative ──
+  SHADOW:  '#6BA86B',  // L3  — ~3.2:1 — borders, hints (decorative)
+  DEEP:    '#A0CCA0',  // L2  — ~1.8:1 — background layer
+  // ── Near-background ──
+  ABYSS:   '#C5E0C5',  // L1  — ~1.3:1 — extreme fade
+  GHOST:   '#D8ECD8',  // L0  — ~1.1:1 — vanished
+} as const
+
+// Light-mode status colors — adjusted for light backgrounds
+export const MATRIX_STATUS_LIGHT = {
+  ERROR:   '#CC2020',  // Dark red — 5.5:1 on #E8F5E8
+  WARNING: '#8A7010',  // Dark amber — 4.5:1 on #E8F5E8
+  SUCCESS: '#1E6A1E',  // L6 — positive
+  INFO:    '#1A5A1A',  // L4 — standard info
+} as const
+
+// ─── Light-mode semantic UI mapping ─────────────────────────────────
+export const MATRIX_UI_LIGHT = {
+  // Prompt & input
+  prompt:         MATRIX_SCALE_LIGHT.NEON,
+  promptDim:      MATRIX_SCALE_LIGHT.SHADOW,
+
+  // Message gutter
+  gutter:         MATRIX_SCALE_LIGHT.DEEP,
+  gutterDot:      MATRIX_SCALE_LIGHT.BRIGHT,
+
+  // Borders & dialogs
+  border:         MATRIX_SCALE_LIGHT.SHADOW,
+  borderDim:      MATRIX_SCALE_LIGHT.DEEP,
+
+  // Tool names & loader
+  toolName:       MATRIX_SCALE_LIGHT.GLOW,
+  toolLoader:     MATRIX_SCALE_LIGHT.NEON,
+
+  // Thinking
+  thinking:       MATRIX_SCALE_LIGHT.NEON,
+  thinkingBody:   MATRIX_SCALE_LIGHT.BASE,
+
+  // Spinner
+  spinner:        MATRIX_SCALE_LIGHT.NEON,
+  spinnerMsg:     MATRIX_SCALE_LIGHT.BASE,
+
+  // Footer & hints
+  hint:           MATRIX_SCALE_LIGHT.SHADOW,
+  statusLine:     MATRIX_SCALE_LIGHT.BASE,
+  footerInfo:     MATRIX_SCALE_LIGHT.BASE,
+
+  // System messages
+  systemMsg:      MATRIX_SCALE_LIGHT.BASE,
+  divider:        MATRIX_SCALE_LIGHT.SHADOW,
+
+  // Chat chrome
+  userMark:       MATRIX_SCALE_LIGHT.BRIGHT,
+  assistantMark:  MATRIX_SCALE_LIGHT.BASE,
+
+  // Status
+  error:          MATRIX_STATUS_LIGHT.ERROR,
+  warning:        MATRIX_STATUS_LIGHT.WARNING,
+  success:        MATRIX_STATUS_LIGHT.SUCCESS,
+  info:           MATRIX_STATUS_LIGHT.INFO,
+
+  // Diff view
+  diffAdded:        MATRIX_SCALE_LIGHT.BRIGHT,
+  diffRemoved:      '#CC2020',
+  diffChanged:      '#8A7010',
+  diffContext:       MATRIX_SCALE_LIGHT.SHADOW,
+  diffHunkHeader:   MATRIX_SCALE_LIGHT.NEON,
+  diffAddedBg:      '#D5F0D5',
+  diffRemovedBg:    '#F5D5D5',
+  diffChangedBg:    '#F0F0D5',
+  diffAddedEmph:    MATRIX_SCALE_LIGHT.GLOW,
+  diffRemovedEmph:  '#FF5050',
+  diffChangedEmph:  '#B0A020',
+  diffAddedEmphBg:  '#B0E0B0',
+  diffRemovedEmphBg:'#E0B0B0',
+
+  // Progress bar
+  progressFill:     MATRIX_SCALE_LIGHT.NEON,
+  progressEmpty:    MATRIX_SCALE_LIGHT.DEEP,
+
+  // Dialog / Pane
+  dialogTitle:      MATRIX_SCALE_LIGHT.NEON,
+  dialogBorder:     MATRIX_SCALE_LIGHT.SHADOW,
+
+  // Selection highlight
+  selectHighlight:  MATRIX_SCALE_LIGHT.FLASH,
+
+  // Pane divider character
+  paneChar:         '━',
+} as const
+
+// ─── Light-mode color interpolation ─────────────────────────────────
+// For MatrixCharRain on light backgrounds: dark-to-pale gradient
+const HEAD_LIGHT: RGB = { r: 22, g: 80, b: 22 }     // L8 deep green — rain head
+const MID_LIGHT: RGB = { r: 26, g: 106, b: 26 }     // L5 mid green
+const MID_DIM_LIGHT: RGB = { r: 107, g: 168, b: 107 } // L3 muted green
+const TAIL_LIGHT: RGB = { r: 192, g: 224, b: 192 }   // L1 pale green (near bg)
+const FADE_LIGHT: RGB = { r: 216, g: 236, b: 216 }   // L0 almost invisible
+
+export function getColorByAgeLight(age: number): RGB {
+  const a = Math.max(0, Math.min(1, age))
+  if (a < 0.10) return lerp(HEAD_LIGHT, MID_LIGHT, a / 0.10)
+  if (a < 0.35) return lerp(MID_LIGHT, MID_DIM_LIGHT, (a - 0.10) / 0.25)
+  if (a < 0.60) return lerp(MID_DIM_LIGHT, TAIL_LIGHT, (a - 0.35) / 0.25)
+  return lerp(TAIL_LIGHT, FADE_LIGHT, (a - 0.60) / 0.40)
+}
+
+export function ageToHexLight(age: number): string {
+  return toHex(getColorByAgeLight(age))
+}

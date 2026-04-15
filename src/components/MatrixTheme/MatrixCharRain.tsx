@@ -8,8 +8,9 @@ import { useRef } from 'react'
 import { Box, Text } from '../../ink.js'
 import { useAnimationFrame } from '../../ink/hooks/use-animation-frame.js'
 import { type CharSet, pickChar } from './matrixCharSets.js'
-import { ageToHex } from './matrixPalette.js'
+import { ageToHex, ageToHexLight } from './matrixPalette.js'
 import { getMatrixWindowsDefaults } from '../../utils/terminalCapability.js'
+import { isMatrixLight } from './isMatrixTheme.js'
 
 // Windows 低能力终端降级参数（模块级缓存，只检测一次）
 const _winDefaults = getMatrixWindowsDefaults()
@@ -35,12 +36,12 @@ interface DepthLayer {
 }
 
 const DEPTH_LAYERS: DepthLayer[] = [
-  // 前景 — 10% 列，快 5-8 行/s，100% 亮度，低闪烁
-  { activationChance: 0.10, speedMin: 5, speedMax: 8, brightnessOffset: 0, flickerRate: 0.03, sparkleRate: 0.01 },
-  // 中景 — 60% 列，中速 8-15 行/s，70% 有效亮度（+0.15 age offset），低闪烁
-  { activationChance: 0.60, speedMin: 8, speedMax: 15, brightnessOffset: 0.15, flickerRate: 0.04, sparkleRate: 0.015 },
-  // 背景 — 30% 列，慢 15-20 行/s，40% 有效亮度（+0.35 offset），几乎不闪烁
-  { activationChance: 0.30, speedMin: 15, speedMax: 20, brightnessOffset: 0.35, flickerRate: 0.02, sparkleRate: 0.005 },
+  // 前景 — 10% 列，快 5-8 行/s，100% 亮度，低闪烁（v2.19 降低闪烁减轻视觉负担）
+  { activationChance: 0.10, speedMin: 5, speedMax: 8, brightnessOffset: 0, flickerRate: 0.02, sparkleRate: 0.005 },
+  // 中景 — 60% 列，中速 8-15 行/s，70% 有效亮度，极低闪烁
+  { activationChance: 0.60, speedMin: 8, speedMax: 15, brightnessOffset: 0.15, flickerRate: 0.025, sparkleRate: 0.008 },
+  // 背景 — 30% 列，慢 15-20 行/s，40% 有效亮度，几乎不闪烁
+  { activationChance: 0.30, speedMin: 15, speedMax: 20, brightnessOffset: 0.35, flickerRate: 0.015, sparkleRate: 0.003 },
 ]
 
 interface MatrixCharRainProps {
@@ -166,12 +167,14 @@ export function MatrixCharRain(props: MatrixCharRainProps): React.ReactNode {
 
       const layer = DEPTH_LAYERS[col.depth]
       const rawAge = distance / tailLength
-      // 深度亮度偏移 + 微闪光（1% 可见字符瞬时提亮）
+      // 深度亮度偏移 + 微闪光（降低概率减轻视觉负担）
       let age = rawAge + layer.brightnessOffset
       if (Math.random() < layer.sparkleRate) {
         age = Math.max(0, age - 0.3) // 临时提亮，更亮
       }
-      const color = ageToHex(age)
+      // 明暗模式使用不同色彩插值
+      const colorFn = isMatrixLight() ? ageToHexLight : ageToHex
+      const color = colorFn(age)
       const char = col.chars[y] || pickChar(charSet)
 
       segments.push(

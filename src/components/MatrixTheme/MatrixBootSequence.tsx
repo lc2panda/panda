@@ -7,8 +7,9 @@ import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { Box, Text, useInput } from '../../ink.js'
 import { MatrixCharRain } from './MatrixCharRain.js'
-import { MATRIX_SCALE } from './matrixPalette.js'
+import { MATRIX_SCALE, MATRIX_SCALE_LIGHT } from './matrixPalette.js'
 import { getMatrixWindowsDefaults } from '../../utils/terminalCapability.js'
+import { isMatrixLight } from './isMatrixTheme.js'
 
 // Windows 低能力终端降级参数
 const _winDefaults = getMatrixWindowsDefaults()
@@ -33,13 +34,23 @@ const PANDA_LOGO = [
 ]
 
 // CRT scanline: alternate rows use slightly dimmer color
-const LOGO_COLORS = [
+// Light mode uses dark-on-light variant
+const LOGO_COLORS_DARK = [
   MATRIX_SCALE.FLASH,  // row 0 — bright
   MATRIX_SCALE.GLOW,   // row 1 — slightly dimmer (scanline)
   MATRIX_SCALE.FLASH,  // row 2 — bright
   MATRIX_SCALE.GLOW,   // row 3 — scanline
   MATRIX_SCALE.FLASH,  // row 4 — bright
   MATRIX_SCALE.GLOW,   // row 5 — scanline
+]
+
+const LOGO_COLORS_LIGHT = [
+  MATRIX_SCALE_LIGHT.FLASH,  // row 0 — dark accent
+  MATRIX_SCALE_LIGHT.GLOW,   // row 1 — slightly lighter (scanline)
+  MATRIX_SCALE_LIGHT.FLASH,  // row 2
+  MATRIX_SCALE_LIGHT.GLOW,   // row 3
+  MATRIX_SCALE_LIGHT.FLASH,  // row 4
+  MATRIX_SCALE_LIGHT.GLOW,   // row 5
 ]
 
 const WAKE_UP_TEXT = '〔 W A K E   U P,   N E O … 〕'
@@ -130,6 +141,11 @@ export function MatrixBootSequence({
   // Cursor: visible during typing, hidden once complete (hold phase)
   const cursor = phase === 'wakeup' && cursorVisible ? '▌' : phase === 'wakeup' ? ' ' : ''
 
+  // Select colors based on light/dark mode
+  const lightMode = isMatrixLight()
+  const LOGO_COLORS = lightMode ? LOGO_COLORS_LIGHT : LOGO_COLORS_DARK
+  const S = lightMode ? MATRIX_SCALE_LIGHT : MATRIX_SCALE
+
   return (
     <Box flexDirection="column">
       <MatrixCharRain
@@ -146,18 +162,18 @@ export function MatrixBootSequence({
           <Box
             flexDirection="column"
             borderStyle="round"
-            borderColor={MATRIX_SCALE.NEON}
+            borderColor={S.NEON}
             paddingX={2}
             paddingY={1}
           >
             {PANDA_LOGO.map((line, i) => (
-              <Text key={i} color={LOGO_COLORS[i] || MATRIX_SCALE.FLASH}>
+              <Text key={i} color={LOGO_COLORS[i] || S.FLASH}>
                 {line}
               </Text>
             ))}
             <Box height={1} />
             {/* 打字机阶段永远 reserve 一行高度，避免 wakeupDisplay 从空到有时 logo 框跳动 */}
-            <Text color={MATRIX_SCALE.NEON}>
+            <Text color={S.NEON}>
               {showWakeup ? `${wakeupDisplay}${cursor}` : ' '}
             </Text>
           </Box>
@@ -173,7 +189,7 @@ export function MatrixBootSequence({
         tailLength={_winDefaults?.tailLength ?? 5}
       />
       <Box>
-        <Text color={MATRIX_SCALE.SHADOW}>
+        <Text color={S.SHADOW}>
           {`   ▶ PANDA CODE  ·  v${MACRO.VERSION}  ·  SYSTEM INITIALIZED  ·  ⏎ skip`}
         </Text>
       </Box>

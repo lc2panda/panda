@@ -1,7 +1,9 @@
 // Input: 当前 theme name（当前通过 env 读取）
-// Output: bool — 是否是 Matrix 主题
+// Output: bool — 是否是 Matrix 主题 / 明暗变体
 // Pos: MatrixTheme 主题检测 helper — Phase C / Phase D 共用接入点
 // 一旦我被修改，请更新 MatrixTheme/README.md
+
+import { getSystemThemeName } from '../../utils/systemTheme.js'
 
 /**
  * 检测当前是否是 Matrix 主题。
@@ -18,4 +20,19 @@ export function isMatrixTheme(): boolean {
   } catch {
     return false
   }
+}
+
+/**
+ * Matrix 主题 + 系统暗色模式。
+ * 用于 MatrixCharRain、MatrixBootSequence 选择深色/浅色渲染路径。
+ */
+export function isMatrixDark(): boolean {
+  return isMatrixTheme() && getSystemThemeName() === 'dark'
+}
+
+/**
+ * Matrix 主题 + 系统亮色模式。
+ */
+export function isMatrixLight(): boolean {
+  return isMatrixTheme() && getSystemThemeName() === 'light'
 }
