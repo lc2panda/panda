@@ -232,7 +232,11 @@ async function getCommandPrefixImpl(
         : `${policySpec}\n\nCommand: ${command}`,
       signal: abortSignal,
       options: {
-        enablePromptCaching: useSystemPromptPolicySpec,
+        // Always enable caching — whether policySpec is in the system prompt
+        // (useSystemPromptPolicySpec=true) or embedded in the user prompt
+        // (false path), the policy spec itself is large (>1024 tokens) and
+        // benefits from prompt caching across repeated preflight checks.
+        enablePromptCaching: true,
         querySource,
         agents: [],
         isNonInteractiveSession,

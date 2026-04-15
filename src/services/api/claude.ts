@@ -367,18 +367,29 @@ export function getCacheControl({
   scope,
   querySource,
   isSystemLevel,
+  longTTL,
 }: {
   scope?: CacheScope
   querySource?: QuerySource
   isSystemLevel?: boolean
+  /**
+   * Force 1h TTL regardless of allowlist. Intended for background forks whose
+   * cadence can exceed the default 5-minute ephemeral window (autoDream,
+   * extractMemories, agentSummary, session memory consolidation, etc.) —
+   * a 5m TTL would expire between runs and force full cache_creation writes
+   * every single time.
+   */
+  longTTL?: boolean
 } = {}): {
   type: 'ephemeral'
   ttl?: '1h'
   scope?: CacheScope
 } {
+  const use1h =
+    longTTL === true || should1hCacheTTL(querySource, isSystemLevel)
   return {
     type: 'ephemeral',
-    ...(should1hCacheTTL(querySource, isSystemLevel) && { ttl: '1h' }),
+    ...(use1h && { ttl: '1h' }),
     ...(scope === 'global' && { scope }),
   }
 }
@@ -398,7 +409,24 @@ export function getCacheControl({
  * Patterns support trailing '*' for prefix matching.
  * The allowlist is cached in STATE for session stability.
  */
+// QuerySources for background / proactive forks whose cadence can exceed the
+// default 5-minute ephemeral window (memory consolidation, morning briefs,
+// agent summaries, etc.). These always get 1h TTL so the per-run fork can hit
+// the previous run's cache instead of paying full cache_creation every time.
+const BACKGROUND_LONG_TTL_QUERY_SOURCES: ReadonlySet<string> = new Set([
+  'session_memory',
+  'auto_dream',
+  'extract_memories',
+  'agent_summary',
+])
+
 function should1hCacheTTL(querySource?: QuerySource, isSystemLevel?: boolean): boolean {
+  // Background forks: always 1h TTL regardless of allowlist / user eligibility,
+  // since their invocation interval often exceeds the 5m ephemeral window.
+  if (querySource && BACKGROUND_LONG_TTL_QUERY_SOURCES.has(querySource)) {
+    return true
+  }
+
   // 3P Bedrock users get 1h TTL when opted in via env var
   if (
     getAPIProvider() === 'bedrock' &&
@@ -1444,6 +1472,33 @@ async function* queryModel(
   }
   // ── Cache stabilization: deterministic tool ordering (Bug 5) ──────
   const allTools = stabilizeToolOrder([...toolSchemas, ...extraToolSchemas])
+
+  // ── BP1: tools-array cache_control marker ─────────────────────────
+  // Official prompt-caching guide recommends marking the last tool to
+  // cache the entire tools prefix as its own segment (independent of the
+  // system and messages prefixes on the server side). This is a separate
+  // cache section from the single message-level marker Mycro constrains
+  // (see addCacheBreakpoints below), so it does not interact with KV
+  // page eviction. The marker is placed on the last tool after
+  // stabilizeToolOrder's alphabetical sort, so its identity is
+  // deterministic across turns → stable cache key.
+  //
+  // When needsToolBasedCacheMarker is true (MCP tools present, static
+  // system prompt can't be globally cached), this tool-level marker is
+  // the primary cache anchor for the tools+system prefix. Otherwise it
+  // still pins the tools segment independently.
+  if (enablePromptCaching && allTools.length > 0) {
+    const lastTool = allTools[allTools.length - 1]! as BetaToolUnion & {
+      cache_control?: { type: 'ephemeral'; ttl?: '1h'; scope?: CacheScope }
+    }
+    // isSystemLevel=true → 1h TTL eligible for firstParty (same as system
+    // prompt blocks). Tools change at the same cadence as the system
+    // prompt prefix, so the long TTL is the right tier.
+    lastTool.cache_control = getCacheControl({
+      querySource: options.querySource,
+      isSystemLevel: true,
+    })
+  }
 
   const isFastMode =
     isFastModeEnabled() &&

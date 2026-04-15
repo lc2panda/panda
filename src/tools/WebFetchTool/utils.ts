@@ -517,6 +517,10 @@ export async function applyPromptToMarkdown(
       isNonInteractiveSession,
       hasAppendSystemPrompt: false,
       mcpTools: [],
+      // Markdown content can be up to MAX_MARKDOWN_LENGTH (100k chars) and
+      // the same page is frequently re-queried with different prompts —
+      // enable caching so the large content prefix is reused.
+      enablePromptCaching: true,
     },
   })
 

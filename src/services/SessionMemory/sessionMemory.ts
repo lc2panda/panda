@@ -22,6 +22,7 @@ import {
   createCacheSafeParams,
   createSubagentContext,
   runForkedAgent,
+  shouldStartFork,
 } from '../../utils/forkedAgent.js'
 import { getFsImplementation } from '../../utils/fsOperations.js'
 import {
@@ -294,6 +295,15 @@ const extractSessionMemory = sequential(async function (
   initSessionMemoryConfigIfNeeded()
 
   if (!shouldExtractMemory(messages)) {
+    return
+  }
+
+  // Dedup: reject a second session_memory fork if one was dispatched in the
+  // last 5s. The sequential() wrapper serializes calls of THIS function, but
+  // two post-sampling events arriving back-to-back can both pass the
+  // shouldExtractMemory gate before the first fork's markExtractionStarted
+  // takes effect (fork runs asynchronously in the background).
+  if (!shouldStartFork('session_memory')) {
     return
   }
 

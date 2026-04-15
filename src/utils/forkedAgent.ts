@@ -80,6 +80,29 @@ export function getLastCacheSafeParams(): CacheSafeParams | null {
   return lastCacheSafeParams
 }
 
+// Lightweight dedup lock for background forks: prevents the same fork type
+// from being dispatched twice within a short window. Fixes a race where a
+// post-sampling hook can fire twice in quick succession (e.g. session_memory
+// observed forking concurrently 2c10ca+7a0c16 in session 7b98a98d).
+const _recentForks = new Map<string, number>()
+const DEFAULT_FORK_DEDUP_WINDOW_MS = 5000
+
+/**
+ * Returns true if a fork of this type may start now, false if another fork of
+ * the same type started within `windowMs` (default 5s). On success the start
+ * timestamp is recorded so the next concurrent caller is rejected.
+ */
+export function shouldStartFork(
+  forkType: string,
+  windowMs: number = DEFAULT_FORK_DEDUP_WINDOW_MS,
+): boolean {
+  const now = Date.now()
+  const last = _recentForks.get(forkType)
+  if (last !== undefined && now - last < windowMs) return false
+  _recentForks.set(forkType, now)
+  return true
+}
+
 export type ForkedAgentParams = {
   /** Messages to start the forked query loop with */
   promptMessages: Message[]
@@ -126,13 +149,22 @@ export type ForkedAgentResult = {
  * To override specific fields (e.g., toolUseContext with cloned file state),
  * spread the result and override: `{ ...createCacheSafeParams(context), toolUseContext: clonedContext }`
  *
+ * Chi P0-1 (Wave 3 cache prefix reuse):
+ * Prefer toolUseContext.renderedSystemPrompt when available — that's the exact
+ * byte sequence the parent turn used at query() time (set by REPL right before
+ * the parent call). context.systemPrompt is the same value in normal operation,
+ * but pinning to renderedSystemPrompt guarantees verbatim reuse and eliminates
+ * drift from any intermediate rebuild (e.g., GrowthBook flag flips between hook
+ * registration and fork spawn).
+ *
  * @param context - The REPLHookContext from the post-sampling hook
  */
 export function createCacheSafeParams(
   context: REPLHookContext,
 ): CacheSafeParams {
+  const parentRendered = context.toolUseContext.renderedSystemPrompt
   return {
-    systemPrompt: context.systemPrompt,
+    systemPrompt: parentRendered ?? context.systemPrompt,
     userContext: context.userContext,
     systemContext: context.systemContext,
     toolUseContext: context.toolUseContext,
@@ -504,12 +536,21 @@ export async function runForkedAgent({
   let totalUsage: NonNullableUsage = { ...EMPTY_USAGE }
 
   const {
-    systemPrompt,
+    systemPrompt: providedSystemPrompt,
     userContext,
     systemContext,
     toolUseContext,
     forkContextMessages,
   } = cacheSafeParams
+
+  // Chi P0-1 (Wave 3 cache prefix reuse):
+  // Always prefer parent's renderedSystemPrompt (the exact bytes parent used
+  // at query() time). Callers that build cacheSafeParams manually may not
+  // thread it through — pin here so every fork path gets verbatim parent
+  // system[0]. Anthropic guide: "Copy the parent's system, tools, and model
+  // verbatim, then append fork-specific content at the end."
+  const systemPrompt =
+    toolUseContext.renderedSystemPrompt ?? providedSystemPrompt
 
   // Create isolated context to prevent mutation of parent state
   const isolatedToolUseContext = createSubagentContext(

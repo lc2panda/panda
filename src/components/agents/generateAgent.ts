@@ -3,7 +3,11 @@ import { getUserContext } from 'src/context.js'
 import { queryModelWithoutStreaming } from 'src/services/api/claude.js'
 import { getEmptyToolPermissionContext } from 'src/Tool.js'
 import { AGENT_TOOL_NAME } from 'src/tools/AgentTool/constants.js'
-import { prependUserContext } from 'src/utils/api.js'
+import {
+  prependUserContext,
+  prependStaticContextToSystem,
+} from 'src/utils/api.js'
+import { STATIC_USER_CONTEXT_KEYS } from 'src/context.js'
 import {
   createUserMessage,
   normalizeMessagesForAPI,
@@ -138,17 +142,30 @@ export async function generateAgent(
   // Fetch user and system contexts
   const userContext = await getUserContext()
 
-  // Prepend user context to messages and append system context to system prompt
+  // Prepend user context to messages and append system context to system prompt.
+  // Note: prependUserContext() strips STATIC_USER_CONTEXT_KEYS; those are
+  // injected into the system prompt below so CLAUDE.md guidance still reaches
+  // the agent-generation model.
   const messagesWithContext = prependUserContext([userMessage], userContext)
 
   // Include memory instructions when the feature is enabled
-  const systemPrompt = isAutoMemoryEnabled()
+  const baseSystemPrompt = isAutoMemoryEnabled()
     ? AGENT_CREATION_SYSTEM_PROMPT + AGENT_MEMORY_INSTRUCTIONS
     : AGENT_CREATION_SYSTEM_PROMPT
 
+  const staticUserContext: { [k: string]: string } = {}
+  for (const k of STATIC_USER_CONTEXT_KEYS) {
+    const v = userContext[k]
+    if (v) staticUserContext[k] = v
+  }
+  const systemPromptBlocks = prependStaticContextToSystem(
+    asSystemPrompt([baseSystemPrompt]),
+    staticUserContext,
+  )
+
   const response = await queryModelWithoutStreaming({
     messages: normalizeMessagesForAPI(messagesWithContext),
-    systemPrompt: asSystemPrompt([systemPrompt]),
+    systemPrompt: asSystemPrompt(systemPromptBlocks),
     thinkingConfig: { type: 'disabled' as const },
     tools: [],
     signal: abortSignal,

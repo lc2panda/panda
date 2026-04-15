@@ -40,6 +40,10 @@ export async function generateSessionName(
         isNonInteractiveSession: false,
         hasAppendSystemPrompt: false,
         mcpTools: [],
+        // Called automatically on every 3rd bridge message; conversationText
+        // grows with the session and typically exceeds the 1024 cache
+        // threshold quickly. Cache hits avoid re-sending the full transcript.
+        enablePromptCaching: true,
       },
     })
 

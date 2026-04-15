@@ -747,6 +747,17 @@ export async function* runAgent({
     agentToolUseContext.preserveToolUseResults = true
   }
 
+  // Chi P0-1 (Wave 3 cache prefix reuse):
+  // Stamp the agent's exact rendered system prompt onto its own
+  // toolUseContext so any downstream fork/side-task (e.g. session_memory,
+  // summarization, btw, /compact) initiated from within this subagent can
+  // reuse the verbatim prefix. Without this, a sub-subagent fork would fall
+  // back to rebuilding the system string and miss the parent's prompt cache.
+  // useExactTools path already inherits via override.systemPrompt ===
+  // toolUseContext.renderedSystemPrompt — normal path (general-purpose,
+  // persona agents) was missing this.
+  agentToolUseContext.renderedSystemPrompt = agentSystemPrompt
+
   // Expose cache-safe params for background summarization (prompt cache sharing)
   if (onCacheSafeParams) {
     onCacheSafeParams({

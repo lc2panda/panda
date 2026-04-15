@@ -55,7 +55,12 @@ import {
   stripSignatureBlocks,
 } from './utils/messages.js'
 import { generateToolUseSummary } from './services/toolUseSummary/toolUseSummaryGenerator.js'
-import { prependUserContext, appendSystemContext } from './utils/api.js'
+import {
+  prependUserContext,
+  appendSystemContext,
+  prependStaticContextToSystem,
+} from './utils/api.js'
+import { STATIC_USER_CONTEXT_KEYS } from './context.js'
 import {
   createAttachmentMessage,
   filterDuplicateMemoryAttachments,
@@ -481,8 +486,25 @@ async function* queryLoop(
       messagesForQuery = collapseResult.messages
     }
 
+    // Split userContext into static (claudeMd, thirdPartyGuidance) and
+    // dynamic (currentDate). Static fields are injected into the system
+    // prompt's static segment (before SYSTEM_PROMPT_DYNAMIC_BOUNDARY) so
+    // they live under cacheScope='global'; this prevents CLAUDE.md churn
+    // from invalidating messages[0] on every turn. Dynamic fields still
+    // flow through prependUserContext() into messages[0] (coarse-grained
+    // time-period labels keep their churn bounded).
+    const staticUserContext: { [k: string]: string } = {}
+    for (const k of STATIC_USER_CONTEXT_KEYS) {
+      const v = userContext[k]
+      if (v) staticUserContext[k] = v
+    }
     const fullSystemPrompt = asSystemPrompt(
-      appendSystemContext(systemPrompt, systemContext),
+      appendSystemContext(
+        asSystemPrompt(
+          prependStaticContextToSystem(systemPrompt, staticUserContext),
+        ),
+        systemContext,
+      ),
     )
 
     queryCheckpoint('query_autocompact_start')

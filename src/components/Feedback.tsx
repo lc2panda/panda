@@ -460,7 +460,11 @@ async function generateTitle(description: string, abortSignal: AbortSignal): Pro
         isNonInteractiveSession: false,
         agents: [],
         querySource: 'feedback',
-        mcpTools: []
+        mcpTools: [],
+        // Bug reports often include long stack traces / error dumps that
+        // exceed the 1024 cache threshold; enable caching in case the user
+        // refines the description and regenerates the title.
+        enablePromptCaching: true
       }
     });
     const firstBlock = Array.isArray(response.message.content) ? response.message.content[0] : undefined;

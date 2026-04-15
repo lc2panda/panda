@@ -199,6 +199,7 @@ export function setSystemPromptInjection(value: string | null): void {
   systemPromptInjection = value
   // Clear context caches immediately when injection changes
   getUserContext.cache.clear?.()
+  getStaticUserContext.cache.clear?.()
   getSystemContext.cache.clear?.()
 }
 
@@ -396,23 +397,42 @@ export const getSystemContext = memoize(
 )
 
 /**
- * This context is prepended to each conversation, and cached for the duration of the conversation.
+ * Keys that represent *static* per-session user context. These are
+ * quasi-frozen (CLAUDE.md contents, third-party guidance) and must NOT
+ * be injected into messages[0] — doing so would sit at the front of
+ * the messages-layer cache prefix and invalidate the entire downstream
+ * prefix whenever any of them changes.
+ *
+ * Per Anthropic prompt caching guidance:
+ *   "Keep the system prompt frozen. Don't interpolate 'current date: X',
+ *    'mode: Y', 'user name: Z' into the system prompt — those sit at
+ *    the front of the prefix and invalidate everything downstream."
+ *
+ * These static keys are injected into the system prompt *before* the
+ * SYSTEM_PROMPT_DYNAMIC_BOUNDARY (global cache scope). The dynamic
+ * keys (currentDate, etc.) continue to flow through messages[0] via
+ * prependUserContext — but their churn is bounded to time-period
+ * granularity (see getTimeAwareness), so cache misses stay rare.
  */
-export const getUserContext = memoize(
-  async (): Promise<{
-    [k: string]: string
-  }> => {
-    const startTime = Date.now()
-    logForDiagnosticsNoPII('info', 'user_context_started')
+export const STATIC_USER_CONTEXT_KEYS = [
+  'claudeMd',
+  'thirdPartyGuidance',
+] as const
 
+export type StaticUserContextKey = (typeof STATIC_USER_CONTEXT_KEYS)[number]
+
+/**
+ * Returns only the static (quasi-frozen) subset of user context.
+ * Intended for injection into the static segment of the system prompt
+ * (before SYSTEM_PROMPT_DYNAMIC_BOUNDARY), not into messages[0].
+ */
+export const getStaticUserContext = memoize(
+  async (): Promise<{ [k: string]: string }> => {
     // CLAUDE_CODE_DISABLE_CLAUDE_MDS: hard off, always.
     // --bare: skip auto-discovery (cwd walk), BUT honor explicit --add-dir.
-    // --bare means "skip what I didn't ask for", not "ignore what I asked for".
     const shouldDisableClaudeMd =
       isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_CLAUDE_MDS) ||
       (isBareMode() && getAdditionalDirectoriesForClaudeMd().length === 0)
-    // Await the async I/O (readFile/readdir directory walk) so the event
-    // loop yields naturally at the first fs.readFile.
     const claudeMd = shouldDisableClaudeMd
       ? null
       : getClaudeMds(filterInjectedMemoryFiles(await getMemoryFiles()))
@@ -421,25 +441,58 @@ export const getUserContext = memoize(
     // cycle through permissions/filesystem → permissions → yoloClassifier).
     setCachedClaudeMdContent(claudeMd || null)
 
+    const thirdPartyGuidance = getThirdPartyModelGuidance()
+
+    return {
+      ...(claudeMd && { claudeMd }),
+      ...(thirdPartyGuidance && { thirdPartyGuidance }),
+    }
+  },
+)
+
+/**
+ * This context is prepended to each conversation, and cached for the duration of the conversation.
+ *
+ * Returns the full user-context dictionary (static + dynamic merged) for
+ * backwards compatibility with consumers that inspect specific fields
+ * (e.g. logContextMetrics reads .claudeMd; runAgent.ts reads .claudeMd
+ * to strip it for read-only sub-agents). The static subset is also
+ * retrievable via getStaticUserContext() for cache-aware injection paths.
+ *
+ * IMPORTANT: when this dictionary is consumed by prependUserContext()
+ * (which injects into messages[0]), the caller must first strip keys
+ * in STATIC_USER_CONTEXT_KEYS — static content belongs in the system
+ * prompt's static segment, not messages[0].
+ */
+export const getUserContext = memoize(
+  async (): Promise<{
+    [k: string]: string
+  }> => {
+    const startTime = Date.now()
+    logForDiagnosticsNoPII('info', 'user_context_started')
+
+    const staticCtx = await getStaticUserContext()
+
     logForDiagnosticsNoPII('info', 'user_context_completed', {
       duration_ms: Date.now() - startTime,
-      claudemd_length: claudeMd?.length ?? 0,
-      claudemd_disabled: Boolean(shouldDisableClaudeMd),
+      claudemd_length: staticCtx.claudeMd?.length ?? 0,
+      claudemd_disabled: !staticCtx.claudeMd,
     })
 
     const timeAwareness = getTimeAwareness()
-    const thirdPartyGuidance = getThirdPartyModelGuidance()
 
     // NOTE: Dynamic fields (personaContext, workingMemoryContext,
     // sessionSummaryContext, morningBriefContext) have been moved to
     // getSystemContext() so they land in the system prompt's dynamic
-    // segment (after BOUNDARY). This keeps messages[0] quasi-static,
-    // preserving the messages-layer cache prefix across compactions.
+    // segment (after BOUNDARY). Static fields (claudeMd,
+    // thirdPartyGuidance) live in getStaticUserContext() and are
+    // injected into the static segment (before BOUNDARY). Only
+    // currentDate remains here — it's coarse-grained (time-period
+    // label, see getTimeAwareness) so its churn is bounded.
 
     return {
-      ...(claudeMd && { claudeMd }),
+      ...staticCtx,
       currentDate: `Today's date is ${getLocalISODate()}. ${timeAwareness}`,
-      ...(thirdPartyGuidance && { thirdPartyGuidance }),
     }
   },
 )

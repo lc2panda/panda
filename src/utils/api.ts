@@ -5,7 +5,11 @@ import type {
 } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import { createHash } from 'crypto'
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from 'src/constants/prompts.js'
-import { getSystemContext, getUserContext } from 'src/context.js'
+import {
+  getSystemContext,
+  getUserContext,
+  STATIC_USER_CONTEXT_KEYS,
+} from 'src/context.js'
 import { isAnalyticsDisabled } from 'src/services/analytics/config.js'
 import {
   checkStatsigFeatureGate_CACHED_MAY_BE_STALE,
@@ -446,6 +450,48 @@ export function appendSystemContext(
   ].filter(Boolean)
 }
 
+/**
+ * Injects static user context (claudeMd, thirdPartyGuidance, …) into
+ * the system prompt's *static* segment — i.e. before the
+ * SYSTEM_PROMPT_DYNAMIC_BOUNDARY marker. This keeps quasi-frozen
+ * content in the global-cache-scoped prefix instead of messages[0],
+ * where it would invalidate the entire messages-layer cache prefix on
+ * every change (see Anthropic prompt caching guidance).
+ *
+ * Fallback behavior when the boundary marker is absent (3P providers
+ * or older prompt variants): appends the static block to the end,
+ * matching the pre-existing appendSystemContext semantics.
+ */
+export function prependStaticContextToSystem(
+  systemPrompt: SystemPrompt,
+  staticContext: { [k: string]: string },
+): string[] {
+  const entries = Object.entries(staticContext)
+  if (entries.length === 0) return [...systemPrompt]
+
+  const block = entries.map(([k, v]) => `${k}: ${v}`).join('\n')
+  if (!block) return [...systemPrompt]
+
+  const boundaryIndex = systemPrompt.findIndex(
+    s => s === SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
+  )
+
+  if (boundaryIndex === -1) {
+    // No boundary marker — fall back to append semantics so the
+    // static block still reaches the model, albeit without the
+    // global-cache-scope optimization.
+    return [...systemPrompt, block].filter(Boolean)
+  }
+
+  // Insert just before BOUNDARY so the block is classified as static
+  // (cacheScope='global') by splitSysPromptPrefix.
+  return [
+    ...systemPrompt.slice(0, boundaryIndex),
+    block,
+    ...systemPrompt.slice(boundaryIndex),
+  ].filter(Boolean)
+}
+
 export function prependUserContext(
   messages: Message[],
   context: { [k: string]: string },
@@ -454,15 +500,21 @@ export function prependUserContext(
     return messages
   }
 
-  if (Object.entries(context).length === 0) {
+  // Strip static keys — they belong in the system prompt's static
+  // segment (via prependStaticContextToSystem), not messages[0].
+  // Leaving them here would re-introduce the messages-layer cache
+  // prefix invalidation that the static/dynamic split is meant to fix.
+  const dynamicEntries = Object.entries(context).filter(
+    ([k]) => !STATIC_USER_CONTEXT_KEYS.includes(k as never),
+  )
+
+  if (dynamicEntries.length === 0) {
     return messages
   }
 
   return [
     createUserMessage({
-      content: `<system-reminder>\nAs you answer the user's questions, you can use the following context:\n${Object.entries(
-        context,
-      )
+      content: `<system-reminder>\nAs you answer the user's questions, you can use the following context:\n${dynamicEntries
         .map(([key, value]) => `# ${key}\n${value}`)
         .join('\n')}
 
