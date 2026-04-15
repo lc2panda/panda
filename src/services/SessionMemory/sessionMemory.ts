@@ -303,7 +303,10 @@ const extractSessionMemory = sequential(async function (
   // two post-sampling events arriving back-to-back can both pass the
   // shouldExtractMemory gate before the first fork's markExtractionStarted
   // takes effect (fork runs asynchronously in the background).
-  if (!shouldStartFork('session_memory')) {
+  // v2.20.2: 30s dedup window (was 5s default). Observed ec5e4044 spawned
+  // 2 concurrent session_memory forks within same session because hooks fired
+  // > 5s apart. 30s window matches the minimum meaningful memory update cadence.
+  if (!shouldStartFork('session_memory', 30_000)) {
     return
   }
 
@@ -332,7 +335,7 @@ const extractSessionMemory = sequential(async function (
     querySource: 'session_memory',
     forkLabel: 'session_memory',
     skipCacheWrite: true, // fire-and-forget memory update — unique context per run
-    maxTurns: 10, // Hard cap — prevents runaway loop (observed 231 iterations in 1fbecad7)
+    maxTurns: 3, // v2.20.2: extraction should complete in 1-3 turns (was 10)
     overrides: { readFileState: setupContext.readFileState },
   })
 
@@ -441,7 +444,7 @@ export async function manuallyExtractSessionMemory(
       canUseTool: createMemoryFileCanUseTool(memoryPath),
       querySource: 'session_memory',
       forkLabel: 'session_memory_manual',
-      maxTurns: 10, // Hard cap — prevents runaway loop
+      maxTurns: 3, // v2.20.2: extraction should complete in 1-3 turns
       overrides: { readFileState: setupContext.readFileState },
     })
 

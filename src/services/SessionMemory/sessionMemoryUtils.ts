@@ -29,10 +29,14 @@ export type SessionMemoryConfig = {
 }
 
 // Default configuration values
+// v2.20.2: Raised thresholds to prevent session_memory from firing during
+// small conversations. Observed in ec5e4044: 2 user messages triggered 2
+// session_memory forks consuming 127k cache_read tokens.
+// 对齐 claude-code-cache-fix 实测: session_memory 应只在实质会话后触发。
 export const DEFAULT_SESSION_MEMORY_CONFIG: SessionMemoryConfig = {
-  minimumMessageTokensToInit: 10000,
-  minimumTokensBetweenUpdate: 5000,
-  toolCallsBetweenUpdates: 3,
+  minimumMessageTokensToInit: 30000, // 10k→30k: don't fire until real conversation
+  minimumTokensBetweenUpdate: 20000, // 5k→20k: reduce firing frequency
+  toolCallsBetweenUpdates: 10, // 3→10: tool calls threshold raised
 }
 
 // Current session memory configuration
