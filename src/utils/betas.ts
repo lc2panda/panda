@@ -221,15 +221,17 @@ export function shouldIncludeFirstPartyOnlyBetas(): boolean {
 }
 
 /**
- * Global-scope prompt caching is firstParty only. Foundry is excluded because
- * GrowthBook never bucketed Foundry users into the rollout experiment — the
- * treatment data is firstParty-only.
+ * Global-scope prompt caching: enable static/dynamic system prompt boundary
+ * for all providers that support Anthropic-compatible prompt caching.
+ * The boundary splits system prompt into a cacheable static prefix and
+ * a dynamic suffix, dramatically improving cache hit rates.
+ *
+ * Panda: enabled for all providers (firstParty, Bedrock, Vertex).
+ * Third-party providers that don't understand cache_control will simply
+ * ignore it. Kill switch: CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1.
  */
 export function shouldUseGlobalCacheScope(): boolean {
-  return (
-    getAPIProvider() === 'firstParty' &&
-    !isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS)
-  )
+  return !isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS)
 }
 
 export const getAllModelBetas = memoize((model: string): string[] => {

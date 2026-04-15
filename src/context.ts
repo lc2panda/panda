@@ -137,7 +137,10 @@ function getTimeAwareness(): string {
     hour < 18 ? '下午' :
     hour < 22 ? '晚上' : '深夜'
   const isWorkHours = hour >= 9 && hour < 18
-  return `当前时段：${timeLabel}（${hour}:${String(now.getMinutes()).padStart(2, '0')}）${isWorkHours ? '，工作时间' : '，非工作时间'}`
+  // Cache-friendly: use time-period label only (stable for 2-4 hours).
+  // Minute-level precision was invalidating prompt cache on every request.
+  // Exact time is available via Date tool if needed.
+  return `当前时段：${timeLabel}${isWorkHours ? '，工作时间' : '，非工作时间'}`
 }
 
 function getPersonaContext(): string | null {
