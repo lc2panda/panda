@@ -7,12 +7,15 @@
  *   Bug 3 — Resume 附件块漂移：normalizeResumeMessages()
  *   Bug 5 — 工具定义顺序不确定：stabilizeToolOrder()
  *   附加  — 旧图片 base64 累积：stripOldToolResultImages()
+ *   G-Beta-1 — deferred-tools 块独立排序 + SHA256 pin
+ *   G-Beta-2 — /clear 残留 <local-command-*> 块清理
  *
- * 参考: https://github.com/cnighswonger/claude-code-cache-fix (v1.2.0)
+ * 参考: https://github.com/cnighswonger/claude-code-cache-fix (v1.11.0)
  * 我们在源码层面直接修复，无需外部 preload 猴子补丁。
  */
 
 import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
+import { createHash } from 'crypto'
 import type {
   AssistantMessage,
   UserMessage,
@@ -123,6 +126,109 @@ function sortSkillsBlock(text: string): string {
   return [...prefix, ...skills, ...suffix].join('\n')
 }
 
+// ─── Helper: sort deferred-tools block + SHA256 pin (Gap G-Beta-1) ───
+// MCP runtime registers tools asynchronously, so `<deferred-tools>` block
+// ordering drifts across turns and busts the cache prefix. We sort the
+// `<tool>` entries stably by name, then record a SHA256 fingerprint in a
+// module-scope Map keyed by block-type for later dump-prompts diffing.
+// The fingerprint store is READ-ONLY w.r.t. cache_control decisions —
+// addCacheBreakpoints never consults it.
+
+const _deferredToolsFingerprints = new Map<
+  string,
+  { hash: string; sampledAt: number }
+>()
+
+/** debug-only accessor; not exported publicly for runtime consumers */
+export function _getDeferredToolsFingerprint(
+  key: string = 'default',
+): { hash: string; sampledAt: number } | undefined {
+  return _deferredToolsFingerprints.get(key)
+}
+
+function sortDeferredToolsBlock(text: string): string {
+  // Format (see src/utils/messages.ts:4228):
+  //   <system-reminder>
+  //   The following deferred tools are now available via ToolSearch[...]:
+  //   <toolName1>
+  //   <toolName2>
+  //   ...
+  //   </system-reminder>
+  // Tool names are plain identifier lines (no list prefix).
+  const lines = text.split('\n')
+  // Locate the header line that introduces the tool list
+  let headerIdx = -1
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]!.includes('deferred tools are now available')) {
+      headerIdx = i
+      break
+    }
+  }
+  if (headerIdx < 0) return text
+
+  // Collect identifier-looking lines immediately after the header, stopping
+  // at blank line, `</system-reminder>`, or any non-identifier content
+  // (e.g. the "no longer available" sub-block that comes after a blank).
+  const identRe = /^[A-Za-z_][A-Za-z0-9_-]*$/
+  let start = headerIdx + 1
+  let end = start
+  while (end < lines.length) {
+    const raw = lines[end]!
+    const trimmed = raw.trim()
+    if (trimmed === '' || !identRe.test(trimmed)) break
+    end++
+  }
+  if (end <= start + 1) {
+    // 0 or 1 tool — nothing to reorder, but still pin the fingerprint
+    _recordDeferredToolsFingerprint(text)
+    return text
+  }
+
+  const toolLines = lines.slice(start, end)
+  // Stable sort by raw text (identifiers only, no locale quirks)
+  const sorted = [...toolLines].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  // Short-circuit if already sorted (preserves byte-identical output)
+  let alreadySorted = true
+  for (let i = 0; i < toolLines.length; i++) {
+    if (toolLines[i] !== sorted[i]) {
+      alreadySorted = false
+      break
+    }
+  }
+  const rebuilt = alreadySorted
+    ? text
+    : [...lines.slice(0, start), ...sorted, ...lines.slice(end)].join('\n')
+
+  _recordDeferredToolsFingerprint(rebuilt)
+  return rebuilt
+}
+
+function _recordDeferredToolsFingerprint(text: string): void {
+  const hash = createHash('sha256').update(text).digest('hex')
+  const key = 'default'
+  const prev = _deferredToolsFingerprints.get(key)
+  if (prev?.hash !== hash) {
+    _deferredToolsFingerprints.set(key, { hash, sampledAt: Date.now() })
+    logForDebugging(
+      `[cache-stabilize] deferred-tools fingerprint: ${hash.slice(0, 16)}… (${prev ? 'changed' : 'initial'})`,
+    )
+  }
+}
+
+// ─── Helper: strip /clear residue blocks (Gap G-Beta-2) ──────────────
+// After `/clear`, the harness leaves `<local-command-*>` artifact blocks
+// in messages[0], which poisons the cache prefix compared to a genuinely
+// fresh session. Upstream bug (anthropics/claude-code#47756).
+// We strip stdout/stderr/message/name/args pairs; caveat tags remain as
+// they carry user-visible context that the model legitimately references.
+
+const LOCAL_COMMAND_RESIDUE_RE =
+  /<local-command-(stdout|stderr|message|name|args)>[\s\S]*?<\/local-command-\1>/gi
+
+function stripLocalCommandBlocks(text: string): string {
+  return text.replace(LOCAL_COMMAND_RESIDUE_RE, '')
+}
+
 // ─── Bug 3: normalizeResumeMessages ──────────────────────────────────
 
 /**
@@ -142,6 +248,34 @@ export function normalizeResumeMessages(
   const firstUserIdx = messages.findIndex(m => m.type === 'user')
   if (firstUserIdx < 0) return
 
+  // ── Gap G-Beta-2: strip /clear residue from every user text block ──
+  // Runs unconditionally so that sessions with no relocatable blocks
+  // still benefit. Mutates block.text in place, drops now-empty text
+  // blocks, preserves byte-identical output when nothing matches.
+  let clearArtifactsStripped = 0
+  for (const msg of messages) {
+    if (msg.type !== 'user') continue
+    const content = msg.message?.content
+    if (!Array.isArray(content)) continue
+    for (let j = content.length - 1; j >= 0; j--) {
+      const block = content[j]
+      if (!block || block.type !== 'text' || !('text' in block)) continue
+      const cleaned = stripLocalCommandBlocks(block.text)
+      if (cleaned === block.text) continue
+      clearArtifactsStripped++
+      if (cleaned.trim() === '') {
+        content.splice(j, 1)
+      } else {
+        ;(block as { text: string }).text = cleaned
+      }
+    }
+  }
+  if (clearArtifactsStripped > 0) {
+    logForDebugging(
+      `[cache-stabilize] stripped /clear residue from ${clearArtifactsStripped} text block(s)`,
+    )
+  }
+
   // Collect latest version of each relocatable block type (reverse scan)
   const latest = new Map<RelocatableType, { text: string }>()
 
@@ -159,6 +293,7 @@ export function normalizeResumeMessages(
         let text = block.text
         if (kind === 'hooks') text = stripSessionKnowledge(text)
         if (kind === 'skills') text = sortSkillsBlock(text)
+        if (kind === 'deferred') text = sortDeferredToolsBlock(text)
         latest.set(kind, { text })
       }
     }

@@ -174,6 +174,29 @@ export async function getAnthropicClient({
     }
   }
 
+  // v2.20.14 阶段F-2: Minimax 自动切 Anthropic 兼容 endpoint
+  // Minimax 默认 endpoint 不支持 cache_control。但 api.minimax.io/anthropic
+  // 完整兼容 Anthropic 协议（官方文档：TTL 5m, write 1.25x, read 0.1x）。
+  // 检测到 Minimax 模型 (minimax-* / MiniMax-* / abab*) 时自动切换。
+  // env DISABLE_MINIMAX_ANTHROPIC_ENDPOINT 可 opt-out。
+  if (!isEnvTruthy(process.env.DISABLE_MINIMAX_ANTHROPIC_ENDPOINT)) {
+    const baseUrl = process.env.ANTHROPIC_BASE_URL
+    const model = process.env.ANTHROPIC_MODEL || ''
+    if (baseUrl && /^(minimax|abab)/i.test(model)) {
+      try {
+        const url = new URL(baseUrl)
+        if (url.host === 'api.minimax.io' && !url.pathname.includes('anthropic')) {
+          url.pathname = '/anthropic' + (url.pathname === '/' ? '' : url.pathname)
+          process.env.ANTHROPIC_BASE_URL = url.toString().replace(/\/$/, '')
+          try {
+            const { logForDebugging } = await import('../../utils/debug.js')
+            logForDebugging(`[cache-strategy] Minimax Anthropic endpoint auto-enabled: ${process.env.ANTHROPIC_BASE_URL}`)
+          } catch {}
+        }
+      } catch {}
+    }
+  }
+
   const containerId = process.env.CLAUDE_CODE_CONTAINER_ID
   const remoteSessionId = process.env.CLAUDE_CODE_REMOTE_SESSION_ID
   const clientApp = process.env.CLAUDE_AGENT_SDK_CLIENT_APP

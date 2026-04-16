@@ -68,7 +68,8 @@ export type CacheStrategy = 'explicit' | 'implicit' | 'none'
  */
 const EXPLICIT_CACHE_THIRD_PARTY_HOSTS = new Set([
   'api.moonshot.ai',  // Moonshot anthropic compat: api.moonshot.ai/anthropic
-  // 未来可扩展: zhipu / 火山 / 智谱 anthropic-compat endpoint
+  'api.minimax.io',   // Minimax Anthropic compat: api.minimax.io/anthropic (TTL 5m/1h, 1.25x write / 0.1x read)
+  // 注意：GLM/智谱官方不支持 cache_control，即使用 /api/anthropic 路径也仅走隐式缓存，维持在 IMPLICIT 列表
 ])
 
 /**
@@ -80,7 +81,8 @@ const IMPLICIT_CACHE_THIRD_PARTY_HOSTS = new Set([
   'api.groq.com',
   'api.x.ai',  // Grok
   'dashscope.aliyuncs.com',  // Qwen
-  'open.bigmodel.cn',  // GLM/智谱
+  'open.bigmodel.cn',  // GLM/智谱 — 仅隐式自动缓存，50% 折扣，不读 cache_control（provider 层天花板）
+  'api.z.ai',  // Z.ai — GLM 国际镜像，同 open.bigmodel.cn
 ])
 
 export function getCacheStrategy(): CacheStrategy {
