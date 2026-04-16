@@ -57,6 +57,7 @@ import { isBetaTracingEnabled } from '../utils/telemetry/betaSessionTracing.js'
 import { getTelemetryAttributes } from '../utils/telemetryAttributes.js'
 import { setShellIfWindows } from '../utils/windowsPaths.js'
 import { installHello2ccHooks } from '../utils/hello2ccInstaller.js'
+import { initDefaultPandaccSettings } from '../utils/initPandaccSettings.js'
 
 // initialize1PEventLogging is dynamically imported to defer OpenTelemetry sdk-logs/resources
 
@@ -89,6 +90,21 @@ function migrateFromClaude() {
 export const init = memoize(async (): Promise<void> => {
   migrateFromClaude()
   installHello2ccHooks()
+  // Panda: 自动补齐 17 项 PANDA_* 默认 env 到 ~/.pandacc/settings.json。
+  // 必须在 enableConfigs() 之前 — 否则 settings 已被读入缓存，env 合并无法生效。
+  // 写入后 enableConfigs() 会从磁盘重新读取并 merge 到 process.env。
+  // 任何失败静默 skip，绝不阻塞启动。
+  try {
+    const initResult = initDefaultPandaccSettings({ silent: true })
+    if (initResult.newlyAddedKeys.length > 0) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[Panda] 初始化 ${initResult.newlyAddedKeys.length} 项默认 env 到 settings.json（首次安装自动补齐）`,
+      )
+    }
+  } catch {
+    // 绝不 crash panda 启动
+  }
   const initStartTime = Date.now()
   logForDiagnosticsNoPII('info', 'init_started')
   profileCheckpoint('init_function_start')

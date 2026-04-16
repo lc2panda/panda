@@ -1,6 +1,6 @@
 {
   "name": "@lc2panda/panda-code",
-  "version": "2.21.3",
+  "version": "2.21.4",
   "description": "AI terminal assistant — multi-provider, privacy-first, cross-platform",
   "main": "dist/cli.js",
   "type": "module",
@@ -39,12 +39,14 @@
   ],
   "files": [
     "dist",
+    "scripts/postinstall-init.cjs",
     "README.md"
   ],
   "scripts": {
     "build": "bun run build.ts",
     "dev": "bun run build && bun dist/cli.js",
     "prepublishOnly": "bun run build",
+    "postinstall": "node scripts/postinstall-init.cjs",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --fix src/",
     "format": "biome format --write src/",
