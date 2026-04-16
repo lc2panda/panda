@@ -3261,20 +3261,39 @@ export function addCacheBreakpoints(
     skipCacheWrite,
   })
 
-  // Exactly one message-level cache_control marker per request. Mycro's
-  // turn-to-turn eviction (page_manager/index.rs: Index::insert) frees
-  // local-attention KV pages at any cached prefix position NOT in
-  // cache_store_int_token_boundaries. With two markers the second-to-last
-  // position is protected and its locals survive an extra turn even though
-  // nothing will ever resume from there — with one marker they're freed
-  // immediately. For fire-and-forget forks (skipCacheWrite) we shift the
-  // marker to the second-to-last message: that's the last shared-prefix
-  // point, so the write is a no-op merge on mycro (entry already exists)
-  // and the fork doesn't leave its own tail in the KVCC. Dense pages are
-  // refcounted and survive via the new hash either way.
-  const markerIndex = skipCacheWrite ? messages.length - 2 : messages.length - 1
+  // v2.20.10: 双marker策略 — 针对非Mycro后端（Bedrock/Vertex/第三方）
+  //
+  // 单marker策略针对 Anthropic Mycro 内部推理后端设计（local-attention KV页驱逐）。
+  // 但 Bedrock/Vertex/第三方 后端行为不同：它们按 cache_control marker 精确建立
+  // 缓存段，多个 marker 可以叠加命中（每个独立段），对应 Anthropic 官方文档
+  // "最多4个 cache_control" 设计意图。
+  //
+  // 观测会话 7432fd36 (v2.20.8 Bedrock): 15 calls / 28.5% hit。
+  // 交替 MISS/HIT 模式源于单 marker 对 fork 不友好：fork 打破 messages.length-1
+  // prefix 后，主线程无历史锚点可命中。
+  //
+  // 方案: 非Mycro启用 2 markers:
+  //   - secondary: 倒数第二个 user 消息末端（稳定历史锚点，跨 fork 存活）
+  //   - primary: messages.length-1（当前 turn）
+  // skipCacheWrite 场景保持单 marker（fire-and-forget 逻辑不变）。
+  const isMycroBackend = getAPIProvider() === 'firstParty'
+  const primaryIdx = skipCacheWrite ? messages.length - 2 : messages.length - 1
+  let secondaryIdx = -1
+  if (!isMycroBackend && !skipCacheWrite && messages.length >= 4) {
+    // 找倒数第二个 user 消息位置（跳过最后一个 user + 其 assistant 回复）
+    let userCount = 0
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]!.type === 'user') {
+        userCount++
+        if (userCount === 2) {
+          secondaryIdx = i
+          break
+        }
+      }
+    }
+  }
   const result = messages.map((msg, index) => {
-    const addCache = index === markerIndex
+    const addCache = index === primaryIdx || index === secondaryIdx
     if (msg.type === 'user') {
       return userMessageToMessageParam(
         msg,
