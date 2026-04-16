@@ -315,6 +315,128 @@ panda auth login
 
 </details>
 
+<details>
+<summary><strong>环境变量参考</strong> — 全量 55+ env（默认折叠，点击展开；v2.21.2 新增 <code>PANDA_FORCE_CACHE_STRATEGY</code>）</summary>
+
+> 注：`未设置` 表示 env 不导出；`1` / `true` 生效（`isEnvTruthy` 语义）。近期版本新增项标注 version 列。
+
+#### Panda 专属（PANDA_*）
+
+| 变量 | 版本 | 默认 | 用途 |
+|---|---|---|---|
+| `PANDA_SECURITY_RESEARCH` | v2.1.x | 未设置 | 设为 `1` 禁用 4 项安全限制（CYBER_RISK/URL 限制/谨慎操作/恶意提醒） |
+| `PANDA_HIDE_CONTEXT_WARNING` | v2.1.x | 未设置 | 设为 `1` 隐藏"上下文快满"警告 |
+| `PANDA_NO_AUTO_COLLAPSE` | v2.1.x | 未设置 | 设为 `1` 禁止 Read/Grep 结果自动折叠 |
+| `PANDA_SHOW_DEVBAR` | v2.1.x | 未设置 | 设为 `1` 在非 dev 构建中显示 DevBar |
+| `PANDA_DEBUG` | v2.1.x | 未设置 | 设为 `1` 输出任务分类/进化写回/缓存等调试日志 |
+| `PANDA_THEME` | v2.11.0 | 未设置 | 设为 `matrix` 启用 Matrix 黑客帝国风主题 |
+| `PANDA_CONFIG_DIR` | v2.1.x | `~/.pandacc` | 覆盖配置目录路径（优先级高于 `CLAUDE_CONFIG_DIR`） |
+| `PANDA_MODEL_ROUTING` | v2.16.x | 未设置 | 设为 `1` 启用 Multi-Model Agent Routing |
+| `PANDA_CONTEXT_COLLAPSE` | v2.18.x | 未设置 | 设为 `1` 启用零 API 调用增量上下文折叠 |
+| `PANDA_AGENT_MAX_TURNS` | v2.20.7 | `10` | Subagent 单次最大轮数（防 runaway loop） |
+| `PANDA_AGENT_PER_TURN_LIMIT` | v2.20.4 | `2` | AgentTool 每轮 fork 上限（防过度 fork） |
+| `PANDA_AGENT_TIMEOUT_MS` | v2.20.8 | `0`（关闭） | AgentTool 单次超时毫秒（v2.20.8 曾默认 120000；v2.20.9 改 opt-in） |
+| `PANDA_FORK_TIMEOUT_MS` | v2.20.8 | `0`（关闭） | fork 子会话超时毫秒（同上，v2.20.9 改 opt-in） |
+| `PANDA_CACHE_TEXT_KEEP_LAST` | v2.20.4 | `5` | Endless Mode：保留最近 N 条 tool_result 文本不压缩 |
+| `PANDA_CACHE_TEXT_MIN_SIZE` | v2.20.4 | `1500` | Endless Mode：字符数低于此阈值不压缩 |
+| `PANDA_FORCE_CACHE_STRATEGY` | v2.21.2 | 未设置 | 代理用户声明后端 cache 能力，取值 `explicit`/`implicit`/`none` |
+| `PANDA_SKILL_LEARNING_TEST` | v2.16.x | 未设置 | 设为 `1` 启用 Skill learning 模块测试钩子（内部） |
+
+#### 缓存与 Provider（v2.20.11 ~ v2.21.2 Wave 3/9 多 provider 统一）
+
+| 变量 | 版本 | 默认 | 用途 |
+|---|---|---|---|
+| `DISABLE_PROMPT_CACHING` | v2.1.x | 未设置 | 设为 `1` 全局禁用 prompt cache |
+| `DISABLE_PROMPT_CACHING_HAIKU` | v2.1.x | 未设置 | 设为 `1` 禁用 Haiku 模型缓存 |
+| `DISABLE_PROMPT_CACHING_SONNET` | v2.1.x | 未设置 | 设为 `1` 禁用 Sonnet 模型缓存 |
+| `DISABLE_PROMPT_CACHING_OPUS` | v2.1.x | 未设置 | 设为 `1` 禁用 Opus 模型缓存 |
+| `DISABLE_PROMPT_CACHING_1H` | v2.20.11 | 未设置 | 非直连 provider 默认启用 1h TTL；设为 `1` 降级回 5m TTL |
+| `DISABLE_MOONSHOT_ANTHROPIC_ENDPOINT` | v2.20.13 | 未设置 | 设为 `1` 关闭 Kimi 自动路径重写（`/anthropic`） |
+| `DISABLE_MINIMAX_ANTHROPIC_ENDPOINT` | v2.21.0 | 未设置 | 设为 `1` 关闭 Minimax 自动路径重写（`/anthropic`） |
+| `DISABLE_CACHE_SCOPE_GATE` | v2.21.1 | 未设置 | 设为 `1` 回滚 `scope='global'` 的 firstParty gate（重新广播给所有 provider） |
+| `DISABLE_CACHE_DEFENSIVE_FALLBACK` | v2.21.1 | 未设置 | 设为 `1` 关闭 `cache_control` 400 防御式剥离重试 |
+| `DEBUG_CACHE` | v2.18.x | 未设置 | 设为 `1` 输出第三方 API cache token 原始数据到 stderr |
+
+#### 功能控制
+
+| 变量 | 版本 | 默认 | 用途 |
+|---|---|---|---|
+| `CLAUDE_CODE_COORDINATOR_MODE` | v2.15.x | 未设置 | 设为 `1` 启用 Coordinator 多 Agent 模式 |
+| `ENABLE_TOOL_SEARCH` | v2.16.x | `true` | ToolSearch 默认启用（非 Anthropic provider 也开启） |
+| `ENABLE_SESSION_MEMORY` | v2.20.3 | 未设置 | 设为 `1` 启用 session memory（v2.20.3 后改为 opt-in） |
+| `ENABLE_SESSION_PERSISTENCE` | v2.1.x | 未设置 | 设为 `1` 启用 session 持久化 |
+| `ENABLE_CLAUDE_CODE_SM_COMPACT` | v2.20.x | 未设置 | 设为 `1` 启用 session memory compact |
+| `DISABLE_CLAUDE_CODE_SM_COMPACT` | v2.20.x | 未设置 | 设为 `1` 禁用 session memory compact |
+| `DISABLE_COMPACT` | v2.1.x | 未设置 | 设为 `1` 禁用 compact（含命令与自动压缩） |
+| `DISABLE_AUTO_COMPACT` | v2.1.x | 未设置 | 设为 `1` 仅禁用自动压缩，保留手动 `/compact` |
+| `ENABLE_LSP_TOOL` | v2.1.x | 未设置 | 设为 `1` 注册 LSPTool 到工具列表 |
+| `ENABLE_CLAUDEAI_MCP_SERVERS` | v2.1.x | 默认启用 | 设为 `false` 禁用 Claude.ai 官方 MCP server |
+| `ENABLE_MCP_LARGE_OUTPUT_FILES` | v2.1.x | 默认启用 | 设为 `false` 关闭 MCP 大输出落盘 |
+| `DISABLE_INTERLEAVED_THINKING` | v2.1.x | 未设置 | 设为 `1` 关闭 interleaved thinking beta |
+| `DISABLE_TELEMETRY` | v2.1.x | 未设置 | 设为任意真值禁用遥测 |
+| `DISABLE_ERROR_REPORTING` | v2.1.x | 未设置 | 设为 `1` 禁用错误上报 |
+| `DISABLE_AUTOUPDATER` | v2.1.x | 未设置 | 设为 `1` 禁用自动更新 |
+| `DISABLE_INSTALLATION_CHECKS` | v2.1.x | `1`（CLI 启动时自动置位） | 禁用安装检查；CLI 入口强制置 `1` |
+| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | v2.1.x | `1` | 禁用非必要网络流量（遥测/分析/GrowthBook） |
+| `CLAUDE_INTERNAL_FC_OVERRIDES` | v2.1.x | 自动设置 | GrowthBook feature flag 覆盖（31+ tengu flags） |
+
+#### 命令开关（`DISABLE_*_COMMAND`）
+
+| 变量 | 默认 | 用途 |
+|---|---|---|
+| `DISABLE_LOGIN_COMMAND` | 未设置 | 设为 `1` 禁用 `/login` |
+| `DISABLE_LOGOUT_COMMAND` | 未设置 | 设为 `1` 禁用 `/logout` |
+| `DISABLE_DOCTOR_COMMAND` | 未设置 | 设为 `1` 禁用 `/doctor` |
+| `DISABLE_UPGRADE_COMMAND` | 未设置 | 设为 `1` 禁用 `/upgrade` |
+| `DISABLE_FEEDBACK_COMMAND` / `DISABLE_BUG_COMMAND` | 未设置 | 设为 `1` 禁用 `/feedback` / `/bug` |
+| `DISABLE_EXTRA_USAGE_COMMAND` | 未设置 | 设为 `1` 禁用 `/extra-usage` |
+| `DISABLE_INSTALL_GITHUB_APP_COMMAND` | 未设置 | 设为 `1` 禁用 `/install-github-app` |
+| `DISABLE_COST_WARNINGS` | 未设置 | 设为 `1` 禁用成本警告提示 |
+
+#### API 配置
+
+| 变量 | 用途 |
+|---|---|
+| `ANTHROPIC_API_KEY` | API 密钥 |
+| `ANTHROPIC_BASE_URL` | API 基础 URL（非 Anthropic 直连时由 provider 规则判定 host） |
+| `ANTHROPIC_MODEL` | 默认模型 |
+| `ANTHROPIC_SMALL_FAST_MODEL` | 快速模型 |
+| `OPENROUTER_PREFER_PROVIDER` | OpenRouter 首选 provider 优先级 |
+
+#### 使用示例（缓存与 Provider）
+
+**场景 1 — 直连 Anthropic（默认，无需配置）**
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+panda
+# getCacheStrategy() → 'explicit'（Anthropic 直连）
+# cache_control 字段正常插入，scope='global' 仅发给 firstParty
+```
+
+**场景 2 — 本地代理转 Minimax / 未知 CDN（设 `PANDA_FORCE_CACHE_STRATEGY`）**
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:8787
+export PANDA_FORCE_CACHE_STRATEGY=explicit   # 代理后端是 Anthropic 兼容
+# 或
+export PANDA_FORCE_CACHE_STRATEGY=implicit   # 代理后端是 DeepSeek/Qwen/GLM 类隐式缓存
+# 或
+export PANDA_FORCE_CACHE_STRATEGY=none       # 代理后端不支持缓存，关闭 cache_control
+panda
+```
+
+**场景 3 — 回滚 scope gate（出现兼容性问题时）**
+
+```bash
+export DISABLE_CACHE_SCOPE_GATE=1           # 重新广播 scope='global' 给所有 provider
+export DISABLE_CACHE_DEFENSIVE_FALLBACK=1   # 同时关闭 cache_control 400 防御重试
+panda
+# 适用：定位 scope 字段兼容性问题或需要与旧版字节等价
+```
+
+</details>
+
 ---
 
 ## 2. 命令速查
@@ -420,7 +542,7 @@ panda auth login
 
 ### 2.6 环境变量
 
-> 完整表（含 v2.20.11 ~ v2.21.2 新增缓存/Provider/超时等项）见 [十五、环境变量参考](#十五环境变量参考)。常用精选：
+> 完整 55+ 项表（含 v2.20.11 ~ v2.21.2 新增缓存/Provider/超时等项）见 [**1.4 配置参考 → 环境变量参考折叠块**](#14-配置参考)（已默认折叠）。常用精选：
 
 | 变量                               | 说明                                 |
 | -------------------------------- | ---------------------------------- |
@@ -1742,125 +1864,6 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | `/agents-platform` | Agent 平台 | | |
 
 **反向禁用**: `/feedback`（ant 内部渠道）、`/peers`（UDS_INBOX 未启用）
-
-### 十五、环境变量参考
-
-> 注：`未设置` 表示 env 不导出；`1` / `true` 生效（`isEnvTruthy` 语义）。近期版本新增项标注 version 列。
-
-#### Panda 专属（PANDA_*）
-
-| 变量 | 版本 | 默认 | 用途 |
-|---|---|---|---|
-| `PANDA_SECURITY_RESEARCH` | v2.1.x | 未设置 | 设为 `1` 禁用 4 项安全限制（CYBER_RISK/URL 限制/谨慎操作/恶意提醒） |
-| `PANDA_HIDE_CONTEXT_WARNING` | v2.1.x | 未设置 | 设为 `1` 隐藏"上下文快满"警告 |
-| `PANDA_NO_AUTO_COLLAPSE` | v2.1.x | 未设置 | 设为 `1` 禁止 Read/Grep 结果自动折叠 |
-| `PANDA_SHOW_DEVBAR` | v2.1.x | 未设置 | 设为 `1` 在非 dev 构建中显示 DevBar |
-| `PANDA_DEBUG` | v2.1.x | 未设置 | 设为 `1` 输出任务分类/进化写回/缓存等调试日志 |
-| `PANDA_THEME` | v2.11.0 | 未设置 | 设为 `matrix` 启用 Matrix 黑客帝国风主题 |
-| `PANDA_CONFIG_DIR` | v2.1.x | `~/.pandacc` | 覆盖配置目录路径（优先级高于 `CLAUDE_CONFIG_DIR`） |
-| `PANDA_MODEL_ROUTING` | v2.16.x | 未设置 | 设为 `1` 启用 Multi-Model Agent Routing |
-| `PANDA_CONTEXT_COLLAPSE` | v2.18.x | 未设置 | 设为 `1` 启用零 API 调用增量上下文折叠 |
-| `PANDA_AGENT_MAX_TURNS` | v2.20.7 | `10` | Subagent 单次最大轮数（防 runaway loop） |
-| `PANDA_AGENT_PER_TURN_LIMIT` | v2.20.4 | `2` | AgentTool 每轮 fork 上限（防过度 fork） |
-| `PANDA_AGENT_TIMEOUT_MS` | v2.20.8 | `0`（关闭） | AgentTool 单次超时毫秒（v2.20.8 曾默认 120000；v2.20.9 改 opt-in） |
-| `PANDA_FORK_TIMEOUT_MS` | v2.20.8 | `0`（关闭） | fork 子会话超时毫秒（同上，v2.20.9 改 opt-in） |
-| `PANDA_CACHE_TEXT_KEEP_LAST` | v2.20.4 | `5` | Endless Mode：保留最近 N 条 tool_result 文本不压缩 |
-| `PANDA_CACHE_TEXT_MIN_SIZE` | v2.20.4 | `1500` | Endless Mode：字符数低于此阈值不压缩 |
-| `PANDA_FORCE_CACHE_STRATEGY` | v2.21.2 | 未设置 | 代理用户声明后端 cache 能力，取值 `explicit`/`implicit`/`none` |
-| `PANDA_SKILL_LEARNING_TEST` | v2.16.x | 未设置 | 设为 `1` 启用 Skill learning 模块测试钩子（内部） |
-
-#### 缓存与 Provider（v2.20.11 ~ v2.21.1 Wave 3 缓存根治 + Wave 9 多 provider 统一）
-
-| 变量 | 版本 | 默认 | 用途 |
-|---|---|---|---|
-| `DISABLE_PROMPT_CACHING` | v2.1.x | 未设置 | 设为 `1` 全局禁用 prompt cache |
-| `DISABLE_PROMPT_CACHING_HAIKU` | v2.1.x | 未设置 | 设为 `1` 禁用 Haiku 模型缓存 |
-| `DISABLE_PROMPT_CACHING_SONNET` | v2.1.x | 未设置 | 设为 `1` 禁用 Sonnet 模型缓存 |
-| `DISABLE_PROMPT_CACHING_OPUS` | v2.1.x | 未设置 | 设为 `1` 禁用 Opus 模型缓存 |
-| `DISABLE_PROMPT_CACHING_1H` | v2.20.11 | 未设置 | 非直连 provider 默认启用 1h TTL；设为 `1` 降级回 5m TTL |
-| `DISABLE_MOONSHOT_ANTHROPIC_ENDPOINT` | v2.20.13 | 未设置 | 设为 `1` 关闭 Kimi 自动路径重写（`/anthropic`） |
-| `DISABLE_MINIMAX_ANTHROPIC_ENDPOINT` | v2.21.0 | 未设置 | 设为 `1` 关闭 Minimax 自动路径重写（`/anthropic`） |
-| `DISABLE_CACHE_SCOPE_GATE` | v2.21.1 | 未设置 | 设为 `1` 回滚 `scope='global'` 的 firstParty gate（重新广播给所有 provider） |
-| `DISABLE_CACHE_DEFENSIVE_FALLBACK` | v2.21.1 | 未设置 | 设为 `1` 关闭 `cache_control` 400 防御式剥离重试 |
-| `DEBUG_CACHE` | v2.18.x | 未设置 | 设为 `1` 输出第三方 API cache token 原始数据到 stderr |
-
-#### 功能控制
-
-| 变量 | 版本 | 默认 | 用途 |
-|---|---|---|---|
-| `CLAUDE_CODE_COORDINATOR_MODE` | v2.15.x | 未设置 | 设为 `1` 启用 Coordinator 多 Agent 模式 |
-| `ENABLE_TOOL_SEARCH` | v2.16.x | `true` | ToolSearch 默认启用（非 Anthropic provider 也开启） |
-| `ENABLE_SESSION_MEMORY` | v2.20.3 | 未设置 | 设为 `1` 启用 session memory（v2.20.3 后改为 opt-in） |
-| `ENABLE_SESSION_PERSISTENCE` | v2.1.x | 未设置 | 设为 `1` 启用 session 持久化 |
-| `ENABLE_CLAUDE_CODE_SM_COMPACT` | v2.20.x | 未设置 | 设为 `1` 启用 session memory compact |
-| `DISABLE_CLAUDE_CODE_SM_COMPACT` | v2.20.x | 未设置 | 设为 `1` 禁用 session memory compact |
-| `DISABLE_COMPACT` | v2.1.x | 未设置 | 设为 `1` 禁用 compact（含命令与自动压缩） |
-| `DISABLE_AUTO_COMPACT` | v2.1.x | 未设置 | 设为 `1` 仅禁用自动压缩，保留手动 `/compact` |
-| `ENABLE_LSP_TOOL` | v2.1.x | 未设置 | 设为 `1` 注册 LSPTool 到工具列表 |
-| `ENABLE_CLAUDEAI_MCP_SERVERS` | v2.1.x | 默认启用 | 设为 `false` 禁用 Claude.ai 官方 MCP server |
-| `ENABLE_MCP_LARGE_OUTPUT_FILES` | v2.1.x | 默认启用 | 设为 `false` 关闭 MCP 大输出落盘 |
-| `DISABLE_INTERLEAVED_THINKING` | v2.1.x | 未设置 | 设为 `1` 关闭 interleaved thinking beta |
-| `DISABLE_TELEMETRY` | v2.1.x | 未设置 | 设为任意真值禁用遥测 |
-| `DISABLE_ERROR_REPORTING` | v2.1.x | 未设置 | 设为 `1` 禁用错误上报 |
-| `DISABLE_AUTOUPDATER` | v2.1.x | 未设置 | 设为 `1` 禁用自动更新 |
-| `DISABLE_INSTALLATION_CHECKS` | v2.1.x | `1`（CLI 启动时自动置位） | 禁用安装检查；CLI 入口强制置 `1` |
-| `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | v2.1.x | `1` | 禁用非必要网络流量（遥测/分析/GrowthBook） |
-| `CLAUDE_INTERNAL_FC_OVERRIDES` | v2.1.x | 自动设置 | GrowthBook feature flag 覆盖（31+ tengu flags） |
-
-#### 命令开关（`DISABLE_*_COMMAND`）
-
-| 变量 | 默认 | 用途 |
-|---|---|---|
-| `DISABLE_LOGIN_COMMAND` | 未设置 | 设为 `1` 禁用 `/login` |
-| `DISABLE_LOGOUT_COMMAND` | 未设置 | 设为 `1` 禁用 `/logout` |
-| `DISABLE_DOCTOR_COMMAND` | 未设置 | 设为 `1` 禁用 `/doctor` |
-| `DISABLE_UPGRADE_COMMAND` | 未设置 | 设为 `1` 禁用 `/upgrade` |
-| `DISABLE_FEEDBACK_COMMAND` / `DISABLE_BUG_COMMAND` | 未设置 | 设为 `1` 禁用 `/feedback` / `/bug` |
-| `DISABLE_EXTRA_USAGE_COMMAND` | 未设置 | 设为 `1` 禁用 `/extra-usage` |
-| `DISABLE_INSTALL_GITHUB_APP_COMMAND` | 未设置 | 设为 `1` 禁用 `/install-github-app` |
-| `DISABLE_COST_WARNINGS` | 未设置 | 设为 `1` 禁用成本警告提示 |
-
-#### API 配置
-
-| 变量 | 用途 |
-|---|---|
-| `ANTHROPIC_API_KEY` | API 密钥 |
-| `ANTHROPIC_BASE_URL` | API 基础 URL（非 Anthropic 直连时由 provider 规则判定 host） |
-| `ANTHROPIC_MODEL` | 默认模型 |
-| `ANTHROPIC_SMALL_FAST_MODEL` | 快速模型 |
-| `OPENROUTER_PREFER_PROVIDER` | OpenRouter 首选 provider 优先级 |
-
-#### 使用示例（缓存与 Provider）
-
-**场景 1 — 直连 Anthropic（默认，无需配置）**
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-panda
-# getCacheStrategy() → 'explicit'（Anthropic 直连）
-# cache_control 字段正常插入，scope='global' 仅发给 firstParty
-```
-
-**场景 2 — 本地代理转 Minimax / 未知 CDN（设 `PANDA_FORCE_CACHE_STRATEGY`）**
-
-```bash
-export ANTHROPIC_BASE_URL=http://localhost:8787
-export PANDA_FORCE_CACHE_STRATEGY=explicit   # 代理后端是 Anthropic 兼容
-# 或
-export PANDA_FORCE_CACHE_STRATEGY=implicit   # 代理后端是 DeepSeek/Qwen/GLM 类隐式缓存
-# 或
-export PANDA_FORCE_CACHE_STRATEGY=none       # 代理后端不支持缓存，关闭 cache_control
-panda
-```
-
-**场景 3 — 回滚 scope gate（出现兼容性问题时）**
-
-```bash
-export DISABLE_CACHE_SCOPE_GATE=1           # 重新广播 scope='global' 给所有 provider
-export DISABLE_CACHE_DEFENSIVE_FALLBACK=1   # 同时关闭 cache_control 400 防御重试
-panda
-# 适用：定位 scope 字段兼容性问题或需要与旧版字节等价
-```
 
 ### 十六、Feature Flag 对照表
 
