@@ -550,11 +550,19 @@ export async function* runAgent({
   // - Override takes precedence
   // - Async agents get a new unlinked controller (runs independently)
   // - Sync agents share parent's controller
-  const agentAbortController = override?.abortController
+  const baseAbortController = override?.abortController
     ? override.abortController
     : isAsync
       ? new AbortController()
       : toolUseContext.abortController
+
+  // v2.20.8: 对齐 claude-mem/Hermes timeout 防护 — agent 加 120s 硬限。
+  // env PANDA_AGENT_TIMEOUT_MS 可覆盖。
+  const agentAbortController = baseAbortController
+  const agentTimeoutMs = parseInt(process.env.PANDA_AGENT_TIMEOUT_MS || '120000', 10)
+  const agentTimeoutId = setTimeout(() => {
+    agentAbortController.abort()
+  }, agentTimeoutMs)
 
   // Execute SubagentStart hooks and collect additional context
   const additionalContexts: string[] = []
@@ -857,6 +865,7 @@ export async function* runAgent({
       agentDefinition.callback()
     }
   } finally {
+    clearTimeout(agentTimeoutId) // v2.20.8: 清理超时计时器
     // Clean up agent-specific MCP servers (runs on normal completion, abort, or error)
     await mcpCleanup()
     // Clean up agent's session hooks

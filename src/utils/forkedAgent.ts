@@ -535,6 +535,22 @@ export async function runForkedAgent({
   const outputMessages: Message[] = []
   let totalUsage: NonNullableUsage = { ...EMPTY_USAGE }
 
+  // v2.20.8: 对齐 claude-mem 2s timeout 设计 — fork 加时间硬限。
+  // Agent fork 需更长 (默认 120s)。env PANDA_FORK_TIMEOUT_MS 可覆盖。
+  const timeoutMs = parseInt(process.env.PANDA_FORK_TIMEOUT_MS || '120000', 10)
+  const forkAbortController = new AbortController()
+  const timeoutId = setTimeout(() => {
+    logForDebugging(`[forkedAgent] ${forkLabel} timed out after ${timeoutMs}ms — aborting`)
+    forkAbortController.abort()
+  }, timeoutMs)
+  // 合并 caller 的 abortController (如果有)
+  if (overrides?.abortController) {
+    const parentSignal = overrides.abortController.signal
+    if (parentSignal.aborted) forkAbortController.abort()
+    else parentSignal.addEventListener('abort', () => forkAbortController.abort(), { once: true })
+  }
+  overrides = { ...overrides, abortController: forkAbortController }
+
   const {
     systemPrompt: providedSystemPrompt,
     userContext,
@@ -638,6 +654,7 @@ export async function runForkedAgent({
       }
     }
   } finally {
+    clearTimeout(timeoutId) // v2.20.8: 清理超时计时器
     // Release cloned file state cache memory (same pattern as runAgent.ts)
     isolatedToolUseContext.readFileState.clear()
     // Release the cloned fork context messages
