@@ -7,6 +7,7 @@
 import { writeFile } from 'fs/promises'
 import memoize from 'lodash-es/memoize.js'
 import { getIsRemoteMode } from '../../bootstrap/state.js'
+import { isEnvTruthy } from '../../utils/envUtils.js'
 import { getSystemPrompt } from '../../constants/prompts.js'
 import { getSystemContext, getUserContext } from '../../context.js'
 import type { CanUseToolFn } from '../../hooks/useCanUseTool.js'
@@ -371,6 +372,21 @@ const extractSessionMemory = sequential(async function (
  */
 export function initSessionMemory(): void {
   if (getIsRemoteMode()) return
+  // v2.20.3: session_memory 默认关闭。观测 45aa2c8e 仍因 baseline 20k context
+  // (CLAUDE.md+system+tools) 推过任何阈值立即触发，导致简短对话也产生大量 fork
+  // overhead。改为 opt-in via env var: ENABLE_SESSION_MEMORY=1
+  // 用户可通过 /memory 手动触发或显式启用自动模式。
+  const autoEnabled = isEnvTruthy(process.env.ENABLE_SESSION_MEMORY)
+  if (!autoEnabled) {
+    if (process.env.USER_TYPE === 'ant') {
+      logEvent('tengu_session_memory_init', {
+        auto_compact_enabled: false,
+        reason: 'opt_in_disabled',
+      })
+    }
+    return
+  }
+
   // Session memory is used for compaction, so respect auto-compact settings
   const autoCompactEnabled = isAutoCompactEnabled()
 

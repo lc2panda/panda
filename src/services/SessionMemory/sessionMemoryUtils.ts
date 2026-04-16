@@ -29,14 +29,17 @@ export type SessionMemoryConfig = {
 }
 
 // Default configuration values
-// v2.20.2: Raised thresholds to prevent session_memory from firing during
-// small conversations. Observed in ec5e4044: 2 user messages triggered 2
-// session_memory forks consuming 127k cache_read tokens.
-// 对齐 claude-code-cache-fix 实测: session_memory 应只在实质会话后触发。
+// v2.20.3: 根治 — shouldExtractMemory 用 total context 计算阈值，但 baseline
+// (CLAUDE.md 7-8k + system prompt 5k + tools 5k + MEMORY.md 2k) 即 ~20k。
+// 为防止短对话被基线推过阈值立即触发，再次大幅上调到 80000：
+//   - baseline ~20k + 用户实际对话量需达 60k+ 才触发
+//   - "几句话+几次工具" 的小对话彻底不会触发 session_memory
+// 观测 45aa2c8e: "读取记忆，激活" 一句话仍触发 session_memory + agent fork
+// 双爆发，118k tokens for 简单任务 — 明显过度。
 export const DEFAULT_SESSION_MEMORY_CONFIG: SessionMemoryConfig = {
-  minimumMessageTokensToInit: 30000, // 10k→30k: don't fire until real conversation
-  minimumTokensBetweenUpdate: 20000, // 5k→20k: reduce firing frequency
-  toolCallsBetweenUpdates: 10, // 3→10: tool calls threshold raised
+  minimumMessageTokensToInit: 80000, // 30k→80k: 抠掉baseline，需真正的长对话
+  minimumTokensBetweenUpdate: 50000, // 20k→50k: update间隔再拉大
+  toolCallsBetweenUpdates: 20, // 10→20: 工具调用阈值再翻倍
 }
 
 // Current session memory configuration
