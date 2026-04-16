@@ -556,13 +556,13 @@ export async function* runAgent({
       ? new AbortController()
       : toolUseContext.abortController
 
-  // v2.20.8: 对齐 claude-mem/Hermes timeout 防护 — agent 加 120s 硬限。
-  // env PANDA_AGENT_TIMEOUT_MS 可覆盖。
+  // v2.20.9: 移除默认硬超时（复杂任务时间不可预测，maxTurns=10 已足够）。
+  // env PANDA_AGENT_TIMEOUT_MS 可 opt-in 启用（默认0=禁用）。
   const agentAbortController = baseAbortController
-  const agentTimeoutMs = parseInt(process.env.PANDA_AGENT_TIMEOUT_MS || '120000', 10)
-  const agentTimeoutId = setTimeout(() => {
+  const agentTimeoutMs = parseInt(process.env.PANDA_AGENT_TIMEOUT_MS || '0', 10)
+  const agentTimeoutId = agentTimeoutMs > 0 ? setTimeout(() => {
     agentAbortController.abort()
-  }, agentTimeoutMs)
+  }, agentTimeoutMs) : undefined
 
   // Execute SubagentStart hooks and collect additional context
   const additionalContexts: string[] = []
