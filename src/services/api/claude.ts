@@ -250,6 +250,7 @@ import {
   CACHE_TTL_1HOUR_MS,
   checkResponseForCacheBreak,
   recordPromptState,
+  stripCacheControlFromRequestParams,
 } from './promptCacheBreakDetection.js'
 import {
   CannotRetryError,
@@ -375,6 +376,20 @@ export function getPromptCachingEnabled(model: string): boolean {
   return true
 }
 
+/**
+ * Wave 7 (Chi-2 调研结论)：`scope: 'global'` 是 Claude Code CLI 与 Anthropic
+ * 后端的内部 Mycro 协议扩展，**Anthropic 官方公开 docs 未定义该字段**。
+ * 发给 Bedrock / Vertex / 第三方 anthropic-compat endpoint (Kimi /anthropic、
+ * Minimax /anthropic 等) 可能被忽略或触发 400，并污染请求 hash 导致 cache miss。
+ *
+ * 仅当 provider='firstParty' **且** BASE_URL 真实指向 api.anthropic.com(staging)
+ * 时才下发 scope。env `DISABLE_CACHE_SCOPE_GATE=1` 可一键回滚到旧行为。
+ */
+function shouldIncludeGlobalScope(): boolean {
+  if (isEnvTruthy(process.env.DISABLE_CACHE_SCOPE_GATE)) return true
+  return getAPIProvider() === 'firstParty' && isFirstPartyAnthropicBaseUrl()
+}
+
 export function getCacheControl({
   scope,
   querySource,
@@ -402,7 +417,7 @@ export function getCacheControl({
   return {
     type: 'ephemeral',
     ...(use1h && { ttl: '1h' }),
-    ...(scope === 'global' && { scope }),
+    ...(scope === 'global' && shouldIncludeGlobalScope() && { scope }),
   }
 }
 
@@ -1829,7 +1844,7 @@ async function* queryModel(
 
     lastRequestBetas = betasParams
 
-    return {
+    const builtParams: BetaMessageStreamParams = {
       model: normalizeModelStringForAPI(options.model),
       messages: addCacheBreakpoints(
         messagesForAPI,
@@ -1860,6 +1875,11 @@ async function* queryModel(
       }),
       ...(speed !== undefined && { speed }),
     }
+    // Wave 7 Psi: 防御式 fallback — 若上一次 attempt 因 cache_control/scope 被 400 拒绝，
+    // withRetry 会置位 retryContext.stripCacheControl；此处重建 params 时剥离所有 cache_control。
+    return retryContext.stripCacheControl
+      ? stripCacheControlFromRequestParams(builtParams)
+      : builtParams
   }
 
   // Compute log scalars synchronously so the fire-and-forget .then() closure

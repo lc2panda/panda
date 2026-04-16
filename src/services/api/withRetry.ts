@@ -122,6 +122,22 @@ export interface RetryContext {
   model: string
   thinkingConfig: ThinkingConfig
   fastMode?: boolean
+  /**
+   * Wave 7 P1-2 — set to true by the retry loop after a 400
+   * `cache_control`/`invalid_request_error` is detected so the operation
+   * callback knows to strip cache_control (and the Anthropic-internal
+   * `scope` sub-field) from its next request. Flag is sticky for the
+   * remainder of the retry loop; the 400-detect path fires at most once
+   * per loop (no recursion, no second strip).
+   *
+   * Disable via env `DISABLE_CACHE_DEFENSIVE_FALLBACK=1`.
+   *
+   * The operation side is wired up in claude.ts / executeNonStreamingRequest
+   * (callers of `paramsFromContext`). Unwired callers observe the flag as
+   * informational only and retry with unchanged params (fallback degrades to
+   * normal retry semantics — still safe, just no effective strip).
+   */
+  stripCacheControl?: boolean
 }
 
 interface RetryOptions {
@@ -310,6 +326,32 @@ export async function* withRetry<T>(
       if (wasFastModeActive && isFastModeNotEnabledError(error)) {
         handleFastModeRejectedByAPI()
         retryContext.fastMode = false
+        continue
+      }
+
+      // Wave 7 P1-2 — Defensive cache_control strip fallback.
+      // 若 provider 拒绝 cache_control / scope 字段（Bedrock/Vertex/第三方 400），
+      // flip retryContext.stripCacheControl 让下一次 operation 重新构建 params
+      // 时剥离 cache_control；flag 仅置位一次（防递归）。延迟为 0（即刻重试），
+      // 不消耗 529 计数，也不受 persistent/fast-mode 分支影响。
+      // 若已 strip 过仍 400 → 落回正常 retry/error 路径，不再 strip。
+      if (
+        !isDefensiveCacheFallbackDisabled() &&
+        !retryContext.stripCacheControl &&
+        isCacheControlRejection400(error)
+      ) {
+        retryContext.stripCacheControl = true
+        logForDebugging(
+          `[cache-defensive] 400 suggests cache_control/scope rejection — stripping cache_control and retrying once (${errorMessage(error)})`,
+          { level: 'warn' },
+        )
+        logEvent('tengu_api_cache_control_defensive_fallback', {
+          status: (error as APIError).status,
+          attempt,
+          provider: getAPIProviderForStatsig(),
+          error: (error as APIError)
+            .message as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        })
         continue
       }
 
@@ -605,6 +647,64 @@ function isFastModeNotEnabledError(error: unknown): boolean {
     error.status === 400 &&
     (error.message?.includes('Fast mode is not enabled') ?? false)
   )
+}
+
+/**
+ * Wave 7 P1-2 — Detect 400 errors that smell like a provider rejecting
+ * `cache_control` / `scope` fields. Sigma cleancache 项目证据：挂 OpenRouter 某些
+ * 3P 路由返回 `No endpoints found that support cache control`；Chi-2 调研：
+ * `scope: 'global'` 为 Anthropic 内部 Mycro 扩展，发给 Bedrock/Vertex 可能 400.
+ *
+ * 匹配尽量宽松以容下不同 provider 的错误文案，但仅限 400 避免误伤 5xx/network.
+ * Keywords are lowercased and checked against the error body + message.
+ */
+const CACHE_CONTROL_400_KEYWORDS = [
+  'cache_control',
+  'cache control',
+  'invalid cache',
+  'unsupported parameter',
+  'unknown parameter',
+  'scope',
+]
+
+function isCacheControlRejection400(error: unknown): boolean {
+  if (!(error instanceof APIError)) return false
+  if (error.status !== 400) return false
+  // Pull from both .message (normalized by SDK) and raw error body if present.
+  const msg = (error.message ?? '').toLowerCase()
+  let bodyStr = ''
+  const body = (error as { error?: unknown }).error
+  if (body) {
+    try {
+      bodyStr = (
+        typeof body === 'string' ? body : JSON.stringify(body)
+      ).toLowerCase()
+    } catch {
+      bodyStr = ''
+    }
+  }
+  // Require at least one cache-specific keyword (cache_control / cache control /
+  // invalid cache). `scope` / `unsupported parameter` / `unknown parameter`
+  // alone would over-match unrelated 400s, so they must co-occur with a cache
+  // keyword in the combined text.
+  const combined = `${msg}\n${bodyStr}`
+  const hasCacheKeyword =
+    combined.includes('cache_control') ||
+    combined.includes('cache control') ||
+    combined.includes('invalid cache')
+  if (hasCacheKeyword) return true
+  // Edge case: some providers say "unsupported parameter: scope" without
+  // mentioning cache_control. Catch that too.
+  const hasScopeAndUnsupported =
+    combined.includes('scope') &&
+    (combined.includes('unsupported parameter') ||
+      combined.includes('unknown parameter') ||
+      combined.includes('unsupported field'))
+  return hasScopeAndUnsupported
+}
+
+function isDefensiveCacheFallbackDisabled(): boolean {
+  return isEnvTruthy(process.env.DISABLE_CACHE_DEFENSIVE_FALLBACK)
 }
 
 export function is529Error(error: unknown): boolean {

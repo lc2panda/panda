@@ -167,6 +167,77 @@ function stripCacheControl(
   })
 }
 
+/**
+ * Wave 7 P1-2 — defensive fallback for providers that reject `cache_control`
+ * fields (Bedrock/Vertex/第三方). Recursively drops `cache_control` keys from
+ * system blocks, tool definitions, and message content blocks (including
+ * nested tool_result content) on a BetaMessageStreamParams-shaped object.
+ *
+ * Returns a shallow-cloned params object with stripped fields — does NOT
+ * mutate the input. Callers wire this into the retry path when `withRetry`
+ * signals `context.stripCacheControl === true` (see withRetry.ts).
+ *
+ * Also drops the Anthropic internal `scope` sub-field inside any surviving
+ * cache_control objects — Chi-2 调研: `scope: 'global'` 为 Mycro 内部协议扩展，
+ * 发给第三方会触发 400 invalid_request_error.
+ */
+export function stripCacheControlFromRequestParams<
+  P extends {
+    system?: unknown
+    tools?: unknown
+    messages?: unknown
+  },
+>(params: P): P {
+  const cloneDrop = <T extends Record<string, unknown>>(obj: T): T => {
+    if (!obj || typeof obj !== 'object') return obj
+    if (!('cache_control' in obj)) return obj
+    const { cache_control: _cc, ...rest } = obj
+    return rest as T
+  }
+
+  const stripBlocks = (blocks: unknown): unknown => {
+    if (!Array.isArray(blocks)) return blocks
+    return blocks.map(b => {
+      if (!b || typeof b !== 'object') return b
+      const cleaned = cloneDrop(b as Record<string, unknown>)
+      // tool_result carries nested content blocks that may also have cache_control
+      if (
+        cleaned &&
+        typeof cleaned === 'object' &&
+        'type' in cleaned &&
+        (cleaned as { type?: string }).type === 'tool_result' &&
+        Array.isArray((cleaned as { content?: unknown }).content)
+      ) {
+        ;(cleaned as { content: unknown }).content = stripBlocks(
+          (cleaned as { content: unknown[] }).content,
+        )
+      }
+      return cleaned
+    })
+  }
+
+  const out: P = { ...params }
+
+  if (Array.isArray(out.system)) {
+    out.system = (out.system as Array<Record<string, unknown>>).map(cloneDrop)
+  }
+
+  if (Array.isArray(out.tools)) {
+    out.tools = (out.tools as Array<Record<string, unknown>>).map(cloneDrop)
+  }
+
+  if (Array.isArray(out.messages)) {
+    out.messages = (out.messages as Array<Record<string, unknown>>).map(msg => {
+      if (!msg || typeof msg !== 'object') return msg
+      const content = (msg as { content?: unknown }).content
+      if (typeof content === 'string' || content === undefined) return msg
+      return { ...msg, content: stripBlocks(content) }
+    })
+  }
+
+  return out
+}
+
 function computeHash(data: unknown): number {
   const str = jsonStringify(data)
   if (typeof Bun !== 'undefined') {

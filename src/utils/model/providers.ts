@@ -68,7 +68,7 @@ export type CacheStrategy = 'explicit' | 'implicit' | 'none'
  */
 const EXPLICIT_CACHE_THIRD_PARTY_HOSTS = new Set([
   'api.moonshot.ai',  // Moonshot anthropic compat: api.moonshot.ai/anthropic
-  'api.minimax.io',   // Minimax Anthropic compat: api.minimax.io/anthropic (TTL 5m/1h, 1.25x write / 0.1x read)
+  'api.minimax.io',   // Minimax Anthropic compat: api.minimax.io/anthropic (TTL 5m only, 1.25x write / 0.1x read — per official docs 2026-04)
   // 注意：GLM/智谱官方不支持 cache_control，即使用 /api/anthropic 路径也仅走隐式缓存，维持在 IMPLICIT 列表
 ])
 
@@ -83,6 +83,11 @@ const IMPLICIT_CACHE_THIRD_PARTY_HOSTS = new Set([
   'dashscope.aliyuncs.com',  // Qwen
   'open.bigmodel.cn',  // GLM/智谱 — 仅隐式自动缓存，50% 折扣，不读 cache_control（provider 层天花板）
   'api.z.ai',  // Z.ai — GLM 国际镜像，同 open.bigmodel.cn
+  // Wave 7 新增 (Sigma + Tau 调研)：
+  'ark.cn-beijing.volces.com',  // 火山引擎 Ark — 字节跳动，自动隐式缓存
+  'dashscope-intl.aliyuncs.com',  // 阿里云 DashScope 国际版 Qwen — 走 /apps/anthropic 但每次 full re-process (Tau 实测)
+  'api.moonshot.cn',  // Moonshot 国内版 — 与 api.moonshot.ai 并存，保守 IMPLICIT (若开 /anthropic 待 PM 后续验证切 EXPLICIT)
+  'platform.kimi.ai',  // Moonshot 品牌迁移后的新域名 — 保守 IMPLICIT
 ])
 
 export function getCacheStrategy(): CacheStrategy {
