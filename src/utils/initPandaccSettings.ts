@@ -1,5 +1,5 @@
 // Input: 无（读 PANDA_CONFIG_DIR / CLAUDE_CONFIG_DIR / 回退 os.homedir()/.pandacc）
-// Output: merge 17 项 PANDA_* 默认值到 settings.json 的 env block（不覆盖已有）；
+// Output: merge 16 项 PANDA_* 默认值到 settings.json 的 env block（不覆盖已有）；
 //         返回 { newlyAddedKeys, skipped }
 // Pos: 启动早期（init.ts 最开头）或 npm postinstall，保证新用户一键获得 Panda 专属能力
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
@@ -9,10 +9,12 @@ import { homedir } from 'os'
 import { join } from 'path'
 
 /**
- * 17 项 Panda 默认 env。任何新增项走此处集中。
- * PANDA_CONFIG_DIR 的值保留字面 "~/.pandacc"：它是给用户阅读 settings.json 的提示，
- * 实际读取时 envUtils.getClaudeConfigHomeDir() 会优先取 env 变量，且本文件中的路径
- * 解析永远使用 os.homedir() —— 跨平台安全。
+ * 16 项 Panda 默认 env。任何新增项走此处集中。
+ *
+ * v2.21.5 移除 PANDA_CONFIG_DIR: '~/.pandacc' 默认项 — 该字面值在
+ * src/utils/envUtils.ts / env.ts / cli/handlers/auth.ts 多处被当作绝对路径直接
+ * join filename 使用（未展开 ~），会产生 `$CWD/~/.pandacc/...` 错误目录。
+ * 未设 env 时 panda 自动走 os.homedir() + '/.pandacc'，无需手工配置。
  */
 export const PANDA_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   PANDA_SECURITY_RESEARCH: '1',
@@ -21,7 +23,6 @@ export const PANDA_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   PANDA_SHOW_DEVBAR: '1',
   PANDA_DEBUG: '1',
   PANDA_THEME: 'matrix',
-  PANDA_CONFIG_DIR: '~/.pandacc',
   PANDA_MODEL_ROUTING: '1',
   PANDA_CONTEXT_COLLAPSE: '1',
   PANDA_AGENT_MAX_TURNS: '10',

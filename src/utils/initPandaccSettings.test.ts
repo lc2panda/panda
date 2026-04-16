@@ -44,13 +44,13 @@ describe('initDefaultPandaccSettings', () => {
     }
   })
 
-  test('settings.json 不存在 → 创建并写入全部 17 项', () => {
+  test('settings.json 不存在 → 创建并写入全部 16 项', () => {
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
     expect(result.newlyAddedKeys.length).toBe(
       Object.keys(PANDA_DEFAULTS).length,
     )
-    expect(result.newlyAddedKeys.length).toBe(17)
+    expect(result.newlyAddedKeys.length).toBe(16)
 
     const path = join(tmpRoot, 'settings.json')
     expect(existsSync(path)).toBe(true)
@@ -95,8 +95,8 @@ describe('initDefaultPandaccSettings', () => {
 
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
-    // 补了 17 - 2 = 15 项（PANDA_THEME / PANDA_FORCE_CACHE_STRATEGY 已存在）
-    expect(result.newlyAddedKeys.length).toBe(15)
+    // 补了 16 - 2 = 14 项（PANDA_THEME / PANDA_FORCE_CACHE_STRATEGY 已存在）
+    expect(result.newlyAddedKeys.length).toBe(14)
     expect(result.newlyAddedKeys).not.toContain('PANDA_THEME')
     expect(result.newlyAddedKeys).not.toContain('PANDA_FORCE_CACHE_STRATEGY')
 
@@ -148,7 +148,7 @@ describe('initDefaultPandaccSettings', () => {
 
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
-    expect(result.newlyAddedKeys.length).toBe(17)
+    expect(result.newlyAddedKeys.length).toBe(16)
     const written = JSON.parse(readFileSync(path, 'utf-8'))
     expect(written.env.PANDA_THEME).toBe('matrix')
   })

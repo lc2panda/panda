@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Input: 无
-// Output: 向 ~/.pandacc/settings.json 补齐 17 项 PANDA_* 默认 env（幂等，不覆盖）
+// Output: 向 ~/.pandacc/settings.json 补齐 16 项 PANDA_* 默认 env（幂等，不覆盖）
 // Pos: npm postinstall 钩子，用户 npm/pnpm/yarn 安装 @lc2panda/panda-code 时自动执行
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 //
@@ -25,7 +25,6 @@ const PANDA_DEFAULTS = {
   PANDA_SHOW_DEVBAR: '1',
   PANDA_DEBUG: '1',
   PANDA_THEME: 'matrix',
-  PANDA_CONFIG_DIR: '~/.pandacc',
   PANDA_MODEL_ROUTING: '1',
   PANDA_CONTEXT_COLLAPSE: '1',
   PANDA_AGENT_MAX_TURNS: '10',
