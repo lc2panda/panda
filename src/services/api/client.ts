@@ -145,10 +145,19 @@ export async function getAnthropicClient({
   if (!routingOverride) {
     const _tpConfig = getGlobalConfig().thirdPartyProvider
     if (_tpConfig) {
-      process.env.ANTHROPIC_BASE_URL = _tpConfig.baseURL
-      process.env.ANTHROPIC_AUTH_TOKEN = _tpConfig.apiKey
-      process.env.ANTHROPIC_API_KEY = _tpConfig.apiKey
-      process.env.ANTHROPIC_MODEL = _tpConfig.model
+      if (_tpConfig.name === 'openai') {
+        // OpenAI provider: set PANDA_PROVIDER + OPENAI_* env vars
+        // so the OpenAI adapter proxy in getAnthropicClient() is activated
+        process.env.PANDA_PROVIDER = 'openai'
+        process.env.OPENAI_API_KEY = _tpConfig.apiKey
+        process.env.OPENAI_BASE_URL = _tpConfig.baseURL
+        process.env.ANTHROPIC_MODEL = _tpConfig.model
+      } else {
+        process.env.ANTHROPIC_BASE_URL = _tpConfig.baseURL
+        process.env.ANTHROPIC_AUTH_TOKEN = _tpConfig.apiKey
+        process.env.ANTHROPIC_API_KEY = _tpConfig.apiKey
+        process.env.ANTHROPIC_MODEL = _tpConfig.model
+      }
     }
   }
 
@@ -421,6 +430,48 @@ export async function getAnthropicClient({
     }
     // we have always been lying about the return type - this doesn't support batching or models
     return new AnthropicVertex(vertexArgs) as unknown as Anthropic
+  }
+
+  // ---- OpenAI Provider ----
+  if (process.env.PANDA_PROVIDER === 'openai' && process.env.OPENAI_API_KEY) {
+    const { OpenAIClient } = await import('./openaiAdapter.js')
+    const openaiApiKey = process.env.OPENAI_API_KEY
+    const openaiBaseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
+    const openaiClient = new OpenAIClient(openaiApiKey, openaiBaseUrl)
+
+    // Return a Proxy that intercepts beta.messages.create calls
+    // and routes them through the OpenAI adapter
+    const proxy = {
+      beta: {
+        messages: {
+          create: async (params: any, options?: any) => {
+            if (params.stream || options?.stream) {
+              // Return an async iterable that yields Anthropic-format events
+              const stream = openaiClient.createMessageStream(params)
+              // Wrap in an object that mimics Anthropic's stream response
+              return {
+                [Symbol.asyncIterator]: () => stream[Symbol.asyncIterator](),
+                async *events() {
+                  yield* stream
+                },
+                // Provide a finalMessage() that collects all events
+                async finalMessage() {
+                  return openaiClient.createMessage(params)
+                },
+              }
+            }
+            return openaiClient.createMessage(params)
+          },
+        },
+      },
+      messages: {
+        create: async (params: any) => {
+          return openaiClient.createMessage(params)
+        },
+      },
+    }
+    logForDebugging(`[API:openai] Using OpenAI provider: ${openaiBaseUrl}, model mapping active`)
+    return proxy as unknown as Anthropic
   }
 
   const _hasThirdParty = !!getGlobalConfig().thirdPartyProvider

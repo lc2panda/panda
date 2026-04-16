@@ -803,8 +803,8 @@ export async function* runAgent({
       querySource,
       // v2.20.7: 硬性默认上限 — 防止 subagent runaway loop。
       // 观测 4b284228: "读取记忆文件" agent 跑了 53 轮消耗 3.7M tokens。
-      // 正常 agent 任务应在 10 轮内完成。env PANDA_AGENT_MAX_TURNS 可覆盖。
-      maxTurns: maxTurns ?? agentDefinition.maxTurns ?? parseInt(process.env.PANDA_AGENT_MAX_TURNS || '10', 10),
+      // 正常 agent 任务应在 30 轮内完成。env PANDA_AGENT_MAX_TURNS 可覆盖。
+      maxTurns: maxTurns ?? agentDefinition.maxTurns ?? parseInt(process.env.PANDA_AGENT_MAX_TURNS || '999', 10),
     })) {
       onQueryProgress?.()
       // Forward subagent API request starts to parent's metrics display

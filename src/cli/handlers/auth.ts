@@ -57,6 +57,7 @@ const THIRD_PARTY_PROVIDERS: Record<
   minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'minimax-m2.7', consoleURL: 'https://platform.minimax.io' },
   glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic/', defaultModel: 'glm-5.1', consoleURL: 'https://open.bigmodel.cn/' },
   volcano: { name: 'Volcano (火山引擎)', baseURL: 'https://ark.cn-beijing.volces.com/api/coding', defaultModel: 'doubao-seed-code', consoleURL: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey' },
+  openai: { name: 'OpenAI', baseURL: 'https://api.openai.com/v1', defaultModel: 'gpt-4o', consoleURL: 'https://platform.openai.com/api-keys' },
 }
 
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -84,6 +85,15 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'glm-4.5': 131000,
   'glm-4-plus': 128000,
   'doubao-seed-code': 256000,
+  'gpt-4o': 128000,
+  'gpt-4o-mini': 128000,
+  'gpt-4.1': 1047576,
+  'gpt-4.1-mini': 1047576,
+  'gpt-4.1-nano': 1047576,
+  'o3': 200000,
+  'o3-mini': 200000,
+  'o4-mini': 200000,
+  'codex-mini': 192000,
 }
 
 function getContextWindowForThirdPartyModel(model: string): number | undefined {
@@ -209,6 +219,13 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
   process.env.ANTHROPIC_BASE_URL = provider.baseURL
   process.env.ANTHROPIC_AUTH_TOKEN = apiKey.trim()
   process.env.ANTHROPIC_MODEL = selectedModel
+
+  // OpenAI provider: also set env vars for OpenAI adapter
+  if (providerKey === 'openai') {
+    process.env.PANDA_PROVIDER = 'openai'
+    process.env.OPENAI_API_KEY = apiKey.trim()
+    process.env.OPENAI_BASE_URL = provider.baseURL
+  }
 
   process.stdout.write(`\n✓ Login successful! Provider: ${provider.name}\n`)
   process.stdout.write(`  Model: ${selectedModel}\n`)
