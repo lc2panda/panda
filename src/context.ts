@@ -375,6 +375,11 @@ export const getSystemContext = memoize(
       ? allocateBudget(budgetableContents)
       : budgetableContents
 
+    // CACHE-001: timeAwareness moved here from getUserContext so it lands in
+    // the system prompt's dynamic segment instead of polluting currentDate
+    // (which sits in messages[0] and breaks the messages-layer cache prefix).
+    const timeAwareness = getTimeAwareness()
+
     logForDiagnosticsNoPII('info', 'system_context_completed', {
       duration_ms: Date.now() - startTime,
       has_git_status: gitStatus !== null,
@@ -389,6 +394,7 @@ export const getSystemContext = memoize(
           }
         : {}),
       ...(personaContext && { personaContext }),
+      ...(timeAwareness && { timeInfo: timeAwareness }),
       ...(budgeted.workingMemory && { workingMemoryContext: budgeted.workingMemory }),
       ...(budgeted.morningBrief && { morningBriefContext: budgeted.morningBrief }),
       ...(budgeted.sessionSummary && { sessionSummaryContext: budgeted.sessionSummary }),
@@ -479,20 +485,18 @@ export const getUserContext = memoize(
       claudemd_disabled: !staticCtx.claudeMd,
     })
 
-    const timeAwareness = getTimeAwareness()
-
     // NOTE: Dynamic fields (personaContext, workingMemoryContext,
-    // sessionSummaryContext, morningBriefContext) have been moved to
-    // getSystemContext() so they land in the system prompt's dynamic
+    // sessionSummaryContext, morningBriefContext, timeAwareness) have been
+    // moved to getSystemContext() so they land in the system prompt's dynamic
     // segment (after BOUNDARY). Static fields (claudeMd,
     // thirdPartyGuidance) live in getStaticUserContext() and are
     // injected into the static segment (before BOUNDARY). Only
-    // currentDate remains here — it's coarse-grained (time-period
-    // label, see getTimeAwareness) so its churn is bounded.
+    // currentDate remains here — it contains only the date string,
+    // no dynamic time-awareness content.
 
     return {
       ...staticCtx,
-      currentDate: `Today's date is ${getLocalISODate()}. ${timeAwareness}`,
+      currentDate: `Today's date is ${getLocalISODate()}.`,
     }
   },
 )

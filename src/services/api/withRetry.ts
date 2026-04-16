@@ -11,7 +11,10 @@ import { isAwsCredentialsProviderError } from 'src/utils/aws.js'
 import { logForDebugging } from 'src/utils/debug.js'
 import { logError } from 'src/utils/log.js'
 import { createSystemAPIErrorMessage } from 'src/utils/messages.js'
-import { getAPIProviderForStatsig } from 'src/utils/model/providers.js'
+import {
+  getAPIProviderForStatsig,
+  getCacheStrategy,
+} from 'src/utils/model/providers.js'
 import {
   clearApiKeyHelperCache,
   clearAwsCredentialsCache,
@@ -264,6 +267,11 @@ export async function* withRetry<T>(
           }
         }
         client = await getClient()
+      }
+
+      // CACHE-003: Reset stripCacheControl when retrying with a provider that supports explicit caching
+      if (retryContext.stripCacheControl && getCacheStrategy() === 'explicit') {
+        retryContext.stripCacheControl = false
       }
 
       return await operation(client, attempt, retryContext)

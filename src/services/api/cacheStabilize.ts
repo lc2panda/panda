@@ -139,6 +139,11 @@ const _deferredToolsFingerprints = new Map<
   { hash: string; sampledAt: number }
 >()
 
+// ─── CACHE-004: sortDeferredToolsBlock result cache ─────────────────
+// Avoids re-sorting when the input text is byte-identical across turns.
+let _lastDeferredInput: string | null = null
+let _lastDeferredResult: string | null = null
+
 /** debug-only accessor; not exported publicly for runtime consumers */
 export function _getDeferredToolsFingerprint(
   key: string = 'default',

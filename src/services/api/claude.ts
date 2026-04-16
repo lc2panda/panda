@@ -3305,35 +3305,24 @@ export function addCacheBreakpoints(
   // prefix 后，主线程无历史锚点可命中。
   //
   // 方案: 非Mycro启用 2 markers:
-  //   - secondary: 倒数第二个 user 消息末端（稳定历史锚点，跨 fork 存活）
+  //   - secondary: messages[0]（稳定锚点，不随对话增长漂移，跨 fork 存活）
   //   - primary: messages.length-1（当前 turn）
   // skipCacheWrite 场景保持单 marker（fire-and-forget 逻辑不变）。
   const isMycroBackend = getAPIProvider() === 'firstParty'
   const primaryIdx = skipCacheWrite ? messages.length - 2 : messages.length - 1
   let secondaryIdx = -1
   if (!isMycroBackend && messages.length >= 4) {
-    // v2.20.12 阶段B: Fork secondary marker 与 main 对齐。
+    // CACHE-002 fix: Anchor secondary breakpoint to messages[0] (stable).
     //
-    // main messages: [U1, A1, U2, A2, U3, A3]
-    //   primary = A3 (messages.length-1), secondary = U2 (倒数第二 user)
+    // Previously, secondary was placed on the Nth-from-last user message,
+    // which drifted every turn and caused cache misses. Anthropic caches
+    // the prefix from the start up to each cache_control marker, so:
+    //   - secondary @ messages[0] → caches system prompt + first message (stable)
+    //   - primary @ last message   → caches full conversation (updated each turn)
     //
-    // fork messages: [U1, A1, U2, A2, U3, A3, fork_prompt]
-    //   对齐 main 的 secondary，fork 也应放在 U2 位置（倒数第三 user）
-    //   这样 fork prefix [U1..U2_with_marker] 命中 main 建立的 cache entry
-    //
-    // 非 skipCacheWrite: 找倒数第二个 user
-    // skipCacheWrite (fork): 找倒数第三个 user（对齐 main 的倒数第二）
-    const targetUserCount = skipCacheWrite ? 3 : 2
-    let userCount = 0
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i]!.type === 'user') {
-        userCount++
-        if (userCount === targetUserCount) {
-          secondaryIdx = i
-          break
-        }
-      }
-    }
+    // The secondary cache entry now survives across turns and forks,
+    // giving a stable baseline hit for the conversation prefix.
+    secondaryIdx = 0
   }
   const result = messages.map((msg, index) => {
     const addCache = index === primaryIdx || index === secondaryIdx
