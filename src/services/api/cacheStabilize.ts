@@ -237,6 +237,99 @@ export function stabilizeToolOrder(tools: BetaToolUnion[]): BetaToolUnion[] {
   return tools
 }
 
+// ─── Endless Mode: compressOldToolResultText ─────────────────────────
+// 对齐 claude-mem Endless Mode：旧 tool_result 文本压缩为摘要占位符，
+// 让长会话的 context 从 O(N²) 降为 O(N)。
+// keepLast 默认 5，控制保留最近 N 条原始内容。
+// minSize 默认 1500 字符，小于此值的不压缩（节省小，破坏 cache 不值）。
+const TEXT_COMPRESSION_PLACEHOLDER_FN = (id: string, originalSize: number) =>
+  `[历史 tool_result 已压缩 — ${originalSize} chars elided. id=${id}. 如需查看请重新执行工具]`
+
+/**
+ * Compresses old tool_result text content to prevent O(N²) context growth.
+ * Mirrors stripOldToolResultImages but for text blocks. Replaces large old
+ * tool_result text with a short placeholder that includes the tool_use_id
+ * for traceability.
+ *
+ * @param messages - Message array (mutated in place)
+ * @param keepLast - Number of recent user messages to preserve uncompressed
+ * @param minSize - Minimum text size (chars) to trigger compression
+ */
+export function compressOldToolResultText(
+  messages: (UserMessage | AssistantMessage)[],
+  keepLast: number,
+  minSize: number = 1500,
+): { compressedCount: number; estimatedTokensSaved: number } {
+  if (keepLast <= 0) return { compressedCount: 0, estimatedTokensSaved: 0 }
+
+  const userIndices: number[] = []
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i]!.type === 'user') userIndices.push(i)
+  }
+  const cutoffIdx =
+    userIndices.length > keepLast
+      ? userIndices[userIndices.length - keepLast]!
+      : 0
+
+  let compressedCount = 0
+  let estimatedBytes = 0
+
+  for (let i = 0; i < cutoffIdx; i++) {
+    const msg = messages[i]!
+    if (msg.type !== 'user') continue
+    const content = msg.message?.content
+    if (!Array.isArray(content)) continue
+
+    for (const block of content) {
+      if (block.type !== 'tool_result') continue
+      const toolUseId = (block as any).tool_use_id || 'unknown'
+      const resultContent = (block as any).content
+
+      // Case 1: content is a string (legacy/simple path)
+      if (typeof resultContent === 'string') {
+        const len = resultContent.length
+        if (len >= minSize) {
+          ;(block as any).content = TEXT_COMPRESSION_PLACEHOLDER_FN(
+            toolUseId,
+            len,
+          )
+          estimatedBytes += len
+          compressedCount++
+        }
+        continue
+      }
+
+      // Case 2: content is array of blocks
+      if (Array.isArray(resultContent)) {
+        for (let k = 0; k < resultContent.length; k++) {
+          const item = resultContent[k]
+          if (item && item.type === 'text' && typeof item.text === 'string') {
+            const len = item.text.length
+            if (len >= minSize) {
+              resultContent[k] = {
+                type: 'text',
+                text: TEXT_COMPRESSION_PLACEHOLDER_FN(toolUseId, len),
+              }
+              estimatedBytes += len
+              compressedCount++
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ~3 chars per token for mixed CJK/ASCII content
+  const estimatedTokensSaved = Math.round(estimatedBytes / 3)
+  if (compressedCount > 0) {
+    logForDebugging(
+      `[cache-stabilize] compressOldToolResultText: compressed ${compressedCount} blocks, ~${estimatedTokensSaved} tokens saved`,
+    )
+  }
+
+  return { compressedCount, estimatedTokensSaved }
+}
+
 // ─── 附加: stripOldToolResultImages ──────────────────────────────────
 
 const IMAGE_PLACEHOLDER = '[image stripped from history — file may still be on disk]'

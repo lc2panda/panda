@@ -260,6 +260,7 @@ import {
 import {
   normalizeResumeMessages,
   stabilizeToolOrder,
+  compressOldToolResultText,
   stripOldToolResultImages,
 } from './cacheStabilize.js'
 import type { FormatAdapter } from '../../routing/formatAlignment.js'
@@ -1339,6 +1340,21 @@ async function* queryModel(
   const imageKeepLast = parseInt(process.env.CACHE_FIX_IMAGE_KEEP_LAST || '', 10) || 0
   if (imageKeepLast > 0) {
     stripOldToolResultImages(messagesForAPI, imageKeepLast)
+  }
+
+  // ── Endless Mode: compress old tool_result text (claude-mem 等效) ──
+  // 默认开启，保留最近 5 条用户消息原始内容；env 可调或禁用。
+  // 防止 long conversations 的 O(N²) context 增长。
+  const textKeepLast = parseInt(
+    process.env.PANDA_CACHE_TEXT_KEEP_LAST || '5',
+    10,
+  )
+  const textMinSize = parseInt(
+    process.env.PANDA_CACHE_TEXT_MIN_SIZE || '1500',
+    10,
+  )
+  if (textKeepLast > 0) {
+    compressOldToolResultText(messagesForAPI, textKeepLast, textMinSize)
   }
 
   queryCheckpoint('query_message_normalization_end')
