@@ -250,6 +250,25 @@ export const AgentTool = buildTool({
     cwd
   }: AgentToolInput, toolUseContext, canUseTool, assistantMessage, onProgress?) {
     const startTime = Date.now();
+
+    // v2.20.4: Agent tool per-turn throttle — 防止LLM过度使用Agent做简单任务。
+    // 观测 2cdde826: "读取记忆，激活" 一句话触发 6 个 Agent fork，浪费 7.5×。
+    // 限制: 每个 turn（主线程 API 轮次）最多 2 个 Agent 调用。
+    // Coordinator 模式不受限（它就是多 agent 管理器）。
+    if (!isCoordinatorMode()) {
+      const turnId = toolUseContext.queryTracker?.turnId ?? 'default'
+      const key = `agent_call_${turnId}`
+      const count = ((globalThis as any)[key] ?? 0) + 1
+      ;(globalThis as any)[key] = count
+      if (count > 2) {
+        return {
+          type: 'result' as const,
+          resultForAssistant: `Agent 调用超出本轮限额 (${count}/2)。请直接使用 Read / Bash / Edit 等工具完成剩余工作，不要再调用 Agent。`,
+          data: undefined,
+        }
+      }
+    }
+
     // Hermes P1-3 subagent policy: haiku 默认 + blocked tools + ~/.pandacc/config/subagent.json 覆盖。
     // Coordinator 模式保留"不显式覆盖"语义（model=undefined），由下游自行继承 parent。
     const subagentPolicy = isCoordinatorMode() ? null : resolveSubagentPolicy(modelParam);
