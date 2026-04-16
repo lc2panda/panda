@@ -48,3 +48,71 @@ export function isFirstPartyAnthropicBaseUrl(): boolean {
     return false
   }
 }
+
+/**
+ * v2.20.13 阶段D: 多 provider 缓存策略分类
+ *
+ * - 'explicit': 需要 Anthropic 风格 cache_control 标记才能缓存
+ *   (Anthropic 直连 / Bedrock / Vertex / Moonshot Anthropic endpoint)
+ *
+ * - 'implicit': provider 自动处理缓存，**cache_control 会被忽略或引发问题**
+ *   不应该插入 cache_control 标记
+ *   (DeepSeek / OpenAI / Kimi 默认 endpoint / Grok / Qwen 等)
+ *
+ * - 'none': 完全不支持缓存（少见，一般用 implicit 兜底）
+ */
+export type CacheStrategy = 'explicit' | 'implicit' | 'none'
+
+/**
+ * Hosts 识别：已知支持 Anthropic cache_control 协议的第三方 endpoint
+ */
+const EXPLICIT_CACHE_THIRD_PARTY_HOSTS = new Set([
+  'api.moonshot.ai',  // Moonshot anthropic compat: api.moonshot.ai/anthropic
+  // 未来可扩展: zhipu / 火山 / 智谱 anthropic-compat endpoint
+])
+
+/**
+ * Hosts 识别：已知不支持 cache_control（走自动隐式缓存）
+ */
+const IMPLICIT_CACHE_THIRD_PARTY_HOSTS = new Set([
+  'api.deepseek.com',
+  'api.openai.com',
+  'api.groq.com',
+  'api.x.ai',  // Grok
+  'dashscope.aliyuncs.com',  // Qwen
+  'open.bigmodel.cn',  // GLM/智谱
+])
+
+export function getCacheStrategy(): CacheStrategy {
+  const provider = getAPIProvider()
+  // firstParty / bedrock / vertex / foundry 都是 explicit (Anthropic 兼容)
+  if (provider !== 'firstParty') return 'explicit'
+
+  const baseUrl = process.env.ANTHROPIC_BASE_URL
+  if (!baseUrl) return 'explicit'  // 默认直连
+
+  try {
+    const url = new URL(baseUrl)
+    const host = url.host
+
+    // Anthropic 直连
+    if (host === 'api.anthropic.com' || host === 'api-staging.anthropic.com') {
+      return 'explicit'
+    }
+
+    // Moonshot 的 Anthropic endpoint: /anthropic pathname
+    if (EXPLICIT_CACHE_THIRD_PARTY_HOSTS.has(host) && url.pathname.includes('anthropic')) {
+      return 'explicit'
+    }
+
+    // 已知隐式缓存 provider
+    if (IMPLICIT_CACHE_THIRD_PARTY_HOSTS.has(host)) {
+      return 'implicit'
+    }
+
+    // 未知第三方 — 保守起见走 implicit (避免插入 cache_control 导致 API 报错)
+    return 'implicit'
+  } catch {
+    return 'explicit'  // BASE_URL parse 失败，保守走 explicit
+  }
+}

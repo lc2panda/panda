@@ -22,6 +22,7 @@ import type { Stream } from '@anthropic-ai/sdk/streaming.mjs'
 import { randomUUID } from 'crypto'
 import {
   getAPIProvider,
+  getCacheStrategy,
   isFirstPartyAnthropicBaseUrl,
   isThirdPartyProvider,
 } from 'src/utils/model/providers.js'
@@ -342,6 +343,16 @@ export function getExtraBodyParams(betaHeaders?: string[]): JsonObject {
 export function getPromptCachingEnabled(model: string): boolean {
   // Global disable takes precedence
   if (isEnvTruthy(process.env.DISABLE_PROMPT_CACHING)) return false
+
+  // v2.20.13 阶段D: Provider 感知 — 只对 explicit 策略 provider 插入 cache_control
+  // 对 implicit provider (DeepSeek/Kimi默认/OpenAI/Grok)：provider 自动处理缓存，
+  // 插入 cache_control 反而可能被忽略或引发 API 错误。
+  const strategy = getCacheStrategy()
+  if (strategy !== 'explicit') {
+    // implicit / none: 返回 false 阻止 addCacheBreakpoints 插 marker
+    // 但这些 provider 仍能通过自动机制缓存（服务端隐式），成本在后续统计
+    return false
+  }
 
   // Check if we should disable for small/fast model
   if (isEnvTruthy(process.env.DISABLE_PROMPT_CACHING_HAIKU)) {

@@ -152,13 +152,54 @@ export async function getAnthropicClient({
     }
   }
 
+  // v2.20.13 阶段F: Kimi/Moonshot 自动切 Anthropic 兼容 endpoint
+  // Moonshot 默认 endpoint 不支持 cache_control。但 api.moonshot.ai/anthropic
+  // 完全兼容 Anthropic 协议（官方公告）。检测到 Kimi 模型时自动切换。
+  // env DISABLE_MOONSHOT_ANTHROPIC_ENDPOINT 可 opt-out。
+  if (!isEnvTruthy(process.env.DISABLE_MOONSHOT_ANTHROPIC_ENDPOINT)) {
+    const baseUrl = process.env.ANTHROPIC_BASE_URL
+    const model = process.env.ANTHROPIC_MODEL || ''
+    if (baseUrl && /^kimi/i.test(model)) {
+      try {
+        const url = new URL(baseUrl)
+        if (url.host === 'api.moonshot.ai' && !url.pathname.includes('anthropic')) {
+          url.pathname = '/anthropic' + (url.pathname === '/' ? '' : url.pathname)
+          process.env.ANTHROPIC_BASE_URL = url.toString().replace(/\/$/, '')
+          try {
+            const { logForDebugging } = await import('../../utils/debug.js')
+            logForDebugging(`[cache-strategy] Moonshot Anthropic endpoint auto-enabled: ${process.env.ANTHROPIC_BASE_URL}`)
+          } catch {}
+        }
+      } catch {}
+    }
+  }
+
   const containerId = process.env.CLAUDE_CODE_CONTAINER_ID
   const remoteSessionId = process.env.CLAUDE_CODE_REMOTE_SESSION_ID
   const clientApp = process.env.CLAUDE_AGENT_SDK_CLIENT_APP
   const customHeaders = getCustomHeaders()
+  // v2.20.13 阶段G: OpenRouter sticky provider routing
+  // 对 openrouter.ai 的请求自动加 OR-Prefer-Provider，确保后续请求路由到
+  // 同一个底层 provider, 避免 cache 因 provider 轮询失效。
+  const openrouterHeaders: { [key: string]: string } = {}
+  try {
+    const baseUrl = process.env.ANTHROPIC_BASE_URL
+    if (baseUrl && new URL(baseUrl).host.includes('openrouter')) {
+      // 默认保留底层 provider 路由一致性（sticky）
+      const preferProvider = process.env.OPENROUTER_PREFER_PROVIDER
+      openrouterHeaders['X-OR-Sort'] = 'throughput'  // 优先高吞吐
+      if (preferProvider) {
+        openrouterHeaders['X-OR-Prefer-Provider'] = preferProvider
+      }
+      // OpenRouter provider sticky routing: 复用上次成功的 provider
+      openrouterHeaders['X-OR-Allow-Fallbacks'] = 'false'
+    }
+  } catch {}
+
   const defaultHeaders: { [key: string]: string } = isThirdPartyProvider()
     ? {
         'User-Agent': getUserAgent(),
+        ...openrouterHeaders,
         ...customHeaders,
       }
     : {
