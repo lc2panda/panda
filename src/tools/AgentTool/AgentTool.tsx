@@ -229,7 +229,7 @@ export const AgentTool = buildTool({
   aliases: [LEGACY_AGENT_TOOL_NAME],
   maxResultSizeChars: 100_000,
   async description() {
-    return 'Launch a new agent';
+    return 'Launch a new agent. COST WARNING: Each agent fork re-sends the full system prompt + tools (~10-20k tokens). For simple tasks (reading files, running commands, checking status), use Read/Bash/Edit directly — they cost 0 extra tokens. Only use Agent when you need parallel independent work or a specialized agent type.';
   },
   get inputSchema(): InputSchema {
     return inputSchema();
@@ -251,19 +251,21 @@ export const AgentTool = buildTool({
   }: AgentToolInput, toolUseContext, canUseTool, assistantMessage, onProgress?) {
     const startTime = Date.now();
 
-    // v2.20.4: Agent tool per-turn throttle — 防止LLM过度使用Agent做简单任务。
+    // v2.20.5: Agent tool per-turn throttle — 源码级防止 LLM 过度 fork。
     // 观测 2cdde826: "读取记忆，激活" 一句话触发 6 个 Agent fork，浪费 7.5×。
-    // 限制: 每个 turn（主线程 API 轮次）最多 2 个 Agent 调用。
+    // 用 assistantMessage.uuid 作为 turn key（每次 LLM 回复唯一），确保不跨轮误限。
     // Coordinator 模式不受限（它就是多 agent 管理器）。
+    // 可通过 PANDA_AGENT_PER_TURN_LIMIT env 覆盖（默认 2）。
     if (!isCoordinatorMode()) {
-      const turnId = toolUseContext.queryTracker?.turnId ?? 'default'
-      const key = `agent_call_${turnId}`
-      const count = ((globalThis as any)[key] ?? 0) + 1
-      ;(globalThis as any)[key] = count
-      if (count > 2) {
+      const turnKey = assistantMessage?.uuid ?? 'fallback'
+      const limitKey = `__agent_throttle_${turnKey}`
+      const limit = parseInt(process.env.PANDA_AGENT_PER_TURN_LIMIT || '2', 10)
+      const count = ((globalThis as any)[limitKey] ?? 0) + 1
+      ;(globalThis as any)[limitKey] = count
+      if (count > limit) {
         return {
           type: 'result' as const,
-          resultForAssistant: `Agent 调用超出本轮限额 (${count}/2)。请直接使用 Read / Bash / Edit 等工具完成剩余工作，不要再调用 Agent。`,
+          resultForAssistant: `Agent tool throttled (${count}/${limit} this turn). Use Read, Bash, Edit, or other direct tools to complete the remaining work instead of spawning more agents.`,
           data: undefined,
         }
       }
