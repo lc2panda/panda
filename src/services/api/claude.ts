@@ -428,11 +428,12 @@ function should1hCacheTTL(querySource?: QuerySource, isSystemLevel?: boolean): b
     return true
   }
 
-  // 3P Bedrock users get 1h TTL when opted in via env var
-  if (
-    getAPIProvider() === 'bedrock' &&
-    isEnvTruthy(process.env.ENABLE_PROMPT_CACHING_1H_BEDROCK)
-  ) {
+  // v2.20.11 Stage A: 非直连 provider (Bedrock/Vertex/3P) 默认启用 1h TTL。
+  // AWS 2026-01 已宣布 Claude 4.5 系列全部支持 1h TTL (Opus 4.5, Sonnet 4.5, Haiku 4.5)。
+  // Vertex/3P 同样支持。仅 Mycro (Anthropic 直连) 走下面的 allowlist 逻辑。
+  // env DISABLE_PROMPT_CACHING_1H 可 opt-out (主要供 legacy 模型用户)。
+  const provider = getAPIProvider()
+  if (provider !== 'firstParty' && !isEnvTruthy(process.env.DISABLE_PROMPT_CACHING_1H)) {
     return true
   }
 
