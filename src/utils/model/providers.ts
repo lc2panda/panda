@@ -90,7 +90,20 @@ const IMPLICIT_CACHE_THIRD_PARTY_HOSTS = new Set([
   'platform.kimi.ai',  // Moonshot 品牌迁移后的新域名 — 保守 IMPLICIT
 ])
 
+/**
+ * Wave 9 方案C: 代理用户 opt-in env override。
+ * 当 ANTHROPIC_BASE_URL 指向 localhost / 私有代理 / 未知 CDN 时，
+ * host 判定失效，用户可通过 PANDA_FORCE_CACHE_STRATEGY 显式声明后端能力：
+ *   'explicit' | 'implicit' | 'none'（其他值按未设置处理）。
+ * 未设置时 getCacheStrategy() 行为与旧版完全一致（守住 Anthropic 直连底线）。
+ */
 export function getCacheStrategy(): CacheStrategy {
+  // Wave 9 方案C: env override（置于最前，读 ANTHROPIC_BASE_URL 之前）
+  const forced = process.env.PANDA_FORCE_CACHE_STRATEGY
+  if (forced === 'explicit' || forced === 'implicit' || forced === 'none') {
+    return forced
+  }
+
   const provider = getAPIProvider()
   // firstParty / bedrock / vertex / foundry 都是 explicit (Anthropic 兼容)
   if (provider !== 'firstParty') return 'explicit'
