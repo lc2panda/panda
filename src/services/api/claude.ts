@@ -3280,13 +3280,24 @@ export function addCacheBreakpoints(
   const isMycroBackend = getAPIProvider() === 'firstParty'
   const primaryIdx = skipCacheWrite ? messages.length - 2 : messages.length - 1
   let secondaryIdx = -1
-  if (!isMycroBackend && !skipCacheWrite && messages.length >= 4) {
-    // 找倒数第二个 user 消息位置（跳过最后一个 user + 其 assistant 回复）
+  if (!isMycroBackend && messages.length >= 4) {
+    // v2.20.12 阶段B: Fork secondary marker 与 main 对齐。
+    //
+    // main messages: [U1, A1, U2, A2, U3, A3]
+    //   primary = A3 (messages.length-1), secondary = U2 (倒数第二 user)
+    //
+    // fork messages: [U1, A1, U2, A2, U3, A3, fork_prompt]
+    //   对齐 main 的 secondary，fork 也应放在 U2 位置（倒数第三 user）
+    //   这样 fork prefix [U1..U2_with_marker] 命中 main 建立的 cache entry
+    //
+    // 非 skipCacheWrite: 找倒数第二个 user
+    // skipCacheWrite (fork): 找倒数第三个 user（对齐 main 的倒数第二）
+    const targetUserCount = skipCacheWrite ? 3 : 2
     let userCount = 0
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i]!.type === 'user') {
         userCount++
-        if (userCount === 2) {
+        if (userCount === targetUserCount) {
           secondaryIdx = i
           break
         }
