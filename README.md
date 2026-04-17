@@ -73,7 +73,7 @@ panda auth status   # 查看认证状态
 
 ```bash
 panda auth login
-# 交互式选择：Anthropic / DeepSeek / Kimi / Qwen / MiniMax / GLM / 火山引擎
+# 交互式选择：Anthropic / DeepSeek / Kimi / Qwen / MiniMax / GLM / 火山引擎 / OpenAI
 ```
 
 | Provider  | Base URL                                   | 默认模型              | 控制台                                                                                       |
@@ -85,6 +85,18 @@ panda auth login
 | MiniMax   | api.minimax.io/anthropic                   | minimax-m2.7      | [platform.minimax.io](https://platform.minimax.io)                                        |
 | GLM       | open.bigmodel.cn/api/anthropic             | glm-5.1           | [open.bigmodel.cn](https://open.bigmodel.cn/)                                             |
 | Volcano   | ark.cn-beijing.volces.com/api/coding       | doubao-seed-code  | [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey) |
+| OpenAI    | api.openai.com/v1                          | gpt-4o            | [platform.openai.com](https://platform.openai.com/api-keys)                               |
+
+**OpenAI / Codex — 浏览器 OAuth 登录**（v2.21.16）
+
+OpenAI provider 支持完整的 PKCE OAuth 流程：`panda auth login` 选择 OpenAI 后浏览器自动打开
+`auth.openai.com`，登录完成后 `id_token` 会换取 API key 并持久化到 `thirdPartyProvider`
+配置，全程无需手动复制粘贴 key。底层通过 `openaiAdapter.ts`（Anthropic ↔ OpenAI Chat
+Completions 格式双向转换 592 行）接入，已覆盖 GPT-4o / GPT-4.1 / o3 / o4-mini / codex-mini
+等 10 款模型（上下文窗口从 128K 到 1M 不等，见 `MODEL_CONTEXT_WINDOWS`）。OpenAI 自身的
+`prompt_tokens_details.cached_tokens`（implicit cache）由 Cache Token 面板自动识别，无需额外配置。
+
+手动模式仍可用：`panda auth login --provider openai` 后选择输入 API key，走老路径。 (v2.21.16 · commit 3fb48b3 + 8871987)
 
 ### 1.4 配置参考
 
@@ -402,6 +414,9 @@ panda auth login
 | `ANTHROPIC_MODEL` | 默认模型 |
 | `ANTHROPIC_SMALL_FAST_MODEL` | 快速模型 |
 | `OPENROUTER_PREFER_PROVIDER` | OpenRouter 首选 provider 优先级 |
+| `PANDA_PROVIDER` | v2.21.16 — 设为 `openai` 启用 OpenAI Chat Completions 适配器（由 `panda auth login` 自动写入，手动设置仅用于调试） |
+| `OPENAI_API_KEY` | v2.21.16 — OpenAI provider API key（OAuth 登录后自动写入，也可手动设置跳过登录） |
+| `OPENAI_BASE_URL` | v2.21.16 — OpenAI 兼容端点 base URL，默认 `https://api.openai.com/v1`（自建代理/Azure OpenAI 兼容层时覆盖） |
 
 #### 使用示例（缓存与 Provider）
 
@@ -974,6 +989,45 @@ query() 执行顺序：
   ③ API 调用
   ④ 若 413 → contextCollapse.recoverFromOverflow() → 重试
 ```
+
+### Fork 缓存与智能压缩（FIRE_AND_FORGET + smartCompact）
+
+后台 fork（fire-and-forget）不会被后续请求读取，给它们写 cache_creation 等于白付
+1.25× 写溢价。v2.21.16 在 `src/utils/forkedAgent.ts` 加了白名单 `FIRE_AND_FORGET_FORK_LABELS`，
+对下列 8 类 fork 自动开启 `skipCacheWrite`：
+
+```
+session_memory · prompt_suggestion · away_summary · extract_memories
+auto_dream · compact · agent_summary · session_summary
+```
+
+触发条件为白名单命中**或** `maxTurns === 1`。Anthropic 直连（firstParty）路径
+byte-equal 不变，仅影响 fork 路径最后一个 cache_control marker。
+
+**`smartCompactContent` 三层零 API 压缩**（v2.21.16）
+
+| 层 | 机制                                                                        | 触发        |
+| - | --------------------------------------------------------------------------- | --------- |
+| L1 | 结构化截断：保留 head 15 行 + tail 8 行 + key lines（errors / warnings / grep 行号 / diff hunks / 函数定义 / TODO/FIXME / 文件引用），至多 30 行 key | 单条 tool_result 超 budget |
+| L2 | 时间衰减：age=0 保留 100%，每+1 age 扣 15%，age≥6 兜底 20%；预算按权重 `0.3 + 0.7·(age/N)` 分配给更旧的项 | 总 context 超 `contextBudgetChars`（默认 480K 字符 ≈ 200K token 的 60%） |
+| L3 | LLM summary：`sideQuery` haiku 单次调用，把老消息压成结构化摘要，保留最近 `keepRecent` 轮 | L1+L2 后仍超 70% 模型窗口 |
+
+关键原则：**总量不超 budget 时零操作**——`truncateOldToolResults()` 先算总字符数，
+没超标直接原样返回；超了才对 old tool_results 按年龄递进压缩；最近 4 条（`keepRecent`）
+永远 100% 保留。
+
+### Cache 前缀稳定化（CACHE-001 ~ CACHE-005）
+
+v2.21.8（commit 281293a）修了 5 个导致缓存命中率长期 <5% 的前缀漂移 bug，预期
+命中率提升到 60–80%：
+
+| 编号 | 症状 | 修复位置 |
+| -- | -- | -- |
+| CACHE-001 | `currentDate` 每分钟变一次，`timeAwareness` 被写死在静态段导致每次 prefix 不同 | `src/context.ts` — `timeAwareness` 迁到 dynamic segment |
+| CACHE-002 | secondary breakpoint 锚点随 messages 长度漂移 | `src/services/api/claude.ts` — 锚定到 `messages[0]` |
+| CACHE-003 | 显式缓存 provider 遭遇 400 剥离重试后 `stripCacheControl` 残留 true，污染下一次请求 | `src/services/api/withRetry.ts` — retry 时 reset；守 Anthropic 直连 byte-equal |
+| CACHE-004 | `sortDeferredToolsBlock` 每次重排产生非确定性 tool 顺序 | `src/services/api/cacheStabilize.ts` — 按 byte-identical input 命中 fingerprint 缓存 |
+| CACHE-005 | `compressOldToolResultText` 越界压缩了已稳定前缀 | `src/services/api/cacheStabilize.ts` — 新增 `protectBeforeIndex` 参数守护 |
 
 </details>
 
