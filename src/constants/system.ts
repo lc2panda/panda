@@ -4,7 +4,10 @@ import { feature } from 'bun:bundle'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import { logForDebugging } from '../utils/debug.js'
 import { isEnvDefinedFalsy } from '../utils/envUtils.js'
-import { getAPIProvider } from '../utils/model/providers.js'
+import {
+  getAPIProvider,
+  isFirstPartyAnthropicBaseUrl,
+} from '../utils/model/providers.js'
 import { getWorkload } from '../utils/workloadContext.js'
 
 const DEFAULT_PREFIX = `You are Panda Code, PandaAI's agentic coding tool.`
@@ -87,7 +90,22 @@ export function getAttributionHeader(fingerprint: string): string {
   // cch attestation (placeholder overwritten in serialized body bytes after
   // this string is built). Server _parse_cc_header tolerates unknown extra
   // fields so old API deploys silently ignore this.
-  const workload = getWorkload()
+  //
+  // v2.21.21 P0-2: cc_workload 仅在 firstParty-Anthropic 直连下输出。
+  //
+  // 问题：cc_workload 走 AsyncLocalStorage turn-scoped 可变字节（cron/interactive/
+  // fork 不同）→ 非 firstParty provider (Bedrock/Vertex/第三方) 的 system prompt
+  // 前缀每轮 workload 切换就变字节 → 后端前缀哈希变 → system cache 全废。
+  // 观测 session 056f8651 命中率仅 36%，根因之一。
+  //
+  // byte-equal 守护：firstParty-Anthropic 是上游 Claude Code 原生行为（Server
+  // _parse_cc_header 与 _sanitize_entrypoint in claude_code.py 定义），
+  // 保留原样。非 firstParty 后端不消费 cc_workload（Bedrock/Vertex 忽略
+  // x-anthropic-billing-header 内字段；第三方 provider 更不认识），
+  // 剥离它完全安全且让 system prefix 跨轮稳定。
+  const isFirstPartyAnthropic =
+    getAPIProvider() === 'firstParty' && isFirstPartyAnthropicBaseUrl()
+  const workload = isFirstPartyAnthropic ? getWorkload() : undefined
   const workloadPair = workload ? ` cc_workload=${workload};` : ''
   const header = `x-anthropic-billing-header: cc_version=${version}; cc_entrypoint=${entrypoint};${cch}${workloadPair}`
 
