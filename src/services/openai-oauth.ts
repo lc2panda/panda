@@ -6,10 +6,16 @@
  */
 
 import axios from 'axios'
+import { execFile } from 'child_process'
 import { createHash, randomBytes } from 'crypto'
+import { readFileSync } from 'fs'
 import { createServer, type Server } from 'http'
+import { Agent as HttpsAgent } from 'https'
 import type { AddressInfo } from 'net'
+import { promisify } from 'util'
 import { openBrowser } from '../utils/browser.js'
+
+const execFileAsync = promisify(execFile)
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -161,6 +167,154 @@ function startCallbackServer(
   })
 }
 
+// ─── HTTP transport: axios / axios+CA / subprocess curl ──────────────────────
+//
+// Why three transports:
+//   - Bun 1.3.x does NOT read Windows system CA store, so axios (which uses
+//     node:https under Bun) fails TLS handshake against auth.openai.com when
+//     a MITM proxy / enterprise CA is in use. Upstream issues:
+//       anthropics/claude-code#31777, oven-sh/bun#27890
+//   - curl (Windows curl.exe / macOS/Linux /usr/bin/curl) uses the system CA
+//     bundle + honors HTTPS_PROXY, so it just works on Bun.
+//   - PANDA_OAUTH_CA_FILE provides an explicit override for both Node and Bun.
+
+interface PostFormResponse {
+  status: number
+  data: unknown
+}
+
+class CurlNotAvailableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'CurlNotAvailableError'
+  }
+}
+
+/** Invoke system curl via child_process. System CA + system proxy honored. */
+async function postFormViaCurl(
+  url: string,
+  body: string,
+  timeoutMs: number,
+): Promise<PostFormResponse> {
+  const curlBin = process.platform === 'win32' ? 'curl.exe' : 'curl'
+  const maxTimeSec = Math.max(1, Math.ceil(timeoutMs / 1000))
+  const args = [
+    '-sS',
+    '-X',
+    'POST',
+    '-H',
+    'Content-Type: application/x-www-form-urlencoded',
+    '--data',
+    body,
+    '--max-time',
+    String(maxTimeSec),
+    '-w',
+    '\n%{http_code}',
+    url,
+  ]
+
+  try {
+    const { stdout } = await execFileAsync(curlBin, args, {
+      env: { ...process.env },
+      timeout: timeoutMs + 2000,
+      maxBuffer: 10 * 1024 * 1024,
+    })
+    // Last line is %{http_code}, everything before is the body.
+    const newlineIdx = stdout.lastIndexOf('\n')
+    const rawBody = newlineIdx >= 0 ? stdout.slice(0, newlineIdx) : ''
+    const statusLine = newlineIdx >= 0 ? stdout.slice(newlineIdx + 1) : stdout
+    const status = parseInt(statusLine.trim(), 10)
+    if (!Number.isFinite(status)) {
+      throw new Error(
+        `postFormViaCurl: could not parse http_code from curl output: ${JSON.stringify(stdout).slice(0, 200)}`,
+      )
+    }
+    let data: unknown = rawBody
+    if (rawBody.length > 0) {
+      try {
+        data = JSON.parse(rawBody)
+      } catch {
+        // Leave as string; caller renders it into an error message.
+      }
+    }
+    return { status, data }
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException & { stderr?: string; code?: string | number }
+    if (e && (e.code === 'ENOENT' || /ENOENT/.test(String(e.message || '')))) {
+      throw new CurlNotAvailableError(
+        `system ${curlBin} not found (ENOENT). Install curl or set PANDA_OAUTH_CA_FILE.`,
+      )
+    }
+    const stderr = typeof e.stderr === 'string' ? e.stderr.trim() : ''
+    const suffix = stderr ? ` | stderr: ${stderr}` : ''
+    throw new Error(`curl exited non-zero for ${url}: ${e.message}${suffix}`)
+  }
+}
+
+/** axios POST with explicit CA bundle loaded from PANDA_OAUTH_CA_FILE. */
+async function postFormViaAxiosWithCA(
+  url: string,
+  body: string,
+  caFile: string,
+  timeoutMs: number,
+): Promise<PostFormResponse> {
+  const ca = readFileSync(caFile)
+  const httpsAgent = new HttpsAgent({ ca, keepAlive: false })
+  const response = await axios.post(url, body, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    validateStatus: () => true,
+    timeout: timeoutMs,
+    httpsAgent,
+  })
+  return { status: response.status, data: response.data }
+}
+
+/** Dispatcher picks the right transport per runtime and env. */
+async function postForm(
+  url: string,
+  body: string,
+  timeoutMs: number,
+): Promise<PostFormResponse> {
+  const caFile = process.env.PANDA_OAUTH_CA_FILE
+  const isBun = typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined'
+
+  if (caFile) {
+    return postFormViaAxiosWithCA(url, body, caFile, timeoutMs)
+  }
+
+  if (isBun) {
+    try {
+      return await postFormViaCurl(url, body, timeoutMs)
+    } catch (err) {
+      if (err instanceof CurlNotAvailableError) {
+        throw new Error(
+          `OpenAI login failed: Bun runtime requires system curl for TLS, ` +
+            `but curl is not available. Install curl or set ` +
+            `PANDA_OAUTH_CA_FILE to point at your CA certificate file.\n\n` +
+            `Original error: ${err.message}`,
+        )
+      }
+      throw err
+    }
+  }
+
+  // Node runtime, no CA override — keep v2.21.22 axios path.
+  const response = await axios.post(url, body, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    validateStatus: () => true,
+    timeout: timeoutMs,
+  })
+  return { status: response.status, data: response.data }
+}
+
+// Exposed for unit tests only.
+export const __testing = {
+  postFormViaCurl,
+  postFormViaAxiosWithCA,
+  postForm,
+  CurlNotAvailableError,
+}
+
 // ─── Token exchange helpers ──────────────────────────────────────────────────
 
 async function exchangeCodeForTokens(params: {
@@ -178,13 +332,10 @@ async function exchangeCodeForTokens(params: {
     code_verifier: params.codeVerifier,
   })
 
-  const response = await axios.post(
+  const response = await postForm(
     `${OPENAI_ISSUER}/oauth/token`,
     body.toString(),
-    {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      validateStatus: () => true,
-    },
+    30000,
   )
 
   if (response.status < 200 || response.status >= 300) {
@@ -215,13 +366,10 @@ async function exchangeTokenForApiKey(idToken: string): Promise<string> {
     subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
   })
 
-  const response = await axios.post(
+  const response = await postForm(
     `${OPENAI_ISSUER}/oauth/token`,
     body.toString(),
-    {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      validateStatus: () => true,
-    },
+    30000,
   )
 
   if (response.status < 200 || response.status >= 300) {
