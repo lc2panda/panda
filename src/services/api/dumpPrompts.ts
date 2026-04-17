@@ -87,9 +87,61 @@ function initFingerprint(req: Record<string, unknown>): string {
   return `${req.model}|${toolNames}|${sysLen}`
 }
 
+/**
+ * Compute a compact per-request summary for cache-diagnostics截面对比.
+ * Includes stable byte-level hashes of system + tools so that字节级 prefix
+ * drift can be detected even when initFingerprint (model|names|sysLen)
+ * happens to collide across turns.
+ */
+function computeRequestSummary(
+  req: Record<string, unknown>,
+  requestId: string,
+  ts: string,
+): Record<string, unknown> {
+  const system = req.system as unknown
+  const tools = req.tools as Array<{ name?: string }> | undefined
+  const messages = (req.messages ?? []) as Array<{ role?: string }>
+
+  const systemStr =
+    typeof system === 'string'
+      ? system
+      : system !== undefined
+        ? JSON.stringify(system)
+        : ''
+  const systemLen =
+    typeof system === 'string'
+      ? system.length
+      : Array.isArray(system)
+        ? (system as Array<unknown>).reduce(
+            (n, b) => n + ((b as { text?: string }).text?.length ?? 0),
+            0,
+          )
+        : 0
+  const toolsStr = tools !== undefined ? JSON.stringify(tools) : ''
+
+  const summary: Record<string, unknown> = {
+    type: 'request',
+    timestamp: ts,
+    requestId,
+    model: req.model ?? null,
+    stream: req.stream ?? null,
+    messagesCount: messages.length,
+    systemHash: systemStr ? hashString(systemStr) : null,
+    systemLen,
+    toolsHash: toolsStr ? hashString(toolsStr) : null,
+    toolCount: tools?.length ?? 0,
+  }
+  if (req.temperature !== undefined) summary.temperature = req.temperature
+  if (req.max_tokens !== undefined) summary.max_tokens = req.max_tokens
+  if (req.thinking !== undefined) summary.thinking = req.thinking
+  if (req.metadata !== undefined) summary.metadata = req.metadata
+  return summary
+}
+
 function dumpRequest(
   body: string,
   ts: string,
+  requestId: string,
   state: DumpState,
   filePath: string,
 ): void {
@@ -101,8 +153,8 @@ function dumpRequest(
     const entries: string[] = []
     const messages = (req.messages ?? []) as Array<{ role?: string }>
 
-    // Write init data (system, tools, metadata) on first request,
-    // and a system_update entry whenever it changes.
+    // 1. Write init data (system, tools, metadata) on first request,
+    //    and a system_update entry whenever it changes.
     // Cheap fingerprint first: system+tools don't change between turns,
     // so skip the 300ms stringify when the shape is unchanged.
     const fingerprint = initFingerprint(req)
@@ -127,11 +179,22 @@ function dumpRequest(
       }
     }
 
-    // Write only new user messages (assistant messages captured in response)
+    // 2. Always emit a per-turn request summary so that every真实 API 请求
+    //    都有一条可配对的记录（requestId 关联后续 response）。
+    //    记录保持轻量 (~300B)，system/tools 只存 SHA256 指纹，
+    //    完整内容仍由 init + system_update 承担。
+    entries.push(jsonStringify(computeRequestSummary(req, requestId, ts)))
+
+    // 3. Write only new user messages (assistant messages captured in response)
     for (const msg of messages.slice(state.messageCountSeen)) {
       if (msg.role === 'user') {
         entries.push(
-          jsonStringify({ type: 'message', timestamp: ts, data: msg }),
+          jsonStringify({
+            type: 'message',
+            timestamp: ts,
+            requestId,
+            data: msg,
+          }),
         )
       }
     }
@@ -141,6 +204,16 @@ function dumpRequest(
   } catch {
     // Ignore parsing errors
   }
+}
+
+/**
+ * Generate a short, unique-enough request id for dump pairing.
+ * Not cryptographic; collision-resistant for per-session pairing.
+ */
+function generateRequestId(): string {
+  const rand = Math.random().toString(36).slice(2, 10)
+  const t = Date.now().toString(36)
+  return `req_${t}_${rand}`
 }
 
 export function createDumpPromptsFetch(
@@ -158,13 +231,22 @@ export function createDumpPromptsFetch(
     dumpState.set(agentIdOrSessionId, state)
 
     let timestamp: string | undefined
+    let requestId: string | undefined
 
     if (init?.method === 'POST' && init.body) {
       timestamp = new Date().toISOString()
+      requestId = generateRequestId()
       // Parsing + stringifying the request (system prompt + tool schemas = MBs)
       // takes hundreds of ms. Defer so it doesn't block the actual API call —
       // this is debug tooling for /issue, not on the critical path.
-      setImmediate(dumpRequest, init.body as string, timestamp, state, filePath)
+      setImmediate(
+        dumpRequest,
+        init.body as string,
+        timestamp,
+        requestId,
+        state,
+        filePath,
+      )
     }
 
     // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
@@ -213,7 +295,12 @@ export function createDumpPromptsFetch(
 
           await fs.appendFile(
             filePath,
-            jsonStringify({ type: 'response', timestamp, data }) + '\n',
+            jsonStringify({
+              type: 'response',
+              timestamp,
+              requestId,
+              data,
+            }) + '\n',
           )
         } catch {
           // Best effort
