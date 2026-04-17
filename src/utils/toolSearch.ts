@@ -625,12 +625,30 @@ export type DeferredToolsDeltaScanContext = {
  * True → announce deferred tools via persisted delta attachments.
  * False → claude.ts keeps its per-call <available-deferred-tools>
  * header prepend (the attachment does not fire).
+ *
+ * v2.21.21 P0-3: 非 firstParty-Anthropic 通道默认启用 delta。
+ *
+ * 问题：ToolSearch 每发现新 MCP 工具 → filteredTools 集合扩张 → tools 数组
+ * 前缀/后缀都变 → cache bust。已有 delta 路径能固定 tools 描述字节。
+ * 观测 session 056f8651 命中率 36% 根因之三。
+ *
+ * byte-equal 守护：firstParty-Anthropic (Mycro 直连) 保持原默认 false（仅
+ * ant USER_TYPE 或 GrowthBook 翻转 true）。理由：上游 Claude Code byte-equal
+ * 依赖未翻转 delta 的 tools 序列化字节；翻转默认会破坏 byte-equal 核验。
+ * 非 firstParty 后端（Bedrock/Vertex/第三方）不走 byte-equal 约束，
+ * 默认启用 delta 让 tools 前缀稳定、命中率回升。
  */
 export function isDeferredToolsDeltaEnabled(): boolean {
-  return (
+  if (
     process.env.USER_TYPE === 'ant' ||
     getFeatureValue_CACHED_MAY_BE_STALE('tengu_glacier_2xr', false)
-  )
+  ) {
+    return true
+  }
+  // 非 firstParty-Anthropic 默认启用
+  const isFirstPartyAnthropic =
+    getAPIProvider() === 'firstParty' && isFirstPartyAnthropicBaseUrl()
+  return !isFirstPartyAnthropic
 }
 
 /**
