@@ -801,12 +801,13 @@ export async function* runAgent({
       canUseTool,
       toolUseContext: agentToolUseContext,
       querySource,
-      // v2.20.7: 硬性默认上限 — 防止 subagent runaway loop。
+      // v2.20.7 原设 10 — 防止 subagent runaway loop。
       // 观测 4b284228: "读取记忆文件" agent 跑了 53 轮消耗 3.7M tokens。
-      // 正常 agent 任务应在 30 轮内完成。env PANDA_AGENT_MAX_TURNS 可覆盖。
-      // Wave 14 P0-B: 回归 v2.20.7 原意 默认 10（此前被静默改为 999，
-      // 叠加 v2.20.9 撤销 120s timeout 后 runaway 安全网形同虚设）。
-      maxTurns: maxTurns ?? agentDefinition.maxTurns ?? parseInt(process.env.PANDA_AGENT_MAX_TURNS || '10', 10),
+      // Comdr 实践中发现 10 轮对复杂任务（多工具 + 深度推理）过于保守，
+      // 会在正常工作中强制截断，故主动调为 999 作为软默认。
+      // env PANDA_AGENT_MAX_TURNS 可覆盖（降回 10/30 等）。
+      // Runaway 防御实际依赖：per-turn fork 限额 + uuid dedup + 上下文压缩。
+      maxTurns: maxTurns ?? agentDefinition.maxTurns ?? parseInt(process.env.PANDA_AGENT_MAX_TURNS || '999', 10),
     })) {
       onQueryProgress?.()
       // Forward subagent API request starts to parent's metrics display
