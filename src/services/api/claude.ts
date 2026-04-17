@@ -3368,7 +3368,27 @@ export function addCacheBreakpoints(
   //   - primary: messages.length-1（当前 turn）
   // skipCacheWrite 场景保持单 marker（fire-and-forget 逻辑不变）。
   const isMycroBackend = getAPIProvider() === 'firstParty'
-  let primaryIdx = skipCacheWrite ? messages.length - 2 : messages.length - 1
+
+  // v2.21.21 P0-1: skipCacheWrite 短 fork 零 marker 洞修复。
+  //
+  // 问题：fire-and-forget fork (side_question/compact/prompt_suggestion/
+  // session_memory/auto_dream) 的首条 request 仅含 1 条 user msg →
+  // primaryIdx = 1 - 2 = -1 + secondaryIdx = -1 (length<4) → 整条零 marker，
+  // 父级 prefix 无锚可 cache_read。观测 session 056f8651 命中率仅 36%。
+  //
+  // 修复：非 firstParty-Anthropic 通道下，skipCacheWrite 场景保底至少 1 marker
+  // 在 messages[0]，语义是"不写新 cache，但给父级 prefix 一个 cache_read 锚点"。
+  //
+  // byte-equal 守护：firstParty-Anthropic (Mycro 直连) 保持旧行为（primaryIdx
+  // 可以为 -1 导致零 marker），因为上游 Claude Code 的 byte-equal 约定建立在
+  // 该路径历史行为之上，不能动。短 fork 场景在 Mycro 后端也非主要命中路径。
+  const isFirstPartyAnthropicChannel =
+    isMycroBackend && isFirstPartyAnthropicBaseUrl()
+  let primaryIdx = skipCacheWrite
+    ? isFirstPartyAnthropicChannel
+      ? messages.length - 2
+      : Math.max(messages.length - 2, 0)
+    : messages.length - 1
   let secondaryIdx = -1
   // CACHE-FIX: 所有后端都启用双标记策略
   // firstParty (Mycro) 也需要稳定的前缀锚点来提高缓存命中率。
@@ -3379,6 +3399,16 @@ export function addCacheBreakpoints(
   //   - secondary @ messages[0] → 缓存 system prompt + 首条消息（跨 turn 不变）
   //   - primary @ last message   → 缓存完整对话（每轮更新）
   if (messages.length >= 4) {
+    secondaryIdx = 0
+  } else if (
+    skipCacheWrite &&
+    !isFirstPartyAnthropicChannel &&
+    messages.length >= 2 &&
+    primaryIdx !== 0
+  ) {
+    // v2.21.21 P0-1 续：非 firstParty-Anthropic 的短 fork 路径，
+    // messages.length ∈ [2, 3] 时也给 secondary 一个锚点在 messages[0]，
+    // 让 fork 能命中父级 prefix。primaryIdx !== 0 保证 secondary/primary 不重合。
     secondaryIdx = 0
   }
 
