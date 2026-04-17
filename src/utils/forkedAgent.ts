@@ -518,6 +518,294 @@ export function createSubagentContext(
  * })
  * ```
  */
+// Known fire-and-forget fork labels whose final cache_creation will never be
+// read by a subsequent request. Automatically opt into skipCacheWrite to avoid
+// paying the 1.25× write premium for cache entries that are never reused.
+const FIRE_AND_FORGET_FORK_LABELS = new Set([
+  'session_memory',
+  'prompt_suggestion',
+  'away_summary',
+  'extract_memories',
+  'auto_dream',
+  'compact',
+  'agent_summary',
+  'session_summary',
+])
+
+/**
+ * Smart context compaction for forked agents (L1+L2).
+ *
+ * L1: Structural truncation — preserve head/tail + key lines (errors, grep
+ *     matches, diff hunks, function defs). Zero API calls.
+ * L2: Time-decay — recent tool results kept in full, older ones get
+ *     progressively more aggressive truncation based on "age" (position
+ *     distance from the most recent tool_result).
+ *
+ * L3 (LLM summary) is handled separately via sideQuery when the context
+ * exceeds 70% of model window — see the caller in the query loop.
+ */
+function smartCompactContent(
+  content: string,
+  maxLen: number,
+  age: number,
+): string {
+  if (content.length <= maxLen) return content
+
+  const lines = content.split('\n')
+
+  // L1: Extract structurally important lines
+  const keyLines: string[] = []
+  for (const line of lines) {
+    if (
+      line.includes('error') || line.includes('Error') || line.includes('ERROR') ||
+      line.includes('warning') || line.includes('Warning') ||
+      /^\s*\d+[:-]/.test(line) ||                          // grep with line numbers
+      /^[+-][^+-]/.test(line) ||                            // diff change lines
+      /^(def |class |function |export |import )/.test(line) || // definitions
+      line.startsWith('===') || line.startsWith('---') ||   // section separators
+      /\.(ts|js|py|rs|go|java|cpp|sh)[:(\s]/.test(line) || // file references
+      line.includes('TODO') || line.includes('FIXME')
+    ) {
+      keyLines.push(line)
+    }
+  }
+
+  // Head (first 15 lines) + tail (last 8 lines) + key lines (up to 30)
+  const head = lines.slice(0, 15).join('\n')
+  const tail = lines.slice(-8).join('\n')
+  const keySection = keyLines.slice(0, 30).join('\n')
+
+  // L2: Time-decay factor — older results get truncated more aggressively
+  // age=0 → keep 100%, age=1 → 85%, age=2 → 70%, ... age≥6 → 20% minimum
+  const decayFactor = Math.max(0.2, 1 - age * 0.15)
+  const budget = Math.floor(maxLen * decayFactor)
+
+  const assembled = [
+    head,
+    keySection.length > 0 ? `\n... [${keyLines.length} key lines extracted] ...\n${keySection}` : '',
+    `\n... [${lines.length - 23} lines omitted] ...\n`,
+    tail,
+  ].filter(Boolean).join('\n')
+
+  const truncated = assembled.slice(0, budget)
+  return truncated + `\n[L1+L2 smart-compact: ${content.length}→${truncated.length} chars, age=${age}, decay=${(decayFactor * 100).toFixed(0)}%]`
+}
+
+/**
+ * Budget-driven smart compaction for forked agents (L1+L2).
+ *
+ * Key principle: **DO NOT truncate unless total context actually needs it.**
+ * Only when total size exceeds the budget do we start compressing, and we
+ * compress from oldest to newest with progressive aggressiveness.
+ *
+ * Budget allocation:
+ *   1. Calculate total chars of all messages
+ *   2. If total < contextBudget → return as-is (no truncation!)
+ *   3. If total > contextBudget → compress old tool_results:
+ *      - Recent N tool_results: 100% preserved
+ *      - Older ones: budget allocated by weight (newest-old gets more)
+ *      - Each compressed via smartCompactContent (L1: key-line extraction)
+ *      - Weight decays with age (L2: time-decay)
+ */
+export function truncateOldToolResults(
+  messages: Message[],
+  {
+    keepRecent = 4,
+    // 200K tokens × ~4 chars/token × 60% safe margin = 480K chars
+    contextBudgetChars = 480_000,
+  }: {
+    keepRecent?: number
+    contextBudgetChars?: number
+  } = {},
+): Message[] {
+  // Step 1: Calculate total context size
+  const totalChars = messages.reduce((sum, m) => {
+    const content = typeof m.content === 'string'
+      ? m.content
+      : JSON.stringify(m.content)
+    return sum + content.length
+  }, 0)
+
+  // If within budget, return unchanged — no truncation needed!
+  if (totalChars <= contextBudgetChars) return messages
+
+  // Step 2: Collect all tool_result positions with their content sizes
+  const toolResultPositions: { msgIdx: number; blockIdx: number; size: number }[] = []
+  for (let m = 0; m < messages.length; m++) {
+    const msg = messages[m]!
+    if (!Array.isArray(msg.content)) continue
+    for (let b = 0; b < msg.content.length; b++) {
+      const block = msg.content[b]!
+      if (block.type === 'tool_result') {
+        const size = typeof block.content === 'string'
+          ? block.content.length
+          : JSON.stringify(block.content).length
+        toolResultPositions.push({ msgIdx: m, blockIdx: b, size })
+      }
+    }
+  }
+
+  if (toolResultPositions.length <= keepRecent) return messages
+
+  // Step 3: Calculate how much we need to trim
+  const excessChars = totalChars - contextBudgetChars
+  const oldPositions = toolResultPositions.slice(0, -keepRecent)
+
+  // Total size of old tool_results
+  const oldTotalSize = oldPositions.reduce((s, p) => s + p.size, 0)
+
+  // If old tool_results are smaller than excess, we can't save enough
+  // by truncating them — but we try our best
+  const targetReduction = Math.min(excessChars, oldTotalSize * 0.8)
+
+  // Step 4: Allocate compression budgets with age-based decay
+  // Oldest gets most aggressive compression, newest-old gets least
+  const compressionTargets = new Map<string, { budget: number; age: number }>()
+
+  for (let i = 0; i < oldPositions.length; i++) {
+    const pos = oldPositions[i]!
+    const age = oldPositions.length - i  // oldest = highest age
+
+    // Weight: older items should contribute more to reduction
+    // age=1 (newest-old) → weight 0.3, age=N (oldest) → weight 1.0
+    const weight = 0.3 + 0.7 * (age / oldPositions.length)
+
+    // How much this item should contribute to total reduction
+    const itemReduction = (weight * pos.size / oldTotalSize) * targetReduction
+    const itemBudget = Math.max(2000, pos.size - itemReduction) // minimum 2K chars
+
+    compressionTargets.set(`${pos.msgIdx}:${pos.blockIdx}`, {
+      budget: Math.floor(itemBudget),
+      age,
+    })
+  }
+
+  // Step 5: Apply compression only where needed
+  return messages.map((msg, mIdx) => {
+    if (!Array.isArray(msg.content)) return msg
+
+    let changed = false
+    const newContent = msg.content.map((block, bIdx) => {
+      const key = `${mIdx}:${bIdx}`
+      const target = compressionTargets.get(key)
+      if (!target || block.type !== 'tool_result') return block
+
+      const currentSize = typeof block.content === 'string'
+        ? block.content.length
+        : JSON.stringify(block.content).length
+
+      // If this block is already within its budget, don't touch it!
+      if (currentSize <= target.budget) return block
+
+      changed = true
+
+      if (typeof block.content === 'string') {
+        return { ...block, content: smartCompactContent(block.content, target.budget, target.age) }
+      }
+
+      if (Array.isArray(block.content)) {
+        return {
+          ...block,
+          content: block.content.map((sub: any) => {
+            if (sub.type === 'text' && typeof sub.text === 'string' && sub.text.length > target.budget / 2) {
+              return { ...sub, text: smartCompactContent(sub.text, target.budget / 2, target.age) }
+            }
+            return sub
+          }),
+        }
+      }
+
+      return block
+    })
+
+    return changed ? { ...msg, content: newContent } : msg
+  })
+}
+
+/**
+ * L3: LLM-powered summarization of old conversation context.
+ * Triggered when total context exceeds 70% of model window after L1+L2.
+ * Uses a single haiku call to compress old messages into a structured summary.
+ * Returns modified messages array with old messages replaced by summary.
+ */
+async function l3SummarizeOldContext(
+  messages: Message[],
+  querySource: QuerySource,
+  keepRecentCount: number = 6,
+  modelWindowTokens: number = 200_000,
+): Promise<Message[]> {
+  if (messages.length <= keepRecentCount + 2) return messages
+
+  // Rough token estimate: ~4 chars per token
+  const totalChars = messages.reduce((sum, m) => {
+    const content =
+      typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+    return sum + content.length
+  }, 0)
+  const estimatedTokens = totalChars / 4
+
+  // Only trigger at 70% of model window
+  if (estimatedTokens < modelWindowTokens * 0.7) return messages
+
+  const recentMessages = messages.slice(-keepRecentCount)
+  const oldMessages = messages.slice(0, -keepRecentCount)
+
+  // Build summary prompt from old messages
+  const oldContent = oldMessages
+    .map((m, i) => {
+      const content =
+        typeof m.content === 'string'
+          ? m.content
+          : Array.isArray(m.content)
+            ? m.content
+                .map((b: any) => b.text || b.content || '[non-text]')
+                .join('\n')
+            : JSON.stringify(m.content)
+      // Truncate each message to 500 chars for the summary prompt
+      return `[${m.role} #${i}]: ${content.slice(0, 500)}`
+    })
+    .join('\n\n')
+
+  try {
+    const { sideQuery } = await import('./sideQuery.js')
+    const response = await sideQuery({
+      model: 'claude-haiku-4-5',
+      system:
+        'You are a context summarizer. Summarize the key facts, decisions, file paths, code changes, errors, and action items from the conversation. Be concise but preserve all actionable information. Output in bullet points.',
+      messages: [
+        {
+          role: 'user',
+          content: `Summarize this conversation history:\n\n${oldContent.slice(0, 30_000)}`,
+        },
+      ],
+      max_tokens: 2048,
+      querySource,
+    })
+
+    // Extract text from haiku response
+    const summaryText = response.content
+      .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+      .map(b => b.text)
+      .join('\n')
+
+    if (!summaryText) return messages
+
+    // Replace old messages with a single summary message
+    const summaryMessage: Message = {
+      role: 'user',
+      content: `[Context Summary - ${oldMessages.length} earlier messages compressed]\n\n${summaryText}`,
+      type: 'user',
+      uuid: randomUUID() as any,
+    }
+
+    return [summaryMessage, ...recentMessages]
+  } catch (err) {
+    // L3 failure is non-fatal — return messages as-is (L1+L2 already applied)
+    logForDebugging(`[forkedAgent] L3 summarization failed: ${err}`)
+    return messages
+  }
+}
+
 export async function runForkedAgent({
   promptMessages,
   cacheSafeParams,
@@ -531,6 +819,15 @@ export async function runForkedAgent({
   skipTranscript,
   skipCacheWrite,
 }: ForkedAgentParams): Promise<ForkedAgentResult> {
+  // Auto-enable skipCacheWrite for fire-and-forget forks: single-turn forks
+  // or known labels whose cache_creation on the last breakpoint will never be
+  // read by a subsequent request — avoids the 1.25× write cost.
+  if (!skipCacheWrite) {
+    if (maxTurns === 1 || FIRE_AND_FORGET_FORK_LABELS.has(forkLabel)) {
+      skipCacheWrite = true
+    }
+  }
+
   const startTime = Date.now()
   const outputMessages: Message[] = []
   let totalUsage: NonNullableUsage = { ...EMPTY_USAGE }
@@ -580,7 +877,13 @@ export async function runForkedAgent({
   // partial tool batches, orphaning the paired results (API 400). Dangling
   // tool_uses are repaired downstream by ensureToolResultPairing in claude.ts,
   // same as the main thread — identical post-repair prefix keeps the cache hit.
-  const initialMessages: Message[] = [...forkContextMessages, ...promptMessages]
+  //
+  // L1+L2: truncate old tool results (cheap, no API calls)
+  // L3: if still >70% of model window, summarize old messages via haiku
+  const initialMessages: Message[] = await l3SummarizeOldContext(
+    truncateOldToolResults([...forkContextMessages, ...promptMessages]),
+    querySource,
+  )
 
   // Generate agent ID and record initial messages for transcript
   // When skipTranscript is set, skip agent ID creation and all transcript I/O

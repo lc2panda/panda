@@ -3311,17 +3311,15 @@ export function addCacheBreakpoints(
   const isMycroBackend = getAPIProvider() === 'firstParty'
   const primaryIdx = skipCacheWrite ? messages.length - 2 : messages.length - 1
   let secondaryIdx = -1
-  if (!isMycroBackend && messages.length >= 4) {
-    // CACHE-002 fix: Anchor secondary breakpoint to messages[0] (stable).
-    //
-    // Previously, secondary was placed on the Nth-from-last user message,
-    // which drifted every turn and caused cache misses. Anthropic caches
-    // the prefix from the start up to each cache_control marker, so:
-    //   - secondary @ messages[0] → caches system prompt + first message (stable)
-    //   - primary @ last message   → caches full conversation (updated each turn)
-    //
-    // The secondary cache entry now survives across turns and forks,
-    // giving a stable baseline hit for the conversation prefix.
+  // CACHE-FIX: 所有后端都启用双标记策略
+  // firstParty (Mycro) 也需要稳定的前缀锚点来提高缓存命中率。
+  // 之前只有非 Mycro 后端 (Bedrock/Vertex) 启用双 marker，导致 firstParty
+  // 每轮只有 messages[-1] 一个 marker，前缀无锚点，缓存命中率低。
+  //
+  // messages[0] 作为稳定锚点：
+  //   - secondary @ messages[0] → 缓存 system prompt + 首条消息（跨 turn 不变）
+  //   - primary @ last message   → 缓存完整对话（每轮更新）
+  if (messages.length >= 4) {
     secondaryIdx = 0
   }
   const result = messages.map((msg, index) => {

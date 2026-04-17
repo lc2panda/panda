@@ -120,11 +120,66 @@ function readlineQuestion(prompt: string): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: save OpenAI config after successful OAuth login
+// ---------------------------------------------------------------------------
+function saveOpenAIConfig(
+  providerKey: string,
+  provider: { name: string; baseURL: string; defaultModel: string; consoleURL: string },
+  apiKey: string,
+): void {
+  const selectedModel = provider.defaultModel
+
+  saveGlobalConfig(current => ({
+    ...current,
+    thirdPartyProvider: {
+      name: providerKey,
+      baseURL: provider.baseURL,
+      apiKey,
+      model: selectedModel,
+      contextWindow: getContextWindowForThirdPartyModel(selectedModel),
+    },
+  }))
+
+  // Clean settings.json env vars that might conflict
+  try {
+    const { readFileSync, writeFileSync } = require('fs') as typeof import('fs')
+    const { join } = require('path') as typeof import('path')
+    const { homedir } = require('os') as typeof import('os')
+    const settingsPath = join(
+      process.env.PANDA_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.pandacc'),
+      'settings.json',
+    )
+    const raw = readFileSync(settingsPath, 'utf-8')
+    const settings = JSON.parse(raw)
+    if (settings.env) {
+      delete settings.env.ANTHROPIC_BASE_URL
+      delete settings.env.ANTHROPIC_AUTH_TOKEN
+      delete settings.env.ANTHROPIC_MODEL
+      if (Object.keys(settings.env).length === 0) delete settings.env
+      writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
+    }
+  } catch {}
+
+  // Set env vars for the current process
+  process.env.PANDA_PROVIDER = 'openai'
+  process.env.OPENAI_API_KEY = apiKey
+  process.env.OPENAI_BASE_URL = provider.baseURL
+  process.env.ANTHROPIC_BASE_URL = provider.baseURL
+  process.env.ANTHROPIC_AUTH_TOKEN = apiKey
+  process.env.ANTHROPIC_MODEL = selectedModel
+
+  process.stdout.write(`\n✓ Login successful! Provider: ${provider.name}\n`)
+  process.stdout.write(`  Model: ${selectedModel}\n`)
+  process.stdout.write(`  Base URL: ${provider.baseURL}\n`)
+  process.stdout.write(`\nRun 'panda' to start.\n`)
+  process.exit(0)
+}
+
+// ---------------------------------------------------------------------------
 // Third-party login flow
 // ---------------------------------------------------------------------------
 async function thirdPartyLogin(providerKey: string): Promise<void> {
   // Clear previous auth state to prevent conflicts between providers
-  // Fixes: https://github.com/panda-ai/panda-code/issues/XXX
   await performLogout({ clearOnboarding: false })
   clearOAuthTokenCache()
 
@@ -132,6 +187,19 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
   if (!provider) {
     process.stderr.write(`Error: unknown provider "${providerKey}".\n`)
     process.exit(1)
+  }
+
+  // OpenAI uses a browser-based OAuth flow instead of manual API key input
+  if (providerKey === 'openai') {
+    const { openaiOAuthLogin } = await import('../../services/openai-oauth.js')
+    try {
+      const { apiKey } = await openaiOAuthLogin()
+      saveOpenAIConfig(providerKey, provider, apiKey)
+      return
+    } catch (err) {
+      process.stderr.write(`\nOpenAI login failed: ${err instanceof Error ? err.message : String(err)}\n`)
+      process.exit(1)
+    }
   }
 
   process.stdout.write(`\nLogging in to ${provider.name}...\n`)

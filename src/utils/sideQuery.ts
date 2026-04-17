@@ -167,6 +167,17 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
         : []),
   ].filter((block): block is TextBlockParam => block !== null)
 
+  // Add cache_control to the last system block so the system prompt prefix is
+  // cached across repeated sideQuery calls (e.g. permission_explainer). Without
+  // this every call pays full uncached input cost for the identical prefix.
+  if (systemBlocks.length > 0) {
+    const lastBlock = systemBlocks[systemBlocks.length - 1]!
+    systemBlocks[systemBlocks.length - 1] = {
+      ...lastBlock,
+      cache_control: { type: 'ephemeral' },
+    } as TextBlockParam
+  }
+
   let thinkingConfig: BetaThinkingConfigParam | undefined
   if (thinking === false) {
     thinkingConfig = { type: 'disabled' }

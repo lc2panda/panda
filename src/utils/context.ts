@@ -22,7 +22,7 @@ const MAX_OUTPUT_TOKENS_UPPER_LIMIT = 64_000
 // (see query.ts max_output_tokens_escalate). Cap is applied in
 // claude.ts:getMaxOutputTokensForModel to avoid the growthbook→betas→context
 // import cycle.
-export const CAPPED_DEFAULT_MAX_TOKENS = 8_000
+export const CAPPED_DEFAULT_MAX_TOKENS = 16_000
 export const ESCALATED_MAX_TOKENS = 64_000
 
 /**

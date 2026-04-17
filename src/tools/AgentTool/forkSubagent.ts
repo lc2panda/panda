@@ -62,7 +62,7 @@ export const FORK_AGENT = {
   whenToUse:
     'Implicit fork — inherits full conversation context. Not selectable via subagent_type; triggered by omitting subagent_type when the fork experiment is active.',
   tools: ['*'],
-  maxTurns: 200,
+  maxTurns: 999,
   model: 'inherit',
   permissionMode: 'bubble',
   source: 'built-in',
