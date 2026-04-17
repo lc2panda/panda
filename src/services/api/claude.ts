@@ -2032,8 +2032,14 @@ async function* queryModel(
     // kill hung streams. Without this, a silently dropped connection can hang
     // the session indefinitely since the SDK's request timeout only covers the
     // initial fetch(), not the streaming body.
-    const streamWatchdogEnabled = isEnvTruthy(
-      process.env.CLAUDE_ENABLE_STREAM_WATCHDOG,
+    //
+    // Wave 16 P0 (v2.21.20): 默认启用 — Comdr 观察到 agent 有时"直接被截断"，
+    // 根因是 server 返回 200 后 body stream 中途静默，客户端无兜底挂死。
+    // 对 Anthropic 原生通道 byte-equal 无影响（正常 stream 90s 内总有 chunk）。
+    // env CLAUDE_DISABLE_STREAM_WATCHDOG=1 可 opt-out 回旧行为。
+    // env CLAUDE_ENABLE_STREAM_WATCHDOG 保留兼容（任一方式均可启用，默认启用）。
+    const streamWatchdogEnabled = !isEnvTruthy(
+      process.env.CLAUDE_DISABLE_STREAM_WATCHDOG,
     )
     const STREAM_IDLE_TIMEOUT_MS =
       parseInt(process.env.CLAUDE_STREAM_IDLE_TIMEOUT_MS || '', 10) || 90_000
