@@ -37,7 +37,25 @@ async function drain<T>(
 }
 
 describe('Wave 7 P1-2 — withRetry defensive cache_control fallback', () => {
+  // CACHE-003 (281293a) resets stripCacheControl on explicit-cache providers to
+  // protect Anthropic 直连 from being falsely stripped. This test targets the
+  // implicit-provider scenario (the real use case for defensive fallback —
+  // third-party proxies that reject cache_control with 400). We force implicit
+  // cache strategy so CACHE-003 reset doesn't fire.
+  const priorForceStrategy = process.env.PANDA_FORCE_CACHE_STRATEGY
+  const forceImplicit = () => {
+    process.env.PANDA_FORCE_CACHE_STRATEGY = 'implicit'
+  }
+  const restoreStrategy = () => {
+    if (priorForceStrategy === undefined) {
+      delete process.env.PANDA_FORCE_CACHE_STRATEGY
+    } else {
+      process.env.PANDA_FORCE_CACHE_STRATEGY = priorForceStrategy
+    }
+  }
+
   test('400 "cache_control" → flips context.stripCacheControl, retries once, succeeds', async () => {
+    forceImplicit()
     let attempt = 0
     const contextSeen: { stripCacheControl?: boolean }[] = []
 
@@ -76,6 +94,7 @@ describe('Wave 7 P1-2 — withRetry defensive cache_control fallback', () => {
     expect(contextSeen.length).toBe(2)
     expect(contextSeen[0]?.stripCacheControl).toBeFalsy()
     expect(contextSeen[1]?.stripCacheControl).toBe(true)
+    restoreStrategy()
   })
 
   test('400 without cache keyword → NOT marked for strip; error propagates (non-retryable 400)', async () => {
