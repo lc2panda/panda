@@ -1844,6 +1844,13 @@ async function* queryModel(
 
     lastRequestBetas = betasParams
 
+    // Wave 14 Rho-3 (P0-A): 统计 system + tools 已占 cache_control marker 数量，
+    // 交给 addCacheBreakpoints 计算 messages 可用 marker 预算，守 Anthropic 4 上限。
+    const occupiedMarkerCount = countExistingCacheControlMarkers(
+      system,
+      allTools,
+    )
+
     const builtParams: BetaMessageStreamParams = {
       model: normalizeModelStringForAPI(options.model),
       messages: addCacheBreakpoints(
@@ -1854,6 +1861,7 @@ async function* queryModel(
         consumedCacheEdits as any,
         consumedPinnedEdits as any,
         options.skipCacheWrite,
+        occupiedMarkerCount,
       ),
       system,
       tools: allTools,
@@ -3277,6 +3285,45 @@ type CachedMCPinnedEdits = {
   block: CachedMCEditsBlock
 }
 
+/**
+ * Wave 14 Rho-3 (P0-A): Anthropic 硬上限 4 个 cache_control breakpoint。
+ * 超过后 Bedrock/Vertex 会静默丢弃未知 marker，导致 messages[0] secondary
+ * 锚失效、cache_read≈0、cache_create 重复支付。
+ *
+ * ref: src/skills/bundled/claude-api/shared/prompt-caching.md:107
+ * > "Max 4 cache_control breakpoints per request."
+ */
+export const MAX_CACHE_CONTROL_MARKERS = 4
+
+/**
+ * Wave 14 Rho-3: 统计 system + tools 里已占用的 cache_control marker 数量。
+ * 用于 addCacheBreakpoints 计算 messages 可用 marker 预算（≤ 4 总上限）。
+ *
+ * 仅统计顶层 cache_control（system block / tool definition）。
+ * 不统计 messages 内的 marker — 那部分由 addCacheBreakpoints 自己管理。
+ */
+export function countExistingCacheControlMarkers(
+  systemBlocks: readonly { cache_control?: unknown }[] | undefined,
+  tools: readonly { cache_control?: unknown }[] | undefined,
+): number {
+  let count = 0
+  if (systemBlocks) {
+    for (const block of systemBlocks) {
+      if (block && typeof block === 'object' && 'cache_control' in block) {
+        count += 1
+      }
+    }
+  }
+  if (tools) {
+    for (const tool of tools) {
+      if (tool && typeof tool === 'object' && 'cache_control' in tool) {
+        count += 1
+      }
+    }
+  }
+  return count
+}
+
 // Exported for testing cache_reference placement constraints
 export function addCacheBreakpoints(
   messages: (UserMessage | AssistantMessage)[],
@@ -3286,6 +3333,12 @@ export function addCacheBreakpoints(
   newCacheEdits?: CachedMCEditsBlock | null,
   pinnedEdits?: CachedMCPinnedEdits[],
   skipCacheWrite = false,
+  /**
+   * Wave 14 Rho-3: system + tools 已占用的 cache_control marker 数量。
+   * 用于动态收缩 messages primary/secondary marker 以守 ≤ 4 总上限。
+   * 未传时默认 0（回退到旧行为，但调用方应传值以启用防御）。
+   */
+  occupiedMarkerCount = 0,
 ): MessageParam[] {
   logEvent('tengu_api_cache_breakpoints', {
     totalMessageCount: messages.length,
@@ -3309,7 +3362,7 @@ export function addCacheBreakpoints(
   //   - primary: messages.length-1（当前 turn）
   // skipCacheWrite 场景保持单 marker（fire-and-forget 逻辑不变）。
   const isMycroBackend = getAPIProvider() === 'firstParty'
-  const primaryIdx = skipCacheWrite ? messages.length - 2 : messages.length - 1
+  let primaryIdx = skipCacheWrite ? messages.length - 2 : messages.length - 1
   let secondaryIdx = -1
   // CACHE-FIX: 所有后端都启用双标记策略
   // firstParty (Mycro) 也需要稳定的前缀锚点来提高缓存命中率。
@@ -3322,6 +3375,46 @@ export function addCacheBreakpoints(
   if (messages.length >= 4) {
     secondaryIdx = 0
   }
+
+  // Wave 14 Rho-3 (P0-A): 5-marker 上限防御。
+  // Anthropic 硬上限 4。system + tools 已占 `occupiedMarkerCount` 个，
+  // messages 的可用预算 = max(0, 4 - occupiedMarkerCount)。
+  //
+  // Nu-2 session 5855d256：system(2) + tools(1) + messages(primary+secondary=2)
+  // = 5 → Bedrock 静默丢 secondary → cache_read=0。
+  //
+  // 降级策略（优先保 primary，因为 primary 是每轮唯一的新写入点；
+  // secondary 只是稳定前缀锚，丢了回退到单 marker，仍能命中 system+tools prefix）：
+  //   - budget ≥ 2 → 不变：secondary + primary 都插
+  //   - budget == 1 → 砍 secondary，保 primary（旧的单 marker 行为）
+  //   - budget == 0 → primary + secondary 都不插（极罕见，system+tools 已占 4）
+  //
+  // byte-equal 底线：firstParty Global Cache 边界命中路径下 occupiedMarkerCount=2
+  // （1 system global + 1 tools），budget=2 → 行为完全不变，不破坏 Anthropic 直连。
+  if (enablePromptCaching && occupiedMarkerCount > 0) {
+    const slotsAvailableForMessages = Math.max(
+      0,
+      MAX_CACHE_CONTROL_MARKERS - occupiedMarkerCount,
+    )
+    if (slotsAvailableForMessages === 0) {
+      primaryIdx = -1
+      secondaryIdx = -1
+      logEvent('tengu_cache_marker_budget_exhausted', {
+        occupiedMarkerCount,
+        messagesLength: messages.length,
+        degradedTo: 'none',
+      })
+    } else if (slotsAvailableForMessages === 1 && secondaryIdx >= 0) {
+      // 砍 secondary，保 primary
+      secondaryIdx = -1
+      logEvent('tengu_cache_marker_budget_shrunk', {
+        occupiedMarkerCount,
+        messagesLength: messages.length,
+        degradedTo: 'primary_only',
+      })
+    }
+  }
+
   const result = messages.map((msg, index) => {
     const addCache = index === primaryIdx || index === secondaryIdx
     if (msg.type === 'user') {
