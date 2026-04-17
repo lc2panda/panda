@@ -5,6 +5,7 @@
  * server, exchanging the resulting id_token for an OpenAI API key.
  */
 
+import axios from 'axios'
 import { createHash, randomBytes } from 'crypto'
 import { createServer, type Server } from 'http'
 import type { AddressInfo } from 'net'
@@ -177,26 +178,28 @@ async function exchangeCodeForTokens(params: {
     code_verifier: params.codeVerifier,
   })
 
-  const response = await fetch(`${OPENAI_ISSUER}/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  })
+  const response = await axios.post(
+    `${OPENAI_ISSUER}/oauth/token`,
+    body.toString(),
+    {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      validateStatus: () => true,
+    },
+  )
 
-  process.stderr.write(`DEBUG exchangeCodeForTokens: status = ${response.status}\n`)
-
-  if (!response.ok) {
-    const text = await response.text()
+  if (response.status < 200 || response.status >= 300) {
+    const text =
+      typeof response.data === 'string'
+        ? response.data
+        : JSON.stringify(response.data)
     throw new Error(`Token exchange failed (${response.status}): ${text}`)
   }
 
-  const result = await response.json() as {
+  return response.data as {
     id_token: string
     access_token: string
     refresh_token?: string
   }
-  process.stderr.write(`DEBUG exchangeCodeForTokens: response keys = ${Object.keys(result).join(', ')}\n`)
-  return result
 }
 
 async function exchangeTokenForApiKey(idToken: string): Promise<string> {
@@ -212,26 +215,24 @@ async function exchangeTokenForApiKey(idToken: string): Promise<string> {
     subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
   })
 
-  const response = await fetch(`${OPENAI_ISSUER}/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  })
+  const response = await axios.post(
+    `${OPENAI_ISSUER}/oauth/token`,
+    body.toString(),
+    {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      validateStatus: () => true,
+    },
+  )
 
-  if (!response.ok) {
-    const text = await response.text()
-    const debugBody = {
-      grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-      client_id: OPENAI_CLIENT_ID,
-      requested_token: 'openai-api-key',
-      subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-      subject_token_length: idToken.length,
-    }
-    process.stderr.write(`DEBUG exchangeTokenForApiKey: request body (sans subject_token) = ${JSON.stringify(debugBody)}\n`)
+  if (response.status < 200 || response.status >= 300) {
+    const text =
+      typeof response.data === 'string'
+        ? response.data
+        : JSON.stringify(response.data)
     throw new Error(`API key exchange failed (${response.status}): ${text}`)
   }
 
-  const data = (await response.json()) as { access_token: string }
+  const data = response.data as { access_token: string }
   return data.access_token
 }
 
@@ -275,8 +276,6 @@ export async function openaiOAuthLogin(): Promise<{ apiKey: string }> {
     port: actualPort,
     codeVerifier,
   })
-  process.stderr.write(`DEBUG: tokens keys = ${Object.keys(tokens).join(', ')}\n`)
-  process.stderr.write(`DEBUG: id_token present = ${!!tokens.id_token}, length = ${tokens.id_token?.length ?? 0}\n`)
 
   // 6. Exchange id_token → API key
   process.stdout.write('Obtaining API key...\n')
