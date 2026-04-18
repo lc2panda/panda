@@ -117,6 +117,88 @@ try {
   }
 }
 
+// ─── settings.json proxy 注入 ────────────────────────────────────────────────
+// 作战线 N：Option A 根治方案 —— 在 SDK 初始化前从 ~/.pandacc/settings.json
+// 读取 proxy 字段写入 env。env 最优先，用户临时 `HTTPS_PROXY=... bun ...` 仍可覆盖。
+// 支持两种形式：
+//   "proxy": "http://127.0.0.1:7897"                           ← 字符串：https/http 都用它
+//   "proxy": { "https": "...", "http": "...", "noProxy": "..." } ← 对象：分别指定
+// Anthropic SDK 天然读 HTTPS_PROXY/HTTP_PROXY env，byte-equal 契约不变。
+try {
+    const _osMod = require('os');
+    const _fsMod = require('fs');
+    const _pathMod = require('path');
+    const _cfgDir: string =
+        process.env.PANDA_CONFIG_DIR ||
+        process.env.CLAUDE_CONFIG_DIR ||
+        _pathMod.join(_osMod.homedir(), '.pandacc');
+    const _settingsPath = _pathMod.join(_cfgDir, 'settings.json');
+    const _settingsRaw = _fsMod.readFileSync(_settingsPath, 'utf-8');
+    const _settings = JSON.parse(_settingsRaw);
+    const _proxyCfg = _settings?.proxy;
+    if (_proxyCfg) {
+        const _httpsProxy: string | undefined =
+            typeof _proxyCfg === 'string' ? _proxyCfg : _proxyCfg?.https;
+        const _httpProxy: string | undefined =
+            typeof _proxyCfg === 'string'
+                ? _proxyCfg
+                : (_proxyCfg?.http ?? _proxyCfg?.https);
+        if (_httpsProxy && !process.env.HTTPS_PROXY && !process.env.https_proxy) {
+            process.env.HTTPS_PROXY = _httpsProxy;
+            // 中文日志：让指挥官实测时能确认注入生效
+            if (process.env.PANDA_DEBUG || process.env.PANDA_PROXY_DEBUG) {
+                process.stderr.write(
+                    `[panda] 使用 settings.json proxy: ${_httpsProxy}\n`,
+                );
+            }
+        }
+        if (_httpProxy && !process.env.HTTP_PROXY && !process.env.http_proxy) {
+            process.env.HTTP_PROXY = _httpProxy;
+        }
+        if (typeof _proxyCfg !== 'string' && _proxyCfg?.noProxy) {
+            const _nop = Array.isArray(_proxyCfg.noProxy)
+                ? _proxyCfg.noProxy.join(',')
+                : String(_proxyCfg.noProxy);
+            if (_nop && !process.env.NO_PROXY && !process.env.no_proxy) {
+                process.env.NO_PROXY = _nop;
+            }
+        }
+    }
+} catch (e: any) {
+    // 缺文件/解析失败不致命：保持旧行为，静默跳过
+    if (e?.code !== 'ENOENT' && e?.code !== 'MODULE_NOT_FOUND') {
+        if (process.env.PANDA_DEBUG || process.env.PANDA_PROXY_DEBUG) {
+            process.stderr.write(
+                `[panda] settings.json proxy 加载失败（忽略）: ${e?.message || e}\n`,
+            );
+        }
+    }
+}
+
+// ─── CLI flag --proxy 一次性覆盖（优先级最高，用户临时绕过 settings/env） ───
+// 在 commander 解析前直接扫 argv，避免动到 main.tsx 巨型 program 定义。
+// 用法：panda --proxy http://127.0.0.1:7897 -p "..."
+try {
+    const _argv = process.argv.slice(2);
+    const _idx = _argv.findIndex((a: string) => a === '--proxy' || a.startsWith('--proxy='));
+    if (_idx !== -1) {
+        const _val = _argv[_idx]!.startsWith('--proxy=')
+            ? _argv[_idx]!.slice('--proxy='.length)
+            : _argv[_idx + 1];
+        if (typeof _val === 'string' && _val.length > 0) {
+            process.env.HTTPS_PROXY = _val;
+            process.env.HTTP_PROXY = _val;
+            if (process.env.PANDA_DEBUG || process.env.PANDA_PROXY_DEBUG) {
+                process.stderr.write(`[panda] --proxy 覆盖：${_val}\n`);
+            }
+            // 把 --proxy（及其值）从 argv 移除，防止 commander strict 报错。
+            // process.argv[0..1] 是 node/bun + entry，所以 argv 偏移 +2。
+            const _removeCount = _argv[_idx]!.startsWith('--proxy=') ? 1 : 2;
+            process.argv.splice(_idx + 2, _removeCount);
+        }
+    }
+} catch {}
+
 // Bugfix for corepack auto-pinning, which adds yarnpkg to peoples' package.jsons
 // eslint-disable-next-line custom-rules/no-top-level-side-effects
 process.env.COREPACK_ENABLE_AUTO_PIN = "0";

@@ -8,6 +8,8 @@ import { toInkColor } from '../../utils/ink.js';
 import { jsonParse } from '../../utils/slowOperations.js';
 import { isShutdownApproved } from '../../utils/teammateMailbox.js';
 import { MessageResponse } from '../MessageResponse.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 import { tryRenderPlanApprovalMessage } from './PlanApprovalMessage.js';
 import { tryRenderShutdownMessage } from './ShutdownMessage.js';
 import { tryRenderTaskAssignmentMessage } from './TaskAssignmentMessage.js';
@@ -123,7 +125,7 @@ export function UserTeammateMessage({
           taskSubject?: string;
         };
         return <Box key={index} flexDirection="column" marginTop={1}>
-              <Text color={inkColor}>{`@${displayName}${figures.pointer}`}</Text>
+              <Text color={isMatrixTheme() ? MATRIX_UI.userGutter : inkColor}>{`@${displayName}${isMatrixTheme() ? '│' : figures.pointer}`}</Text>
               <MessageResponse>
                 <Text color="success">✓</Text>
                 <Text>
@@ -156,10 +158,11 @@ export function TeammateMessageContent(t0) {
     summary,
     isTranscriptMode
   } = t0;
-  const t1 = `@${displayName}${figures.pointer}`;
+  const _isM_tmc = isMatrixTheme();
+  const t1 = `@${displayName}${_isM_tmc ? '│' : figures.pointer}`;
   let t2;
   if ($[0] !== inkColor || $[1] !== t1) {
-    t2 = <Text color={inkColor}>{t1}</Text>;
+    t2 = <Text color={_isM_tmc ? MATRIX_UI.userGutter : inkColor}>{t1}</Text>;
     $[0] = inkColor;
     $[1] = t1;
     $[2] = t2;

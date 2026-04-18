@@ -1,8 +1,16 @@
 /**
  * OpenAI / Codex OAuth login flow.
  *
- * Implements the full PKCE browser-based OAuth flow against OpenAI's auth
- * server, exchanging the resulting id_token for an OpenAI API key.
+ * Input:  交互式 PKCE 浏览器流 / env 中现存 refresh_token
+ * Output: ChatGPT backend token 三元组 { accessToken, refreshToken, idToken, accountId, expiresAt }
+ *         以及 refresh 时的新三元组（refresh_token 会轮换，必须覆盖保存）
+ * Pos:    src/services/openai-oauth.ts — OAuth 前端 + token 仓库入口
+ *
+ * 契约：
+ *   - id_token 里 namespaced claim "https://api.openai.com/auth" 含 chatgpt_account_id
+ *   - refresh 使用 application/x-www-form-urlencoded，client_id=app_EMoamEEZ73f0CkXaXp7hrann
+ *   - refresh 响应的 refresh_token 会轮换，漏存即下次 401（CLIProxyAPI 实测）
+ *   - 并发 refresh 竞态用 module-level Promise 锁防抖（refreshLock）
  */
 
 import axios from 'axios'
@@ -198,6 +206,8 @@ async function postFormViaCurl(
 ): Promise<PostFormResponse> {
   const curlBin = process.platform === 'win32' ? 'curl.exe' : 'curl'
   const maxTimeSec = Math.max(1, Math.ceil(timeoutMs / 1000))
+  // Windows 下 curl.exe 不读 WinHTTP/PAC 系统代理，必须显式 -x 透传
+  // （和 chatgptBackendRequest 用同一个 detectSystemProxy）
   const args = [
     '-sS',
     '-X',
@@ -210,8 +220,27 @@ async function postFormViaCurl(
     String(maxTimeSec),
     '-w',
     '\n%{http_code}',
-    url,
   ]
+  // 复用 openaiAdapter 的系统代理探测（PAC / 注册表 / env 三级）
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const adapterMod = require('./api/openaiAdapter.js') as {
+      detectSystemProxyForOAuth?: () => string | undefined
+    }
+    const proxy = adapterMod.detectSystemProxyForOAuth?.()
+    if (proxy) {
+      args.push('-x', proxy)
+    }
+  } catch {
+    // openaiAdapter 暴露的 detect 不可用 → 退回 env-only
+    const envProxy =
+      process.env.HTTPS_PROXY ||
+      process.env.https_proxy ||
+      process.env.HTTP_PROXY ||
+      process.env.http_proxy
+    if (envProxy) args.push('-x', envProxy)
+  }
+  args.push(url)
 
   try {
     const { stdout } = await execFileAsync(curlBin, args, {
@@ -313,6 +342,8 @@ export const __testing = {
   postFormViaAxiosWithCA,
   postForm,
   CurlNotAvailableError,
+  // refresh 并发锁状态（测试用）
+  isRefreshLockActive: () => refreshLock !== null,
 }
 
 // ─── Token exchange helpers ──────────────────────────────────────────────────
@@ -321,7 +352,12 @@ async function exchangeCodeForTokens(params: {
   code: string
   port: number
   codeVerifier: string
-}): Promise<{ id_token: string; access_token: string; refresh_token?: string }> {
+}): Promise<{
+  id_token: string
+  access_token: string
+  refresh_token?: string
+  expires_in?: number
+}> {
   const redirectUri = `http://localhost:${params.port}${OPENAI_REDIRECT_PATH}`
 
   const body = new URLSearchParams({
@@ -350,43 +386,151 @@ async function exchangeCodeForTokens(params: {
     id_token: string
     access_token: string
     refresh_token?: string
+    expires_in?: number
   }
 }
 
-async function exchangeTokenForApiKey(idToken: string): Promise<string> {
-  if (!idToken) {
-    throw new Error('exchangeTokenForApiKey: idToken is falsy (missing or empty). The token exchange step likely did not return an id_token.')
+// ─── JWT helpers ─────────────────────────────────────────────────────────────
+
+export interface OpenAITokenBundle {
+  accessToken: string
+  refreshToken: string
+  idToken: string
+  accountId: string | null
+  email: string | null
+  /** unix ms epoch; set conservatively to 28 minutes from issuance (tokens live 30m) */
+  expiresAt: number
+}
+
+/**
+ * 解析 JWT payload 段（不校验签名，仅读 claim）。
+ * OpenAI 的 id_token 里带 namespaced claim:
+ *   payload["https://api.openai.com/auth"].chatgpt_account_id
+ */
+export function decodeJwtPayload(
+  token: string,
+): Record<string, unknown> | null {
+  if (!token || typeof token !== 'string') return null
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  try {
+    // base64url → base64
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const pad = b64.length % 4 === 0 ? b64 : b64 + '='.repeat(4 - (b64.length % 4))
+    const json = Buffer.from(pad, 'base64').toString('utf-8')
+    return JSON.parse(json) as Record<string, unknown>
+  } catch {
+    return null
   }
+}
 
-  const body = new URLSearchParams({
-    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-    client_id: OPENAI_CLIENT_ID,
-    requested_token: 'openai-api-key',
-    subject_token: idToken,
-    subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-  })
+/**
+ * 从 JWT payload 抽取 chatgpt_account_id。
+ * CLIProxyAPI 实测：claim key 必须是 URL 形式 "https://api.openai.com/auth"，不能用点路径。
+ */
+export function extractAccountId(token: string): string | null {
+  const payload = decodeJwtPayload(token)
+  if (!payload) return null
+  const authClaim = payload['https://api.openai.com/auth'] as
+    | Record<string, unknown>
+    | undefined
+  if (!authClaim || typeof authClaim !== 'object') return null
+  const id = authClaim['chatgpt_account_id']
+  return typeof id === 'string' && id.length > 0 ? id : null
+}
 
-  const response = await postForm(
-    `${OPENAI_ISSUER}/oauth/token`,
-    body.toString(),
-    30000,
-  )
+export function extractEmail(token: string): string | null {
+  const payload = decodeJwtPayload(token)
+  if (!payload) return null
+  const email = payload['email']
+  return typeof email === 'string' && email.length > 0 ? email : null
+}
 
-  if (response.status < 200 || response.status >= 300) {
-    const text =
-      typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data)
-    throw new Error(`API key exchange failed (${response.status}): ${text}`)
+/**
+ * 作战线 N：从 id_token 解 chatgpt_plan_type（free/plus/pro/team/enterprise）
+ * 用途：Codex 模型候选列表分派（free 走 mini 列表，paid 走 full 列表）。
+ * Claim 路径与 account_id 同源：`https://api.openai.com/auth`.chatgpt_plan_type
+ * 未找到返回 null（调用方应 fallback 到 free 策略以免误给 free 账户发 paid-only 模型）
+ */
+export function extractPlanType(token: string): string | null {
+  const payload = decodeJwtPayload(token)
+  if (!payload) return null
+  const authClaim = payload['https://api.openai.com/auth'] as
+    | Record<string, unknown>
+    | undefined
+  if (!authClaim || typeof authClaim !== 'object') return null
+  const pt = authClaim['chatgpt_plan_type']
+  return typeof pt === 'string' && pt.length > 0 ? pt : null
+}
+
+// ─── Token refresh (with module-level concurrency lock) ──────────────────────
+
+// 防并发：多个请求同时到期触发 refresh，会同时 POST 两次 /oauth/token，
+// 第二次拿到的 refresh_token 会被第一次覆盖，然后第二次的 rt 作废 → 401。
+// 用 module-level Promise 锁保证同一时刻只有一次 refresh 飞行。
+let refreshLock: Promise<OpenAITokenBundle> | null = null
+
+export async function refreshOpenAIAccessToken(
+  currentRefreshToken: string,
+): Promise<OpenAITokenBundle> {
+  if (!currentRefreshToken) {
+    throw new Error('refreshOpenAIAccessToken: refreshToken is empty')
   }
+  if (refreshLock) return refreshLock
 
-  const data = response.data as { access_token: string }
-  return data.access_token
+  refreshLock = (async (): Promise<OpenAITokenBundle> => {
+    try {
+      const body = new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: currentRefreshToken,
+        client_id: OPENAI_CLIENT_ID,
+        scope: OPENAI_SCOPES,
+      })
+      const response = await postForm(
+        `${OPENAI_ISSUER}/oauth/token`,
+        body.toString(),
+        30000,
+      )
+      if (response.status < 200 || response.status >= 300) {
+        const text =
+          typeof response.data === 'string'
+            ? response.data
+            : JSON.stringify(response.data)
+        throw new Error(`Token refresh failed (${response.status}): ${text}`)
+      }
+      const data = response.data as {
+        access_token: string
+        refresh_token?: string
+        id_token?: string
+        expires_in?: number
+      }
+      const newIdToken = data.id_token || ''
+      // 保守估计：expires_in 若缺失则默认 30min，再留 2min 余量
+      const ttlSec =
+        typeof data.expires_in === 'number' && data.expires_in > 0
+          ? data.expires_in
+          : 30 * 60
+      const expiresAt = Date.now() + Math.max(60, ttlSec - 120) * 1000
+      return {
+        accessToken: data.access_token,
+        // 必须回写新 rt；如果 server 未轮换（兜底），保留旧的
+        refreshToken: data.refresh_token || currentRefreshToken,
+        idToken: newIdToken,
+        accountId: newIdToken ? extractAccountId(newIdToken) : null,
+        email: newIdToken ? extractEmail(newIdToken) : null,
+        expiresAt,
+      }
+    } finally {
+      refreshLock = null
+    }
+  })()
+
+  return refreshLock
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-export async function openaiOAuthLogin(): Promise<{ apiKey: string }> {
+export async function openaiOAuthLogin(): Promise<OpenAITokenBundle> {
   // 1. PKCE + state
   const codeVerifier = generateCodeVerifier()
   const codeChallenge = generateCodeChallenge(codeVerifier)
@@ -425,9 +569,52 @@ export async function openaiOAuthLogin(): Promise<{ apiKey: string }> {
     codeVerifier,
   })
 
-  // 6. Exchange id_token → API key
-  process.stdout.write('Obtaining API key...\n')
-  const apiKey = await exchangeTokenForApiKey(tokens.id_token)
+  if (!tokens.access_token) {
+    throw new Error('OAuth succeeded but server did not return access_token')
+  }
+  if (!tokens.refresh_token) {
+    throw new Error(
+      'OAuth succeeded but server did not return refresh_token. ' +
+        'The "offline_access" scope may be missing or declined.',
+    )
+  }
 
-  return { apiKey }
+  // 6. 解 id_token 拿 chatgpt_account_id（ChatGPT backend 必需 header）
+  process.stdout.write('Decoding ChatGPT account id...\n')
+  const accountId = tokens.id_token ? extractAccountId(tokens.id_token) : null
+  const email = tokens.id_token ? extractEmail(tokens.id_token) : null
+  if (!accountId) {
+    throw new Error(
+      'OAuth succeeded but id_token did not contain chatgpt_account_id. ' +
+        'The namespaced claim "https://api.openai.com/auth" is missing.',
+    )
+  }
+
+  // TTL 三级优先：OAuth 响应 expires_in → id_token 的 exp claim → 兜底 10 天
+  // CLIProxyAPI 实测样本 access_token iat→exp ≈ 10 天（864001s），不是 30min
+  let ttlSec: number
+  if (typeof tokens.expires_in === 'number' && tokens.expires_in > 60) {
+    ttlSec = tokens.expires_in
+  } else {
+    const payload = tokens.id_token ? decodeJwtPayload(tokens.id_token) : null
+    const jwtExp =
+      payload && typeof payload.exp === 'number'
+        ? (payload.exp as number)
+        : null
+    if (jwtExp && jwtExp * 1000 > Date.now()) {
+      ttlSec = jwtExp - Math.floor(Date.now() / 1000)
+    } else {
+      ttlSec = 10 * 24 * 60 * 60 // 10-day fallback
+    }
+  }
+  const expiresAt = Date.now() + Math.max(60, ttlSec - 120) * 1000
+
+  return {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    idToken: tokens.id_token,
+    accountId,
+    email,
+    expiresAt,
+  }
 }

@@ -146,12 +146,66 @@ export async function getAnthropicClient({
     const _tpConfig = getGlobalConfig().thirdPartyProvider
     if (_tpConfig) {
       if (_tpConfig.name === 'openai') {
-        // OpenAI provider: set PANDA_PROVIDER + OPENAI_* env vars
-        // so the OpenAI adapter proxy in getAnthropicClient() is activated
+        // OpenAI provider 双轨：
+        //   mode='chatgpt_backend' → OAuth access_token + chatgpt_account_id，到期前自动 refresh
+        //   mode='api_key' (默认)   → 传统 API key
         process.env.PANDA_PROVIDER = 'openai'
-        process.env.OPENAI_API_KEY = _tpConfig.apiKey
         process.env.OPENAI_BASE_URL = _tpConfig.baseURL
         process.env.ANTHROPIC_MODEL = _tpConfig.model
+
+        const mode = _tpConfig.mode ?? 'api_key'
+        if (mode === 'chatgpt_backend') {
+          process.env.PANDA_OPENAI_MODE = 'chatgpt'
+          // 若已到期或即将到期（≤2min），用 refresh_token 换新 bundle 并回写 config
+          let accessToken = _tpConfig.accessToken ?? ''
+          let accountId = _tpConfig.accountId ?? ''
+          const rt = _tpConfig.refreshToken ?? ''
+          const expiresAt = _tpConfig.expiresAt ?? 0
+          const needsRefresh = !accessToken || Date.now() >= expiresAt - 120_000
+          if (needsRefresh && rt) {
+            try {
+              const { refreshOpenAIAccessToken } = await import(
+                '../openai-oauth.js'
+              )
+              const bundle = await refreshOpenAIAccessToken(rt)
+              accessToken = bundle.accessToken
+              accountId = bundle.accountId ?? accountId
+              // 回写 config —— refresh_token 轮换必须保存
+              const { saveGlobalConfig } = await import('../../utils/config.js')
+              saveGlobalConfig(current => {
+                const tp = current.thirdPartyProvider
+                if (!tp || tp.name !== 'openai') return current
+                return {
+                  ...current,
+                  thirdPartyProvider: {
+                    ...tp,
+                    accessToken: bundle.accessToken,
+                    refreshToken: bundle.refreshToken,
+                    idToken: bundle.idToken || tp.idToken,
+                    accountId: bundle.accountId ?? tp.accountId,
+                    email: bundle.email ?? tp.email,
+                    expiresAt: bundle.expiresAt,
+                  },
+                }
+              })
+              logForDebugging('[API:openai] ChatGPT backend token refreshed')
+            } catch (err) {
+              logForDebugging(
+                `[API:openai] Token refresh failed: ${err instanceof Error ? err.message : String(err)}`,
+                { level: 'error' },
+              )
+              // 继续用旧 token 尝试一次（让下游 401 以明确错误呈现）
+            }
+          }
+          process.env.OPENAI_ACCESS_TOKEN = accessToken
+          process.env.OPENAI_ACCOUNT_ID = accountId
+          delete process.env.OPENAI_API_KEY
+        } else {
+          process.env.PANDA_OPENAI_MODE = 'api_key'
+          process.env.OPENAI_API_KEY = _tpConfig.apiKey
+          delete process.env.OPENAI_ACCESS_TOKEN
+          delete process.env.OPENAI_ACCOUNT_ID
+        }
       } else {
         process.env.ANTHROPIC_BASE_URL = _tpConfig.baseURL
         process.env.ANTHROPIC_AUTH_TOKEN = _tpConfig.apiKey
@@ -433,45 +487,67 @@ export async function getAnthropicClient({
   }
 
   // ---- OpenAI Provider ----
-  if (process.env.PANDA_PROVIDER === 'openai' && process.env.OPENAI_API_KEY) {
-    const { OpenAIClient } = await import('./openaiAdapter.js')
-    const openaiApiKey = process.env.OPENAI_API_KEY
-    const openaiBaseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
-    const openaiClient = new OpenAIClient(openaiApiKey, openaiBaseUrl)
-
-    // Return a Proxy that intercepts beta.messages.create calls
-    // and routes them through the OpenAI adapter
-    const proxy = {
-      beta: {
+  // 双轨 dispatch：
+  //   PANDA_OPENAI_MODE='chatgpt' + OPENAI_ACCESS_TOKEN → ChatGPTBackendClient
+  //   否则（默认）+ OPENAI_API_KEY                      → OpenAIClient（Chat Completions）
+  if (process.env.PANDA_PROVIDER === 'openai') {
+    const mode = process.env.PANDA_OPENAI_MODE ?? 'api_key'
+    if (mode === 'chatgpt' && process.env.OPENAI_ACCESS_TOKEN) {
+      const { ChatGPTBackendClient } = await import('./openaiAdapter.js')
+      const accessToken = process.env.OPENAI_ACCESS_TOKEN
+      const accountId = process.env.OPENAI_ACCOUNT_ID || ''
+      const client = new ChatGPTBackendClient(accessToken, accountId)
+      // ChatGPTBackendClient 自身已暴露 Anthropic SDK 兼容的 beta.messages.create，
+      // 返回 APIPromiseLike（可 await 也可 .withResponse()），满足 claude.ts 三个调用点契约：
+      //   - verify_api_key (claude.ts:626)        —— await create(...)
+      //   - 非流式 fallback (claude.ts:934)        —— await create(..., { signal, timeout })
+      //   - 主流式 (claude.ts:1983)                —— create(..., { signal, headers }).withResponse()
+      // 为兼容 claude.ts 中少量直接 `anthropic.messages.create` 的老路径，额外补一层顶层 messages 代理。
+      const proxy = {
+        beta: client.beta,
         messages: {
-          create: async (params: any, options?: any) => {
-            if (params.stream || options?.stream) {
-              // Return an async iterable that yields Anthropic-format events
-              const stream = openaiClient.createMessageStream(params)
-              // Wrap in an object that mimics Anthropic's stream response
-              return {
-                [Symbol.asyncIterator]: () => stream[Symbol.asyncIterator](),
-                async *events() {
-                  yield* stream
-                },
-                // Provide a finalMessage() that collects all events
-                async finalMessage() {
-                  return openaiClient.createMessage(params)
-                },
+          create: (params: any, options?: any) =>
+            client.beta.messages.create(params, options),
+        },
+      }
+      logForDebugging(`[API:openai] Using ChatGPT backend (OAuth)`)
+      return proxy as unknown as Anthropic
+    }
+    if (process.env.OPENAI_API_KEY) {
+      const { OpenAIClient } = await import('./openaiAdapter.js')
+      const openaiApiKey = process.env.OPENAI_API_KEY
+      const openaiBaseUrl =
+        process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
+      const openaiClient = new OpenAIClient(openaiApiKey, openaiBaseUrl)
+      const proxy = {
+        beta: {
+          messages: {
+            create: async (params: any, options?: any) => {
+              if (params.stream || options?.stream) {
+                const stream = openaiClient.createMessageStream(params)
+                return {
+                  [Symbol.asyncIterator]: () => stream[Symbol.asyncIterator](),
+                  async *events() {
+                    yield* stream
+                  },
+                  async finalMessage() {
+                    return openaiClient.createMessage(params)
+                  },
+                }
               }
-            }
-            return openaiClient.createMessage(params)
+              return openaiClient.createMessage(params)
+            },
           },
         },
-      },
-      messages: {
-        create: async (params: any) => {
-          return openaiClient.createMessage(params)
+        messages: {
+          create: async (params: any) => openaiClient.createMessage(params),
         },
-      },
+      }
+      logForDebugging(
+        `[API:openai] Using OpenAI provider: ${openaiBaseUrl}, model mapping active`,
+      )
+      return proxy as unknown as Anthropic
     }
-    logForDebugging(`[API:openai] Using OpenAI provider: ${openaiBaseUrl}, model mapping active`)
-    return proxy as unknown as Anthropic
   }
 
   const _hasThirdParty = !!getGlobalConfig().thirdPartyProvider

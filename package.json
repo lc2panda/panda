@@ -1,6 +1,6 @@
 {
   "name": "@lc2panda/panda-code",
-  "version": "2.21.23",
+  "version": "2.21.24",
   "description": "AI terminal assistant — multi-provider, privacy-first, cross-platform",
   "main": "dist/cli.js",
   "type": "module",
@@ -57,6 +57,9 @@
     "docs:dev": "npx mintlify dev"
   },
   "dependencies": {},
+  "optionalDependencies": {
+    "@vscode/ripgrep": "^1.17.1"
+  },
   "devDependencies": {
     "@alcalzone/ansi-tokenize": "^0.3.0",
     "@ant/claude-for-chrome-mcp": "workspace:*",

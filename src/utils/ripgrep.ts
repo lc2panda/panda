@@ -23,10 +23,29 @@ const __dirname = path.join(
 )
 
 type RipgrepConfig = {
-  mode: 'system' | 'builtin' | 'embedded'
+  mode: 'system' | 'builtin' | 'embedded' | 'vscode-ripgrep'
   command: string
   args: string[]
   argv0?: string
+}
+
+// 懒加载 @vscode/ripgrep 的 rgPath（optionalDependency，可能不存在）
+// 使用 createRequire 兼容 ESM；require 失败 / 文件缺失返回 null
+function tryGetVscodeRipgrepPath(): string | null {
+  try {
+    // 在函数内部 import 以避免顶层 ESM static import 在 optionalDependency
+    // 缺失（公司网络/防火墙导致 postinstall 失败）时整个模块加载崩溃。
+    // 使用 createRequire 而非 dynamic import，保证同步、零开销、无 promise。
+    const { createRequire } = require('module') as typeof import('module')
+    const req = createRequire(import.meta.url)
+    const mod = req('@vscode/ripgrep') as { rgPath?: string }
+    if (mod && typeof mod.rgPath === 'string' && existsSync(mod.rgPath)) {
+      return mod.rgPath
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 const getRipgrepConfig = memoize((): RipgrepConfig => {
@@ -54,6 +73,15 @@ const getRipgrepConfig = memoize((): RipgrepConfig => {
       args: ['--no-config'],
       argv0: 'rg',
     }
+  }
+
+  // @vscode/ripgrep — 通过 npm optionalDependency 安装；其 postinstall
+  // 会下载对应平台的 prebuilt binary 到 node_modules/@vscode/ripgrep/bin/。
+  // 优先于 repo-local vendored 路径，因为它跟随 panda-code npm 包安装时机
+  // 自动落地，覆盖面更广（用户机器、CI、容器均能命中）。
+  const vscodeRgPath = tryGetVscodeRipgrepPath()
+  if (vscodeRgPath) {
+    return { mode: 'vscode-ripgrep', command: vscodeRgPath, args: [] }
   }
 
   // Vendored binary — only use if it actually exists on disk
@@ -540,7 +568,7 @@ let ripgrepStatus: {
  * Returns current configuration immediately, with working status if available
  */
 export function getRipgrepStatus(): {
-  mode: 'system' | 'builtin' | 'embedded'
+  mode: 'system' | 'builtin' | 'embedded' | 'vscode-ripgrep'
   path: string
   working: boolean | null // null if not yet tested
 } {

@@ -120,25 +120,181 @@ function readlineQuestion(prompt: string): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: ↑↓ select Codex model from fetched list
+// ---------------------------------------------------------------------------
+/**
+ * 作战线 Q：登录后让用户 ↑↓ 选默认 Codex 模型。
+ *
+ * 风格沿用本文件 thirdPartyLogin api_key 分支的 raw-mode 选择器（同款体验，
+ * 无新增 inquirer/prompts 依赖 —— 项目当前根本不依赖 inquirer）。
+ *
+ * 退出语义：
+ *   ↑/k     上移
+ *   ↓/j     下移
+ *   Enter   确认当前项
+ *   Ctrl+C  退出整个 login 流程（process.exit）
+ *
+ * @param models    fetched 可用模型列表（含 id + 可选 label）
+ * @param defaultIdx 默认高亮位置（pickDefaultCodexModel 推荐项的索引；找不到→0）
+ * @param planType  用于在推荐项后显示 "(推荐 - <plan>)" 标签
+ */
+async function promptSelectCodexModel(
+  models: { id: string; label?: string }[],
+  defaultIdx: number,
+  planType: string | null,
+): Promise<string> {
+  let sel = Math.max(0, Math.min(defaultIdx, models.length - 1))
+
+  const formatLine = (m: { id: string; label?: string }, i: number): string => {
+    const mark = i === sel ? '\x1b[36m❯\x1b[0m' : ' '
+    const text = i === sel ? `\x1b[1m${m.id}\x1b[0m` : `\x1b[2m${m.id}\x1b[0m`
+    const label = m.label && m.label !== m.id ? ` \x1b[2m(${m.label})\x1b[0m` : ''
+    const recommend =
+      i === defaultIdx
+        ? ` \x1b[33m← 推荐${planType ? ` - ${planType}` : ''}\x1b[0m`
+        : ''
+    return `  ${mark} ${text}${label}${recommend}\n`
+  }
+
+  process.stdout.write('\n选择默认模型 (↑↓ 移动, Enter 确认, Ctrl+C 退出):\n')
+  for (let i = 0; i < models.length; i++) {
+    process.stdout.write(formatLine(models[i]!, i))
+  }
+
+  const render = () => {
+    // 回到列表起点，清屏到末尾，重绘
+    process.stdout.write(`\x1b[${models.length}A\x1b[J`)
+    for (let i = 0; i < models.length; i++) {
+      process.stdout.write(formatLine(models[i]!, i))
+    }
+  }
+
+  return new Promise<string>(resolve => {
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+    process.stdin.setEncoding('utf-8')
+
+    const onKey = (d: string) => {
+      // 上键 / k
+      if (d === '\x1b[A' || d === 'k') {
+        sel = (sel - 1 + models.length) % models.length
+        render()
+        return
+      }
+      // 下键 / j
+      if (d === '\x1b[B' || d === 'j') {
+        sel = (sel + 1) % models.length
+        render()
+        return
+      }
+      // Enter
+      if (d === '\r' || d === '\n') {
+        process.stdin.setRawMode(false)
+        process.stdin.pause()
+        process.stdin.removeListener('data', onKey)
+        resolve(models[sel]!.id)
+        return
+      }
+      // Ctrl+C
+      if (d === '\x03') {
+        process.stdin.setRawMode(false)
+        process.stderr.write('\n登录已取消\n')
+        process.exit(130)
+      }
+    }
+    process.stdin.on('data', onKey)
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Helper: save OpenAI config after successful OAuth login
 // ---------------------------------------------------------------------------
+/**
+ * OpenAI config 保存 —— 双轨：
+ *   'api_key'          传统手动 API key 模式（保留向后兼容）
+ *   'chatgpt_backend'  新增 ChatGPT backend + OAuth token bundle 模式
+ */
+interface OpenAIApiKeyConfig {
+  mode: 'api_key'
+  apiKey: string
+}
+interface OpenAIChatGPTConfig {
+  mode: 'chatgpt_backend'
+  accessToken: string
+  refreshToken: string
+  idToken: string
+  accountId: string
+  email: string | null
+  expiresAt: number
+  /** 作战线 N：从 id_token 解出的 chatgpt_plan_type，用于选默认模型 */
+  planType: string | null
+  /**
+   * 作战线 Q：登录后从 /backend-api/codex/models 拉到的可用模型 id 列表。
+   * 拉取失败时 undefined（saveOpenAIConfig 会走 pickDefaultCodexModel 兜底）。
+   */
+  availableModels?: string[]
+  /**
+   * 作战线 Q：用户在 inquirer prompt 选定的模型（如有）。
+   * 缺失则 saveOpenAIConfig 用 pickDefaultCodexModel(planType) 兜底。
+   */
+  selectedModel?: string
+}
+type OpenAIAuthConfig = OpenAIApiKeyConfig | OpenAIChatGPTConfig
+
 function saveOpenAIConfig(
   providerKey: string,
   provider: { name: string; baseURL: string; defaultModel: string; consoleURL: string },
-  apiKey: string,
+  auth: OpenAIAuthConfig,
 ): void {
-  const selectedModel = provider.defaultModel
+  // 作战线 N：chatgpt_backend 模式按 plan-type 动态选默认模型
+  // 作战线 Q：若 thirdPartyLogin 已 prompt 用户选定（auth.selectedModel），优先使用
+  //          否则回退 pickDefaultCodexModel(planType)；api_key 模式仍用 provider.defaultModel
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { pickDefaultCodexModel } = require('../../services/api/openaiAdapter.js') as {
+    pickDefaultCodexModel: (planType: string | null | undefined) => string
+  }
+  const selectedModel =
+    auth.mode === 'chatgpt_backend'
+      ? auth.selectedModel || pickDefaultCodexModel(auth.planType)
+      : provider.defaultModel
+  // ChatGPT backend 走 chatgpt.com/backend-api/codex/responses（与 api.openai.com/v1 完全不同）
+  const baseURL =
+    auth.mode === 'chatgpt_backend'
+      ? 'https://chatgpt.com/backend-api/codex'
+      : provider.baseURL
 
-  saveGlobalConfig(current => ({
-    ...current,
-    thirdPartyProvider: {
+  saveGlobalConfig(current => {
+    const base = {
       name: providerKey,
-      baseURL: provider.baseURL,
-      apiKey,
+      baseURL,
       model: selectedModel,
       contextWindow: getContextWindowForThirdPartyModel(selectedModel),
-    },
-  }))
+    }
+    return {
+      ...current,
+      thirdPartyProvider:
+        auth.mode === 'api_key'
+          ? { ...base, apiKey: auth.apiKey, mode: 'api_key' as const }
+          : {
+              ...base,
+              mode: 'chatgpt_backend' as const,
+              accessToken: auth.accessToken,
+              refreshToken: auth.refreshToken,
+              idToken: auth.idToken,
+              accountId: auth.accountId,
+              email: auth.email ?? undefined,
+              expiresAt: auth.expiresAt,
+              // 作战线 N：持久化 planType，后续 fallback 逻辑可读
+              ...(auth.planType ? { planType: auth.planType } : {}),
+              // 作战线 Q：持久化 fetched 可用模型列表，供 /model autocomplete + 后续 fallback
+              ...(auth.availableModels && auth.availableModels.length > 0
+                ? { availableModels: auth.availableModels }
+                : {}),
+              // 保留 apiKey 字段为空字符串以兼容旧代码路径（某些地方直接读 tp.apiKey）
+              apiKey: '',
+            },
+    }
+  })
 
   // Clean settings.json env vars that might conflict
   try {
@@ -162,15 +318,51 @@ function saveOpenAIConfig(
 
   // Set env vars for the current process
   process.env.PANDA_PROVIDER = 'openai'
-  process.env.OPENAI_API_KEY = apiKey
-  process.env.OPENAI_BASE_URL = provider.baseURL
-  process.env.ANTHROPIC_BASE_URL = provider.baseURL
-  process.env.ANTHROPIC_AUTH_TOKEN = apiKey
+  if (auth.mode === 'chatgpt_backend') {
+    process.env.OPENAI_ACCESS_TOKEN = auth.accessToken
+    process.env.OPENAI_ACCOUNT_ID = auth.accountId
+    process.env.PANDA_OPENAI_MODE = 'chatgpt'
+    // 清 api_key 模式遗留
+    delete process.env.OPENAI_API_KEY
+  } else {
+    process.env.OPENAI_API_KEY = auth.apiKey
+    process.env.PANDA_OPENAI_MODE = 'api_key'
+    delete process.env.OPENAI_ACCESS_TOKEN
+    delete process.env.OPENAI_ACCOUNT_ID
+  }
+  process.env.OPENAI_BASE_URL = baseURL
+
+  // 不向 ANTHROPIC_* 写入任何 token —— 严格守 Anthropic 原生通道 byte-equal
+  // 旧代码写 ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN 是错的，会污染 provider 判定
+  delete process.env.ANTHROPIC_BASE_URL
+  delete process.env.ANTHROPIC_AUTH_TOKEN
   process.env.ANTHROPIC_MODEL = selectedModel
 
   process.stdout.write(`\n✓ Login successful! Provider: ${provider.name}\n`)
-  process.stdout.write(`  Model: ${selectedModel}\n`)
-  process.stdout.write(`  Base URL: ${provider.baseURL}\n`)
+  if (auth.mode === 'chatgpt_backend') {
+    process.stdout.write(`  Mode: ChatGPT backend (OAuth)\n`)
+    if (auth.email) {
+      process.stdout.write(`  Account: ${auth.email}\n`)
+    }
+    if (auth.planType) {
+      process.stdout.write(`  Plan: ${auth.planType}\n`)
+    }
+  } else {
+    process.stdout.write(`  Mode: API key\n`)
+  }
+  // 作战线 Q：标注模型来源（fetched / fallback）
+  if (
+    auth.mode === 'chatgpt_backend' &&
+    auth.availableModels &&
+    auth.availableModels.length > 0
+  ) {
+    process.stdout.write(
+      `  Model: ${selectedModel}  (从 ${auth.availableModels.length} 个可用模型中选择)\n`,
+    )
+  } else {
+    process.stdout.write(`  Model: ${selectedModel}\n`)
+  }
+  process.stdout.write(`  Base URL: ${baseURL}\n`)
   process.stdout.write(`\nRun 'panda' to start.\n`)
   process.exit(0)
 }
@@ -189,12 +381,50 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
     process.exit(1)
   }
 
-  // OpenAI uses a browser-based OAuth flow instead of manual API key input
+  // OpenAI: 浏览器 OAuth 流 → ChatGPT backend token bundle
   if (providerKey === 'openai') {
-    const { openaiOAuthLogin } = await import('../../services/openai-oauth.js')
+    const { openaiOAuthLogin, extractPlanType } = await import('../../services/openai-oauth.js')
+    const { fetchAvailableCodexModels, pickDefaultCodexModel } = await import(
+      '../../services/api/openaiAdapter.js'
+    )
     try {
-      const { apiKey } = await openaiOAuthLogin()
-      saveOpenAIConfig(providerKey, provider, apiKey)
+      const bundle = await openaiOAuthLogin()
+      // 作战线 N：从 id_token 解 plan_type 用于选默认模型
+      const planType = bundle.idToken ? extractPlanType(bundle.idToken) : null
+
+      // 作战线 Q：登录成功立即拉真实可用模型列表
+      process.stdout.write('\nFetching available models...\n')
+      const models = await fetchAvailableCodexModels(bundle.accessToken, bundle.accountId!)
+
+      // 默认选中：planType 推荐项 → 否则列表首项
+      const recommended = pickDefaultCodexModel(planType)
+      const defaultIdx = Math.max(
+        0,
+        models.findIndex(m => m.id === recommended),
+      )
+
+      // 让用户 ↑↓ 选择（TTY 才弹，CI/pipe 直接走推荐项 / 列表首项）
+      let selectedModel: string | undefined
+      if (models.length > 0 && process.stdin.isTTY) {
+        selectedModel = await promptSelectCodexModel(models, defaultIdx, planType)
+      } else if (models.length > 0) {
+        // 非交互终端：用推荐项（若在列表中）或列表首项
+        selectedModel = models[defaultIdx]?.id ?? models[0]?.id
+      }
+      // models 为空（fetch 失败）→ selectedModel 留 undefined，saveOpenAIConfig 走 pickDefaultCodexModel 兜底
+
+      saveOpenAIConfig(providerKey, provider, {
+        mode: 'chatgpt_backend',
+        accessToken: bundle.accessToken,
+        refreshToken: bundle.refreshToken,
+        idToken: bundle.idToken,
+        accountId: bundle.accountId!, // openaiOAuthLogin 已校验非空
+        email: bundle.email,
+        planType,
+        expiresAt: bundle.expiresAt,
+        availableModels: models.length > 0 ? models.map(m => m.id) : undefined,
+        selectedModel,
+      })
       return
     } catch (err) {
       process.stderr.write(`\nOpenAI login failed: ${err instanceof Error ? err.message : String(err)}\n`)

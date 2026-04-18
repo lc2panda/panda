@@ -277,6 +277,21 @@ export const SettingsSchema = lazySchema(() =>
         .describe(
           'Command to refresh GCP authentication (e.g., gcloud auth application-default login)',
         ),
+      // 作战线 N：全局代理配置。启动时（src/entrypoints/cli.tsx）会把这里写入
+      // HTTPS_PROXY/HTTP_PROXY env。env 优先，用户临时可覆盖。
+      proxy: z
+        .union([
+          z.string(),
+          z.object({
+            https: z.string().optional(),
+            http: z.string().optional(),
+            noProxy: z.union([z.array(z.string()), z.string()]).optional(),
+          }),
+        ])
+        .optional()
+        .describe(
+          'HTTPS/HTTP proxy for all outbound HTTP calls. String form "http://host:port" applies to both. Object form allows {https, http, noProxy}.',
+        ),
       // Gated so the SDK generator (which runs without CLAUDE_CODE_ENABLE_XAA)
       // doesn't surface this in GlobalClaudeSettings. Read via getXaaIdpSettings().
       // .passthrough() on the outer object keeps an existing settings.json key

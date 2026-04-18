@@ -18,6 +18,7 @@ import { getTurnCompletionVerbs, TURN_COMPLETION_VERBS } from '../../constants/t
 import { isZh } from '../../utils/i18n.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
 import { MATRIX_UI, MATRIX_SCALE, MATRIX_STATUS } from '../MatrixTheme/matrixPalette.js';
+import { ScanlineText } from '../MatrixTheme/scanlineMarkdown.js';
 import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import type { SystemMessage, SystemStopHookSummaryMessage, SystemBridgeStatusMessage, SystemTurnDurationMessage, SystemThinkingMessage, SystemMemorySavedMessage } from '../../types/message.js';
 import { SystemAPIErrorMessage } from './SystemAPIErrorMessage.js';
@@ -104,7 +105,7 @@ export function SystemTextMessage(t0) {
     let t2;
     let t3;
     if ($[13] === Symbol.for("react.memo_cache_sentinel")) {
-      t2 = <Box minWidth={2}><Text color={_isMatrix_ak ? MATRIX_STATUS.ERROR : "error"}>{BLACK_CIRCLE}</Text></Box>;
+      t2 = <Box minWidth={2}><Text color={_isMatrix_ak ? MATRIX_STATUS.ERROR : "error"}>{_isMatrix_ak ? '│' : BLACK_CIRCLE}</Text></Box>;
       t3 = <Text dimColor={true} color={_isMatrix_ak ? MATRIX_UI.systemMsg : undefined}>All background agents stopped</Text>;
       $[13] = t2;
       $[14] = t3;
@@ -332,7 +333,8 @@ function StopHookSummaryMessage(t0) {
   const t3 = addMargin ? 1 : 0;
   let t4;
   if ($[16] === Symbol.for("react.memo_cache_sentinel")) {
-    t4 = <Box minWidth={2}><Text color={isMatrixTheme() ? MATRIX_UI.systemMsg : undefined}>{BLACK_CIRCLE}</Text></Box>;
+    const _isM_shs = isMatrixTheme();
+    t4 = <Box minWidth={2}><Text color={_isM_shs ? MATRIX_UI.systemMsg : undefined}>{_isM_shs ? '│' : BLACK_CIRCLE}</Text></Box>;
     $[16] = t4;
   } else {
     t4 = $[16];
@@ -448,7 +450,8 @@ function SystemTextMessageInner(t0) {
   const t1 = addMargin ? 1 : 0;
   let t2;
   if ($[0] !== color || $[1] !== dimColor || $[2] !== dot) {
-    t2 = dot && <Box minWidth={2}><Text color={color} dimColor={dimColor}>{BLACK_CIRCLE}</Text></Box>;
+    const _isM_inner = isMatrixTheme();
+    t2 = dot && <Box minWidth={2}><Text color={color} dimColor={dimColor}>{_isM_inner ? '│' : BLACK_CIRCLE}</Text></Box>;
     $[0] = color;
     $[1] = dimColor;
     $[2] = dot;
@@ -467,7 +470,12 @@ function SystemTextMessageInner(t0) {
   }
   let t5;
   if ($[6] !== color || $[7] !== dimColor || $[8] !== t4) {
-    t5 = <Text color={color} dimColor={dimColor} wrap="wrap">{t4}</Text>;
+    // v3 P5: Matrix 主题 + 纯文本 system 消息 → ScanlineText（关键词高亮 + 行 parity）
+    // 非 Matrix 走原 <Text>。系统消息 dimColor 时仍交由 ScanlineText 内部 token 着色
+    // （color prop 会被 token 覆盖；这是渐进增强）
+    t5 = isMatrixTheme()
+      ? <ScanlineText text={t4} />
+      : <Text color={color} dimColor={dimColor} wrap="wrap">{t4}</Text>;
     $[6] = color;
     $[7] = dimColor;
     $[8] = t4;
@@ -633,7 +641,8 @@ function MemorySavedMessage(t0) {
   const t5 = addMargin ? 1 : 0;
   let t6;
   if ($[5] === Symbol.for("react.memo_cache_sentinel")) {
-    t6 = <Box minWidth={2}><Text dimColor={true}>{BLACK_CIRCLE}</Text></Box>;
+    const _isM_msm = isMatrixTheme();
+    t6 = <Box minWidth={2}><Text dimColor={true} color={_isM_msm ? MATRIX_UI.systemMsg : undefined}>{_isM_msm ? '│' : BLACK_CIRCLE}</Text></Box>;
     $[5] = t6;
   } else {
     t6 = $[5];

@@ -8,6 +8,7 @@ import { isFullscreenEnvEnabled } from '../utils/fullscreen.js';
 import sliceAnsi from '../utils/sliceAnsi.js';
 import { expectColorDiff } from './StructuredDiff/colorDiff.js';
 import { StructuredDiffFallback } from './StructuredDiff/Fallback.js';
+import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
 type Props = {
   patch: StructuredPatchHunk;
   dim: boolean;
@@ -108,10 +109,12 @@ export const StructuredDiff = memo(function StructuredDiff(t0: Props) {
   const settings = useSettings();
   const syntaxHighlightingDisabled = settings.syntaxHighlightingDisabled ?? false;
   const safeWidth = Math.max(1, Math.floor(width));
+  // T-B3: Matrix 主题强制走 Fallback（NAPI ColorDiff 颜色不可 Matrix 化）
+  const _matrixDiff = isMatrixTheme();
   let t2;
   if ($[0] !== dim || $[1] !== fileContent || $[2] !== filePath || $[3] !== firstLine || $[4] !== patch || $[5] !== safeWidth || $[6] !== skipHighlighting || $[7] !== syntaxHighlightingDisabled || $[8] !== theme) {
     const splitGutter = isFullscreenEnvEnabled();
-    t2 = skipHighlighting || syntaxHighlightingDisabled ? null : renderColorDiff(patch, firstLine, filePath, fileContent ?? null, theme, safeWidth, dim, splitGutter);
+    t2 = skipHighlighting || syntaxHighlightingDisabled || _matrixDiff ? null : renderColorDiff(patch, firstLine, filePath, fileContent ?? null, theme, safeWidth, dim, splitGutter);
     $[0] = dim;
     $[1] = fileContent;
     $[2] = filePath;

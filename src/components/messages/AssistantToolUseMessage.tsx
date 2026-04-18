@@ -8,8 +8,10 @@ import { BLACK_CIRCLE } from '../../constants/figures.js';
 import { stringWidth } from '../../ink/stringWidth.js';
 import { Box, Text, useTheme } from '../../ink.js';
 import { useAppStateMaybeOutsideOfProvider } from '../../state/AppState.js';
-import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
-import { MATRIX_UI, MATRIX_SCALE } from '../MatrixTheme/matrixPalette.js';
+import { isMatrixTheme, isMatrixLight } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI, MATRIX_UI_LIGHT, MATRIX_SCALE, MATRIX_SCALE_LIGHT, MATRIX_BREATH_PULSE, MATRIX_BREATH_PULSE_LIGHT } from '../MatrixTheme/matrixPalette.js';
+import { ScanLine } from '../MatrixTheme/ScanLine.js';
+import { usePhosphorBreath } from '../../hooks/usePhosphorBreath.js';
 import { findToolByName, type Tool, type ToolProgressData, type Tools } from '../../Tool.js';
 import type { ProgressMessage } from '../../types/message.js';
 import { useIsClassifierChecking } from '../../utils/classifierApprovalsHook.js';
@@ -186,7 +188,15 @@ export function AssistantToolUseMessage(t0) {
   const t6 = stringWidth(userFacingToolName) + (shouldShowDot ? 2 : 0);
   let t7;
   if ($[31] !== isQueued || $[32] !== isResolved || $[33] !== lookups.erroredToolUseIDs || $[34] !== param.id || $[35] !== shouldAnimate || $[36] !== shouldShowDot) {
-    t7 = shouldShowDot && (isQueued ? <Box minWidth={2}><Text dimColor={isQueued} color={isMatrixTheme() ? MATRIX_UI.gutterDot : undefined}>{BLACK_CIRCLE}</Text></Box> : <ToolUseLoader shouldAnimate={shouldAnimate} isUnresolved={!isResolved} isError={lookups.erroredToolUseIDs.has(param.id)} />);
+    // v3 P6 + P9.7: Matrix 主题下 tool 行 gutter 用 `├─ ` 树枝符号 + [exec] 呼吸标签。
+    // 非 Matrix 保留原 ●/loader 行为。queued 用 dim ├─，进行中用 ToolUseLoader。
+    t7 = shouldShowDot && (isQueued
+      ? (isMatrixTheme()
+          ? <Box minWidth={3}><Text color={MATRIX_UI.toolGutter}>├─ </Text></Box>
+          : <Box minWidth={2}><Text dimColor={isQueued} color={undefined}>{BLACK_CIRCLE}</Text></Box>)
+      : (isMatrixTheme()
+          ? <Box minWidth={3}><Text color={MATRIX_UI.toolGutter}>├─ </Text></Box>
+          : <ToolUseLoader shouldAnimate={shouldAnimate} isUnresolved={!isResolved} isError={lookups.erroredToolUseIDs.has(param.id)} />));
     $[31] = isQueued;
     $[32] = isResolved;
     $[33] = lookups.erroredToolUseIDs;
@@ -198,12 +208,33 @@ export function AssistantToolUseMessage(t0) {
     t7 = $[37];
   }
   const t8 = userFacingToolNameBackgroundColor ? "inverseText" : undefined;
+  // v3 P6: Matrix 主题下在 toolName 前追加 [exec] 标签
+  // P9.7 呼吸：进行中（!isResolved && !isQueued）时 [exec] BASE↔NEON↔BRIGHT 1.6s 周期
+  const _matrixBreathT = usePhosphorBreath(1600);
+  const _execActive = isMatrixTheme() && !isResolved && !isQueued;
+  const _execColor = (() => {
+    if (!isMatrixTheme()) return undefined;
+    const palette = isMatrixLight() ? MATRIX_BREATH_PULSE_LIGHT : MATRIX_BREATH_PULSE;
+    if (_execActive) {
+      const idx = Math.min(palette.length - 1, Math.floor(_matrixBreathT * palette.length));
+      return palette[idx];
+    }
+    return isMatrixLight() ? MATRIX_SCALE_LIGHT.BRIGHT : MATRIX_SCALE.BRIGHT;
+  })();
   let t9;
-  if ($[38] !== t8 || $[39] !== userFacingToolName || $[40] !== userFacingToolNameBackgroundColor) {
-    t9 = <Box flexShrink={0}><Text bold={true} wrap="truncate-end" backgroundColor={userFacingToolNameBackgroundColor} color={isMatrixTheme() ? MATRIX_UI.toolName : t8}>{userFacingToolName}</Text></Box>;
+  if ($[38] !== t8 || $[39] !== userFacingToolName || $[40] !== userFacingToolNameBackgroundColor || $['mx_exec'] !== _execColor) {
+    t9 = (
+      <Box flexShrink={0} flexDirection="row">
+        {isMatrixTheme() && (
+          <Text color={_execColor}>{'[exec] '}</Text>
+        )}
+        <Text bold={true} wrap="truncate-end" backgroundColor={userFacingToolNameBackgroundColor} color={isMatrixTheme() ? MATRIX_UI.toolName : t8}>{userFacingToolName}</Text>
+      </Box>
+    );
     $[38] = t8;
     $[39] = userFacingToolName;
     $[40] = userFacingToolNameBackgroundColor;
+    $['mx_exec'] = _execColor;
     $[41] = t9;
   } else {
     t9 = $[41];
@@ -226,14 +257,19 @@ export function AssistantToolUseMessage(t0) {
   } else {
     t11 = $[47];
   }
+  // T-C4: Matrix 主题下 tool 进行中时在工具名后挂一条 12 字宽往返扫描线
+  const _matrixScan = isMatrixTheme() && !isResolved && !isQueued
+    ? <Box marginLeft={1}><ScanLine active={true} /></Box>
+    : null;
   let t12;
-  if ($[48] !== t10 || $[49] !== t11 || $[50] !== t6 || $[51] !== t7 || $[52] !== t9) {
-    t12 = <Box flexDirection="row" flexWrap="nowrap" minWidth={t6}>{t7}{t9}{t10}{t11}</Box>;
+  if ($[48] !== t10 || $[49] !== t11 || $[50] !== t6 || $[51] !== t7 || $[52] !== t9 || $['ms'] !== _matrixScan) {
+    t12 = <Box flexDirection="row" flexWrap="nowrap" minWidth={t6}>{t7}{t9}{t10}{t11}{_matrixScan}</Box>;
     $[48] = t10;
     $[49] = t11;
     $[50] = t6;
     $[51] = t7;
     $[52] = t9;
+    $['ms'] = _matrixScan;
     $[53] = t12;
   } else {
     t12 = $[53];

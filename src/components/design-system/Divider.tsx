@@ -75,7 +75,8 @@ export function Divider(t0) {
     title
   } = t0;
   const _isMatrix = isMatrixTheme();
-  const char = t1 === undefined ? (_isMatrix ? "\u2501" : "\u2500") : t1;
+  // T-E1: Matrix 主题统一用 '═'（双线）作为分割字符
+  const char = t1 === undefined ? (_isMatrix ? "\u2550" : "\u2500") : t1;
   const padding = t2 === undefined ? 0 : t2;
   const color = colorProp === undefined && _isMatrix ? MATRIX_UI.divider as any : colorProp;
   const {

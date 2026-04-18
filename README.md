@@ -87,16 +87,31 @@ panda auth login
 | Volcano   | ark.cn-beijing.volces.com/api/coding       | doubao-seed-code  | [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey) |
 | OpenAI    | api.openai.com/v1                          | gpt-4o            | [platform.openai.com](https://platform.openai.com/api-keys)                               |
 
-**OpenAI / Codex — 浏览器 OAuth 登录**（v2.21.16）
+**OpenAI / Codex — ChatGPT 订阅 OAuth 登录**（v2.21.24）
 
-OpenAI provider 支持完整的 PKCE OAuth 流程：`panda auth login` 选择 OpenAI 后浏览器自动打开
-`auth.openai.com`，登录完成后 `id_token` 会换取 API key 并持久化到 `thirdPartyProvider`
-配置，全程无需手动复制粘贴 key。底层通过 `openaiAdapter.ts`（Anthropic ↔ OpenAI Chat
-Completions 格式双向转换 592 行）接入，已覆盖 GPT-4o / GPT-4.1 / o3 / o4-mini / codex-mini
-等 10 款模型（上下文窗口从 128K 到 1M 不等，见 `MODEL_CONTEXT_WINDOWS`）。OpenAI 自身的
-`prompt_tokens_details.cached_tokens`（implicit cache）由 Cache Token 面板自动识别，无需额外配置。
+`panda auth login` 选择 OpenAI 后，浏览器打开 `auth.openai.com` 完成 PKCE OAuth：
 
-手动模式仍可用：`panda auth login --provider openai` 后选择输入 API key，走老路径。 (v2.21.16 · commit 3fb48b3 + 8871987)
+1. **登录成功后自动拉取可用模型列表**（`GET chatgpt.com/backend-api/codex/models?client_version=0.118.0`），弹出 ↑↓ 选择器（`↑/k` 上、`↓/j` 下、`Enter` 确认、`Ctrl+C` 退出）；推荐项按 ChatGPT plan 自动高亮（标签 `← 推荐 - <plan>`）。
+2. **选定模型持久化**到 `~/.pandacc.json` 的 `thirdPartyProvider.{model, availableModels, planType}`，下次启动直接用。
+3. **默认走 ChatGPT backend 模式**（`mode: 'chatgpt_backend'`），消耗 ChatGPT Plus / Pro 订阅额度，**无需 API key 计费**。后端为 `chatgpt.com/backend-api/codex/responses`（流式）+ `/responses/compact`（非流式），流式/非流式分离。
+4. **access_token (10 天) + refresh_token 自动轮换**，module-level Promise 锁单飞防并发。
+5. **支持 ChatGPT Free / Plus / Pro / Team / Enterprise**：Free 账户自动用 mini 候选链（`gpt-5.4-mini → gpt-5-mini → gpt-4o-mini → gpt-4-turbo`），Plus/Pro 用主力链（`gpt-5.4 → gpt-5-codex → gpt-5 → gpt-5.4-mini`）。
+6. **TTY 兜底**：非交互终端跳过 prompt，直接用 `pickDefaultCodexModel(planType)` 默认值。
+
+**双模式并存**：旧的 API key 模式仍可用（`mode: 'api_key'`），手动配 `OPENAI_API_KEY` 走 `api.openai.com/v1` 路径，企业用户 / 有 API quota 用户继续按用量付费。
+
+**会话内切换模型**：`/model <name>`（如 `/model gpt-5.4-mini`）即时生效；可用模型清单自动同步登录时拉到的 list。模型映射 `mapModelToCodex()` 直通 `gpt-5.4 / gpt-5.4-mini / gpt-5.3-codex-spark / o3 / o4-mini`，`gpt-5-codex` 默认降级为 `gpt-5.4-mini`（Free 友好；Plus/Pro 可设 `PANDA_CODEX_ALLOW_CODEX_MODEL=1` 显式解锁），其他未知模型兜底 `gpt-5.4-mini`。
+
+**Bun BoringSSL TLS 三路径分发**（v2.21.24，HTTP 客户端解耦）：
+- 路径 A：设了 `PANDA_OAUTH_CA_FILE` → `axios` + 自定义 CA `https.Agent`（Node / Bun 通吃，处理科学上网工具的 MITM 证书）。
+- 路径 B：Bun runtime → subprocess `curl.exe -N -i` + 系统代理 + Schannel CA store。
+- 路径 C：Node runtime → 标准 `fetch` + `undici ProxyAgent`。
+
+**OpenAI 自身缓存**：`prompt_tokens_details.cached_tokens`（implicit cache）由 Cache Token 面板自动识别，无需额外配置。
+
+**`gpt-5-codex` 受限提示**：仅 Plus/Pro 账户可用；Free 账户调用会触发 `not supported when using Codex with a ChatGPT account` 错误，请改用 `gpt-5.4-mini` 或升级订阅 + 设置 `PANDA_CODEX_ALLOW_CODEX_MODEL=1`。
+
+(v2.21.16 引入 OAuth；v2.21.24 重构为 ChatGPT backend 默认 + 登录后模型选择 + Bun TLS 分发)
 
 ### 1.4 配置参考
 
@@ -104,7 +119,7 @@ Completions 格式双向转换 592 行）接入，已覆盖 GPT-4o / GPT-4.1 / o
 
 #### settings.json — 全局设置
 
-```json
+```jsonc
 // ~/.pandacc/settings.json
 {
   "enableModelRouting": true,          // Multi-Model Agent Routing
@@ -112,9 +127,40 @@ Completions 格式双向转换 592 行）接入，已覆盖 GPT-4o / GPT-4.1 / o
     "cost-saving": { "agentModelMap": { "Explore": "haiku", "Plan": "sonnet" } }
   },
   "privacyEnhanced": true,             // 隐私增强模式（非 Anthropic 渠道自动启用）
-  "autoMemoryEnabled": true             // 自动记忆系统
+  "autoMemoryEnabled": true,            // 自动记忆系统
+
+  // 代理（v2.21.24 — 彻底根治 Bun BoringSSL + 中国大陆访问 OpenAI / Anthropic 直连问题）
+  // 字符串形式：所有协议共用
+  "proxy": "http://127.0.0.1:7897"
+
+  // 或对象形式：分协议配置
+  // "proxy": {
+  //   "https": "http://127.0.0.1:7897",
+  //   "http":  "http://127.0.0.1:7897",
+  //   "noProxy": ["localhost", "127.0.0.1", "*.internal"]
+  // }
 }
 ```
+
+**`proxy` 字段优先级链**（v2.21.24）：
+
+```
+环境变量 HTTPS_PROXY / HTTP_PROXY / NO_PROXY
+    ↓ 未设置
+settings.json 的 "proxy" 字段
+    ↓ 未设置
+Windows PAC 自动检测（系统代理脚本）
+    ↓ 未命中
+Windows 注册表 ProxyServer
+    ↓ 未配置
+直连（无代理）
+```
+
+panda 启动最早期会把 `proxy` 注入 `process.env.HTTPS_PROXY / HTTP_PROXY / NO_PROXY`，所有 HTTP 路径自动继承（Anthropic SDK / ChatGPT backend / OAuth / curl / axios / fetch 全打通）。
+
+**临时一次性覆盖**：CLI flag `--proxy <url>`（不写入配置）。
+
+**诊断**：`PANDA_PROXY_DEBUG=1` 打印 stderr 代理诊断日志（resolve 链路 + 实际命中源）。
 
 <details>
 <summary><code>proactive.json</code> — 主动推送配置</summary>
@@ -353,6 +399,10 @@ Completions 格式双向转换 592 行）接入，已覆盖 GPT-4o / GPT-4.1 / o
 | `PANDA_CACHE_TEXT_MIN_SIZE` | v2.20.4 | `1500` | Endless Mode：字符数低于此阈值不压缩 |
 | `PANDA_FORCE_CACHE_STRATEGY` | v2.21.2 | 未设置 | 代理用户声明后端 cache 能力，取值 `explicit`/`implicit`/`none` |
 | `PANDA_SKILL_LEARNING_TEST` | v2.16.x | 未设置 | 设为 `1` 启用 Skill learning 模块测试钩子（内部） |
+| `PANDA_OAUTH_CA_FILE` | v2.21.24 | 未设置 | MITM 根证书路径，绕过 Bun BoringSSL 不读系统 CA store 的限制（科学上网工具自签证书场景） |
+| `PANDA_PROXY_DEBUG` | v2.21.24 | 未设置 | 设为 `1` 打印 stderr 代理诊断日志（resolve 链路 + 实际命中源） |
+| `PANDA_CODEX_DEFAULT_MODEL` | v2.21.24 | 未设置 | 覆盖 `pickDefaultCodexModel(planType)` 的兜底模型（OpenAI ChatGPT backend 模式） |
+| `PANDA_CODEX_ALLOW_CODEX_MODEL` | v2.21.24 | 未设置 | 设为 `1` 显式解锁 `gpt-5-codex` 等受限模型（仅 ChatGPT Plus / Pro 账户实际有效） |
 
 #### 缓存与 Provider（v2.20.11 ~ v2.21.2 Wave 3/9 多 provider 统一）
 
@@ -391,6 +441,7 @@ Completions 格式双向转换 592 行）接入，已覆盖 GPT-4o / GPT-4.1 / o
 | `DISABLE_INSTALLATION_CHECKS` | v2.1.x | `1`（CLI 启动时自动置位） | 禁用安装检查；CLI 入口强制置 `1` |
 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | v2.1.x | `1` | 禁用非必要网络流量（遥测/分析/GrowthBook） |
 | `CLAUDE_INTERNAL_FC_OVERRIDES` | v2.1.x | 自动设置 | GrowthBook feature flag 覆盖（31+ tengu flags） |
+| `CLAUDE_DISABLE_STREAM_WATCHDOG` | v2.21.20 | 未设置 | 设为 `1` opt-out v2.21.20 默认启用的 stream watchdog（agent 静默截断兜底） |
 
 #### 命令开关（`DISABLE_*_COMMAND`）
 
@@ -414,9 +465,12 @@ Completions 格式双向转换 592 行）接入，已覆盖 GPT-4o / GPT-4.1 / o
 | `ANTHROPIC_MODEL` | 默认模型 |
 | `ANTHROPIC_SMALL_FAST_MODEL` | 快速模型 |
 | `OPENROUTER_PREFER_PROVIDER` | OpenRouter 首选 provider 优先级 |
-| `PANDA_PROVIDER` | v2.21.16 — 设为 `openai` 启用 OpenAI Chat Completions 适配器（由 `panda auth login` 自动写入，手动设置仅用于调试） |
-| `OPENAI_API_KEY` | v2.21.16 — OpenAI provider API key（OAuth 登录后自动写入，也可手动设置跳过登录） |
-| `OPENAI_BASE_URL` | v2.21.16 — OpenAI 兼容端点 base URL，默认 `https://api.openai.com/v1`（自建代理/Azure OpenAI 兼容层时覆盖） |
+| `PANDA_PROVIDER` | v2.21.16 — 设为 `openai` 启用 OpenAI provider（由 `panda auth login` 自动写入，手动设置仅用于调试） |
+| `OPENAI_API_KEY` | v2.21.16 — OpenAI **API key 模式**（`mode: 'api_key'`）使用，走 `api.openai.com/v1`；**ChatGPT backend 模式**（v2.21.24 默认）不需要此 env |
+| `OPENAI_BASE_URL` | v2.21.16 — OpenAI 兼容端点 base URL，默认 `https://api.openai.com/v1`（自建代理 / Azure OpenAI 兼容层时覆盖；仅对 API key 模式生效） |
+| `HTTPS_PROXY` | v2.21.24 — HTTPS 流量代理（标准 env，优先级最高，覆盖 settings.json `proxy` 字段） |
+| `HTTP_PROXY` | v2.21.24 — HTTP 流量代理（同上） |
+| `NO_PROXY` | v2.21.24 — 代理排除列表（逗号分隔，如 `localhost,127.0.0.1,*.internal`） |
 
 #### 使用示例（缓存与 Provider）
 
@@ -450,7 +504,39 @@ panda
 # 适用：定位 scope 字段兼容性问题或需要与旧版字节等价
 ```
 
+**场景 4 — OpenAI ChatGPT backend + 中国大陆代理 + Bun runtime**（v2.21.24）
+
+```bash
+# 方式 A：标准 env（最高优先级，覆盖一切）
+export HTTPS_PROXY=http://127.0.0.1:7897
+export HTTP_PROXY=http://127.0.0.1:7897
+export NO_PROXY=localhost,127.0.0.1,*.internal
+panda auth login            # 选 OpenAI → OAuth → ↑↓ 选模型 → 完成
+panda                       # 直接对话，走 chatgpt.com/backend-api/codex/responses
+
+# 方式 B：写入 settings.json（持久化，全用户全 panda 实例生效）
+# 在 ~/.pandacc/settings.json 加：  "proxy": "http://127.0.0.1:7897"
+
+# 方式 C：MITM 自签证书绕过（科学上网工具拦截 TLS 时）
+export PANDA_OAUTH_CA_FILE=/path/to/mitmproxy-ca-cert.pem
+export PANDA_PROXY_DEBUG=1   # 看 stderr 诊断
+panda
+```
+
 </details>
+
+### 1.5 OpenAI / 代理常见问题（v2.21.24）
+
+| 现象 | 原因 | 解决方案 |
+|---|---|---|
+| OpenAI 登录后对话报 `unknown certificate verification error` | Bun runtime 不读系统 CA store，遇到科学上网工具的 MITM 证书无法验证 | 在 `~/.pandacc/settings.json` 加 `"proxy": "http://127.0.0.1:7897"`（端口改成你工具的实际混合端口）；或导出 MITM 根证书，设 `PANDA_OAUTH_CA_FILE=<path>` |
+| `/model gpt-5-codex` 报 `not supported when using Codex with a ChatGPT account` | `gpt-5-codex` 仅 ChatGPT Plus / Pro 账户可用，Free 账户被服务端拒绝 | 改用 `/model gpt-5.4-mini`（Free 可用）；或升级订阅后设 `PANDA_CODEX_ALLOW_CODEX_MODEL=1` 显式解锁 |
+| `curl` 报 `Proxy CONNECT aborted` | Windows PAC 给的代理 URL 是远端标识符（如 `proxy.company.com:8080`）而非本地入口 | 手动设 `HTTPS_PROXY=http://127.0.0.1:7897`（指向本地 Clash / V2Ray / sing-box 的混合端口） |
+| OAuth 回调 `localhost:1455` 永远不返回 | 浏览器走代理把 `localhost` 也代理出去了 | 设 `NO_PROXY=localhost,127.0.0.1`，或把代理工具的"绕过本地地址"打开 |
+| `/model` 切换后请求被服务端 400 拒收 | 旧版 v2.21.16 的 `stream` / `store` 字段在 ChatGPT backend 不被接受 | 升级到 v2.21.24+，已修该 bug（mode-aware 字段过滤） |
+| 选择器卡住、终端不响应 ↑↓ | 非 TTY 环境（CI / pipe）但 panda 仍尝试交互 prompt | v2.21.24 已加 TTY 兜底；非交互终端自动跳过 prompt 用 `pickDefaultCodexModel(planType)` 默认值 |
+| `panda auth login` 后 access_token 过期就报错 | refresh_token 续期失败（网络瞬断 / 代理 race） | v2.21.24 用 module-level Promise 锁单飞 refresh，再次执行 `panda` 即可触发自动续期；持续失败则重新 `panda auth login` |
+| Agent 长任务中途无任何输出后静默退出 | 上游 SSE 连接断开但 client 未察觉（v2.21.20 之前） | v2.21.20 默认启用 stream watchdog 兜底；如需 opt-out，设 `CLAUDE_DISABLE_STREAM_WATCHDOG=1` |
 
 ---
 

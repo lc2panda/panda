@@ -6,6 +6,8 @@ import { getCliHighlightPromise } from '../../utils/cliHighlight.js';
 import { logForDebugging } from '../../utils/debug.js';
 import { convertLeadingTabsToSpaces } from '../../utils/file.js';
 import { hashPair } from '../../utils/hash.js';
+import { isMatrixTheme, isMatrixLight } from '../MatrixTheme/isMatrixTheme.js';
+import { getMatrixSyntaxTheme } from '../MatrixTheme/matrixSyntaxTheme.js';
 type Props = {
   code: string;
   filePath: string;
@@ -19,16 +21,19 @@ type Props = {
 const HL_CACHE_MAX = 500;
 const hlCache = new Map<string, string>();
 function cachedHighlight(hl: NonNullable<Awaited<ReturnType<typeof getCliHighlightPromise>>>, code: string, language: string): string {
-  const key = hashPair(language, code);
+  // T-B2: Matrix 主题用自定 phosphor syntax theme；其它主题保持默认
+  const matrixOn = isMatrixTheme();
+  const themeKey = matrixOn ? (isMatrixLight() ? 'mxL' : 'mxD') : 'def';
+  const key = `${themeKey}|${hashPair(language, code)}`;
   const hit = hlCache.get(key);
   if (hit !== undefined) {
     hlCache.delete(key);
     hlCache.set(key, hit);
     return hit;
   }
-  const out = hl.highlight(code, {
-    language
-  });
+  const out = matrixOn
+    ? hl.highlight(code, { language, theme: getMatrixSyntaxTheme() as any })
+    : hl.highlight(code, { language });
   if (hlCache.size >= HL_CACHE_MAX) {
     const first = hlCache.keys().next().value;
     if (first !== undefined) hlCache.delete(first);

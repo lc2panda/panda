@@ -5,6 +5,8 @@ import { useMemo } from 'react';
 import type { ThemeName } from 'src/utils/theme.js';
 import { stringWidth } from '../../ink/stringWidth.js';
 import { Box, NoSelect, Text, useTheme, wrapText } from '../../ink.js';
+import { isMatrixTheme, isMatrixLight } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI, MATRIX_UI_LIGHT } from '../MatrixTheme/matrixPalette.js';
 
 /*
  * StructuredDiffFallback Component: Word-Level Diff Highlighting Example
@@ -107,10 +109,23 @@ export function StructuredDiffFallback(t0) {
   } else {
     t2 = $[7];
   }
+  // T-B3: Matrix 主题在 diff 上方挂一行 hunk header `┄┄ -X,Y +X,Y ┄┄`
+  // 用 diffHunkHeader 色（NEON G5），dot 字符暗示"重要节点"
+  let matrixHeader: React.ReactNode = null;
+  if (isMatrixTheme()) {
+    const ui = isMatrixLight() ? MATRIX_UI_LIGHT : MATRIX_UI;
+    const headerText = `\u2504\u2504 -${patch.oldStart},${patch.oldLines} +${patch.newStart},${patch.newLines} \u2504\u2504`;
+    matrixHeader = (
+      <Box>
+        <Text color={ui.diffHunkHeader} dimColor>{headerText}</Text>
+      </Box>
+    );
+  }
   let t3;
-  if ($[8] !== t2) {
-    t3 = <Box flexDirection="column" flexGrow={1}>{t2}</Box>;
+  if ($[8] !== t2 || $['mh'] !== matrixHeader) {
+    t3 = <Box flexDirection="column" flexGrow={1}>{matrixHeader}{t2}</Box>;
     $[8] = t2;
+    $['mh'] = matrixHeader;
     $[9] = t3;
   } else {
     t3 = $[9];

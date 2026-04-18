@@ -5,6 +5,8 @@ import * as React from 'react';
 import { COMMAND_MESSAGE_TAG } from '../../constants/xml.js';
 import { Box, Text } from '../../ink.js';
 import { extractTag } from '../../utils/messages.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 type Props = {
   addMargin: boolean;
   param: TextBlockParam;
@@ -44,7 +46,8 @@ export function UserCommandMessage(t0) {
     const t4 = addMargin ? 1 : 0;
     let t5;
     if ($[4] === Symbol.for("react.memo_cache_sentinel")) {
-      t5 = <Text color="subtle">{figures.pointer} </Text>;
+      const _isM_ucm_skill = isMatrixTheme();
+      t5 = <Text color={_isM_ucm_skill ? MATRIX_UI.userGutter : "subtle"}>{_isM_ucm_skill ? '│' : figures.pointer} </Text>;
       $[4] = t5;
     } else {
       t5 = $[4];
@@ -81,7 +84,8 @@ export function UserCommandMessage(t0) {
   const t5 = addMargin ? 1 : 0;
   let t6;
   if ($[13] === Symbol.for("react.memo_cache_sentinel")) {
-    t6 = <Text color="subtle">{figures.pointer} </Text>;
+    const _isM_ucm = isMatrixTheme();
+    t6 = <Text color={_isM_ucm ? MATRIX_UI.userGutter : "subtle"}>{_isM_ucm ? '│' : figures.pointer} </Text>;
     $[13] = t6;
   } else {
     t6 = $[13];

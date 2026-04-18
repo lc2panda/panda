@@ -11,6 +11,7 @@ import { Markdown } from '../Markdown.js';
 import { isZh } from '../../utils/i18n.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
 import { MATRIX_UI, MATRIX_SCALE } from '../MatrixTheme/matrixPalette.js';
+import { ThinkingPanel } from '../MatrixTheme/ThinkingPanel.js';
 type Props = {
   // Accept either full ThinkingBlock/ThinkingBlockParam or a minimal shape with just type and thinking
   param: ThinkingBlock | ThinkingBlockParam | {
@@ -107,16 +108,11 @@ export function AssistantThinkingMessage(t0: Props) {
   const displayThinking = verbose ? thinking : (thinking.length > 200 ? thinking.slice(0, 200) + (isZh() ? '…\n\n_Ctrl+O 展开完整思考_' : '…\n\n_Ctrl+O to expand full thinking_') : thinking);
 
   if (matrix) {
-    // Matrix expanded: ⟩⟩ THINKING ━━━━━━━━━━
+    // T-B1: 用 TurnGutter (thinking) + TurnHeader 包裹，统一身份色 ╎ + ∴ 标签
+    // ThinkingPanel 内部按 collapseAt 阈值自动头尾保留 + 中间折叠摘要
     return (
-      <Box flexDirection="column" gap={1} marginTop={marginTop} width="100%">
-        <Text>
-          <Text color={MATRIX_SCALE.NEON} bold>{"\u27E9\u27E9"} THINKING</Text>
-          <Text color={MATRIX_SCALE.SHADOW}> ━━━━━━━━━━</Text>
-        </Text>
-        <Box paddingLeft={2}>
-          <Markdown dimColor={true} color={MATRIX_SCALE.BASE}>{displayThinking}</Markdown>
-        </Box>
+      <Box flexDirection="column" marginTop={marginTop} width="100%">
+        <ThinkingPanel text={displayThinking} expanded={true} />
       </Box>
     );
   }

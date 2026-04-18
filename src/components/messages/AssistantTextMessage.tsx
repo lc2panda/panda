@@ -5,6 +5,8 @@ import { ERROR_MESSAGE_USER_ABORT } from 'src/services/compact/compact.js';
 import { isRateLimitErrorMessage } from 'src/services/rateLimitMessages.js';
 import { BLACK_CIRCLE } from '../../constants/figures.js';
 import { Box, NoSelect, Text } from '../../ink.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 import { API_ERROR_MESSAGE_PREFIX, API_TIMEOUT_ERROR_MESSAGE, CREDIT_BALANCE_TOO_LOW_ERROR_MESSAGE, CUSTOM_OFF_SWITCH_MESSAGE, INVALID_API_KEY_ERROR_MESSAGE, INVALID_API_KEY_ERROR_MESSAGE_EXTERNAL, ORG_DISABLED_ERROR_MESSAGE_ENV_KEY, ORG_DISABLED_ERROR_MESSAGE_ENV_KEY_WITH_OAUTH, PROMPT_TOO_LONG_ERROR_MESSAGE, startsWithApiErrorPrefix, TOKEN_REVOKED_ERROR_MESSAGE } from '../../services/api/errors.js';
 import { isEmptyMessageText, NO_RESPONSE_REQUESTED } from '../../utils/messages.js';
 import { getUpgradeMessage } from '../../utils/model/contextWindowUpgradeCheck.js';
@@ -229,7 +231,10 @@ export function AssistantTextMessage(t0) {
         const t3 = isSelected ? "messageActionsBackground" : undefined;
         let t4;
         if ($[22] !== isSelected || $[23] !== shouldShowDot) {
-          t4 = shouldShowDot && <NoSelect fromLeftEdge={true} minWidth={2}><Text color={isSelected ? "suggestion" : "text"}>{BLACK_CIRCLE}</Text></NoSelect>;
+          // T0 重构：Matrix 主题下用 ╎ pandaGutter 替换 ● 杂乱字符
+          t4 = shouldShowDot && (isMatrixTheme()
+            ? <NoSelect fromLeftEdge={true} minWidth={2}><Text color={MATRIX_UI.pandaGutter}>│</Text></NoSelect>
+            : <NoSelect fromLeftEdge={true} minWidth={2}><Text color={isSelected ? "suggestion" : "text"}>{BLACK_CIRCLE}</Text></NoSelect>);
           $[22] = isSelected;
           $[23] = shouldShowDot;
           $[24] = t4;

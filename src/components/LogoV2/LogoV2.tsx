@@ -45,6 +45,7 @@ import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
 import { renderModelSetting } from '../../utils/model/model.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
 import { MatrixBootSequence } from '../MatrixTheme/MatrixBootSequence.js';
+import { WelcomeCard } from '../MatrixTheme/WelcomeCard.js';
 const LEFT_PANEL_MAX_WIDTH = 50;
 export function LogoV2() {
   const $ = _c(94);
@@ -250,8 +251,9 @@ export function LogoV2() {
   }
   // Matrix theme: opt-in 启动动画（PANDA_THEME=matrix），所有现有 hooks 上方已执行完毕，
   // 此处早返回不会违反 hooks rules。Phase D 会切到正式的 theme 系统。
+  // T-D2: boot 序列结束后挂一张 WelcomeCard（双线框 KV + tagline），由 MatrixBootGate 控制时序。
   if (isMatrixTheme()) {
-    return <MatrixBootSequence cols={columns} />;
+    return <MatrixBootGate cols={columns} />;
   }
   const layoutMode = getLayoutMode(columns);
   const userTheme = resolveThemeSetting(getGlobalConfig().theme);
@@ -549,4 +551,14 @@ function _temp2(s_0) {
 }
 function _temp(s) {
   return s.agent;
+}
+
+// T-D2: Matrix 主题 boot 序列结束后展示 WelcomeCard。
+// MatrixBootSequence 的 onDone 触发后切换到 WelcomeCard；不嵌套保证布局干净。
+function MatrixBootGate({ cols }: { cols: number }): React.ReactNode {
+  const [done, setDone] = useState(false);
+  if (!done) {
+    return <MatrixBootSequence cols={cols} onDone={() => setDone(true)} />;
+  }
+  return <WelcomeCard />;
 }

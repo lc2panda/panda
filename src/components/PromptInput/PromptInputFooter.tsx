@@ -18,9 +18,8 @@ import type { AutoUpdaterResult } from '../../utils/autoUpdater.js';
 import { isFullscreenEnvEnabled } from '../../utils/fullscreen.js';
 import { isUndercover } from '../../utils/undercover.js';
 import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
-import { MATRIX_UI, MATRIX_SCALE } from '../MatrixTheme/matrixPalette.js';
+import { MatrixHUD } from '../MatrixTheme/MatrixHUD.js';
 import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
-import { getCurrentUsage } from '../../utils/tokens.js';
 import { CoordinatorTaskPanel, useCoordinatorTaskCount } from '../CoordinatorAgentStatus.js';
 import { getLastAssistantMessageId, StatusLine, statusLineShouldDisplay } from '../StatusLine.js';
 import { Notifications } from './Notifications.js';
@@ -122,9 +121,8 @@ function PromptInputFooter({
   const coordinatorTaskIndex = useAppState(s => s.coordinatorTaskIndex);
   const pillSelected = tasksSelected && (coordinatorTaskCount === 0 || coordinatorTaskIndex < 0);
 
-  // Matrix footer: show model + context info when StatusLine is not configured
+  // Matrix footer (T-D1 HUD): show model + ctx + cache hit + tps when StatusLine is not configured
   const matrixModel = useMainLoopModel();
-  const matrixUsage = isMatrixTheme() ? getCurrentUsage(messages) : null;
   const showMatrixFooter = isMatrixTheme() && !statusLineShouldDisplay(settings) && mode === 'prompt' && !isShort && !exitMessage.show && !isPasting;
 
   // Hide `? for shortcuts` if the user has a custom status line, or during ctrl-r
@@ -149,9 +147,7 @@ function PromptInputFooter({
         <Box flexDirection="column" flexShrink={isNarrow ? 0 : 1}>
           {mode === 'prompt' && !isShort && !exitMessage.show && !isPasting && statusLineShouldDisplay(settings) && <StatusLine messagesRef={messagesRef} lastAssistantMessageId={lastAssistantMessageId} vimMode={vimMode} />}
           {showMatrixFooter && <Box>
-            <Text color={MATRIX_SCALE.SHADOW}>▐ </Text>
-            {isMatrixTheme() && matrixModel && <Text color={MATRIX_SCALE.NEON}>{String(matrixModel).replace(/-\d{8}$/, '')}</Text>}
-            {matrixUsage && <Text color={MATRIX_SCALE.SHADOW}>{matrixModel ? ' · ' : ''}{(() => { const total = matrixUsage.input_tokens + matrixUsage.output_tokens; return total > 1000 ? `${(total / 1000).toFixed(1)}k ctx` : `${total} ctx`; })()}</Text>}
+            <MatrixHUD model={matrixModel} messages={messages} />
           </Box>}
           <PromptInputFooterLeftSide exitMessage={exitMessage} vimMode={vimMode} mode={mode} toolPermissionContext={toolPermissionContext} suppressHint={suppressHint} isLoading={isLoading} tasksSelected={pillSelected} teamsSelected={teamsSelected} teammateFooterIndex={teammateFooterIndex} tmuxSelected={tmuxSelected} isPasting={isPasting} isSearching={isSearching} historyQuery={historyQuery} setHistoryQuery={setHistoryQuery} historyFailedMatch={historyFailedMatch} onOpenTasksDialog={onOpenTasksDialog} />
         </Box>

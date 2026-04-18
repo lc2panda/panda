@@ -22,6 +22,8 @@ import { isEnvTruthy } from '../../utils/envUtils.js';
 import { isAgentSwarmsEnabled } from '../../utils/agentSwarmsEnabled.js';
 import { tryRenderPlanApprovalMessage, formatTeammateMessageContent } from './PlanApprovalMessage.js';
 import { BLACK_CIRCLE } from '../../constants/figures.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 import { TeammateMessageContent } from './UserTeammateMessage.js';
 import { isShutdownApproved } from '../../utils/teammateMailbox.js';
 import { CtrlOToExpand } from '../CtrlOToExpand.js';
@@ -78,7 +80,9 @@ export function AttachmentMessage({
         }
         if (parsedMsg?.type === 'task_assignment') {
           return <Box key={idx} paddingLeft={2}>
-                <Text>{BLACK_CIRCLE} </Text>
+                <Text color={isMatrixTheme() ? MATRIX_UI.toolGutter : undefined}>
+                  {isMatrixTheme() ? '│' : BLACK_CIRCLE}{' '}
+                </Text>
                 <Text>Task assigned: </Text>
                 <Text bold>#{parsedMsg.taskId}</Text>
                 <Text> - {parsedMsg.subject}</Text>
@@ -335,7 +339,9 @@ export function AttachmentMessage({
       return <TaskStatusMessage attachment={attachment} />;
     case 'teammate_shutdown_batch':
       return <Box flexDirection="row" width="100%" marginTop={1} backgroundColor={bg}>
-          <Text dimColor>{BLACK_CIRCLE} </Text>
+          <Text dimColor color={isMatrixTheme() ? MATRIX_UI.systemMsg : undefined}>
+            {isMatrixTheme() ? '│' : BLACK_CIRCLE}{' '}
+          </Text>
           <Text dimColor>
             {attachment.count} {plural(attachment.count, 'teammate')} shut down
             gracefully
@@ -396,7 +402,8 @@ function GenericTaskStatus(t0) {
   const statusText = attachment.status === "completed" ? "completed in background" : attachment.status === "killed" ? "stopped" : attachment.status === "running" ? "still running in background" : attachment.status;
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
-    t1 = <Text dimColor={true}>{BLACK_CIRCLE} </Text>;
+    const _isM_gts = isMatrixTheme();
+    t1 = <Text dimColor={true} color={_isM_gts ? MATRIX_UI.systemMsg : undefined}>{_isM_gts ? '│' : BLACK_CIRCLE} </Text>;
     $[0] = t1;
   } else {
     t1 = $[0];
@@ -467,7 +474,8 @@ function TeammateTaskStatus(t0: { attachment: TaskStatusAttachment }) {
   const statusText = attachment.status === "completed" ? "shut down gracefully" : attachment.status;
   let t3;
   if ($[6] === Symbol.for("react.memo_cache_sentinel")) {
-    t3 = <Text dimColor={true}>{BLACK_CIRCLE} </Text>;
+    const _isM_tts = isMatrixTheme();
+    t3 = <Text dimColor={true} color={_isM_tts ? MATRIX_UI.systemMsg : undefined}>{_isM_tts ? '│' : BLACK_CIRCLE} </Text>;
     $[6] = t3;
   } else {
     t3 = $[6];

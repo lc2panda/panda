@@ -24,7 +24,11 @@ export function ToolUseLoader(t0) {
     ? (isError ? MATRIX_STATUS.ERROR : isUnresolved ? (isBlinking ? MATRIX_SCALE.NEON : MATRIX_SCALE.SHADOW) : MATRIX_SCALE.BRIGHT)
     : undefined;
   const color = matrixActive ? matrixColor : (isUnresolved ? undefined : isError ? "error" : "success");
-  const t1 = !shouldAnimate || isBlinking || isError || !isUnresolved ? BLACK_CIRCLE : " ";
+  // Matrix 主题下用 ╎ toolGutter 替换 ● — 保持身份 gutter 一致性，避免 ●/◉/▸ 杂乱
+  const matrixGlyph = '│'
+  const t1 = !shouldAnimate || isBlinking || isError || !isUnresolved
+    ? (matrixActive ? matrixGlyph : BLACK_CIRCLE)
+    : " ";
   let t2;
   if ($[0] !== color || $[1] !== isUnresolved || $[2] !== t1) {
     t2 = <Text color={color} dimColor={isUnresolved && !matrixActive}>{t1}</Text>;

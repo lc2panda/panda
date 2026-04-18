@@ -4,6 +4,8 @@ import * as React from 'react';
 import { BLACK_CIRCLE } from '../../constants/figures.js';
 import { Box, Text, type TextProps } from '../../ink.js';
 import { extractTag } from '../../utils/messages.js';
+import { isMatrixTheme } from '../MatrixTheme/isMatrixTheme.js';
+import { MATRIX_UI } from '../MatrixTheme/matrixPalette.js';
 type Props = {
   addMargin: boolean;
   param: TextBlockParam;
@@ -54,7 +56,8 @@ export function UserAgentNotificationMessage(t0) {
   const t4 = addMargin ? 1 : 0;
   let t5;
   if ($[4] !== color) {
-    t5 = <Text color={color}>{BLACK_CIRCLE}</Text>;
+    const _isM_uan = isMatrixTheme();
+    t5 = <Text color={_isM_uan ? MATRIX_UI.systemMsg : color}>{_isM_uan ? '│' : BLACK_CIRCLE}</Text>;
     $[4] = color;
     $[5] = t5;
   } else {

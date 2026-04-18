@@ -577,15 +577,51 @@ export type GlobalConfig = {
   migrationVersion?: number
 
   // Third-party API provider configuration (set via `panda auth login --provider`)
+  //
+  // 向后兼容：旧版只有 apiKey 字段 → 视为 mode='api_key'（默认）。
+  // 新增 mode='chatgpt_backend' 用于 OpenAI OAuth → ChatGPT backend 路径。
   thirdPartyProvider?: {
     name: string
     baseURL: string
     apiKey: string
     model: string
     contextWindow?: number
+    // OpenAI-specific: ChatGPT backend OAuth 模式字段
+    mode?: 'api_key' | 'chatgpt_backend'
+    accessToken?: string
+    refreshToken?: string
+    idToken?: string
+    accountId?: string
+    email?: string
+    /** unix ms epoch */
+    expiresAt?: number
+    /** 作战线 N：chatgpt_plan_type (free/plus/pro/team/enterprise) */
+    planType?: string
+    /**
+     * 作战线 Q：登录后从 chatgpt.com/backend-api/codex/models 拉到的可用模型 id 列表。
+     * 持久化后供 /model 切换 autocomplete + 后续 fallback 缩小候选集。
+     * 拉取失败（401/网络挂）时缺省，不阻塞登录流程。
+     */
+    availableModels?: string[]
   }
 
   language?: string
+
+  /**
+   * 作战线 N：全局代理配置（settings.json / config.json 兼容）
+   * 字符串形式最简：`"proxy": "http://127.0.0.1:7897"` → 同时作 https/http
+   * 对象形式兼容进阶用户：分别指定 https/http/noProxy
+   *
+   * 实际生效走 src/entrypoints/cli.tsx 启动期将其注入 HTTPS_PROXY/HTTP_PROXY env
+   * env 优先级最高，用户临时 `HTTPS_PROXY=... bun ...` 仍可覆盖。
+   */
+  proxy?:
+    | string
+    | {
+        https?: string
+        http?: string
+        noProxy?: string[] | string
+      }
 
   persona?: {
     active: string

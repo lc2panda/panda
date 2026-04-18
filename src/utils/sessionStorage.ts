@@ -1036,6 +1036,32 @@ class Project {
           effectiveParentUuid = message.sourceToolAssistantUUID as UUID
         }
 
+        // [PARENTUUID-FIX] chatgpt_backend / OpenAI adapter 路径下 assistant
+        // message 偶发携带 parentUuid:null 字段（SDK 适配层污染 / 上游 mutate /
+        // 内存复用），spread `...message` 会覆盖前面计算好的 parentUuid →
+        // assistant 链 parentUuid 全部 null → message tree 断裂 → resume 时
+        // 上下文丢失（实测见 v2.1.92 jsonl 证据）。
+        //
+        // 这里先剥离 message 自带的 parentUuid/logicalParentUuid（chain 字段
+        // 由 insertMessageChain 权威计算，message 上的相同字段任何来源都视为
+        // 污染），再走原有 spread 流程。这样既保留 walkChainBeforeParse 依赖
+        // 的 `{"parentUuid":` 行首前缀不变（line 3255 invariant），也根治
+        // spread 覆盖问题。fork-session 不受影响：fresh 文件第一个 chain
+        // participant 本就 chain 不到源 session 的 parent（不在同一文件），
+        // 后续消息靠 line 1068 的 parentUuid=message.uuid 推进。
+        const messageWithoutChainFields =
+          'parentUuid' in (message as Record<string, unknown>) ||
+          'logicalParentUuid' in (message as Record<string, unknown>)
+            ? (() => {
+                const {
+                  parentUuid: _pu,
+                  logicalParentUuid: _lpu,
+                  ...rest
+                } = message as Record<string, unknown>
+                return rest as typeof message
+              })()
+            : message
+
         const transcriptMessage: TranscriptMessage = {
           parentUuid: isCompactBoundary ? null : effectiveParentUuid,
           logicalParentUuid: isCompactBoundary ? parentUuid : undefined,
@@ -1045,7 +1071,7 @@ class Project {
           promptId:
             message.type === 'user' ? (getPromptId() ?? undefined) : undefined,
           agentId,
-          ...message,
+          ...messageWithoutChainFields,
           // Session-stamp fields MUST come after the spread. On --fork-session
           // and --resume, messages arrive as SerializedMessage (carries source
           // sessionId/cwd/etc. because removeExtraFields only strips parentUuid

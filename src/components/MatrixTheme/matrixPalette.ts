@@ -156,6 +156,13 @@ export const MATRIX_UI = {
   userMark:       MATRIX_SCALE.BRIGHT,    // user message indicator "▸" (G6 — brighter)
   assistantMark:  MATRIX_SCALE.BASE,      // assistant indicator "◉" (G4 — softer)
 
+  // ── Turn gutter (T0 重构 — 按身份分色 ╎ 竖线) ──
+  // Phase 1 地基；TurnGutter / MessageResponse Matrix 分支引用
+  userGutter:     MATRIX_SCALE.GLOW,      // G7 — user 高亮身份
+  pandaGutter:    MATRIX_SCALE.BASE,      // G4 — assistant 平稳
+  toolGutter:     MATRIX_SCALE.BRIGHT,    // G6 — tool 动作明确
+  thinkingGutter: MATRIX_SCALE.SHADOW,    // G3 — thinking 内省
+
   // Status
   error:          MATRIX_STATUS.ERROR,
   warning:        MATRIX_STATUS.WARNING,
@@ -190,7 +197,31 @@ export const MATRIX_UI = {
 
   // ── Pane divider character ──────────────────────────────────────
   paneChar:         '━',                    // Matrix-style heavy divider
+
+  // ── v3 OPERATOR-NEO chrome ──────────────────────────────────────
+  // user 行整行极深绿底（vs 文本 #22A022 实测 ~5.0:1，AA normal 通过）
+  userBg:           '#001A00',              // 极深绿 — 仅 user (OPERATOR) message 行背景
+  // turn 之间分隔字符的色（DEEP）
+  roleSeparator:    MATRIX_SCALE.DEEP,      // '#0A4A0A' — turn 分隔点连线 / katakana 彩蛋
 } as const
+
+// ─── v3 P9 breath palette ─────────────────────────────────────────
+// "Phosphor afterglow" 4 段呼吸梯度：BASE → NEON → BRIGHT → NEON → BASE。
+// usePhosphorBreath 返回 t ∈ [0,1]，组件按 t 取数组索引插值。
+// 颜色档差严格控制在 4 级以内，避免高频闪烁刺眼。
+export const MATRIX_BREATH_PULSE = [
+  MATRIX_SCALE.BASE,    // G4 — 静息
+  MATRIX_SCALE.NEON,    // G5 — 缓慢吸气
+  MATRIX_SCALE.BRIGHT,  // G6 — 峰值
+  MATRIX_SCALE.NEON,    // G5 — 呼气
+] as const
+
+export const MATRIX_BREATH_PULSE_LIGHT = [
+  '#1A5A1A', // L4 BASE
+  '#1A6A1A', // L5 NEON
+  '#1E6A1E', // L6 BRIGHT
+  '#1A6A1A', // L5 NEON
+] as const
 
 // ─── Light-mode Matrix scale (H≈130° — cool mint-green on pale paper) ───
 // Designed for bright terminals: deep greens on light background.
@@ -263,6 +294,13 @@ export const MATRIX_UI_LIGHT = {
   userMark:       MATRIX_SCALE_LIGHT.BRIGHT,
   assistantMark:  MATRIX_SCALE_LIGHT.BASE,
 
+  // ── Turn gutter (T0 重构 — 按身份分色 ╎ 竖线) ──
+  // Light 模式 BRIGHT 在浅底上太弱，tool 用 GLOW 替代
+  userGutter:     MATRIX_SCALE_LIGHT.GLOW,
+  pandaGutter:    MATRIX_SCALE_LIGHT.BASE,
+  toolGutter:     MATRIX_SCALE_LIGHT.GLOW,
+  thinkingGutter: MATRIX_SCALE_LIGHT.SHADOW,
+
   // Status
   error:          MATRIX_STATUS_LIGHT.ERROR,
   warning:        MATRIX_STATUS_LIGHT.WARNING,
@@ -295,8 +333,12 @@ export const MATRIX_UI_LIGHT = {
   // Selection highlight
   selectHighlight:  MATRIX_SCALE_LIGHT.FLASH,
 
-  // Pane divider character
-  paneChar:         '━',
+  // Pane divider character (T-E1: 双线统一为 phosphor 双线)
+  paneChar:         '═',
+
+  // ── v3 OPERATOR-NEO chrome (light mode) ─────────────────────────
+  userBg:           '#D5F0D5',              // L1.5 极浅绿 — user message 行背景（vs L4 文本 ~7:1）
+  roleSeparator:    MATRIX_SCALE_LIGHT.DEEP, // turn 分隔字符
 } as const
 
 // ─── Light-mode color interpolation ─────────────────────────────────

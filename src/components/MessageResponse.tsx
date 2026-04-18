@@ -23,7 +23,7 @@ export function MessageResponse(t0) {
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
     t1 = _isMatrix
-      ? <NoSelect fromLeftEdge={true} flexShrink={0}><Text color={MATRIX_UI.gutter}>{"  "}▐  </Text></NoSelect>
+      ? <NoSelect fromLeftEdge={true} flexShrink={0}><Text color={MATRIX_UI.toolGutter}>{"  "}│ </Text></NoSelect>
       : <NoSelect fromLeftEdge={true} flexShrink={0}><Text dimColor={true}>{"  "}⎿  </Text></NoSelect>;
     $[0] = t1;
   } else {
