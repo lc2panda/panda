@@ -1,46 +1,19 @@
-// Input: turnIndex（参考用，决定是否触发彩蛋帧）
-// Output: turn 之间的极简分隔行 — 主帧：── · ── · ── · ── · ──（DEEP 色）
-//         每 5 turn 换 katakana 彩蛋：ｱ  ﾑ    7    ﾝ  ﾄ    ﾞ
-// Pos: Messages.tsx roleChanged 处 TurnHeader 之前插入
+// Input: turnIndex（参考用 — 当前版本 v3.2 已不再渲染任何分隔符）
+// Output: 始终返回 null — turn 之间走纯空白留白，由 TurnHeader marginTop 提供节奏
+// Pos: Messages.tsx roleChanged 处 TurnHeader 之前；保留组件接口便于后续复活
 // 一旦我被修改，请更新 MatrixTheme/README.md
 //
-// [NEW-FILE:#20260418-22] · v3 P4：替代之前 marginTop={1} 的纯空白留白，
-// 给 turn 边界一个极轻的视觉锚点。颜色全部走 DEEP（roleSeparator），不抢眼。
+// v3.2（指挥官二次实测反馈）：5-turn 一次的 katakana 彩蛋（ｱ ﾑ 7 ﾝ ﾄ ﾞ）虽稀疏但仍易误读，
+// 且与正文同色相争夺注意力，决定彻底移除。组件保留为 null-renderer，避免删除后引发
+// Messages.tsx + smoke test 的连锁改动；后续若要复活分隔符直接修改本文件即可。
 
-import * as React from 'react'
-import { Box, Text } from '../../ink.js'
-import { isMatrixLight, isMatrixTheme } from './isMatrixTheme.js'
-import { MATRIX_UI, MATRIX_UI_LIGHT, ageToHex, ageToHexLight } from './matrixPalette.js'
-
-// 主分隔帧：5 个 ── · 节拍，居中、居前留 3 空格缩进对齐 gutter
-const MAIN_PATTERN = '   \u2500\u2500 \u00B7 \u2500\u2500 \u00B7 \u2500\u2500 \u00B7 \u2500\u2500 \u00B7 \u2500\u2500'
-// 彩蛋帧：稀疏 katakana — 更"残影/数据流"
-const EASTER_PATTERN = '   \uFF71  \uFF91    7    \uFF9D  \uFF84    \uFF9E'
-const EASTER_INTERVAL = 5
+import * as React from 'react';
 
 interface Props {
-  /** 参考 turn 序号（不必严格连续，仅决定 % 5 == 0 是否触发彩蛋） */
-  turnIndex: number
+  /** 参考 turn 序号（保留 prop 接口，当前实现忽略） */
+  turnIndex: number;
 }
 
-export function TurnSeparator({ turnIndex }: Props): React.ReactNode {
-  if (!isMatrixTheme()) return null
-  const lightMode = isMatrixLight()
-  const ui = lightMode ? MATRIX_UI_LIGHT : MATRIX_UI
-  const baseColor = ui.roleSeparator
-  // 彩蛋色比主色稍亮一档（age 0.7 ≈ TAIL→FADE 中段）
-  const easterColor = lightMode ? ageToHexLight(0.7) : ageToHex(0.7)
-
-  // v3.1 (指挥官实测反馈)：常规 ── · ── 分隔每 turn 都出现造成阅读负担。
-  // 改为只保留 5-turn 一次的 katakana decay 彩蛋；其余 turn 之间走纯空白留白。
-  const isEaster = turnIndex > 0 && turnIndex % EASTER_INTERVAL === 0
-  if (!isEaster) return null
-
-  return (
-    <Box marginTop={1} marginBottom={0}>
-      <Text color={easterColor} dimColor>
-        {EASTER_PATTERN}
-      </Text>
-    </Box>
-  )
+export function TurnSeparator(_props: Props): React.ReactNode {
+  return null;
 }
