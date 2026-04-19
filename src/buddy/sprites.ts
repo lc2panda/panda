@@ -10,6 +10,7 @@ import {
   duck,
   ghost,
   goose,
+  isPandaSpecies,
   kungFuPanda,
   mushroom,
   octopus,
@@ -458,7 +459,11 @@ const HAT_LINES: Record<Hat, string> = {
 }
 
 export function renderSprite(bones: CompanionBones, frame = 0): string[] {
-  const frames = BODIES[bones.species]
+  // why: v2.21.27 production crash — BODIES 仅含旧 18 物种，panda 系访问 undefined 崩溃；
+  //      panda 系 fallback 走 PANDA_SPECIES_BODIES.idle，旧 18 物种逻辑保 byte-equal
+  const frames = isPandaSpecies(bones.species)
+    ? (PANDA_SPECIES_BODIES[bones.species]?.idle ?? BODIES[duck])
+    : BODIES[bones.species]
   const body = frames[frame % frames.length]!.map(line =>
     line.replaceAll('{E}', bones.eye),
   )
@@ -475,7 +480,12 @@ export function renderSprite(bones: CompanionBones, frame = 0): string[] {
 }
 
 export function spriteFrameCount(species: Species): number {
-  return BODIES[species].length
+  // why: v2.21.27 production crash — BODIES 不含 panda 系，spriteFrameCount(panda) 抛 TypeError；
+  //      panda 系帧数取 idle 帧数（state-driven 渲染下 frameCount 仅用于 sprite tick 节奏）
+  if (isPandaSpecies(species)) {
+    return PANDA_SPECIES_BODIES[species]?.idle?.length ?? 1
+  }
+  return BODIES[species]?.length ?? 1
 }
 
 export function renderFace(bones: CompanionBones): string {
