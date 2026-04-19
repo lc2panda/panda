@@ -6,6 +6,12 @@
 //      检查器 7 习惯偏差检查（深夜关怀 + 长时间连续工作提醒）
 //      检查器 8 LLM 元检查器（本地智能推理：重复话题/错误累积/工具委派建议）
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
+//
+// 2026-04-19 22:07 +08:00 P3-T4-γ 被动层 8 检查器追加 badge bumpBadge（不打扰）：
+//   uncommitted-changes-badge / profile-stale-badge / morning-briefing-badge
+//   pending-notifications-badge / habit-deviation-badge / llm-insight-badge
+//   time-greeting-badge / task-stall-badge
+//   严守 byte-equal — 主战场仍是 inline system msg；桌面端只角标提示
 
 import { join } from 'path'
 import { existsSync, readFileSync, statSync } from 'fs'
@@ -110,6 +116,20 @@ export function formatSuggestionsAsSystemMessage(suggestions: ProactiveSuggestio
   ].join('\n')
 }
 
+// ─── P3-T4-γ desk badge 辅助 — fire-and-forget，永不抛错 ───
+// why: 被动层不打扰，仅角标提示；调用失败不阻塞 proactive 检查链
+function _deskBadge(scenarioId: string, delta = 1): void {
+  try {
+    const { bumpBadge, isOnDeskEnabled } =
+      require('../desk/bridge.js') as typeof import('../desk/bridge.js')
+    if (isOnDeskEnabled()) {
+      bumpBadge(scenarioId, delta)
+    }
+  } catch {
+    // 桥接失败不阻塞 proactive 检查
+  }
+}
+
 // ─── 检查器 1: 长时间无 commit（>2 小时有未提交变更） ───
 
 function _checkUncommittedChanges(context: {
@@ -128,6 +148,7 @@ function _checkUncommittedChanges(context: {
     const twoHours = 2 * 60 * 60 * 1000
 
     if (elapsed > twoHours) {
+      _deskBadge('uncommitted-changes-badge', 1)
       return {
         type: 'reminder',
         priority: 'medium',
@@ -154,6 +175,7 @@ function _checkProfileStaleness(): ProactiveSuggestion | null {
     const daysSinceUpdate = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24)
 
     if (daysSinceUpdate > 7) {
+      _deskBadge('profile-stale-badge', 1)
       return {
         type: 'reminder',
         priority: 'low',
@@ -189,6 +211,7 @@ function _checkMorningBriefing(): ProactiveSuggestion | null {
       } catch {}
 
       if (count > 0) {
+        _deskBadge('morning-briefing-badge', count)
         return {
           type: 'tip',
           priority: 'low',
@@ -295,6 +318,7 @@ function _checkHabitDeviation(): ProactiveSuggestion | null {
     const hour = new Date().getHours()
     // 深夜工作关怀
     if (hour >= 23 || hour < 5) {
+      _deskBadge('habit-deviation-badge', 1)
       return {
         type: 'tip' as ProactiveSuggestion['type'],
         message: '🌙 深夜了，注意休息。持续工作效率会下降，明天继续也不迟。',
@@ -309,6 +333,7 @@ function _checkHabitDeviation(): ProactiveSuggestion | null {
     if (lastTime && firstTime) {
       const duration = (new Date(lastTime).getTime() - new Date(firstTime).getTime()) / 3600000
       if (duration > 3) {
+        _deskBadge('habit-deviation-badge', 1)
         return {
           type: 'tip' as ProactiveSuggestion['type'],
           message: `⏰ 已连续工作 ${Math.round(duration)} 小时，建议休息 10 分钟。`,
@@ -333,6 +358,7 @@ function _checkPendingNotifications(): ProactiveSuggestion | null {
     if (unseen.length === 0) return null
     // 被动层限制最多展示最近 3 条，避免消息爆量
     const recent = unseen.slice(-3)
+    _deskBadge('pending-notifications-badge', recent.length)
     // BUG-4 fix: 不在此处立即标记已读，而是通过 _onAccepted 回调延迟到建议被采纳展示后
     return {
       type: 'pending-notifications',
@@ -418,6 +444,7 @@ function _checkLLMInsight(context: { messages: readonly any[]; turnCount: number
 
     // 4. 生成建议（按优先级返回最重要的一个）
     if (signals.includes('repeated-topic')) {
+      _deskBadge('llm-insight-badge', 1)
       return {
         type: 'llm-insight',
         message: '💡 检测到重复话题 — 试试换个角度描述需求，或用 /plan 先梳理思路？',
@@ -427,6 +454,7 @@ function _checkLLMInsight(context: { messages: readonly any[]; turnCount: number
     }
 
     if (signals.includes('error-accumulation')) {
+      _deskBadge('llm-insight-badge', 1)
       return {
         type: 'llm-insight',
         message: '🔍 多次错误 — 建议先 /debug 查看日志，或用 Agent 分析根因。',
@@ -436,6 +464,7 @@ function _checkLLMInsight(context: { messages: readonly any[]; turnCount: number
     }
 
     if (signals.includes('no-delegation')) {
+      _deskBadge('llm-insight-badge', 1)
       return {
         type: 'llm-insight',
         message: '🤖 长对话建议 — 考虑用 Agent 委派子任务，或 /plan 规划后再执行。',
@@ -503,6 +532,7 @@ function _checkTimeAwareGreeting(context: {
     const gapMin = Math.round(gap / 60000)
     const gapStr = gapMin >= 60 ? `${Math.round(gapMin / 60)} 小时` : `${gapMin} 分钟`
 
+    _deskBadge('time-greeting-badge', 1)
     return {
       type: 'tip',
       priority: 'low',
@@ -550,6 +580,7 @@ function _checkTaskProgressStall(context: {
       })
 
       if (hasErrors) {
+        _deskBadge('task-stall-badge', 1)
         return {
           type: 'insight',
           priority: 'medium',
@@ -559,6 +590,7 @@ function _checkTaskProgressStall(context: {
       }
 
       // 无错误但长时间无 commit
+      _deskBadge('task-stall-badge', 1)
       return {
         type: 'tip',
         priority: 'low',

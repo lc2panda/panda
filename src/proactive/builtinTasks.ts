@@ -2,6 +2,12 @@
 // Output: 核心内置任务（含前瞻记忆扫描） + Phase 1~4 场景模块（系统健康/开发/文件/个人生活/安全/效率/高级系统/高级文件/通信/扩展）
 // Pos: Registered by proactive/index.ts on activateProactive(); executed by night orchestrator.
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+//
+// 2026-04-19 22:07 +08:00 P3-T4-γ 核心 SMART_CRON 漏接 10 项追加 panda-on-desk 接入：
+//   git-uncommitted-badge / prospective-scan / file-organizer / working-memory-cleanup
+//   memory-decay / memory-index-rebuild / dream-report-summary / profile-stale-reminder
+//   code-health / clipboard-poll
+//   严守 byte-equal — 只追加不替换 sense.pushNotification
 
 import type { ProactiveTask } from './taskRegistry.js'
 import { isProactiveActive } from './index.js'
@@ -206,6 +212,15 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
         logForDebugging(
           `[builtinTasks] file-organizer: ${suggestions.length} files could be organized`,
         )
+        // why: P3-T4-γ panda-on-desk 联动 — file-organizer 仅角标累加（默认 OFF）
+        if (suggestions.length > 0) {
+          try {
+            const { bumpBadge, isOnDeskEnabled } = await import('../desk/bridge.js')
+            if (isOnDeskEnabled()) {
+              bumpBadge('file-organizer', suggestions.length)
+            }
+          } catch {}
+        }
       } catch (e) {
         logForDebugging(
           `[builtinTasks] file-organizer failed: ${(e as Error).message}`,
@@ -230,6 +245,15 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
         logForDebugging(
           `[builtinTasks] memory-decay: decayed=${result.decayed} pruned=${result.pruned}`,
         )
+        // why: P3-T4-γ panda-on-desk 联动 — 仅角标提示（不打扰夜间任务）
+        if ((result.decayed ?? 0) + (result.pruned ?? 0) > 0) {
+          try {
+            const { bumpBadge, isOnDeskEnabled } = await import('../desk/bridge.js')
+            if (isOnDeskEnabled()) {
+              bumpBadge('memory-decay', 1)
+            }
+          } catch {}
+        }
       } catch (e) {
         logForDebugging(
           `[builtinTasks] memory-decay failed: ${(e as Error).message}`,
@@ -278,6 +302,21 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
             '../assistant/workingMemory.js'
           )
           setWorkingMemory('code-health-failed', output.slice(-500))
+          // why: P3-T4-γ panda-on-desk 联动 — 构建失败 system + badge
+          try {
+            const { pushNotification: deskPush, bumpBadge, isOnDeskEnabled } =
+              await import('../desk/bridge.js')
+            if (isOnDeskEnabled()) {
+              deskPush({
+                kind: 'system',
+                level: 'warning',
+                scenarioId: 'code-health',
+                title: 'Panda · 代码健康检查失败',
+                body: `bun run build exit=${result.status}`,
+              })
+              bumpBadge('code-health', 1)
+            }
+          } catch {}
         }
       } catch (e) {
         logForDebugging(
@@ -309,6 +348,13 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
         logForDebugging(
           `[builtinTasks] memory-index-rebuild: indexed ${files.length} files`,
         )
+        // why: P3-T4-γ panda-on-desk 联动 — 索引重建仅角标提示（凌晨任务）
+        try {
+          const { bumpBadge, isOnDeskEnabled } = await import('../desk/bridge.js')
+          if (isOnDeskEnabled()) {
+            bumpBadge('memory-index-rebuild', 1)
+          }
+        } catch {}
       } catch (e) {
         logForDebugging(
           `[builtinTasks] memory-index-rebuild failed: ${(e as Error).message}`,
@@ -349,6 +395,15 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           logForDebugging(
             `[builtinTasks] working-memory-cleanup: removed ${cleaned} stale files`,
           )
+          // why: P3-T4-γ panda-on-desk 联动 — 仅角标
+          if (cleaned > 0) {
+            try {
+              const { bumpBadge, isOnDeskEnabled } = await import('../desk/bridge.js')
+              if (isOnDeskEnabled()) {
+                bumpBadge('working-memory-cleanup', 1)
+              }
+            } catch {}
+          }
         } catch {}
       } catch (e) {
         logForDebugging(
@@ -411,12 +466,37 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
 
           try {
             const { pushNotification } = await import('../assistant/sense.js')
+            const drsTitle = '📊 本周 DeepDream 周报'
+            const drsBody = `本周 ${recentDreams.length} 份 DeepDream 报告已汇总。可使用 /memory weekly 查看。`
             pushNotification({
               type: 'action',
-              title: '📊 本周 DeepDream 周报',
-              body: `本周 ${recentDreams.length} 份 DeepDream 报告已汇总。可使用 /memory weekly 查看。`,
+              title: drsTitle,
+              body: drsBody,
               channel: 'all',
             })
+            // why: P3-T4-γ panda-on-desk 联动 — 周报 system + overlay
+            try {
+              const { pushNotification: deskPush, bumpBadge, isOnDeskEnabled } =
+                await import('../desk/bridge.js')
+              if (isOnDeskEnabled()) {
+                deskPush({
+                  kind: 'system',
+                  level: 'info',
+                  scenarioId: 'dream-report-summary',
+                  title: 'Panda · DeepDream 周报',
+                  body: drsBody,
+                })
+                deskPush({
+                  kind: 'overlay',
+                  level: 'info',
+                  scenarioId: 'dream-report-summary',
+                  title: drsTitle,
+                  body: drsBody,
+                  ttlMs: 8_000,
+                })
+                bumpBadge('dream-report-summary', 1)
+              }
+            } catch {}
           } catch {}
         }
         logForDebugging(
@@ -595,6 +675,15 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
             body: `${changedFiles} 个文件未提交，距上次 commit 已 ${Math.round(elapsed / 3600000)} 小时`,
             channel: 'all',
           })
+          // why: P3-T4-γ panda-on-desk 联动 — git 未提交以 badge 提示（不打扰）
+          try {
+            const { bumpBadge, isOnDeskEnabled } = await import('../desk/bridge.js')
+            if (isOnDeskEnabled()) {
+              bumpBadge('git-uncommitted-badge', 1)
+            }
+          } catch {
+            // 桥接失败不阻塞主路径
+          }
         }
       } catch (e) {
         logForDebugging(
@@ -630,6 +719,23 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
             body: `用户画像已 ${Math.round(daysSince)} 天未更新，建议在下次会话中运行 /dream`,
             channel: 'all',
           })
+          // why: P3-T4-γ panda-on-desk 联动 — profile 过期 badge + system 横幅
+          try {
+            const { pushNotification: deskPush, bumpBadge, isOnDeskEnabled } =
+              await import('../desk/bridge.js')
+            if (isOnDeskEnabled()) {
+              deskPush({
+                kind: 'system',
+                level: 'info',
+                scenarioId: 'profile-stale-reminder',
+                title: 'Panda · 用户画像过期',
+                body: `已 ${Math.round(daysSince)} 天未更新`,
+              })
+              bumpBadge('profile-stale-reminder', 1)
+            }
+          } catch {
+            // 桥接失败不阻塞主路径
+          }
         }
       } catch (e) {
         logForDebugging(
@@ -728,12 +834,38 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           try {
             const { pushNotification } = await import('../assistant/sense.js')
             const preview = parts[0].replace(/^##\s*/, '').slice(0, 100)
+            const psBody = `检测到 ${parts.length} 项即将到来的事件/截止日期。${preview ? '\n' + preview : ''}`
             pushNotification({
               type: 'action',
               title: '🔮 前瞻提醒',
-              body: `检测到 ${parts.length} 项即将到来的事件/截止日期。${preview ? '\n' + preview : ''}`,
+              body: psBody,
               channel: 'all',
             })
+            // why: P3-T4-γ panda-on-desk 联动 — 前瞻提醒 system + overlay
+            try {
+              const { pushNotification: deskPush, bumpBadge, isOnDeskEnabled } =
+                await import('../desk/bridge.js')
+              if (isOnDeskEnabled()) {
+                deskPush({
+                  kind: 'system',
+                  level: 'info',
+                  scenarioId: 'prospective-scan',
+                  title: 'Panda · 🔮 前瞻提醒',
+                  body: psBody,
+                })
+                deskPush({
+                  kind: 'overlay',
+                  level: 'info',
+                  scenarioId: 'prospective-scan',
+                  title: '🔮 前瞻提醒',
+                  body: psBody,
+                  ttlMs: 8_000,
+                })
+                bumpBadge('prospective-scan', parts.length)
+              }
+            } catch {
+              // 桥接失败不阻塞
+            }
           } catch {}
         } catch (e) {
           logForDebugging(
@@ -783,6 +915,13 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           timestamp: Date.now(),
         })
         setWorkingMemory('clipboard-recent', payload)
+        // why: P3-T4-γ panda-on-desk 联动 — 剪贴板捕获仅角标（默认 OFF · privacy=medium）
+        try {
+          const { bumpBadge, isOnDeskEnabled } = await import('../desk/bridge.js')
+          if (isOnDeskEnabled()) {
+            bumpBadge('clipboard-poll', 1)
+          }
+        } catch {}
       } catch (e) {
         logForDebugging(
           `[builtinTasks] clipboard-poll failed: ${(e as Error).message}`,

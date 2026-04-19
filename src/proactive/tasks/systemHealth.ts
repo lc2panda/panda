@@ -50,14 +50,17 @@ const diskSpaceAlert: SmartCronTask = {
           channel: 'system',
         })
         // why: P2-T7 panda-on-desk 联动 — 磁盘告警，system 横幅 + 状态栏角标累加
+        // why: P3-T4-α 补 soundCue — warning 级 short；如阈值触及 5% 以下视同 error 用 critical
         try {
           if (isDeskOnDeskEnabled()) {
+            const isCritical = freePercent < 5 || freeGB < 1
             pushDeskNotification({
               kind: 'system',
-              level: 'warning',
+              level: isCritical ? 'error' : 'warning',
               scenarioId: 'disk-low',
               title: 'Panda · 磁盘空间不足',
               body: `${mount} 剩余 ${freeGB.toFixed(1)}GB（${freePercent}%）`,
+              soundCue: isCritical ? 'critical' : 'short',
             })
             bumpDeskBadge('disk-low', 1)
           }
@@ -130,14 +133,17 @@ const memoryPressureAlert: SmartCronTask = {
           channel: 'system',
         })
         // why: P2-T7 panda-on-desk 联动 — 内存压力告警 system 横幅 + 角标
+        // why: P3-T4-α 补 soundCue — usedPercent>95 升级为 error+critical（系统接近 OOM）
         try {
           if (isDeskOnDeskEnabled()) {
+            const isCritical = info.usedPercent > 95
             pushDeskNotification({
               kind: 'system',
-              level: 'warning',
+              level: isCritical ? 'error' : 'warning',
               scenarioId: 'memory-pressure',
               title: 'Panda · 内存压力过高',
               body: `使用 ${info.usedPercent}%（阈值 ${config.memoryUsedPercent}%）`,
+              soundCue: isCritical ? 'critical' : 'short',
             })
             bumpDeskBadge('memory-pressure', 1)
           }
@@ -174,14 +180,16 @@ const networkAnomaly: SmartCronTask = {
           channel: 'system',
         })
         // why: P2-T7 panda-on-desk 联动 — 网络断开 system 横幅 + 角标
+        // why: P3-T4-α 补 soundCue — 完全断网视为 error+critical（影响所有联网功能）
         try {
           if (isDeskOnDeskEnabled()) {
             pushDeskNotification({
               kind: 'system',
-              level: 'warning',
+              level: 'error',
               scenarioId: 'network-anomaly',
               title: 'Panda · 网络断开',
               body: '无法连接到外部网络',
+              soundCue: 'critical',
             })
             bumpDeskBadge('network-anomaly', 1)
           }

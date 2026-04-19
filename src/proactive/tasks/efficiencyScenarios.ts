@@ -3,6 +3,11 @@
 // Pos: proactive/tasks/ 效率场景层，由 taskRegistry 注册调度
 
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-β: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+import {
+  pushNotification as pushDeskNotification,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { localDateStr } from '../../utils/date.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -58,6 +63,21 @@ const noBreakReminder: SmartCronTask = {
             body: `你已经连续工作 ${Math.round(continuousMinutes)} 分钟了，起来走走、伸展一下吧`,
             channel: 'statusLine',
           })
+          // why: P3-T4-β panda-on-desk 联动 — efficiency 类 overlay + gentle 音效；defaultOn=false 用户主动开
+          try {
+            if (isDeskOnDeskEnabled()) {
+              pushDeskNotification({
+                kind: 'overlay',
+                level: 'info',
+                scenarioId: 'efficiency-no-break',
+                title: 'Panda · 该休息一下了',
+                body: `已连续工作 ${Math.round(continuousMinutes)} 分钟，起来活动一下`,
+                soundCue: 'gentle',
+              })
+            }
+          } catch {
+            // 桥接失败不阻塞 proactive 主路径
+          }
           // 推送后重置，避免每 5 分钟连续提醒
           _lastBreakTime = Date.now()
           logForDebugging(`[efficiencyScenarios] no-break-reminder: 已连续工作 ${Math.round(continuousMinutes)} 分钟，已推送提醒`)
@@ -135,6 +155,20 @@ const todoTrendAlert: SmartCronTask = {
             body: `本周 TODO/FIXME 净增 ${growth} 条（${lastCount} → ${currentCount}），建议定期清理技术债务`,
             channel: 'statusLine',
           })
+          // why: P3-T4-β panda-on-desk 联动 — efficiency overlay 提醒，无音效（周报场景）
+          try {
+            if (isDeskOnDeskEnabled()) {
+              pushDeskNotification({
+                kind: 'overlay',
+                level: 'info',
+                scenarioId: 'efficiency-todo-trend',
+                title: 'Panda · TODO/FIXME 增长',
+                body: `本周净增 ${growth} 条（${lastCount} → ${currentCount}）`,
+              })
+            }
+          } catch {
+            // 桥接失败不阻塞 proactive 主路径
+          }
           logForDebugging(`[efficiencyScenarios] todo-trend-alert: 增长 ${growth} 条（阈值 ${threshold}）`)
         } else {
           logForDebugging(`[efficiencyScenarios] todo-trend-alert: 增长 ${growth} 条，未超阈值`)
@@ -223,6 +257,21 @@ const weeklyReport: SmartCronTask = {
         body: `本周 ${commitCount} 次提交，周报已保存至 ${reportPath}`,
         channel: 'statusLine',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 周报完成 overlay 提示，gentle 音效
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'efficiency-weekly-report',
+            title: 'Panda · 周报已生成',
+            body: `本周 ${commitCount} 次提交，已保存至工作记忆`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[efficiencyScenarios] weekly-report: 已生成 ${reportPath}`)
     } catch (e) {
       logForDebugging(`[efficiencyScenarios] weekly-report failed: ${(e as Error).message}`)
@@ -262,6 +311,21 @@ const waterReminder: SmartCronTask = {
         body: msg,
         channel: 'statusLine',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 喝水提醒 overlay + gentle 音效
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'efficiency-water',
+            title: 'Panda · 喝水提醒',
+            body: msg,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging('[efficiencyScenarios] water-reminder: 已推送')
     } catch (e) {
       logForDebugging(`[efficiencyScenarios] water-reminder failed: ${(e as Error).message}`)

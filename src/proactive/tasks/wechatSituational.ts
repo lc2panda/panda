@@ -1,6 +1,11 @@
 // Input: 定时触发的微信态势感知检查请求（cron 调度）
 // Output: 微信全态势感知报告、@提及告警、关键词监控、未回复提醒等主动推送
 // Pos: proactive/tasks/ 微信态势感知层，由 taskRegistry 注册调度
+// 一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
+//
+// 2026-04-19 22:07 +08:00 P3-T4-γ 接入 panda-on-desk · A+B+F (system+overlay+badge)
+//                          全部 HIGH_PRIVACY 默认 OFF — registry.ts 标 privacy:'high'
+//                          严守 byte-equal — 仅追加 desk/bridge.ts 调用
 
 import { pushNotification } from '../../assistant/sense.js'
 import { isScenarioEnabled } from '../proactiveConfig.js'
@@ -8,6 +13,25 @@ import { logForDebugging } from '../../utils/debug.js'
 import { HOME } from '../platform.js'
 import { join } from 'path'
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
+
+// ─── P3-T4-γ desk bridge 接入辅助 — fire-and-forget，永不抛错 ───
+// why: HIGH_PRIVACY 场景；registry.ts 标 defaultOn=false 由 dispatcher 层 gate
+async function _desk(scenarioId: string, title: string, body: string, opts: {
+  level?: 'info' | 'warning' | 'error' | 'success'
+  badgeDelta?: number
+} = {}): Promise<void> {
+  try {
+    const { pushNotification: deskPush, bumpBadge, isOnDeskEnabled } =
+      await import('../../desk/bridge.js')
+    if (!isOnDeskEnabled()) return
+    const level = opts.level ?? 'info'
+    deskPush({ kind: 'system', level, scenarioId, title, body })
+    deskPush({ kind: 'overlay', level, scenarioId, title, body, ttlMs: 6_000 })
+    bumpBadge(scenarioId, opts.badgeDelta ?? 1)
+  } catch {
+    // 桥接失败静默
+  }
+}
 
 interface SmartCronTask {
   id: string
@@ -546,12 +570,15 @@ const wechatDailySituational: SmartCronTask = {
       } catch {}
 
       // 推送通知
+      const dsTitle = '📊 微信态势感知日报'
+      const dsBody = `今日 ${messages.length} 条消息，${mentions.length} 条@提及，${groupChats.length} 个活跃群。报告已生成: ${join(DATA_DIR, `${today}.md`)}`
       pushNotification({
         type: 'info',
-        title: '📊 微信态势感知日报',
-        body: `今日 ${messages.length} 条消息，${mentions.length} 条@提及，${groupChats.length} 个活跃群。报告已生成: ${join(DATA_DIR, `${today}.md`)}`,
+        title: dsTitle,
+        body: dsBody,
         channel: 'all',
       })
+      await _desk('wechat-daily-situational', `Panda · ${dsTitle}`, dsBody)
 
       logForDebugging(`${TAG} wechat-daily-situational: 报告已生成，${messages.length} 条消息`)
     } catch (e) {
@@ -602,11 +629,16 @@ const wechatMentionAlert: SmartCronTask = {
         .map(m => `【${m.channelName}】${m.senderName}: ${m.content}`)
         .join('\n')
 
+      const mentionTitle = '🔔 微信有人@你'
+      const mentionBody = `最近 10 分钟内有 ${mentioned.length} 条@提及：\n${detail}`
       pushNotification({
         type: 'action',
-        title: '🔔 微信有人@你',
-        body: `最近 10 分钟内有 ${mentioned.length} 条@提及：\n${detail}`,
+        title: mentionTitle,
+        body: mentionBody,
         channel: 'all',
+      })
+      await _desk('wechat-mention-alert', `Panda · ${mentionTitle}`, mentionBody, {
+        level: 'warning', badgeDelta: mentioned.length,
       })
 
       logForDebugging(`${TAG} wechat-mention-alert: ${mentioned.length} mentions found`)
@@ -666,11 +698,16 @@ const wechatKeywordMonitor: SmartCronTask = {
         .map(([kw, items]) => `「${kw}」${items.length} 次 — ${items[0].channelName}: ${items[0].content.slice(0, 50)}`)
         .join('\n')
 
+      const kwTitle = '🔍 微信关键词告警'
+      const kwBody = `最近 15 分钟内命中 ${hits.length} 次关键词：\n${detail}`
       pushNotification({
         type: 'info',
-        title: '🔍 微信关键词告警',
-        body: `最近 15 分钟内命中 ${hits.length} 次关键词：\n${detail}`,
+        title: kwTitle,
+        body: kwBody,
         channel: 'all',
+      })
+      await _desk('wechat-keyword-monitor', `Panda · ${kwTitle}`, kwBody, {
+        badgeDelta: hits.length,
       })
 
       logForDebugging(`${TAG} wechat-keyword-monitor: ${hits.length} keyword hits`)
@@ -735,11 +772,16 @@ const wechatUnrepliedReminder: SmartCronTask = {
         .map(u => `  • ${u.channelName}（${u.senderName}）: "${u.content}" (${u.time})`)
         .join('\n')
 
+      const urTitle = '⏰ 微信未回复提醒'
+      const urBody = `有 ${unreplied.length} 个私聊超过 2 小时未回复：\n${detail}`
       pushNotification({
         type: 'warning',
-        title: '⏰ 微信未回复提醒',
-        body: `有 ${unreplied.length} 个私聊超过 2 小时未回复：\n${detail}`,
+        title: urTitle,
+        body: urBody,
         channel: 'all',
+      })
+      await _desk('wechat-unreplied-reminder', `Panda · ${urTitle}`, urBody, {
+        level: 'warning', badgeDelta: unreplied.length,
       })
 
       logForDebugging(`${TAG} wechat-unreplied-reminder: ${unreplied.length} unreplied chats`)
@@ -815,12 +857,15 @@ const wechatGroupDigest: SmartCronTask = {
         setWorkingMemory('wechat-group-digest', summaries.join('\n'))
       } catch {}
 
+      const gdTitle = '📝 微信群聊摘要'
+      const gdBody = `${activeGroups.length} 个活跃群（消息 > 50）：\n${summaries.slice(0, 5).join('\n')}`
       pushNotification({
         type: 'info',
-        title: '📝 微信群聊摘要',
-        body: `${activeGroups.length} 个活跃群（消息 > 50）：\n${summaries.slice(0, 5).join('\n')}`,
+        title: gdTitle,
+        body: gdBody,
         channel: 'all',
       })
+      await _desk('wechat-group-digest', `Panda · ${gdTitle}`, gdBody)
 
       logForDebugging(`${TAG} wechat-group-digest: ${activeGroups.length} active groups summarized`)
     } catch (e) {
@@ -917,12 +962,15 @@ const wechatContactInsights: SmartCronTask = {
         }))
       } catch {}
 
+      const ciTitle = '👤 微信联系人周报'
+      const ciBody = `本周 ${thisWeekCounts.size} 人互动。${silenced.length > 0 ? `${silenced.length} 人突然沉默。` : ''}${activated.length > 0 ? `${activated.length} 人突然活跃。` : ''}`
       pushNotification({
         type: 'info',
-        title: '👤 微信联系人周报',
-        body: `本周 ${thisWeekCounts.size} 人互动。${silenced.length > 0 ? `${silenced.length} 人突然沉默。` : ''}${activated.length > 0 ? `${activated.length} 人突然活跃。` : ''}`,
+        title: ciTitle,
+        body: ciBody,
         channel: 'all',
       })
+      await _desk('wechat-contact-insights', `Panda · ${ciTitle}`, ciBody)
 
       logForDebugging(`${TAG} wechat-contact-insights: silenced=${silenced.length} activated=${activated.length}`)
     } catch (e) {
@@ -978,12 +1026,15 @@ const wechatNoiseFilter: SmartCronTask = {
         .map(g => `  • ${g.name}（${g.total} 条，噪音占 ${Math.round(g.ratio * 100)}%）`)
         .join('\n')
 
+      const nfTitle = '🔇 微信噪音群建议'
+      const nfBody = `本周发现 ${noiseGroups.length} 个高噪音群（低价值消息 > 80%）：\n${detail}\n建议考虑屏蔽或退出。`
       pushNotification({
         type: 'info',
-        title: '🔇 微信噪音群建议',
-        body: `本周发现 ${noiseGroups.length} 个高噪音群（低价值消息 > 80%）：\n${detail}\n建议考虑屏蔽或退出。`,
+        title: nfTitle,
+        body: nfBody,
         channel: 'all',
       })
+      await _desk('wechat-noise-filter', `Panda · ${nfTitle}`, nfBody)
 
       logForDebugging(`${TAG} wechat-noise-filter: ${noiseGroups.length} noise groups found`)
     } catch (e) {
@@ -1065,11 +1116,15 @@ const wechatSentimentPulse: SmartCronTask = {
         }))
       } catch {}
 
+      const spTitle = `🎭 微信情感脉搏 — ${label}`
       pushNotification({
         type: 'info',
-        title: `🎭 微信情感脉搏 — ${label}`,
+        title: spTitle,
         body,
         channel: 'all',
+      })
+      await _desk('wechat-sentiment-pulse', `Panda · ${spTitle}`, body, {
+        level: label === '消极' ? 'warning' : 'info',
       })
 
       logForDebugging(`${TAG} wechat-sentiment-pulse: pos=${posCount} neg=${negCount} total=${total}`)
@@ -1199,12 +1254,15 @@ const wechatWeeklyTrend: SmartCronTask = {
       ensureDir(DATA_DIR)
       writeFileSync(join(DATA_DIR, `weekly-${today}.md`), report, 'utf-8')
 
+      const wtTitle = '📈 微信周趋势报告'
+      const wtBody = `本周 ${thisWeekTotal.toLocaleString()} 条消息（${changeSign}${changePercent}%），${topGroups.length} 个活跃群`
       pushNotification({
         type: 'info',
-        title: '📈 微信周趋势报告',
-        body: `本周 ${thisWeekTotal.toLocaleString()} 条消息（${changeSign}${changePercent}%），${topGroups.length} 个活跃群`,
+        title: wtTitle,
+        body: wtBody,
         channel: 'all',
       })
+      await _desk('wechat-weekly-trend', `Panda · ${wtTitle}`, wtBody)
 
       logForDebugging(`${TAG} wechat-weekly-trend: report generated`)
     } catch (e) {
@@ -1341,12 +1399,15 @@ const wechatMonthlyReport: SmartCronTask = {
         }))
       } catch {}
 
+      const mrTitle = '📅 微信月度报告'
+      const mrBody = `过去 ${snapshots.length} 天共 ${totalMessages.toLocaleString()} 条消息，日均 ${avgDaily} 条`
       pushNotification({
         type: 'info',
-        title: '📅 微信月度报告',
-        body: `过去 ${snapshots.length} 天共 ${totalMessages.toLocaleString()} 条消息，日均 ${avgDaily} 条`,
+        title: mrTitle,
+        body: mrBody,
         channel: 'all',
       })
+      await _desk('wechat-monthly-report', `Panda · ${mrTitle}`, mrBody)
 
       logForDebugging(`${TAG} wechat-monthly-report: report generated, ${snapshots.length} days`)
     } catch (e) {
@@ -1471,12 +1532,15 @@ const wechatQuarterlyReview: SmartCronTask = {
       ensureDir(DATA_DIR)
       writeFileSync(join(DATA_DIR, `quarterly-${today}.md`), report, 'utf-8')
 
+      const qrTitle = '📋 微信季度复盘'
+      const qrBody = `过去 ${snapshots.length} 天共 ${totalMessages.toLocaleString()} 条消息，${highValueContacts.length} 个高价值联系人`
       pushNotification({
         type: 'info',
-        title: '📋 微信季度复盘',
-        body: `过去 ${snapshots.length} 天共 ${totalMessages.toLocaleString()} 条消息，${highValueContacts.length} 个高价值联系人`,
+        title: qrTitle,
+        body: qrBody,
         channel: 'all',
       })
+      await _desk('wechat-quarterly-review', `Panda · ${qrTitle}`, qrBody)
 
       logForDebugging(`${TAG} wechat-quarterly-review: report generated`)
     } catch (e) {
@@ -1613,12 +1677,15 @@ const wechatYearlyDigest: SmartCronTask = {
       ensureDir(DATA_DIR)
       writeFileSync(join(DATA_DIR, `yearly-${year}.md`), report, 'utf-8')
 
+      const ydTitle = `🎉 微信 ${year} 年度总结`
+      const ydBody = `全年 ${totalMessages.toLocaleString()} 条消息，${top10Contacts.length > 0 ? `最佳话友: ${top10Contacts[0][0]}` : ''}`
       pushNotification({
         type: 'info',
-        title: `🎉 微信 ${year} 年度总结`,
-        body: `全年 ${totalMessages.toLocaleString()} 条消息，${top10Contacts.length > 0 ? `最佳话友: ${top10Contacts[0][0]}` : ''}`,
+        title: ydTitle,
+        body: ydBody,
         channel: 'all',
       })
+      await _desk('wechat-yearly-digest', `Panda · ${ydTitle}`, ydBody)
 
       logForDebugging(`${TAG} wechat-yearly-digest: report generated for ${year}`)
     } catch (e) {
@@ -1749,19 +1816,27 @@ const wechatRelationshipHealth: SmartCronTask = {
 
       const alertCount = disconnected.length + cooling.length
       if (alertCount > 0) {
+        const rhTitle = '❤️ VIP 联系人关系预警'
+        const rhBody = `${disconnected.length} 人断联、${cooling.length} 人冷却。建议主动联系: ${toContact.slice(0, 3).join('、')}`
         pushNotification({
           type: 'warning',
-          title: '❤️ VIP 联系人关系预警',
-          body: `${disconnected.length} 人断联、${cooling.length} 人冷却。建议主动联系: ${toContact.slice(0, 3).join('、')}`,
+          title: rhTitle,
+          body: rhBody,
           channel: 'all',
+        })
+        await _desk('wechat-relationship-health', `Panda · ${rhTitle}`, rhBody, {
+          level: 'warning', badgeDelta: alertCount,
         })
       } else {
+        const rhTitle = '❤️ VIP 联系人关系健康'
+        const rhBody = `所有 ${vipList.length} 位 VIP 联系人互动正常`
         pushNotification({
           type: 'info',
-          title: '❤️ VIP 联系人关系健康',
-          body: `所有 ${vipList.length} 位 VIP 联系人互动正常`,
+          title: rhTitle,
+          body: rhBody,
           channel: 'all',
         })
+        await _desk('wechat-relationship-health', `Panda · ${rhTitle}`, rhBody)
       }
 
       logForDebugging(`${TAG} wechat-relationship-health: disconnected=${disconnected.length} cooling=${cooling.length}`)
@@ -1847,11 +1922,16 @@ const wechatTopicTracker: SmartCronTask = {
         ))
       } catch {}
 
+      const ttTitle = '📌 微信话题追踪'
+      const ttBody = `${topicHits.length} 个关注话题有新动态：\n${detail}`
       pushNotification({
         type: 'info',
-        title: '📌 微信话题追踪',
-        body: `${topicHits.length} 个关注话题有新动态：\n${detail}`,
+        title: ttTitle,
+        body: ttBody,
         channel: 'all',
+      })
+      await _desk('wechat-topic-tracker', `Panda · ${ttTitle}`, ttBody, {
+        badgeDelta: topicHits.length,
       })
 
       logForDebugging(`${TAG} wechat-topic-tracker: ${topicHits.length} topics hit`)

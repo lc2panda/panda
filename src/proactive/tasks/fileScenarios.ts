@@ -3,6 +3,13 @@
 // Pos: proactive/tasks/ 文件场景层，由 taskRegistry 注册调度
 
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-α: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+import {
+  pushNotification as pushDeskNotification,
+  bumpBadge as bumpDeskBadge,
+  enableDragTarget as enableDeskDragTarget,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { getDirStats, DOWNLOADS } from '../platform.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -65,6 +72,16 @@ const downloadsClutter: SmartCronTask = {
         body: `Downloads 目录：${parts.join('，')}${oldestInfo}\n建议清理不再需要的文件。`,
         channel: 'system',
       })
+
+      // why: P3-T4-α panda-on-desk 联动 — Downloads 堆积 badge + drag-target（拖文件到 panda 触发分类，A3 §2 表 F+D）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('downloads-clutter', 1)
+          enableDeskDragTarget('downloads-clutter', ['file'])
+        }
+      } catch {
+        // 桥接失败不阻塞主路径
+      }
 
       logForDebugging(`[fileScenarios] downloads-clutter: files=${stats.fileCount} size=${sizeGB}GB oldest=${stats.oldestFile}`)
     } catch (e) {

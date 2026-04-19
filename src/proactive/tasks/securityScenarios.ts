@@ -3,6 +3,13 @@
 // Pos: proactive/tasks/ 安全场景层，由 taskRegistry 注册调度
 
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-β: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+// security 类全部 HIGH_PRIVACY，按 A3 §2/§5 → system + overlay error level；defaultOn=false
+// 启用前 dispatcher 内 shouldDeliverNotification 把关，避免敏感信息误曝
+import {
+  pushNotification as pushDeskNotification,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { HOME } from '../platform.js'
@@ -79,6 +86,29 @@ const passwordBreachCheck: SmartCronTask = {
                 body: `${email} 出现在 ${count} 个已知泄露数据库中，请尽快修改密码`,
                 channel: 'all',
               })
+              // why: P3-T4-β panda-on-desk 联动 — 密码泄露 system + overlay (error)（HIGH_PRIVACY 默认 OFF）
+              try {
+                if (isDeskOnDeskEnabled()) {
+                  pushDeskNotification({
+                    kind: 'system',
+                    level: 'error',
+                    scenarioId: 'security-password-breach',
+                    title: 'Panda · 密码泄露警告',
+                    body: `${email} 出现在 ${count} 个泄露数据库`,
+                    soundCue: 'critical',
+                  })
+                  pushDeskNotification({
+                    kind: 'overlay',
+                    level: 'error',
+                    scenarioId: 'security-password-breach',
+                    title: 'Panda · 密码泄露警告',
+                    body: `${email} 出现在 ${count} 个泄露数据库，请尽快修改密码`,
+                    ttlMs: 10_000,
+                  })
+                }
+              } catch {
+                // 桥接失败不阻塞 proactive 主路径
+              }
               logForDebugging(`[securityScenarios] password-breach-check: ${email} 有 ${count} 个泄露`)
             }
           } else if (resp.status === 404) {
@@ -151,6 +181,28 @@ const sshKeyExpiry: SmartCronTask = {
           body: `以下 SSH key 超过 ${maxDays} 天未更新：${details}`,
           channel: 'system',
         })
+        // why: P3-T4-β panda-on-desk 联动 — SSH key 过期 system + overlay (warning)（HIGH_PRIVACY 默认 OFF）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'warning',
+              scenarioId: 'security-ssh-key-expiry',
+              title: 'Panda · SSH key 需要轮换',
+              body: `${expired.length} 个 key 超 ${maxDays} 天未更新`,
+            })
+            pushDeskNotification({
+              kind: 'overlay',
+              level: 'warning',
+              scenarioId: 'security-ssh-key-expiry',
+              title: 'Panda · SSH key 需要轮换',
+              body: details,
+              ttlMs: 10_000,
+            })
+          }
+        } catch {
+          // 桥接失败不阻塞 proactive 主路径
+        }
         logForDebugging(`[securityScenarios] ssh-key-expiry: ${expired.length} 个 key 已过期`)
       }
     } catch (e) {
@@ -213,6 +265,29 @@ const sslCertExpiry: SmartCronTask = {
           body: `以下域名证书将在 ${warnDays} 天内过期：${details}`,
           channel: 'all',
         })
+        // why: P3-T4-β panda-on-desk 联动 — SSL 证书过期 system + overlay (error)（HIGH_PRIVACY 默认 OFF）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'error',
+              scenarioId: 'security-ssl-cert-expiry',
+              title: 'Panda · SSL 证书即将到期',
+              body: `${expiring.length} 个域名证书 ${warnDays} 天内过期`,
+              soundCue: 'critical',
+            })
+            pushDeskNotification({
+              kind: 'overlay',
+              level: 'error',
+              scenarioId: 'security-ssl-cert-expiry',
+              title: 'Panda · SSL 证书即将到期',
+              body: details,
+              ttlMs: 10_000,
+            })
+          }
+        } catch {
+          // 桥接失败不阻塞 proactive 主路径
+        }
         logForDebugging(`[securityScenarios] ssl-cert-expiry: ${expiring.length} 个域名证书即将过期`)
       }
     } catch (e) {
@@ -294,6 +369,29 @@ const sensitiveFileScan: SmartCronTask = {
           body: `在公开目录发现 ${allFound.length} 个可能含凭据的文件：\n  · ${summary}${extra}`,
           channel: 'all',
         })
+        // why: P3-T4-β panda-on-desk 联动 — 敏感文件暴露 system + overlay (error)（HIGH_PRIVACY 默认 OFF）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'error',
+              scenarioId: 'security-sensitive-file',
+              title: 'Panda · 发现敏感文件暴露',
+              body: `${allFound.length} 个文件可能含凭据`,
+              soundCue: 'critical',
+            })
+            pushDeskNotification({
+              kind: 'overlay',
+              level: 'error',
+              scenarioId: 'security-sensitive-file',
+              title: 'Panda · 发现敏感文件暴露',
+              body: `${allFound.length} 个文件可能含凭据 — 详见日志`,
+              ttlMs: 10_000,
+            })
+          }
+        } catch {
+          // 桥接失败不阻塞 proactive 主路径
+        }
         logForDebugging(`[securityScenarios] sensitive-file-scan: 发现 ${allFound.length} 个敏感文件`)
       }
     } catch (e) {

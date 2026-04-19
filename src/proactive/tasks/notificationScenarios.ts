@@ -3,6 +3,12 @@
 // Pos: proactive/tasks/ 通知感知场景层，由 taskRegistry 注册调度
 
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-β: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+// notification 聚合类按 A3 §2 表全部 F badge only — 不直接打扰，仅累加角标
+import {
+  bumpBadge as bumpDeskBadge,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { localDateStr } from '../../utils/date.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -277,6 +283,14 @@ const notificationDigest: SmartCronTask = {
         body: `过去 24 小时收到 ${notifications.length} 条通知（${sorted.length} 个应用），详见 notification_digest_${today}.md`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 通知日报 badge only（A3 §2 表 F 类，不打扰）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('notif-digest', 1)
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[notificationScenarios] notification-digest: ${notifications.length} notifications from ${sorted.length} apps`)
     } catch (e) {
@@ -343,6 +357,14 @@ const notificationUrgent: SmartCronTask = {
         body: `检测到 ${urgent.length} 条紧急通知：\n${detail}`,
         channel: 'all',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 紧急通知 badge 累加（按数量）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('notif-urgent', urgent.length)
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       // 写入工作记忆
       try {
@@ -422,6 +444,14 @@ const notificationStats: SmartCronTask = {
           body: `以下应用通知量异常增长：\n${anomalies.map(a => `  • ${a}`).join('\n')}`,
           channel: 'system',
         })
+        // why: P3-T4-β panda-on-desk 联动 — 通知统计异常 badge 累加（按异常应用数）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            bumpDeskBadge('notif-stats', anomalies.length)
+          }
+        } catch {
+          // 桥接失败不阻塞 proactive 主路径
+        }
       }
 
       logForDebugging(`[notificationScenarios] notification-stats: total=${notifications.length}, apps=${appCounts.size}, anomalies=${anomalies.length}`)

@@ -3,6 +3,13 @@
 // Pos: proactive/tasks/ 通信场景层，由 builtinTasks loadScenarioModules 注册调度
 
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-β: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+// communication 类全部 HIGH_PRIVACY，按 A3 §2/§5 表 → badge only；defaultOn=false
+// 用户在 settings 显式打开后才放行（dispatcher 内 shouldDeliverNotification 把关）
+import {
+  bumpBadge as bumpDeskBadge,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { localDateStr } from '../../utils/date.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -87,6 +94,14 @@ const emailFlaggedReminder: SmartCronTask = {
         body: `你有 ${flaggedCount} 封标记（flagged）邮件待处理`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 邮件 flagged badge（HIGH_PRIVACY 默认 OFF）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('comm-email-flagged', flaggedCount)
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[communicationScenarios] email-flagged-reminder: ${flaggedCount} flagged`)
     } catch (e) {
       logForDebugging(`[communicationScenarios] email-flagged-reminder failed: ${(e as Error).message}`)
@@ -149,6 +164,14 @@ const emailUnreadImportant: SmartCronTask = {
         body: `过去 24 小时有 ${unreadCount} 封未读邮件，建议尽快处理`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 重要未读邮件 badge（HIGH_PRIVACY 默认 OFF）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('comm-email-unread-important', unreadCount)
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[communicationScenarios] email-unread-important: ${unreadCount} unread`)
     } catch (e) {
       logForDebugging(`[communicationScenarios] email-unread-important failed: ${(e as Error).message}`)
@@ -212,6 +235,14 @@ const slackUnread: SmartCronTask = {
         body: `你有 ${unreadCount} 条未读 Slack 消息`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — Slack 未读 badge（HIGH_PRIVACY 默认 OFF）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('comm-slack-unread', unreadCount)
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[communicationScenarios] slack-unread: ${unreadCount} unread`)
     } catch (e) {
       logForDebugging(`[communicationScenarios] slack-unread failed: ${(e as Error).message}`)
@@ -273,6 +304,14 @@ const calendarConflictEnhanced: SmartCronTask = {
         body: `未来 3 天发现 ${conflicts.length} 处时间冲突：\n${detail}`,
         channel: 'all',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 日历冲突 badge（HIGH_PRIVACY 默认 OFF）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('comm-calendar-conflict', conflicts.length)
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[communicationScenarios] calendar-conflict-enhanced: ${conflicts.length} conflicts`)
     } catch (e) {
       logForDebugging(`[communicationScenarios] calendar-conflict-enhanced failed: ${(e as Error).message}`)
@@ -357,6 +396,14 @@ const meetingPrepReminder: SmartCronTask = {
           body,
           channel: 'all',
         })
+        // why: P3-T4-β panda-on-desk 联动 — 会议准备 badge（HIGH_PRIVACY 默认 OFF）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            bumpDeskBadge('comm-meeting-prep', 1)
+          }
+        } catch {
+          // 桥接失败不阻塞 proactive 主路径
+        }
         logForDebugging(`[communicationScenarios] meeting-prep-reminder: "${evt.title}" in ${minutesBefore}min, ${relatedFiles.length} related files`)
       }
     } catch (e) {
@@ -417,6 +464,14 @@ const emailUnreplied: SmartCronTask = {
         body: `有 ${unrepliedCount} 封已读但超 48 小时未回复的邮件`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 未回复邮件 badge（HIGH_PRIVACY 默认 OFF）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('comm-email-unreplied', unrepliedCount)
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[communicationScenarios] email-unreplied: ${unrepliedCount} unreplied`)
     } catch (e) {
       logForDebugging(`[communicationScenarios] email-unreplied failed: ${(e as Error).message}`)
@@ -497,6 +552,14 @@ end tell`
         body: `未来 3 天有 ${birthdays.length} 位联系人生日：\n${detail}`,
         channel: 'all',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 生日提醒 badge（HIGH_PRIVACY 默认 OFF）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('comm-contact-birthday', birthdays.length)
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[communicationScenarios] contact-birthday: ${birthdays.length} upcoming birthdays`)
     } catch (e) {
       logForDebugging(`[communicationScenarios] contact-birthday failed: ${(e as Error).message}`)
@@ -583,6 +646,14 @@ const emailDailyDigest: SmartCronTask = {
           body: `今日未读 ${unreadCount} 封，标记待办 ${flaggedCount} 封`,
           channel: 'system',
         })
+        // why: P3-T4-β panda-on-desk 联动 — 邮件日报 badge（HIGH_PRIVACY 默认 OFF）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            bumpDeskBadge('comm-email-daily-digest', 1)
+          }
+        } catch {
+          // 桥接失败不阻塞 proactive 主路径
+        }
       }
 
       logForDebugging(`[communicationScenarios] email-daily-digest: unread=${unreadCount} flagged=${flaggedCount}`)
@@ -657,6 +728,14 @@ const imessageUnread: SmartCronTask = {
         body,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — iMessage 未读 badge（HIGH_PRIVACY 默认 OFF）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('comm-imessage-unread', unreadCount)
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[communicationScenarios] imessage-unread: ${unreadCount} unread from ${recentSenders.length} senders`)
     } catch (e) {
       logForDebugging(`[communicationScenarios] imessage-unread failed: ${(e as Error).message}`)

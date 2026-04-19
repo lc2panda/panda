@@ -75,6 +75,15 @@ const gitStaleBranches: SmartCronTask = {
         channel: 'system',
       })
 
+      // why: P3-T4-α panda-on-desk 联动 — Git 过期分支仅累加 badge，不打扰（A3 §2 表 C+F）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('git-stale-branches', 1)
+        }
+      } catch {
+        // 桥接失败不阻塞主路径
+      }
+
       logForDebugging(`[devScenarios] git-stale-branches: ${stale.length} stale branches found`)
     } catch (e) {
       logForDebugging(`[devScenarios] git-stale-branches failed: ${(e as Error).message}`)
@@ -225,6 +234,24 @@ const dependencyAudit: SmartCronTask = {
         body: `检测到 ${critical} 个严重漏洞、${high} 个高危漏洞（${source}）。建议尽快修复。`,
         channel: 'system',
       })
+
+      // why: P3-T4-α panda-on-desk 联动 — npm audit 漏洞 system 横幅 + badge；critical>0 升级 error+critical sound
+      try {
+        if (isDeskOnDeskEnabled()) {
+          const isCritical = critical > 0
+          pushDeskNotification({
+            kind: 'system',
+            level: isCritical ? 'error' : 'warning',
+            scenarioId: 'npm-audit-vuln',
+            title: 'Panda · 依赖安全告警',
+            body: `${critical} 严重 / ${high} 高危（${source}）`,
+            soundCue: isCritical ? 'critical' : 'short',
+          })
+          bumpDeskBadge('npm-audit-vuln', critical + high)
+        }
+      } catch {
+        // 桥接失败不阻塞主路径
+      }
 
       logForDebugging(`[devScenarios] dependency-audit: critical=${critical} high=${high} source=${source}`)
     } catch (e) {

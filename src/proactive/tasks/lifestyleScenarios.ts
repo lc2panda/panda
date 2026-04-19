@@ -3,6 +3,11 @@
 // Pos: proactive/tasks/ 生活方式场景层，由 taskRegistry 注册调度
 
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-β: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+import {
+  pushNotification as pushDeskNotification,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { IS_MAC, IS_WIN, HOME, getUserIdleSeconds } from '../platform.js'
@@ -75,6 +80,21 @@ const countdownEvents: SmartCronTask = {
         body: `${upcoming.length} 个事件即将到来：\n${detail}`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 倒计时事件 overlay + gentle 音效
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'lifestyle-countdown',
+            title: 'Panda · 倒计时提醒',
+            body: `${upcoming.length} 个事件 7 天内到来`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[lifestyleScenarios] countdown-events: ${upcoming.length} upcoming events`)
     } catch (e) {
@@ -126,6 +146,21 @@ const packageTracking: SmartCronTask = {
         body: `${parcels.length} 个包裹待追踪：\n${detail}\n\n提示：需在 tracking.json 中配置快递 API 以获取实时状态。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 包裹追踪 overlay + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'lifestyle-package-tracking',
+            title: 'Panda · 包裹物流',
+            body: `${parcels.length} 个包裹待追踪`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[lifestyleScenarios] package-tracking: ${parcels.length} parcels (placeholder)`)
     } catch (e) {
@@ -222,6 +257,21 @@ const backupStatus: SmartCronTask = {
         body: `${source} 上次备份已是 ${daysSinceBackup} 天前，建议尽快执行备份以防数据丢失。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 备份久未执行 overlay + gentle (warning 级)
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'warning',
+            scenarioId: 'lifestyle-backup-status',
+            title: 'Panda · 备份提醒',
+            body: `${source} 上次备份 ${daysSinceBackup} 天前`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[lifestyleScenarios] backup-status: ${daysSinceBackup} days since last backup (${source})`)
     } catch (e) {
@@ -270,6 +320,21 @@ const screenTimeStats: SmartCronTask = {
                 body: `今日屏幕使用约 ${hours} 小时 ${mins} 分钟。\n\n适当休息，保护眼睛。`,
                 channel: 'system',
               })
+              // why: P3-T4-β panda-on-desk 联动 — 屏幕时间统计 overlay + gentle
+              try {
+                if (isDeskOnDeskEnabled()) {
+                  pushDeskNotification({
+                    kind: 'overlay',
+                    level: 'info',
+                    scenarioId: 'lifestyle-screen-time',
+                    title: 'Panda · 今日屏幕时间',
+                    body: `${hours} 小时 ${mins} 分钟`,
+                    soundCue: 'gentle',
+                  })
+                }
+              } catch {
+                // 桥接失败不阻塞 proactive 主路径
+              }
 
               logForDebugging(`[lifestyleScenarios] screen-time-stats: ${hours}h ${mins}m from knowledgeC.db`)
               return
@@ -307,6 +372,21 @@ const screenTimeStats: SmartCronTask = {
               body: `系统已连续运行约 ${h} 小时 ${m} 分钟（基于进程运行时间估算）。`,
               channel: 'system',
             })
+            // why: P3-T4-β panda-on-desk 联动 — 屏幕时间降级估算 overlay
+            try {
+              if (isDeskOnDeskEnabled()) {
+                pushDeskNotification({
+                  kind: 'overlay',
+                  level: 'info',
+                  scenarioId: 'lifestyle-screen-time',
+                  title: 'Panda · 屏幕时间估算',
+                  body: `约 ${h} 小时 ${m} 分钟`,
+                  soundCue: 'gentle',
+                })
+              }
+            } catch {
+              // 桥接失败不阻塞 proactive 主路径
+            }
           }
         } catch {}
       } else {
@@ -358,6 +438,21 @@ const focusModeSuggest: SmartCronTask = {
         body: '检测到你已持续高频交互超过 10 分钟，建议开启专注模式，减少干扰提升效率。',
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 专注模式建议 overlay + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'lifestyle-focus-mode-suggest',
+            title: 'Panda · 专注模式建议',
+            body: '高频交互已 10 分钟，建议开启专注模式',
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       focusModeNotifiedThisSession = true
       logForDebugging('[lifestyleScenarios] focus-mode-suggest: notification sent')
@@ -426,6 +521,21 @@ const meetingTimeRatio: SmartCronTask = {
         body: `今日会议约 ${meetingHours.toFixed(1)} 小时，占工作时间 ${ratio}%。\n\n会议过多可能影响深度工作，建议合理规划。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 会议时间过长 overlay (warning) + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'warning',
+            scenarioId: 'lifestyle-meeting-ratio',
+            title: 'Panda · 会议时间过长',
+            body: `今日会议 ${meetingHours.toFixed(1)} 小时（占 ${ratio}%）`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[lifestyleScenarios] meeting-time-ratio: ${meetingHours.toFixed(1)}h, ${ratio}%`)
     } catch (e) {
@@ -488,6 +598,21 @@ const cloudBillingAlert: SmartCronTask = {
         body: `检测到 ${providers.length} 个云服务配置：\n${detail}\n\n提示：完整账单查询功能待集成。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 云账单概览 overlay + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'lifestyle-cloud-billing',
+            title: 'Panda · 云服务账单',
+            body: `${providers.length} 个云服务已配置凭据`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[lifestyleScenarios] cloud-billing-alert: ${providers.length} providers configured (placeholder)`)
     } catch (e) {
@@ -572,6 +697,21 @@ const appleCertExpiry: SmartCronTask = {
         body: `${expiringCerts.length} 个代码签名证书即将过期：\n${expiringCerts.join('\n')}\n\n请及时续期，避免影响应用签名与分发。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — Apple 签名证书过期 overlay (warning) + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'warning',
+            scenarioId: 'lifestyle-apple-cert-expiry',
+            title: 'Panda · Apple 签名证书',
+            body: `${expiringCerts.length} 个证书 30 天内过期`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[lifestyleScenarios] apple-cert-expiry: ${expiringCerts.length} certs expiring soon`)
     } catch (e) {
@@ -679,6 +819,21 @@ const healthTrend: SmartCronTask = {
         body: `${insights.join('\n')}\n\n数据来源: ${dataSource}`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 健康趋势 overlay + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'lifestyle-health-trend',
+            title: 'Panda · 健康趋势',
+            body: insights[0] || '今日健康数据已分析',
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[lifestyleScenarios] health-trend: steps=${stepCount} source=${dataSource}`)
     } catch (e) {
@@ -785,6 +940,21 @@ const financeAnomaly: SmartCronTask = {
         body: alerts.join('\n\n'),
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 财务异常 overlay (warning) + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'warning',
+            scenarioId: 'lifestyle-finance-anomaly',
+            title: 'Panda · 财务异常',
+            body: `${alerts.length} 项异常 — 月支出 ¥${monthlyTotal.toFixed(0)}`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[lifestyleScenarios] finance-anomaly: total=¥${monthlyTotal.toFixed(0)}, ${largeTransactions.length} large txns`)
     } catch (e) {

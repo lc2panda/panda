@@ -1,10 +1,33 @@
 // Input: 定时触发的 IM 聚合场景检查请求
 // Output: 跨平台未读汇总/日历冲突/审批催办/文档更新/反向推送的主动通知
 // Pos: proactive/tasks/ IM 聚合场景层，由 builtinTasks loadScenarioModules 注册调度
+// 一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
+//
+// 2026-04-19 22:07 +08:00 P3-T4-γ 接入 panda-on-desk · A+B+F (system+overlay+badge)
+//                          严守 byte-equal — 仅追加 desk/bridge.ts 调用，不改原 sense.pushNotification
 
 import { pushNotification } from '../../assistant/sense.js'
 import { isScenarioEnabled } from '../proactiveConfig.js'
 import { logForDebugging } from '../../utils/debug.js'
+
+// ─── P3-T4-γ desk bridge 接入辅助 — fire-and-forget，永不抛错 ───
+// why: 业务方法不强依赖 desk；若桥接异常，原 sense.pushNotification + workingMemory 链路保留
+async function _desk(scenarioId: string, title: string, body: string, opts: {
+  level?: 'info' | 'warning' | 'error' | 'success'
+  badgeDelta?: number
+} = {}): Promise<void> {
+  try {
+    const { pushNotification: deskPush, bumpBadge, isOnDeskEnabled } =
+      await import('../../desk/bridge.js')
+    if (!isOnDeskEnabled()) return
+    const level = opts.level ?? 'info'
+    deskPush({ kind: 'system', level, scenarioId, title, body })
+    deskPush({ kind: 'overlay', level, scenarioId, title, body, ttlMs: 6_000 })
+    bumpBadge(scenarioId, opts.badgeDelta ?? 1)
+  } catch {
+    // 桥接失败静默 — 不阻塞原主路径
+  }
+}
 
 interface SmartCronTask {
   id: string
@@ -62,11 +85,15 @@ const imUnreadDigest: SmartCronTask = {
       }
 
       const body = platformSummaries.join(' | ')
+      const titleStr = `IM 未读 ${unread.total} 条${unread.mentionTotal > 0 ? `（@${unread.mentionTotal}）` : ''}`
       pushNotification({
         type: unread.mentionTotal > 0 ? 'action' : 'info',
-        title: `IM 未读 ${unread.total} 条${unread.mentionTotal > 0 ? `（@${unread.mentionTotal}）` : ''}`,
+        title: titleStr,
         body,
         channel: 'all',
+      })
+      await _desk('im-unread-digest', `Panda · ${titleStr}`, body, {
+        level: unread.mentionTotal > 0 ? 'warning' : 'info',
       })
 
       // 写入工作记忆
@@ -146,12 +173,14 @@ const imDailyBrief: SmartCronTask = {
       } catch { /* 静默 */ }
 
       if (sections.length > 0) {
+        const briefBody = sections.join('\n')
         pushNotification({
           type: 'info',
           title: 'IM 每日简报',
-          body: sections.join('\n'),
+          body: briefBody,
           channel: 'all',
         })
+        await _desk('im-daily-brief', 'Panda · IM 每日简报', briefBody)
       }
 
       logForDebugging(`[imScenarios] im-daily-brief: ${sections.length} 条简报项`)
@@ -207,12 +236,14 @@ const imCalendarSync: SmartCronTask = {
       }
 
       if (conflicts.length > 0) {
+        const conflictBody = conflicts.slice(0, 5).join('\n')
         pushNotification({
           type: 'warning',
           title: `日历冲突 ${conflicts.length} 个`,
-          body: conflicts.slice(0, 5).join('\n'),
+          body: conflictBody,
           channel: 'all',
         })
+        await _desk('im-calendar-sync', `Panda · 日历冲突 ${conflicts.length} 个`, conflictBody, { level: 'warning' })
       }
 
       logForDebugging(`[imScenarios] im-calendar-sync: ${allEvents.length} 事件, ${conflicts.length} 冲突`)
@@ -257,12 +288,14 @@ const imApprovalAlert: SmartCronTask = {
       }
 
       if (pendingItems.length > 0) {
+        const approvalBody = pendingItems.slice(0, 5).join('\n')
         pushNotification({
           type: 'action',
           title: `${pendingItems.length} 个审批待处理`,
-          body: pendingItems.slice(0, 5).join('\n'),
+          body: approvalBody,
           channel: 'all',
         })
+        await _desk('im-approval-alert', `Panda · ${pendingItems.length} 个审批待处理`, approvalBody, { level: 'warning' })
       }
 
       logForDebugging(`[imScenarios] im-approval-alert: ${pendingItems.length} 个超时审批`)
@@ -304,12 +337,14 @@ const imDocumentUpdate: SmartCronTask = {
       }
 
       if (recentDocs.length > 0) {
+        const docBody = recentDocs.slice(0, 5).join('\n')
         pushNotification({
           type: 'info',
           title: `${recentDocs.length} 个文档近期更新`,
-          body: recentDocs.slice(0, 5).join('\n'),
+          body: docBody,
           channel: 'all',
         })
+        await _desk('im-document-update', `Panda · ${recentDocs.length} 个文档更新`, docBody)
       }
 
       logForDebugging(`[imScenarios] im-document-update: ${recentDocs.length} 个文档更新`)
@@ -374,6 +409,12 @@ const imReversePush: SmartCronTask = {
 
       if (sent > 0) {
         logForDebugging(`[imScenarios] im-reverse-push: 已推送 ${sent} 条, 剩余 ${remaining.length} 条`)
+        await _desk(
+          'im-reverse-push',
+          `Panda · 反向推送 ${sent} 条`,
+          `Panda → IM 已推送 ${sent} 条，队列剩余 ${remaining.length}`,
+          { badgeDelta: sent },
+        )
       }
     } catch (e) {
       logForDebugging(`[imScenarios] im-reverse-push 失败: ${(e as Error).message}`)
@@ -402,11 +443,16 @@ const wechatMessages: SmartCronTask = {
               const summary = await wechatConn.getUnreadSummary()
               if (summary.totalUnread > 0) {
                 const mentionTag = summary.mentionCount > 0 ? ` (@${summary.mentionCount})` : ''
+                const wxTitle = `微信未读 ${summary.totalUnread} 条${mentionTag}`
+                const wxBody = `${summary.totalUnread} 条未读消息等待处理`
                 pushNotification({
                   type: summary.mentionCount > 0 ? 'action' : 'info',
-                  title: `微信未读 ${summary.totalUnread} 条${mentionTag}`,
-                  body: `${summary.totalUnread} 条未读消息等待处理`,
+                  title: wxTitle,
+                  body: wxBody,
                   channel: 'all',
+                })
+                await _desk('wechat-messages', `Panda · ${wxTitle}`, wxBody, {
+                  level: summary.mentionCount > 0 ? 'warning' : 'info',
                 })
               }
               logForDebugging(`[imScenarios] wechat-messages: ${summary.totalUnread} unread via connector`)
@@ -457,11 +503,16 @@ const feishuMessages: SmartCronTask = {
               const summary = await feishuConn.getUnreadSummary()
               if (summary.totalUnread > 0) {
                 const mentionTag = summary.mentionCount > 0 ? ` (@${summary.mentionCount})` : ''
+                const fsTitle = `飞书未读 ${summary.totalUnread} 条${mentionTag}`
+                const fsBody = `${summary.totalUnread} 条未读消息等待处理`
                 pushNotification({
                   type: summary.mentionCount > 0 ? 'action' : 'info',
-                  title: `飞书未读 ${summary.totalUnread} 条${mentionTag}`,
-                  body: `${summary.totalUnread} 条未读消息等待处理`,
+                  title: fsTitle,
+                  body: fsBody,
                   channel: 'all',
+                })
+                await _desk('feishu-messages', `Panda · ${fsTitle}`, fsBody, {
+                  level: summary.mentionCount > 0 ? 'warning' : 'info',
                 })
               }
               logForDebugging(`[imScenarios] feishu-messages: ${summary.totalUnread} unread via connector`)
@@ -471,12 +522,15 @@ const feishuMessages: SmartCronTask = {
               const since = Date.now() - 2 * 60 * 60 * 1000
               const msgs = await feishuConn.getMessages({ since, unreadOnly: true, limit: 50 })
               if (msgs.length > 0) {
+                const fsTitle = `飞书 ${msgs.length} 条新消息`
+                const fsBody = msgs.slice(0, 3).map((m: any) => `• ${m.sender || '?'}: ${(m.content || '').slice(0, 40)}`).join('\n')
                 pushNotification({
                   type: 'info',
-                  title: `飞书 ${msgs.length} 条新消息`,
-                  body: msgs.slice(0, 3).map((m: any) => `• ${m.sender || '?'}: ${(m.content || '').slice(0, 40)}`).join('\n'),
+                  title: fsTitle,
+                  body: fsBody,
                   channel: 'all',
                 })
+                await _desk('feishu-messages', `Panda · ${fsTitle}`, fsBody)
               }
               logForDebugging(`[imScenarios] feishu-messages: ${msgs.length} messages via connector`)
               return
@@ -541,11 +595,16 @@ const dingtalkMessages: SmartCronTask = {
               const summary = await dtConn.getUnreadSummary()
               if (summary.totalUnread > 0) {
                 const mentionTag = summary.mentionCount > 0 ? ` (@${summary.mentionCount})` : ''
+                const dtTitle = `钉钉未读 ${summary.totalUnread} 条${mentionTag}`
+                const dtBody = `${summary.totalUnread} 条未读消息等待处理`
                 pushNotification({
                   type: summary.mentionCount > 0 ? 'action' : 'info',
-                  title: `钉钉未读 ${summary.totalUnread} 条${mentionTag}`,
-                  body: `${summary.totalUnread} 条未读消息等待处理`,
+                  title: dtTitle,
+                  body: dtBody,
                   channel: 'all',
+                })
+                await _desk('dingtalk-messages', `Panda · ${dtTitle}`, dtBody, {
+                  level: summary.mentionCount > 0 ? 'warning' : 'info',
                 })
               }
               logForDebugging(`[imScenarios] dingtalk-messages: ${summary.totalUnread} unread via connector`)

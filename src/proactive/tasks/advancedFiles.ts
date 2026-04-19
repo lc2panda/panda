@@ -4,6 +4,13 @@
 
 import { execSync } from 'child_process'
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-α: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+import {
+  pushNotification as pushDeskNotification,
+  bumpBadge as bumpDeskBadge,
+  enableDragTarget as enableDeskDragTarget,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { getDirStats, DESKTOP, HOME, IS_MAC, IS_WIN } from '../platform.js'
@@ -51,6 +58,15 @@ const desktopClutter: SmartCronTask = {
           body: `桌面有 ${stats.fileCount} 个文件（阈值 ${maxFiles}）${oldestInfo}\n建议整理桌面文件。`,
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — 桌面堆积 badge + drag-target（拖文件到 panda 触发清理，A3 §2 表 F+D）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            bumpDeskBadge('desktop-clutter', 1)
+            enableDeskDragTarget('desktop-clutter', ['file'])
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[advancedFiles] desktop-clutter: 告警触发 — ${stats.fileCount} 个文件`)
       }
     } catch (e) {
@@ -114,6 +130,14 @@ const largeFileDiscovery: SmartCronTask = {
           body: `发现 ${files.length} 个超过 1GB 的文件：\n${list}${files.length > 5 ? `\n  ...及其他 ${files.length - 5} 个` : ''}`,
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — 大文件发现仅 badge（低频低优先，A3 §2 表 F+D）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            bumpDeskBadge('large-files', files.length)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[advancedFiles] large-file-discovery: 发现 ${files.length} 个大文件`)
       }
     } catch (e) {
@@ -173,6 +197,14 @@ const trashBloat: SmartCronTask = {
           body: `回收站占用 ${gb}GB（阈值 ${maxGB}GB），建议清空回收站释放空间。`,
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — 回收站膨胀仅 badge（A3 §2 表 F+D）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            bumpDeskBadge('trash-bloat', 1)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[advancedFiles] trash-bloat: 告警触发 — ${gb}GB`)
       }
     } catch (e) {
@@ -231,6 +263,23 @@ const calendarConflict: SmartCronTask = {
           body: `未来 2 天有 ${conflicts.length} 个时间冲突：\n${detail}`,
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — 日历冲突 system 横幅 + badge（warning 级，时间敏感）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'warning',
+              scenarioId: 'calendar-conflict',
+              title: 'Panda · 日历冲突',
+              body: `未来 2 天 ${conflicts.length} 个冲突`,
+              soundCue: 'short',
+              petStateOverride: 'attention',
+            })
+            bumpDeskBadge('calendar-conflict', conflicts.length)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[advancedFiles] calendar-conflict: 发现 ${conflicts.length} 个冲突`)
       }
     } catch (e) {
@@ -318,6 +367,14 @@ const portConflict: SmartCronTask = {
           body: `发现常用端口被占用：\n${list}`,
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — 端口占用仅 badge（开发场景，低优先不打扰）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            bumpDeskBadge('port-conflict', newPorts.length)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[advancedFiles] port-conflict: 首次发现 ${newPorts.length} 个端口占用`)
       } else {
         logForDebugging(`[advancedFiles] port-conflict: ${occupied.length} 个端口已知占用，无新增`)

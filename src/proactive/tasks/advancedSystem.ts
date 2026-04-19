@@ -7,6 +7,12 @@ import { cpus, loadavg } from 'os'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-α: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+import {
+  pushNotification as pushDeskNotification,
+  bumpBadge as bumpDeskBadge,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { getBatteryInfo, IS_MAC, IS_WIN } from '../platform.js'
@@ -64,6 +70,23 @@ const batteryHealth: SmartCronTask = {
           body: issues.join('；'),
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — 电池告警 system 横幅 + badge（A3 §2 表 A+C）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'warning',
+              scenarioId: 'battery-health',
+              title: 'Panda · 电池健康',
+              body: issues.join('；'),
+              soundCue: 'short',
+              petStateOverride: 'attention',
+            })
+            bumpDeskBadge('battery-health', 1)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[advancedSystem] battery-health: 告警触发 — ${issues.join(', ')}`)
       }
     } catch (e) {
@@ -117,6 +140,24 @@ const cpuHighLoad: SmartCronTask = {
           body: `5 分钟平均负载 ${pct}%（归一化，阈值 80%），${cpus().length} 核心`,
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — CPU 高负载 system 横幅 + badge；>95% 升级 error+critical
+        try {
+          if (isDeskOnDeskEnabled()) {
+            const isCritical = pct > 95
+            pushDeskNotification({
+              kind: 'system',
+              level: isCritical ? 'error' : 'warning',
+              scenarioId: 'cpu-load-high',
+              title: 'Panda · CPU 负载过高',
+              body: `5min 平均 ${pct}%（${cpus().length} 核）`,
+              soundCue: isCritical ? 'critical' : 'short',
+              petStateOverride: 'attention',
+            })
+            bumpDeskBadge('cpu-load-high', 1)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[advancedSystem] cpu-high-load: 告警触发 — 归一化负载 ${pct}%`)
       }
     } catch (e) {
@@ -202,6 +243,23 @@ const zombieProcessAlert: SmartCronTask = {
           body: issues.join('\n'),
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — 僵尸/异常进程 system 横幅 + badge（A3 §2 表 A+C）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'warning',
+              scenarioId: 'zombie-process',
+              title: 'Panda · 异常进程',
+              body: issues.slice(0, 3).join('；'),
+              soundCue: 'short',
+              petStateOverride: 'attention',
+            })
+            bumpDeskBadge('zombie-process', issues.length)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[advancedSystem] zombie-process-alert: 告警触发 — ${issues.join('; ')}`)
       }
     } catch (e) {
@@ -267,6 +325,22 @@ const dockerHealth: SmartCronTask = {
           body: `${unhealthy.length} 个容器已停止：\n${unhealthy.slice(0, 5).join('\n')}`,
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — Docker 容器异常 system 横幅 + badge
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'warning',
+              scenarioId: 'docker-unhealthy',
+              title: 'Panda · Docker 容器异常',
+              body: `${unhealthy.length} 个容器已停止`,
+              soundCue: 'short',
+            })
+            bumpDeskBadge('docker-unhealthy', unhealthy.length)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[advancedSystem] docker-health: 告警触发 — ${unhealthy.length} 个异常容器`)
       }
     } catch (e) {
@@ -341,6 +415,14 @@ const outdatedDeps: SmartCronTask = {
           body: `${majorOutdated.length} 个包的 major 版本差异 > 1：\n${list}`,
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — 依赖 major 过期仅 badge（低频低优先，不打扰）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            bumpDeskBadge('outdated-deps-major', majorOutdated.length)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[advancedSystem] outdated-deps: 告警触发 — ${majorOutdated.length} 个 major 过期`)
       }
     } catch (e) {

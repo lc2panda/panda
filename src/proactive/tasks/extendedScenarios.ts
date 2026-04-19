@@ -3,6 +3,11 @@
 // Pos: proactive/tasks/ 扩展场景层，由 builtinTasks loadScenarioModules 注册调度
 
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-β: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+import {
+  pushNotification as pushDeskNotification,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { localDateStr } from '../../utils/date.js'
 import { logForDebugging } from '../../utils/debug.js'
@@ -53,6 +58,21 @@ const systemUpdateAvailable: SmartCronTask = {
           body: `发现 ${items.length || '若干'} 个 macOS 系统更新可用\n${items.slice(0, 5).join('\n')}`,
           channel: 'system',
         })
+        // why: P3-T4-β panda-on-desk 联动 — macOS 系统更新 overlay + gentle
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'overlay',
+              level: 'info',
+              scenarioId: 'extended-system-update',
+              title: 'Panda · 系统更新',
+              body: `${items.length || '若干'} 个 macOS 更新可用`,
+              soundCue: 'gentle',
+            })
+          }
+        } catch {
+          // 桥接失败不阻塞 proactive 主路径
+        }
       } else if (IS_WIN) {
         try {
           const raw: string = execSync(
@@ -70,6 +90,21 @@ const systemUpdateAvailable: SmartCronTask = {
             body: `发现 ${count} 个 Windows 更新可用`,
             channel: 'system',
           })
+          // why: P3-T4-β panda-on-desk 联动 — Windows 系统更新 overlay + gentle
+          try {
+            if (isDeskOnDeskEnabled()) {
+              pushDeskNotification({
+                kind: 'overlay',
+                level: 'info',
+                scenarioId: 'extended-system-update',
+                title: 'Panda · 系统更新',
+                body: `${count} 个 Windows 更新可用`,
+                soundCue: 'gentle',
+              })
+            }
+          } catch {
+            // 桥接失败不阻塞 proactive 主路径
+          }
         } catch {
           logForDebugging('[extendedScenarios] system-update-available: Windows 更新检查失败')
           return
@@ -134,6 +169,21 @@ const packageManagerOutdated: SmartCronTask = {
         body: `${source} 有 ${outdatedCount} 个过期包可更新`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 包管理器更新 overlay + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'extended-package-outdated',
+            title: 'Panda · 包管理器更新',
+            body: `${source} 有 ${outdatedCount} 个过期包`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[extendedScenarios] package-manager-outdated: ${source} ${outdatedCount} outdated`)
     } catch (e) {
       logForDebugging(`[extendedScenarios] package-manager-outdated failed: ${(e as Error).message}`)
@@ -203,6 +253,21 @@ const screenshotCleanup: SmartCronTask = {
         body: `发现 ${oldScreenshots} 张超过 30 天的旧截图，建议清理`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 截图清理 overlay + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'extended-screenshot-cleanup',
+            title: 'Panda · 旧截图清理',
+            body: `${oldScreenshots} 张超 30 天截图`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[extendedScenarios] screenshot-cleanup: ${oldScreenshots} old screenshots`)
     } catch (e) {
       logForDebugging(`[extendedScenarios] screenshot-cleanup failed: ${(e as Error).message}`)
@@ -284,6 +349,21 @@ const duplicateFileScan: SmartCronTask = {
         body: `~/Downloads 发现 ${duplicateCount} 个重复文件，浪费约 ${wastedMB} MB`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 重复文件检测 overlay + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'extended-duplicate-files',
+            title: 'Panda · 重复文件',
+            body: `~/Downloads ${duplicateCount} 个重复，浪费 ${wastedMB} MB`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[extendedScenarios] duplicate-file-scan: ${duplicateCount} dupes, ${wastedMB}MB wasted`)
     } catch (e) {
       logForDebugging(`[extendedScenarios] duplicate-file-scan failed: ${(e as Error).message}`)
@@ -345,6 +425,21 @@ const cloudSyncStatus: SmartCronTask = {
         body: `iCloud Drive 同步可能出现问题：${detail}`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 云同步异常 overlay (warning) + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'warning',
+            scenarioId: 'extended-cloud-sync',
+            title: 'Panda · 云同步异常',
+            body: detail,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[extendedScenarios] cloud-sync-status: issue detected — ${detail}`)
     } catch (e) {
       logForDebugging(`[extendedScenarios] cloud-sync-status failed: ${(e as Error).message}`)
@@ -410,6 +505,21 @@ const habitTracker: SmartCronTask = {
         body: `今日还有 ${unchecked.length} 项习惯未完成：\n${detail}`,
         channel: 'all',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 习惯打卡 overlay + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'extended-habit-tracker',
+            title: 'Panda · 习惯打卡',
+            body: `今日还有 ${unchecked.length} 项未完成`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[extendedScenarios] habit-tracker: ${unchecked.length} unchecked`)
     } catch (e) {
       logForDebugging(`[extendedScenarios] habit-tracker failed: ${(e as Error).message}`)
@@ -488,6 +598,21 @@ const signingCertExpiry: SmartCronTask = {
         body: `${expiring.length} 个代码签名证书将在 30 天内过期：\n${detail}`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 签名证书过期 overlay (warning) + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'warning',
+            scenarioId: 'extended-signing-cert',
+            title: 'Panda · 签名证书',
+            body: `${expiring.length} 个证书 30 天内过期`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[extendedScenarios] signing-cert-expiry: ${expiring.length} certs expiring`)
     } catch (e) {
       logForDebugging(`[extendedScenarios] signing-cert-expiry failed: ${(e as Error).message}`)
@@ -546,6 +671,21 @@ const apiRateLimit: SmartCronTask = {
         body: `今日 API token 使用量已达 ${Math.round(totalTokens / 1000)}K，超过阈值 ${Math.round(threshold / 1000)}K`,
         channel: 'all',
       })
+      // why: P3-T4-β panda-on-desk 联动 — API 用量预警 overlay (warning) + gentle
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'warning',
+            scenarioId: 'extended-api-rate-limit',
+            title: 'Panda · API 用量预警',
+            body: `今日已用 ${Math.round(totalTokens / 1000)}K tokens（阈值 ${Math.round(threshold / 1000)}K）`,
+            soundCue: 'gentle',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
       logForDebugging(`[extendedScenarios] api-rate-limit: ${totalTokens} tokens exceeds ${threshold}`)
     } catch (e) {
       logForDebugging(`[extendedScenarios] api-rate-limit failed: ${(e as Error).message}`)

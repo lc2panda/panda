@@ -3,6 +3,12 @@
 // Pos: proactive/tasks/ 知识学习场景层，由 taskRegistry 注册调度
 
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-β: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+import {
+  pushNotification as pushDeskNotification,
+  bumpBadge as bumpDeskBadge,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { logForDebugging } from '../../utils/debug.js'
 import { IS_MAC, IS_WIN, HOME } from '../platform.js'
@@ -73,6 +79,21 @@ const browserKnowledgeCards: SmartCronTask = {
         body: `本周 Top 5 高频访问页面：\n${detail}\n\n建议为这些页面生成知识卡片，加深理解与记忆。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 高频页面知识卡片 badge + overlay
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('knowledge-browser-cards', 1)
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'knowledge-browser-cards',
+            title: 'Panda · 知识卡片建议',
+            body: `本周 Top ${top5.length} 高频访问页面`,
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[knowledgeScenarios] browser-knowledge-cards: ${top5.length} top pages found`)
     } catch (e) {
@@ -146,6 +167,21 @@ const bookmarkCleanup: SmartCronTask = {
         body: `Chrome 书签共 ${totalCount} 条（${folderCount} 个文件夹）。\n建议定期清理失效链接、归类分组，保持书签库整洁。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 书签整理 badge + overlay
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('knowledge-bookmark-cleanup', 1)
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'knowledge-bookmark-cleanup',
+            title: 'Panda · 书签整理',
+            body: `Chrome 书签共 ${totalCount} 条`,
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[knowledgeScenarios] bookmark-cleanup: ${totalCount} bookmarks, ${folderCount} folders`)
     } catch (e) {
@@ -241,6 +277,21 @@ const readingListOverflow: SmartCronTask = {
         body: `${source} 阅读列表已有 ${readingListCount} 项，建议抽时间清理或安排阅读计划。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 阅读列表过长 badge + overlay
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('knowledge-reading-list', 1)
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'knowledge-reading-list',
+            title: 'Panda · 阅读列表过长',
+            body: `${source} 已有 ${readingListCount} 项`,
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[knowledgeScenarios] reading-list-overflow: ${readingListCount} items from ${source}`)
     } catch (e) {
@@ -313,6 +364,21 @@ const flashcardReview: SmartCronTask = {
         body: `有 ${dueCount} 张闪卡到期待复习：\n${detail}${moreText}\n\n运行 /learn review 开始复习。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 闪卡复习 badge (按到期数) + overlay
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('knowledge-flashcard-review', dueCount)
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'knowledge-flashcard-review',
+            title: 'Panda · 闪卡复习',
+            body: `${dueCount} 张闪卡到期待复习`,
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[knowledgeScenarios] flashcard-review: ${dueCount} due cards`)
     } catch (e) {
@@ -378,6 +444,21 @@ const rssDigest: SmartCronTask = {
         body: `${feeds.length} 个订阅源共 ${totalNew} 条内容：\n${feedSummary.slice(0, 5).join('\n')}`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — RSS 摘要 badge + overlay
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('knowledge-rss-digest', totalNew)
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'knowledge-rss-digest',
+            title: 'Panda · RSS 摘要',
+            body: `${feeds.length} 个订阅源共 ${totalNew} 条`,
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[knowledgeScenarios] rss-digest: ${totalNew} items from ${feeds.length} feeds`)
     } catch (e) {
@@ -442,6 +523,21 @@ const knowledgeReview: SmartCronTask = {
         body: `${staleCards.length} 张知识卡片超过 7 天未回顾：\n${detail}${moreText}\n\n定期回顾有助于长期记忆巩固。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 知识卡片回顾 badge + overlay
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('knowledge-card-review', staleCards.length)
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'knowledge-card-review',
+            title: 'Panda · 知识回顾',
+            body: `${staleCards.length} 张卡片超 7 天未回顾`,
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[knowledgeScenarios] knowledge-review: ${staleCards.length} stale cards`)
     } catch (e) {
@@ -517,6 +613,21 @@ const learningTimeStats: SmartCronTask = {
         body: `本周学习活动 ${learningEntries} 次，总时长 ${timeStr}。\n\n持续学习，保持成长！`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 学习时间统计 badge + overlay
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('knowledge-learning-stats', 1)
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'knowledge-learning-stats',
+            title: 'Panda · 本周学习统计',
+            body: `${learningEntries} 次活动 / ${timeStr}`,
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[knowledgeScenarios] learning-time-stats: ${learningEntries} entries, ${totalMinutes} min`)
     } catch (e) {
@@ -558,6 +669,21 @@ const notesDigest: SmartCronTask = {
         body: `最近笔记：\n${detail}${moreText}\n\n建议整理到工作记忆中，便于后续检索。`,
         channel: 'system',
       })
+      // why: P3-T4-β panda-on-desk 联动 — 笔记跨应用汇总 badge + overlay
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('knowledge-notes-digest', notes.length)
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'knowledge-notes-digest',
+            title: 'Panda · 笔记汇总',
+            body: `最近 ${notes.length} 条笔记`,
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 主路径
+      }
 
       logForDebugging(`[knowledgeScenarios] notes-digest: ${notes.length} notes found`)
     } catch (e) {

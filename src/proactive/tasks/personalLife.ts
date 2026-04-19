@@ -6,6 +6,12 @@ import type { ProactiveTask } from '../taskRegistry.js'
 import { getUserIdleSeconds } from '../platform.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { pushNotification } from '../../assistant/sense.js'
+// P3-T4-α: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+import {
+  pushNotification as pushDeskNotification,
+  bumpBadge as bumpDeskBadge,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { logForDebugging } from '../../utils/debug.js'
 
 interface SmartCronTask extends ProactiveTask {
@@ -97,6 +103,22 @@ const weatherAlert: SmartCronTask = {
           body: `当前 ${weather.current.tempC}°C｜${alerts.join('；')}`,
           channel: 'system',
         })
+        // why: P3-T4-α panda-on-desk 联动 — 天气变化 system 横幅 + 角标（A3 §2 表 A+F）
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'warning',
+              scenarioId: 'weather-change',
+              title: 'Panda · 天气提醒',
+              body: `${weather.current.tempC}°C｜${alerts.join('；')}`,
+              soundCue: 'short',
+            })
+            bumpDeskBadge('weather-change', 1)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[personalLife] weather-alert: 告警触发 — ${alerts.join(', ')}`)
       }
     } catch (e) {
@@ -194,6 +216,30 @@ const holidayReminder: SmartCronTask = {
         body: upcoming.join('；'),
         channel: 'system',
       })
+      // why: P3-T4-α panda-on-desk 联动 — 节日提醒 system + overlay 卡片 + 喜庆音效（A3 §2 表 A+B+E）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'system',
+            level: 'info',
+            scenarioId: 'holiday-reminder',
+            title: 'Panda · 节日提醒',
+            body: upcoming.join('；'),
+            soundCue: 'gentle',
+            petStateOverride: 'attention',
+          })
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'holiday-reminder',
+            title: '🎉 节日提醒',
+            body: upcoming.join('；'),
+            ttlMs: 10_000,
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞主路径
+      }
       logForDebugging(`[personalLife] holiday-reminder: ${upcoming.length} 个节日提醒`)
     } catch (e) {
       logForDebugging(`[personalLife] holiday-reminder failed: ${(e as Error).message}`)
@@ -252,6 +298,22 @@ const lateNightCare: SmartCronTask = {
         body: msg,
         channel: 'system',
       })
+      // why: P3-T4-α panda-on-desk 联动 — 深夜关怀 overlay 浮卡 + sweeping 状态（A3 §3 #10 表 B+C）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'info',
+            scenarioId: 'midnight-care',
+            title: 'Panda · 深夜关怀',
+            body: msg,
+            ttlMs: 12_000,
+            petStateOverride: 'sweeping',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞主路径
+      }
       logForDebugging(`[personalLife] late-night-care: 关怀推送 — ${hour}:${String(now.getMinutes()).padStart(2, '0')}`)
     } catch (e) {
       logForDebugging(`[personalLife] late-night-care failed: ${(e as Error).message}`)
