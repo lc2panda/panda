@@ -87,7 +87,8 @@ panda auth login
 | Volcano   | ark.cn-beijing.volces.com/api/coding       | doubao-seed-code  | [console.volcengine.com](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey) |
 | OpenAI    | api.openai.com/v1                          | gpt-4o            | [platform.openai.com](https://platform.openai.com/api-keys)                               |
 
-**OpenAI / Codex — ChatGPT 订阅 OAuth 登录**（v2.21.24）
+<details>
+<summary><strong>OpenAI / Codex — ChatGPT 订阅 OAuth 登录</strong>（v2.21.24，点击展开 OAuth 流程 / 双模式 / TLS 三路径 / 缓存 / 受限提示）</summary>
 
 `panda auth login` 选择 OpenAI 后，浏览器打开 `auth.openai.com` 完成 PKCE OAuth：
 
@@ -112,6 +113,8 @@ panda auth login
 **`gpt-5-codex` 受限提示**：仅 Plus/Pro 账户可用；Free 账户调用会触发 `not supported when using Codex with a ChatGPT account` 错误，请改用 `gpt-5.4-mini` 或升级订阅 + 设置 `PANDA_CODEX_ALLOW_CODEX_MODEL=1`。
 
 (v2.21.16 引入 OAuth；v2.21.24 重构为 ChatGPT backend 默认 + 登录后模型选择 + Bun TLS 分发)
+
+</details>
 
 ### 1.4 配置参考
 
@@ -527,6 +530,9 @@ panda
 
 ### 1.5 OpenAI / 代理常见问题（v2.21.24）
 
+<details>
+<summary>展开 8 个常见问题（证书 / 模型受限 / 代理 / OAuth 回调 / SSE watchdog 等）</summary>
+
 | 现象 | 原因 | 解决方案 |
 |---|---|---|
 | OpenAI 登录后对话报 `unknown certificate verification error` | Bun runtime 不读系统 CA store，遇到科学上网工具的 MITM 证书无法验证 | 在 `~/.pandacc/settings.json` 加 `"proxy": "http://127.0.0.1:7897"`（端口改成你工具的实际混合端口）；或导出 MITM 根证书，设 `PANDA_OAUTH_CA_FILE=<path>` |
@@ -537,6 +543,8 @@ panda
 | 选择器卡住、终端不响应 ↑↓ | 非 TTY 环境（CI / pipe）但 panda 仍尝试交互 prompt | v2.21.24 已加 TTY 兜底；非交互终端自动跳过 prompt 用 `pickDefaultCodexModel(planType)` 默认值 |
 | `panda auth login` 后 access_token 过期就报错 | refresh_token 续期失败（网络瞬断 / 代理 race） | v2.21.24 用 module-level Promise 锁单飞 refresh，再次执行 `panda` 即可触发自动续期；持续失败则重新 `panda auth login` |
 | Agent 长任务中途无任何输出后静默退出 | 上游 SSE 连接断开但 client 未察觉（v2.21.20 之前） | v2.21.20 默认启用 stream watchdog 兜底；如需 opt-out，设 `CLAUDE_DISABLE_STREAM_WATCHDOG=1` |
+
+</details>
 
 ---
 
