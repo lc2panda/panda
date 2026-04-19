@@ -1,0 +1,68 @@
+# Input: bunx electron-builder 读取此 YAML 决定 mac/win/linux 三平台打包目标 + 签名 + 通道
+# Output: dist-electron/{Setup-x.x.x.exe, .dmg, .zip, .AppImage, .deb} 制品 + GitHub release 通道（如配 token）
+# Pos: panda-on-desk 跨平台分发配置 god-file — 与 packages/panda-on-desk/package.json 的 build:electron 脚本配套
+#
+# [NEW-FILE:#20260419-P1-16]
+# v0.1-alpha 仅验证 YAML 语法 + 字段结构 — 不实际打包（不安装 electron@41 等子包 deps）
+# Phase 2 真打包前置：
+#   ① bun install electron@41 + electron-builder@25 + electron-updater@6.8 子包 deps
+#   ② macOS：开发者签名证书 + entitlements.mac.plist 实体化（沙箱权限）
+#   ③ Windows：可选 codesign（v0.1-alpha verifyUpdateCodeSignature: false 跳过）
+#   ④ GitHub release token：自动 publish 到 lc2panda/panda 仓库 release 区
+#   ⑤ ICON 资产：build/icon.{icns,ico,png}（待 v0.5 美术补）
+#
+# 上游参考：clawd-on-desk@4b07658:package.json#build 字段（重组为独立 YAML 便于审计）
+
+appId: com.lc2panda.panda-on-desk
+productName: panda-on-desk
+copyright: Copyright (c) 2026 lc2panda
+
+directories:
+  output: dist-electron
+  buildResources: build
+
+# 包含文件清单 — 排除测试文件 / test 目录避免污染发布包
+files:
+  - "src/**/*"
+  - "themes/**/*"
+  - "package.json"
+  - "!**/*.test.{ts,tsx,js}"
+  - "!test/**"
+
+# macOS：dmg + zip 双格式 / x64 + arm64 双架构 / 启用 hardened runtime（公证前置）
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  arch:
+    - x64
+    - arm64
+
+# Windows：NSIS x64（v0.1-alpha 不签名 — verifyUpdateCodeSignature: false 跳过证书校验）
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  publisherName: lc2panda
+  verifyUpdateCodeSignature: false
+
+# Linux：AppImage（通用） + deb（Debian/Ubuntu）/ x64
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+  arch:
+    - x64
+
+# 自动 publish 到 GitHub release（需 GH_TOKEN 环境变量；v0.1-alpha 不自动 publish）
+publish:
+  provider: github
+  owner: lc2panda
+  repo: panda
+  releaseType: release

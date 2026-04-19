@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Input: macOS codesign 工具读取 — electron-builder mac.entitlements 字段引用
+  Output: 应用沙箱权限清单 — 决定 panda-on-desk 在 macOS 可申请的能力（network / file / JIT 等）
+  Pos: panda-on-desk macOS 签名 + 公证（notarization）必备配置 — 仅 mac 平台打包时生效
+
+  [NEW-FILE:#20260419-P1-16]
+  v0.1-alpha 占位：仅给出 Electron 41 必备的最小权限集（JIT + 未签名可执行内存 + 网络客户端 + 用户选择文件）
+  v0.5 真打包 + Apple Developer ID 签名时按需细化（如：camera / microphone / addressbook 等）
+
+  权限解释：
+    · com.apple.security.cs.allow-jit                       — Electron / V8 引擎运行 JIT 必需
+    · com.apple.security.cs.allow-unsigned-executable-memory — Node.js native modules 需要
+    · com.apple.security.cs.allow-dyld-environment-variables — Electron 启动时需要环境变量
+    · com.apple.security.network.client                      — HTTP / WebSocket / SSE 出站
+    · com.apple.security.files.user-selected.read-write      — 用户选择文件读写（设置导出 / 主题导入）
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+</dict>
+</plist>

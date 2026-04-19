@@ -1,0 +1,11 @@
+# Input: 占位 — 让 git 跟踪空目录 build/
+# Output: 未来放置打包资产（icon.icns / icon.ico / icon.png / installer 头图）
+# Pos: panda-on-desk electron-builder buildResources 目录占位
+#
+# [NEW-FILE:#20260419-P1-16]
+# 待补资产清单（v0.5 美术阶段补齐）：
+#   · icon.icns（macOS 应用图标 1024×1024 + 多分辨率）
+#   · icon.ico（Windows 应用图标 256×256 多分辨率）
+#   · icon.png（Linux 应用图标 512×512 PNG）
+#   · entitlements.mac.plist（macOS 沙箱权限申请清单 — 已占位，沙箱启用后细化）
+#   · installer-header.bmp / installerSidebar.bmp（NSIS 安装界面美化，可选）
