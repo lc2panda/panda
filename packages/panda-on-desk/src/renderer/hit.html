@@ -2,16 +2,80 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <title>panda</title>
+  <!--
+    Input: hitWin loadFile(hit.html)
+    Output: 透明窗内可见 panda 简笔形象 + 整窗 CSS drag
+    Pos: panda-on-desk hit window 渲染入口 — v0.5+ 再接 P3-T5 18 物种 sprite IPC 切换
+    [DESK-PET-VISIBLE-FIX 20260419] 完全重写：内嵌 SVG + drag region，去掉对未编译外部 renderer 脚本的依赖
+  -->
   <style>
-    * { margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: rgba(0,0,0,0.004); }
-    #hit-area { width: 100%; height: 100%; cursor: grab; }
-    #hit-area.dragging { cursor: grabbing; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      -webkit-app-region: drag; /* 整窗可拖（Electron transparent window 官方推荐） */
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #pet {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+      cursor: grab;
+      -webkit-app-region: drag;
+    }
+    #pet:active { cursor: grabbing; }
+    #pet svg {
+      width: 100%;
+      height: 100%;
+      max-width: 200px;
+      max-height: 200px;
+    }
+    .panda-face {
+      transform-origin: 100px 105px;
+      animation: idle-breath 3s ease-in-out infinite;
+    }
+    @keyframes idle-breath {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.03); }
+    }
   </style>
 </head>
 <body>
-  <div id="hit-area"></div>
-  <script src="hit-renderer.js"></script>
+  <div id="pet">
+    <!-- 内嵌简笔 panda（圆头 + 黑耳 + 黑眼罩 + 鼻嘴）— 与 build/icons/panda.svg 同风格 -->
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="panda-face">
+      <!-- 黑耳（两侧） -->
+      <ellipse cx="55" cy="55" rx="22" ry="26" fill="#1a1a1a"/>
+      <ellipse cx="145" cy="55" rx="22" ry="26" fill="#1a1a1a"/>
+      <!-- 白头（圆形） -->
+      <circle cx="100" cy="105" r="65" fill="#f5f5f5" stroke="#222" stroke-width="3"/>
+      <!-- 黑眼罩（两侧椭圆） -->
+      <ellipse cx="75" cy="100" rx="16" ry="20" fill="#1a1a1a" transform="rotate(-15 75 100)"/>
+      <ellipse cx="125" cy="100" rx="16" ry="20" fill="#1a1a1a" transform="rotate(15 125 100)"/>
+      <!-- 白眼（黑眼罩内） -->
+      <circle cx="75" cy="100" r="5" fill="#fff"/>
+      <circle cx="125" cy="100" r="5" fill="#fff"/>
+      <!-- 瞳孔 -->
+      <circle cx="76" cy="101" r="2.5" fill="#000"/>
+      <circle cx="126" cy="101" r="2.5" fill="#000"/>
+      <!-- 鼻子 -->
+      <ellipse cx="100" cy="125" rx="6" ry="4" fill="#1a1a1a"/>
+      <!-- 嘴 -->
+      <path d="M100 130 Q92 140 85 136 M100 130 Q108 140 115 136" stroke="#1a1a1a" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <script>
+    // 未来若加按钮，需声明 -webkit-app-region: no-drag 以恢复点击
+    // P3-T5 18 物种切换 / IPC state-loader 接入：v0.5+ 再做
+    console.log('[panda-on-desk] hit window ready - panda visible');
+  </script>
 </body>
 </html>
 <!-- Forked from clawd-on-desk@4b07658:src/hit.html (MIT License) - Panda branded -->

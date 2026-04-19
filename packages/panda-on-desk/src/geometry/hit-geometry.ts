@@ -202,6 +202,21 @@ export function getAssetRectScreen(
   }
 }
 
+// [DESK-PET-VISIBLE-FIX 20260419] safe fallback rect — 永不返 null（避免主进程撞空指针）
+function fallbackHitRect(bounds: BoundsRect | null | undefined) {
+  const pad = 20
+  const bx = bounds && Number.isFinite(bounds.x) ? bounds.x : 100
+  const by = bounds && Number.isFinite(bounds.y) ? bounds.y : 100
+  const bw = bounds && Number.isFinite(bounds.width) && bounds.width > 0 ? bounds.width : 200
+  const bh = bounds && Number.isFinite(bounds.height) && bounds.height > 0 ? bounds.height : 200
+  return {
+    left: bx - pad,
+    top: by - pad,
+    right: bx + bw + pad,
+    bottom: by + bh + pad,
+  }
+}
+
 export function getHitRectScreen(
   theme: ThemeLike | null | undefined,
   bounds: BoundsRect | null | undefined,
@@ -210,10 +225,10 @@ export function getHitRectScreen(
   hitBox: HitBox | null | undefined,
   options: { padX?: number; padY?: number } = {},
 ) {
-  if (!theme || !bounds || !hitBox) return null
+  if (!theme || !bounds || !hitBox) return fallbackHitRect(bounds)
 
   const artRect = getAssetRectScreen(theme, bounds, state, file)
-  if (!artRect) return null
+  if (!artRect) return fallbackHitRect(bounds)
 
   const vb = theme.viewBox
   const scaleX = artRect.w / vb.width

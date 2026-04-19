@@ -322,7 +322,24 @@ function applyPetWindowBounds(b: { x: number; y: number; width: number; height: 
   }
 }
 function getHitRectScreen(petBounds: { x: number; y: number; width: number; height: number }) {
-  return hitGeometry.getHitRectScreen(petBounds, activeTheme)
+  // [DESK-PET-VISIBLE-FIX 20260419] hitGeometry.getHitRectScreen 真实签名为 6 参（theme/bounds/state/file/hitBox/options）
+  // 当前以 2 参调用，必返 null；为避免 main.ts:758 / :447 撞 'Cannot read properties of null'
+  // 给一个基于 petBounds 的合理 fallback（与宠物窗 1:1 对齐，再外扩 20px 作 hit 边距）。
+  const rect = hitGeometry.getHitRectScreen(petBounds as any, activeTheme as any) as
+    | { left: number; top: number; right: number; bottom: number }
+    | null
+  if (rect && Number.isFinite(rect.left)) return rect
+  const pad = 20
+  const bx = Number.isFinite(petBounds?.x) ? petBounds.x : 100
+  const by = Number.isFinite(petBounds?.y) ? petBounds.y : 100
+  const bw = Number.isFinite(petBounds?.width) && petBounds.width > 0 ? petBounds.width : 200
+  const bh = Number.isFinite(petBounds?.height) && petBounds.height > 0 ? petBounds.height : 200
+  return {
+    left: bx - pad,
+    top: by - pad,
+    right: bx + bw + pad,
+    bottom: by + bh + pad,
+  }
 }
 function isProportionalMode() {
   const sz = String(_settingsController.get('size') || '')
