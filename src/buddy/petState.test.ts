@@ -3,6 +3,7 @@
 // Pos:    panda 形象宠物 D1 P1-T3 纯函数测试 + D3 P3-T3/T4 one-shot/idle timer 追加 [NEW-FILE:#20260419-AB-01]
 import { describe, expect, test } from 'bun:test'
 import {
+  applyForcedState,
   applyOneShotFallback,
   getCurrentPetState,
   ONE_SHOT_STATES,
@@ -318,5 +319,40 @@ describe('idle timer 梯度（P3-T4）', () => {
         }),
       ),
     ).toBe('idle')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// D4 P5-T1：applyForcedState — globalConfig.companionForcedState 覆盖路径
+// ─────────────────────────────────────────────────────────────────────────────
+describe('applyForcedState — /buddy state/wake/sleep 命令路径', () => {
+  test('forced 缺失 → 透传 derived', () => {
+    expect(applyForcedState('thinking', undefined, undefined, 1_000_000)).toBe(
+      'thinking',
+    )
+  })
+
+  test('forced 存在 + 未过期 → 返回 forced', () => {
+    expect(
+      applyForcedState('idle', 'working', 1_000_000 + 5_000, 1_000_000),
+    ).toBe('working')
+  })
+
+  test('forced 存在 + 已过期 → 透传 derived', () => {
+    expect(
+      applyForcedState('idle', 'working', 1_000_000, 1_000_000 + 1),
+    ).toBe('idle')
+  })
+
+  test('forced 存在 + expiresAt 缺失 → 永远生效（防御性：缺 TTL 视作不过期）', () => {
+    expect(applyForcedState('idle', 'sleeping', undefined, 1_000_000)).toBe(
+      'sleeping',
+    )
+  })
+
+  test('forced=sleeping 在 derived=carrying 时仍覆盖（命令优先级最高）', () => {
+    expect(
+      applyForcedState('carrying', 'sleeping', 1_000_000 + 60_000, 1_000_000),
+    ).toBe('sleeping')
   })
 })

@@ -272,6 +272,13 @@ export type GlobalConfig = {
   // mini-pet（StatusLine 1×5 字符 face）子开关 — D3 P4 决策点 #6：默认 true 便于回滚
   // 仅 companionMiniPet === false 时不渲染；undefined / true 都视为开启
   companionMiniPet?: boolean
+  // D4 P5-T1：/buddy state <name> 手动覆盖 PetState；expiresAt 到期前 hook 强制返回该 state
+  // why: 用 globalConfig 作 single source of truth，避免 hook 内 ref 跨进程 / 跨命令通信复杂度
+  companionForcedState?: import('../buddy/types.js').PetState
+  companionForcedStateExpiresAt?: number
+  // D4 P5-T1：/buddy theme <species> 切换 panda 系物种；getCompanion 后置覆盖 bones.species
+  // why: bones 由 userId hash 决定不可变；forced 字段独立保存以便 reset 回 hash 决定
+  companionForcedSpecies?: import('../buddy/types.js').PandaSpecies
 
   // Feedback survey tracking
   feedbackSurveyState?: {

@@ -1752,8 +1752,17 @@ Panda 自动检测 Windows 终端类型并适配渲染能力：
 - **技巧**: 适合离开电脑时让 AI 自动整理记忆和检查代码
 
 #### `/buddy`
-- **用法**: `/buddy [show|hide|mute|unmute|info]`
-- **说明**: 编程伙伴 — 终端中的虚拟宠物（随机物种，可 show/hide/mute）
+- **用法**: `/buddy [show|hide|mute|unmute|info|state|wake|sleep|theme]`
+- **说明**: 编程伙伴 — 终端中的虚拟宠物（21 物种，含 panda/redPanda/kungFuPanda 三 panda 系；12 态状态机驱动 sprite 帧切换）
+- **子命令**:
+  - `show` / `hide` — 切换显示
+  - `mute` / `unmute` — 静音不影响显示
+  - `info` — 查看物种 / 名字 / 稀有度
+  - `state <name>` — 手动覆盖状态 5s（name ∈ error/notification/sweeping/attention/juggling/carrying/working/thinking/waking/idle/dozing/sleeping）
+  - `wake` — 强制唤醒（清 sleeping/dozing）
+  - `sleep` — 强制 60s 睡眠
+  - `theme <species>` — 切换 panda 系物种（panda / redPanda / kungFuPanda）
+- **示例**: `/buddy state working` `/buddy theme kungFuPanda`
 
 #### `/brief`
 - **用法**: `/brief [on|off]`

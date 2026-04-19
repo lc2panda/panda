@@ -1,12 +1,15 @@
 // Input:  PetStateInput 派生信号（loading/error/notification/工具调用/子 agent/compacting/idle 时长）
+//         + D4 P5-T1: globalConfig.companionForcedState 手动覆盖（带 TTL）
 // Output: 当前 PetState（12 态之一），用于驱动 panda sprite 帧选择
 // Pos:    panda 形象宠物 D1 P1-T3/T4 — 纯函数 getCurrentPetState + hook useCurrentPetState
+//         D4 P5-T1: applyForcedState 纯函数 + hook 接入 globalConfig.companionForcedState
 //         严守 anthropic byte-equal — 仅 src/buddy 与 src/state 读侧；不触碰 services/api 或 oauth
 // [NEW-FILE:#20260419-AB-01]
 
 import { useEffect, useRef, useState } from 'react'
 import { feature } from 'bun:bundle'
 import { useAppState } from '../state/AppState.js'
+import { getGlobalConfig } from '../utils/config.js'
 import {
   ONE_SHOT_STATES,
   PET_STATE_PRIORITY,
@@ -166,6 +169,30 @@ export function applyOneShotFallback(
 }
 
 /**
+ * D4 P5-T1：根据 globalConfig.companionForcedState + expiresAt 决定是否覆盖派生 state。
+ * 纯函数便于单元测试；hook 调用方负责读 globalConfig 并传入。
+ *
+ * why pure: 与 applyOneShotFallback 同源设计，纯函数 = 易测；
+ *          forced 字段过期 / 缺失则透传 raw，调用方无需自行清理 globalConfig。
+ *
+ * @param derived 当前派生 state（getCurrentPetState + applyOneShotFallback 结果）
+ * @param forcedState globalConfig.companionForcedState（可空）
+ * @param forcedExpiresAt globalConfig.companionForcedStateExpiresAt（可空）
+ * @param nowMs 当前时间戳
+ * @returns 若 forced 未过期则返回 forcedState；否则返回 derived
+ */
+export function applyForcedState(
+  derived: PetState,
+  forcedState: PetState | undefined,
+  forcedExpiresAt: number | undefined,
+  nowMs: number,
+): PetState {
+  if (!forcedState) return derived
+  if (forcedExpiresAt != null && nowMs >= forcedExpiresAt) return derived
+  return forcedState
+}
+
+/**
  * 订阅 AppState 派生 PetState；500ms tick 推进 nowMs。
  *
  * 当前订阅 5+ 字段（见函数体），但 AppState 没有原生 isLoading/hasError 等字段，
@@ -260,9 +287,19 @@ export function useCurrentPetState(): PetState {
     lastOneShotKindRef.current = null
   }
 
-  const finalState = applyOneShotFallback(
+  const derivedState = applyOneShotFallback(
     raw,
     lastOneShotAtMsRef.current,
+    now,
+  )
+
+  // D4 P5-T1：globalConfig.companionForcedState 覆盖（/buddy state/wake/sleep 写入）
+  // why: 每 tick 重读 globalConfig 保命令落盘后下一帧即生效；过期后自动透传 derivedState
+  const cfg = getGlobalConfig()
+  const finalState = applyForcedState(
+    derivedState,
+    cfg.companionForcedState,
+    cfg.companionForcedStateExpiresAt,
     now,
   )
 

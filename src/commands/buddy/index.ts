@@ -1,3 +1,7 @@
+// Input:  /buddy 子命令字符串（show/hide/mute/unmute/info/state/wake/sleep/theme）+ globalConfig + AppState
+// Output: 单一 LocalJSXCommand — display:'system' 文案；落盘 globalConfig.companion* 字段
+// Pos:    panda 形象宠物 D4 P5-T1 — 9 子命令实装；旧 5 文案 byte-equal 守护见 buddy.test.ts
+//         一旦本文件被修改，请同步更新头注释 + src/commands/buddy/README.md
 import { feature } from 'bun:bundle'
 import type { Command, LocalJSXCommandContext, LocalJSXCommandOnDone } from '../../types/command.js'
 import { logEvent } from '../../services/analytics/index.js'
@@ -11,7 +15,7 @@ const buddy = {
     if (feature('BUDDY')) { return false }
     return true
   },
-  argumentHint: '[show|hide|mute|unmute|info]',
+  argumentHint: '[show|hide|mute|unmute|info|state|wake|sleep|theme]',
   immediate: true,
   load: () =>
     Promise.resolve({
@@ -25,6 +29,15 @@ const buddy = {
         )
         const subcommand = args.trim().toLowerCase()
         const config = getGlobalConfig()
+        // D4 P5-T1：拆分 head + tail 支持 'state <name>' / 'theme <species>' 带参子命令
+        // why: 旧 5 子命令仅做精确字符串匹配，head 单独抽出后旧分支判断 byte-equal 不变
+        const trimmed = args.trim()
+        const firstSpace = trimmed.indexOf(' ')
+        const head =
+          firstSpace === -1
+            ? trimmed.toLowerCase()
+            : trimmed.slice(0, firstSpace).toLowerCase()
+        const tail = firstSpace === -1 ? '' : trimmed.slice(firstSpace + 1).trim()
 
         if (subcommand === 'info') {
           let companion = config.companion
@@ -79,6 +92,100 @@ const buddy = {
           }))
           logEvent('tengu_buddy_toggled', { enabled: true })
           onDone('Companion visible!', { display: 'system' })
+          return null
+        }
+
+        // D4 P5-T1：手动覆盖 PetState（带 TTL，默认 ~5s 即 10 tick）
+        // why: 命令落盘 globalConfig；hook 每 tick 重读 → 下一帧渲染层即生效
+        if (head === 'state') {
+          const { PET_STATES } = await import('../../buddy/types.js')
+          const target = tail.toLowerCase()
+          if (!target) {
+            onDone(
+              `Usage: /buddy state <${PET_STATES.join('|')}>`,
+              { display: 'system' },
+            )
+            return null
+          }
+          const matched = PET_STATES.find(s => s === target)
+          if (!matched) {
+            onDone(
+              `Unknown state: ${target}. Valid: ${PET_STATES.join(', ')}`,
+              { display: 'system' },
+            )
+            return null
+          }
+          // why 5s TTL：与 ONE_SHOT_TTL_MS (2.5s) 略长，便于人眼观察 + 不锁死
+          const FORCED_STATE_TTL_MS = 5_000
+          saveGlobalConfig(prev => ({
+            ...prev,
+            companionForcedState: matched,
+            companionForcedStateExpiresAt: Date.now() + FORCED_STATE_TTL_MS,
+          }))
+          logEvent('tengu_buddy_state', { state: matched })
+          onDone(`Companion state forced to ${matched} for 5s.`, {
+            display: 'system',
+          })
+          return null
+        }
+
+        // D4 P5-T1：强制唤醒 → 清 sleeping/dozing；写 forced=idle 短 TTL 让 idleMs 阈值兜底
+        // why: 写 idle + 长 TTL 也行，但短 TTL 让 hook 自然走 lastInputAtMs 推进路径
+        if (head === 'wake') {
+          saveGlobalConfig(prev => ({
+            ...prev,
+            companionForcedState: 'idle',
+            // 1s TTL：让 hook 下一帧拿到 idle 后立即透传 derived（已经被 reaction 刷新过 lastInputAt）
+            companionForcedStateExpiresAt: Date.now() + 1_000,
+          }))
+          logEvent('tengu_buddy_wake', {})
+          onDone('Companion is awake.', { display: 'system' })
+          return null
+        }
+
+        // D4 P5-T1：强制 sleeping，长 TTL 让用户能持续观察
+        if (head === 'sleep') {
+          saveGlobalConfig(prev => ({
+            ...prev,
+            companionForcedState: 'sleeping',
+            // 60s TTL：明显长于 SLEEPING_THRESHOLD_MS=60s 提示意图，到期后 hook 走 idle 阈值兜底
+            companionForcedStateExpiresAt: Date.now() + 60_000,
+          }))
+          logEvent('tengu_buddy_sleep', {})
+          onDone('Companion is sleeping.', { display: 'system' })
+          return null
+        }
+
+        // D4 P5-T1：切 panda 系物种（panda / redPanda / kungFuPanda）
+        // why: getCompanion() 已在 companionForcedSpecies 存在时后置覆盖 bones.species
+        if (head === 'theme') {
+          const { PANDA_SPECIES } = await import('../../buddy/types.js')
+          const target = tail
+          if (!target) {
+            onDone(
+              `Usage: /buddy theme <${PANDA_SPECIES.join('|')}>`,
+              { display: 'system' },
+            )
+            return null
+          }
+          const matched = (PANDA_SPECIES as readonly string[]).find(
+            s => s.toLowerCase() === target.toLowerCase(),
+          ) as (typeof PANDA_SPECIES)[number] | undefined
+          if (!matched) {
+            // why 保留旧物种 fallback 提示：避免无效输入静默失败
+            const current = config.companionForcedSpecies ?? config.companion?.name ?? 'unset'
+            onDone(
+              `Unknown species: ${target}. Valid: ${PANDA_SPECIES.join(', ')}. Current forced: ${current}`,
+              { display: 'system' },
+            )
+            return null
+          }
+          saveGlobalConfig(prev => ({
+            ...prev,
+            companionForcedSpecies: matched,
+          }))
+          logEvent('tengu_buddy_theme', { species: matched })
+          onDone(`Companion theme set to ${matched}.`, { display: 'system' })
           return null
         }
 

@@ -1,3 +1,7 @@
+// Input:  userId（来自 oauthAccount/userID/3p apiKey）+ globalConfig.companion / companionForcedSpecies
+// Output: Companion（bones + soul 合并；forced species 后置覆盖）；roll() PRNG 装配
+// Pos:    panda 形象宠物 — 装配核心；D4 P5-T1 增 companionForcedSpecies 后置覆盖路径
+//         一旦本文件被修改，请同步更新头注释 + src/buddy/README.md
 import { getGlobalConfig } from '../utils/config.js'
 import {
   type Companion,
@@ -132,9 +136,16 @@ export function companionUserId(): string {
 // so species renames and SPECIES-array edits can't break stored companions,
 // and editing config.companion can't fake a rarity.
 export function getCompanion(): Companion | undefined {
-  const stored = getGlobalConfig().companion
+  const config = getGlobalConfig()
+  const stored = config.companion
   if (!stored) return undefined
   const { bones } = roll(companionUserId())
   // bones last so stale bones fields in old-format configs get overridden
-  return { ...stored, ...bones }
+  const merged: Companion = { ...stored, ...bones }
+  // D4 P5-T1：/buddy theme <species> 强制覆盖 species（panda 系切换）
+  // why: bones.species 由 userId hash 决定；forced 字段允许用户主动选 panda/redPanda/kungFuPanda
+  if (config.companionForcedSpecies) {
+    return { ...merged, species: config.companionForcedSpecies }
+  }
+  return merged
 }
