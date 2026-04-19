@@ -105,14 +105,56 @@ cd packages/panda-on-desk
 # TS 编译验证
 bunx tsc --noEmit -p tsconfig.json
 
-# 单元测试
+# 单元测试（226 pass · W3 收尾基线）
 bun test                       # === bun test packages/panda-on-desk/test/
 
-# 跨平台打包（v1.0 GA 起可用 — 需先安装 electron@41 子包 deps）
+# 跨平台打包（v1.0 GA 起可用 — electron@41 已迁入 devDependencies）
 bunx electron-builder --mac    # macOS dmg/zip × x64+arm64
 bunx electron-builder --win    # Windows NSIS x64
 bunx electron-builder --linux  # Linux AppImage + deb x64
+
+# 跨平台 dry-run（仅生成 unpacked 目录 / 不打 installer / W3-T2 验证用）
+bunx electron-builder --dir --win    # → dist-electron/win-unpacked/
+bunx electron-builder --dir --linux  # → dist-electron/linux-unpacked/
 ```
+
+## W3 收尾功能（v2.25.0 GA · 系统托盘 + 设置面板）
+
+### 系统托盘（src/tray/index.ts · [NEW-FILE:#20260419-W3-01]）
+
+panda 单 provider Tray，6 项菜单：
+
+| 菜单项 | 行为 |
+|--------|------|
+| Show panda / Hide panda | 切换宠物窗口可见性（label 随 isVisible 自动切换） |
+| DND mode | 免打扰开关（暂停通知 + 宠物动画 / 单一 source-of-truth 镜像广播 dnd-change） |
+| Settings… | 打开设置面板 BrowserWindow |
+| About panda-on-desk | dialog.showMessageBox 显示版本 + 仓库链接 |
+| Quit panda-on-desk | isQuitting=true → app.quit() |
+
+图标：`build/icons/tray-{light,dark}.{png,svg}` — mac 走 template image（系统反色），win/linux 按 nativeTheme 主题切换。
+
+### 设置面板（src/renderer/settings.html · 5 项 panda 偏好）
+
+写入 `~/.pandacc/desk-prefs.json`（atomic write · validate · default fallback）：
+
+| 字段 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `companionOnDesk` | boolean | true | 启用桌面宠物总开关 |
+| `species` | enum | "default" | 18 物种白名单（与 PANDA_SPECIES 1:1 对齐） |
+| `dndStart` / `dndEnd` | "HH:MM" | "22:00" / "08:00" | DND 时段（24h 制） |
+| `notificationVolume` | 0–100 | 60 | 通知音量 |
+| `autoLaunch` | boolean | false | 开机自启（→ OS 登录项 API 联动） |
+
+设置 IPC 通道（preload/settings.ts contextBridge 沙箱）：
+- `panda:desk-prefs:get` / `panda:desk-prefs:save`
+- `panda:species:list` / `panda:app-version`
+- `settings:open-external` / `panda:settings:close`
+
+### 截图占位
+
+> v1.0 GA 阶段：截图待美术与 PM 在真实环境抓取（macOS/Windows/Linux 三平台）后补 `docs/screenshots/`。
+> 当前以代码 + 5 选项 schema + 6 项菜单结构作为接口契约证据。
 
 ## 上游致谢
 

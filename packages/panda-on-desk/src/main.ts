@@ -130,6 +130,18 @@ const badgeManagerMod = _safeRequire<{
   setBadgeRendererNotifier?: (fn: ((channel: string, payload: any) => void) | null) => void
 }>('./badge/manager', {})
 
+// W3-T1：panda 单 provider 系统托盘（[NEW-FILE:#20260419-W3-01]）+ desk-prefs 双写
+// 失败容错：tray 模块缺失时仅没有系统托盘菜单；desk-prefs 失败回 default。
+const trayModule = _safeRequire<{
+  initPandaTray?: (ctx: any) => { tray: any; rebuild: () => void; destroy: () => void }
+}>('./tray', {})
+const deskPrefsMod = _safeRequire<{
+  loadDeskPrefs?: (p?: string) => any
+  saveDeskPrefs?: (data: any, p?: string) => any
+  getDeskPrefsPath?: () => string
+  PANDA_SPECIES_WHITELIST?: readonly string[]
+}>('./prefs', {})
+
 // platform/win-window：Windows koffi user32 FFI 提权（P1-T7 fork）
 // 上游 main.js L37-46 的 AllowSetForegroundWindow 直接 inline；此处提取到 platform/win-window.ts。
 // TODO[P1-T7]: 替换为 import { allowSetForegroundWindow } from './platform/win-window'
@@ -402,6 +414,21 @@ let _updateBubble: any = null
 let _updater: any = null
 // W1-T4：bridge IPC server handle（startBridgeServer 成功后填入；before-quit 清理）
 let _bridgeHandle: { port: number; secret: string; broadcast: (msg: any) => void; close: () => Promise<void> } | null = null
+// W3-T1：panda 系统托盘 handle（initPandaTray 成功后填入；before-quit 清理）
+let _trayHandle: { tray: any; rebuild: () => void; destroy: () => void } | null = null
+// W3-T1：DND（免打扰）状态镜像 — tray + settings 共用单一 source-of-truth
+let _dndEnabled: boolean = false
+function getDoNotDisturb(): boolean { return _dndEnabled }
+function setDoNotDisturb(enabled: boolean): void {
+  _dndEnabled = !!enabled
+  try { sendToRenderer('dnd-change', _dndEnabled) } catch {}
+  try { sendToHitWin('dnd-change', _dndEnabled) } catch {}
+  if (_trayHandle && typeof _trayHandle.rebuild === 'function') _trayHandle.rebuild()
+}
+function requestPandaQuit(): void {
+  isQuitting = true
+  try { app.quit() } catch {}
+}
 
 // hwnd recovery / topmost watchdog（Windows） ─────────────────────────────────
 let hwndRecoveryTimer: any = null
@@ -669,12 +696,18 @@ function openSettingsWindow() {
   if (iconPath) opts.icon = iconPath
   settingsWindow = new BrowserWindow(opts)
   settingsWindow.setMenuBarVisibility(false)
-  // TODO[P1-T6]: settings.html 需要在 renderer 4 窗任务里 fork 落地
-  const settingsHtml = path.join(__dirname, '..', 'renderer', 'settings.html')
-  if (fs.existsSync(settingsHtml)) {
+  // W3-T1：settings.html 已重写为 panda 5 选项面板（package src/renderer/settings.html）
+  // 兼容 dev (__dirname=src) 与 packaged (__dirname=src 内打入 ASAR) 两种位置
+  const settingsHtmlCandidates = [
+    path.join(__dirname, 'renderer', 'settings.html'),
+    path.join(__dirname, '..', 'renderer', 'settings.html'),
+    path.join(__dirname, '..', 'src', 'renderer', 'settings.html'),
+  ]
+  const settingsHtml = settingsHtmlCandidates.find(p => fs.existsSync(p))
+  if (settingsHtml) {
     settingsWindow.loadFile(settingsHtml)
   } else {
-    settingsWindow.loadURL('data:text/html,<body><h1>panda-on-desk settings (P1-T6 待补)</h1></body>')
+    settingsWindow.loadURL('data:text/html,<body><h1>panda-on-desk settings — settings.html missing</h1></body>')
   }
   settingsWindow.once('ready-to-show', () => {
     settingsWindow.show()
@@ -1055,6 +1088,51 @@ ipcMain.handle('settings:open-external', async (_event: any, url: string) => {
 })
 ipcMain.handle('settings:open-window', () => { openSettingsWindow(); return { status: 'ok' } })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// W3-T1 IPC handlers：panda desk-prefs + 物种白名单 + 应用版本 + settings 关窗
+// ─────────────────────────────────────────────────────────────────────────────
+ipcMain.handle('panda:desk-prefs:get', () => {
+  if (deskPrefsMod && typeof deskPrefsMod.loadDeskPrefs === 'function') {
+    try { return deskPrefsMod.loadDeskPrefs() } catch (err) {
+      return { error: (err as Error)?.message }
+    }
+  }
+  return null
+})
+ipcMain.handle('panda:desk-prefs:save', (_event: any, patch: any) => {
+  if (deskPrefsMod && typeof deskPrefsMod.saveDeskPrefs === 'function') {
+    try {
+      const res = deskPrefsMod.saveDeskPrefs(patch || {})
+      // autoLaunch 变更 → 联动系统登录项（复用 _writeSystemOpenAtLogin）
+      if (res && res.status === 'ok' && res.data && typeof res.data.autoLaunch === 'boolean') {
+        try { _writeSystemOpenAtLogin(res.data.autoLaunch) } catch (err) {
+          console.warn('[panda-on-desk] autoLaunch sync failed:', (err as Error).message)
+        }
+      }
+      return res
+    } catch (err) {
+      return { status: 'error', message: (err as Error)?.message }
+    }
+  }
+  return { status: 'error', message: 'desk-prefs module not loaded' }
+})
+ipcMain.handle('panda:species:list', () => {
+  if (deskPrefsMod && Array.isArray(deskPrefsMod.PANDA_SPECIES_WHITELIST)) {
+    return [...deskPrefsMod.PANDA_SPECIES_WHITELIST]
+  }
+  // fallback：与 theme-renderer.PANDA_SPECIES 1:1 对齐（避免循环 require）
+  return [
+    'default','axolotl','blob','cactus','capybara','cat','chonk','dragon','duck',
+    'ghost','goose','mushroom','octopus','owl','penguin','rabbit','robot','snail','turtle',
+  ]
+})
+ipcMain.handle('panda:app-version', () => {
+  try { return app.getVersion() } catch { return '0.0.0' }
+})
+ipcMain.on('panda:settings:close', () => {
+  if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close()
+})
+
 // ── First-run hydrate openAtLogin from system → prefs ──
 function hydrateSystemBackedSettings() {
   if (_settingsController.get('openAtLoginHydrated')) return
@@ -1151,6 +1229,43 @@ if (!gotTheLock) {
       })
     }
 
+    // ── W3-T1：拉起 panda 系统托盘（[NEW-FILE:#20260419-W3-01]） ──
+    // why: 上游 menu.ts createTray 路径走错（../assets/tray-icon.png 不存在），
+    //   panda 单 provider 用独立 tray 模块 6 项菜单（Show/Hide/DND/Settings/About/Quit）。
+    // 失败容错：缺图标/创建失败仅没有托盘菜单，不阻挡 4 BrowserWindow 主路径。
+    if (trayModule && typeof trayModule.initPandaTray === 'function') {
+      try {
+        _trayHandle = trayModule.initPandaTray({
+          getWin: () => win,
+          getHitWin: () => hitWin,
+          openSettingsWindow,
+          togglePetVisibility: () => {
+            togglePetVisibility()
+            if (_trayHandle && typeof _trayHandle.rebuild === 'function') _trayHandle.rebuild()
+          },
+          getDoNotDisturb,
+          setDoNotDisturb,
+          requestQuit: requestPandaQuit,
+          appVersion: (() => { try { return app.getVersion() } catch { return undefined } })(),
+        })
+        console.log('[panda-on-desk] panda tray initialized (W3-T1)')
+      } catch (err) {
+        console.warn('[panda-on-desk] initPandaTray failed:', (err as Error)?.message)
+      }
+    }
+
+    // ── W3-T1：从 desk-prefs 同步 autoLaunch 到系统登录项（首次启动幂等） ──
+    if (deskPrefsMod && typeof deskPrefsMod.loadDeskPrefs === 'function') {
+      try {
+        const _deskPrefs = deskPrefsMod.loadDeskPrefs()
+        if (_deskPrefs && typeof _deskPrefs.autoLaunch === 'boolean') {
+          _writeSystemOpenAtLogin(_deskPrefs.autoLaunch)
+        }
+      } catch (err) {
+        console.warn('[panda-on-desk] desk-prefs autoLaunch hydrate failed:', (err as Error).message)
+      }
+    }
+
     // ── W2-T4：注入 badge renderer notifier — manager 内 publishSnapshot 时推 'badge:update' 给 hitWin ──
     // 失败容错：缺失 manager 不阻挡主路径，仅退化为无 badge 显示。
     if (badgeManagerMod && typeof badgeManagerMod.setBadgeRendererNotifier === 'function') {
@@ -1207,6 +1322,13 @@ if (!gotTheLock) {
         console.warn('[panda-on-desk] bridge close failed:', (err as Error)?.message)
       }
       _bridgeHandle = null
+    }
+    // W3-T1：destroy panda tray
+    if (_trayHandle && typeof _trayHandle.destroy === 'function') {
+      try { _trayHandle.destroy() } catch (err) {
+        console.warn('[panda-on-desk] tray destroy failed:', (err as Error)?.message)
+      }
+      _trayHandle = null
     }
   })
 

@@ -1801,6 +1801,19 @@ panda CLI（authoritative）        ──HTTP/SSE─▶        panda-on-desk（
   103 主动场景 + StatusLine mini-pet  ◀──ack/op──        宠物可视化 + 通知聚合
 ```
 
+**自动启动**（v2.25.0 GA · W3 收尾）：
+
+panda CLI 启动时（`panda` / `bun panda`）会通过 `src/buddy/desk-spawn.ts` **自动 spawn** 已安装的 panda-on-desk 子进程（fallback：未安装时静默跳过，不阻塞 CLI 主路径）。无需手动启动 GUI。
+
+托盘菜单（W3-T1 系统托盘 6 项）：
+- **Show panda / Hide panda** — 切换宠物窗口可见性
+- **DND mode** — 免打扰开关（暂停通知 + 宠物动画）
+- **Settings…** — 打开 5 选项设置面板（启用 / 物种 / DND 时段 / 音量 / 开机自启）
+- **About panda-on-desk** — 版本与仓库链接
+- **Quit panda-on-desk** — 退出 GUI（不影响 CLI）
+
+设置面板写入 `~/.pandacc/desk-prefs.json`（与 panda CLI 共享 `~/.pandacc/runtime.json` 同目录）。
+
 详见子包 [packages/panda-on-desk/README.md](./packages/panda-on-desk/README.md)。
 
 #### `/brief`
