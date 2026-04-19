@@ -10,6 +10,8 @@ import { useEffect, useRef, useState } from 'react'
 import { feature } from 'bun:bundle'
 import { useAppState } from '../state/AppState.js'
 import { getGlobalConfig } from '../utils/config.js'
+import { pushPetStateChange } from '../desk/bridge.js'
+import { getSessionId } from '../bootstrap/state.js'
 import { isStateUnlocked } from './petXP.js'
 import {
   ONE_SHOT_STATES,
@@ -322,6 +324,26 @@ export function useCurrentPetState(): PetState {
   // Phase 0 P0-T6：等级解锁 gate —— 未解锁 state 降级 idle
   // why 在最末: forced state 也要受等级限制（防低级用户 /buddy state sweeping 偷渲染）
   const finalState = applyUnlockGate(forcedState, isStateUnlocked)
+
+  // W1-T4：finalState 变化 → 推送 panda-on-desk（节流 500ms 内置在 bridge 内）
+  // why: 仅在 finalState 实际变化时调用，避免每个 500ms tick 都推送同一 state；
+  //      bridge 层的 throttle 是第二道防线（保护多 hook 实例 / 别处也调用的场景）。
+  // 失败容错：pushPetStateChange 内部 isOnDeskEnabled / runtime.json / HTTP 全部静默吞，
+  //          panda CLI 主路径永不阻塞。
+  if (prevStateRef.current !== finalState) {
+    try {
+      // sessionId 失败兜底为空字符串；on-desk 侧 sessionId 仅用于多终端聚合
+      let sid = ''
+      try {
+        sid = String(getSessionId() ?? '')
+      } catch {
+        sid = ''
+      }
+      pushPetStateChange(finalState, sid)
+    } catch {
+      // bridge 内已静默吞；此处再兜底防 import 链异常波及主渲染
+    }
+  }
 
   // 跨帧记账：保存 final state 供下一帧 waking 判断
   prevStateRef.current = finalState

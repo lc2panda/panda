@@ -30,8 +30,10 @@ describe('panda-on-desk · pet 显示 + 拖拽 hotfix', () => {
     expect(html).toContain('<svg')
     expect(html).toContain('viewBox="0 0 200 200"')
 
-    // 至少 4 个黑色 ellipse —— 两耳 + 两眼罩
-    const blackEllipseCount = (html.match(/<ellipse[^>]*fill="#1a1a1a"/g) || []).length
+    // 至少 4 个深色 ellipse —— 两耳 + 两眼罩
+    // [W1-T2-ART 20260419] 升级后改用 linearGradient 填充（fill="url(#gradEar)" / url(#gradMask)），
+    // 故同时计数 url(#grad*) 与旧 #1a1a1a 兜底；语义不变。
+    const blackEllipseCount = (html.match(/<ellipse[^>]*fill="(?:#1a1a1a|url\(#grad(?:Ear|Mask)\))"/g) || []).length
     expect(blackEllipseCount).toBeGreaterThanOrEqual(4)
 
     // 不再依赖未编译的外部 renderer 脚本（<script src=... 形式）

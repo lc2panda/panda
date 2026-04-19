@@ -272,6 +272,35 @@ export function CompanionSprite(): React.ReactNode {
   // Phase 0 P0-T5：等级订阅 — usePetProgression 内部 feature gate；即使 BUDDY 关也安全
   // why bonesRarity fallback 'common'：companion 可能在首启时还未生成；hook 必须无条件调用
   const progression = usePetProgression(getCompanion()?.rarity ?? 'common');
+  // W2-T1：物种切换 → 推送 panda-on-desk hit window swap SVG
+  // why useRef + tick 触发：CompanionSprite 已有 500ms tick；每帧读 companion.species 与上次比对，
+  //   变化即调 pushSpeciesChange（内部去重 + feature gate + on-desk 离线静默）。
+  //   不开新订阅器 — 复用既有 tick 节拍，避免双倍 setInterval。
+  const lastSpeciesRef = useRef<string | null>(null);
+  useEffect(() => {
+    const sp = getCompanion()?.species;
+    if (!sp || sp === lastSpeciesRef.current) return;
+    lastSpeciesRef.current = sp;
+    try {
+      // dynamic import 防 import 链冷启动时序问题（与 subscribeLevelUp 同模式）
+      import('../desk/bridge.js').then(({ pushSpeciesChange }) => {
+        let sid = '';
+        try {
+          // why dynamic import session id：避免 bootstrap/state 强依赖，feature off 安全
+          import('../bootstrap/state.js').then(({ getSessionId }) => {
+            try { sid = String(getSessionId() ?? '') } catch { sid = '' }
+            try { pushSpeciesChange(sp as never, sid) } catch { /* swallow */ }
+          }).catch(() => { try { pushSpeciesChange(sp as never, sid) } catch { /* swallow */ } });
+        } catch {
+          try { pushSpeciesChange(sp as never, sid) } catch { /* swallow */ }
+        }
+      }).catch(() => { /* bridge import 失败静默 — 主路径不应受影响 */ });
+    } catch {
+      /* swallow — 物种推送失败不应阻塞 panda 渲染 */
+    }
+    // why eslint-disable: tick 触发周期重检 species；getCompanion 是同步读，无需依赖追踪
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
   if (!feature('BUDDY')) return null;
   const companion = getCompanion();
   if (!companion || getGlobalConfig().companionMuted) return null;

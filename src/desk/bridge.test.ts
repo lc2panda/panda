@@ -13,17 +13,24 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
+  __pushPetStateThrottledCore,
+  __resetPetStateThrottleForTesting,
   __resetRuntimeCacheForTesting,
+  buildPetStateChangeEvent,
   checkHealth,
   isOnDeskEnabled,
+  PET_STATE_THROTTLE_MS,
   pushEventToOnDesk,
   pushPermissionRequest,
+  pushPetStateChange,
   subscribeReverseStream,
   subscribeToOnDesk,
 } from './bridge.js'
 import {
   APP_IDENTITY,
   type OnDeskEvent,
+  type PetState,
+  type PetStateChangeEvent,
   type ReverseMessage,
   RUNTIME_FILE_NAME,
   RUNTIME_SCHEMA_VERSION,
@@ -505,6 +512,191 @@ describe('subscribeReverseStream', () => {
     const sub = subscribeReverseStream(() => undefined)
     expect(typeof sub.close).toBe('function')
     sub.close()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W1-T4 端到端 IPC 实测：buildPetStateChangeEvent / 节流 / runtime.json 缺失 /
+// 真 bridge server (startBridgeServer) push → onEvent 接收
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W1-T4 / buildPetStateChangeEvent', () => {
+  test('构造完整 PetStateChangeEvent — 含 type/state/sessionId/ts，不含 forcedUntilMs', () => {
+    const before = Date.now()
+    const ev = buildPetStateChangeEvent('thinking', 'sid-w1-1')
+    const after = Date.now()
+    expect(ev.type).toBe('pet-state')
+    expect(ev.state).toBe('thinking')
+    expect(ev.sessionId).toBe('sid-w1-1')
+    expect(ev.ts).toBeGreaterThanOrEqual(before)
+    expect(ev.ts).toBeLessThanOrEqual(after)
+    // why: 显式传 undefined forcedUntilMs 不应出现 key（避免 desk 侧 in-check 误判）
+    expect('forcedUntilMs' in ev).toBe(false)
+  })
+
+  test('forcedUntilMs 透传', () => {
+    const expires = Date.now() + 60_000
+    const ev = buildPetStateChangeEvent('working', 'sid-w1-2', expires)
+    expect(ev.forcedUntilMs).toBe(expires)
+  })
+})
+
+describe('W1-T4 / pushPetStateChange feature gate', () => {
+  test('feature off → 同步返回 (void)、不调 emit、不抛错', () => {
+    // bun test 默认 feature('BUDDY') = false → pushPetStateChange 应短路
+    expect(isOnDeskEnabled()).toBe(false)
+    expect(() => pushPetStateChange('idle', 'sid-w1-gate')).not.toThrow()
+  })
+})
+
+describe('W1-T4 / __pushPetStateThrottledCore — 节流 + 去重', () => {
+  beforeEach(() => {
+    __resetPetStateThrottleForTesting()
+  })
+  afterEach(() => {
+    __resetPetStateThrottleForTesting()
+  })
+
+  test('首次 push 立即发送（lastSentAt=0 → emit 同步触发）', () => {
+    const emitted: PetStateChangeEvent[] = []
+    __pushPetStateThrottledCore('thinking', 'sid-1', undefined, e => emitted.push(e))
+    expect(emitted.length).toBe(1)
+    expect(emitted[0].state).toBe('thinking')
+    expect(emitted[0].sessionId).toBe('sid-1')
+  })
+
+  test('500ms 窗口内同 state 重复 push → 仅触发 1 次（去重）', () => {
+    const emitted: PetStateChangeEvent[] = []
+    const t0 = Date.now()
+    __pushPetStateThrottledCore('working', 'sid-2', undefined, e => emitted.push(e), t0)
+    __pushPetStateThrottledCore('working', 'sid-2', undefined, e => emitted.push(e), t0 + 100)
+    __pushPetStateThrottledCore('working', 'sid-2', undefined, e => emitted.push(e), t0 + 200)
+    // 同 state → 全部去重；首次发送 + 后续直接吞（连 pending 都不挂）
+    expect(emitted.length).toBe(1)
+  })
+
+  test('500ms 窗口内不同 state 多次 push → pending 合并；窗口结束触发最后 1 次', async () => {
+    const emitted: PetStateChangeEvent[] = []
+    const t0 = Date.now()
+    // T+0: thinking 立即发
+    __pushPetStateThrottledCore('thinking', 'sid-3', undefined, e => emitted.push(e), t0)
+    // T+100: working → 节流窗口内挂 pending
+    __pushPetStateThrottledCore('working', 'sid-3', undefined, e => emitted.push(e), t0 + 100)
+    // T+200: carrying → 覆盖 pending（取最新）
+    __pushPetStateThrottledCore('carrying', 'sid-3', undefined, e => emitted.push(e), t0 + 200)
+    // T+300: juggling → 再次覆盖
+    __pushPetStateThrottledCore('juggling', 'sid-3', undefined, e => emitted.push(e), t0 + 300)
+    // 此刻仅 emit 了首次 thinking
+    expect(emitted.length).toBe(1)
+    expect(emitted[0].state).toBe('thinking')
+    // 等待节流窗口结束（PET_STATE_THROTTLE_MS = 500）+ 余裕
+    await new Promise(r => setTimeout(r, PET_STATE_THROTTLE_MS + 100))
+    // pending 触发 → 最终发送 juggling（最后一个）
+    expect(emitted.length).toBe(2)
+    expect(emitted[1].state).toBe('juggling')
+  })
+
+  test('runtime.json 缺失（pushPetStateChange 真实路径走 isOnDeskEnabled） → 不抛错', () => {
+    // 即便 runtime.json 不存在，pushPetStateChange 也应静默；feature off 已 cover，
+    // 这里再覆盖一遍真实 API 的"端到端"无副作用语义
+    expect(() => pushPetStateChange('error', 'sid-no-runtime')).not.toThrow()
+  })
+})
+
+describe('W1-T4 / 端到端：真 bridge server + 客户端 push → onEvent 接收', () => {
+  test('startBridgeServer + raw HTTP push → onEvent 接收 pet-state 事件', async () => {
+    const { startBridgeServer } = await import(
+      '../../packages/panda-on-desk/src/bridge/server.js'
+    )
+    const onEventCalls: OnDeskEvent[] = []
+    const handle = await startBridgeServer({
+      basePort: 14_900, // why 14900: 远离 PORT_BASE 1455 + 测试常用，降低撞端口概率
+      maxProbe: 50,
+      secret: 'w1t4-test-secret',
+      onEvent: (e: OnDeskEvent) => onEventCalls.push(e),
+    })
+    try {
+      // panda CLI 客户端：用 rawRequest 模拟（绕过 feature gate）
+      const event: PetStateChangeEvent = {
+        type: 'pet-state',
+        state: 'attention' as PetState,
+        sessionId: 'e2e-sid',
+        ts: Date.now(),
+      }
+      const resp = await rawRequest({
+        port: handle.port,
+        path: '/event',
+        method: 'POST',
+        headers: { [SECRET_HEADER]: 'w1t4-test-secret' },
+        body: JSON.stringify(event),
+      })
+      expect(resp.status).toBe(200)
+      // bridge server 同步调 onEvent → 此刻 onEventCalls 至少 1 项
+      expect(onEventCalls.length).toBe(1)
+      expect(onEventCalls[0].type).toBe('pet-state')
+      expect((onEventCalls[0] as PetStateChangeEvent).state).toBe('attention')
+      expect((onEventCalls[0] as PetStateChangeEvent).sessionId).toBe('e2e-sid')
+
+      // /health 探活 — bridge 自己应正确响应
+      const health = await rawRequest({
+        port: handle.port,
+        path: '/health',
+        method: 'GET',
+      })
+      expect(health.status).toBe(200)
+      const parsed = JSON.parse(health.body) as { app: string }
+      expect(parsed.app).toBe(APP_IDENTITY)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  test('真 bridge server：连发 4 个事件类型 → 全部 onEvent 接收且 dispatchEvent 不崩', async () => {
+    const { startBridgeServer } = await import(
+      '../../packages/panda-on-desk/src/bridge/server.js'
+    )
+    const onEventCalls: OnDeskEvent[] = []
+    const handle = await startBridgeServer({
+      basePort: 15_000,
+      maxProbe: 50,
+      secret: 'w1t4-multi-secret',
+      onEvent: (e: OnDeskEvent) => onEventCalls.push(e),
+    })
+    try {
+      const events: OnDeskEvent[] = [
+        { type: 'pet-state', state: 'thinking' as PetState, sessionId: 'm1', ts: Date.now() },
+        { type: 'xp-gained', delta: 5, bucket: 'time', totalXp: 100, level: 2, ts: Date.now() },
+        { type: 'level-up', fromLevel: 1, toLevel: 2, ts: Date.now() },
+        {
+          type: 'notification',
+          kind: 'overlay',
+          level: 'info',
+          scenarioId: 'test-scn',
+          title: 'hello',
+          ts: Date.now(),
+        },
+      ]
+      for (const ev of events) {
+        // eslint-disable-next-line no-await-in-loop
+        const resp = await rawRequest({
+          port: handle.port,
+          path: '/event',
+          method: 'POST',
+          headers: { [SECRET_HEADER]: 'w1t4-multi-secret' },
+          body: JSON.stringify(ev),
+        })
+        expect(resp.status).toBe(200)
+      }
+      expect(onEventCalls.length).toBe(4)
+      expect(onEventCalls.map(e => e.type)).toEqual([
+        'pet-state',
+        'xp-gained',
+        'level-up',
+        'notification',
+      ])
+    } finally {
+      await handle.close()
+    }
   })
 })
 

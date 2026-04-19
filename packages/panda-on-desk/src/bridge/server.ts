@@ -242,6 +242,8 @@ const VALID_EVENT_TYPES: ReadonlySet<string> = new Set([
   'badge',
   'drag-target',
   'dnd',
+  // W2-T1 新增：物种切换（/buddy theme <species> 联动）
+  'species',
 ])
 
 function isValidEvent(body: unknown): body is OnDeskEvent {
@@ -279,7 +281,9 @@ export function dispatchEvent(event: OnDeskEvent): void {
     case 'permission':
     case 'session':
     case 'scene':
-      // why: 这 7 类由 BridgeServerOptions.onEvent 业务层处理（state.ts / xp.ts），
+    case 'species':
+      // why: 这 8 类由 BridgeServerOptions.onEvent 业务层处理（state.ts / xp.ts /
+      //      W2-T1 species → forwardBridgeEventToRenderer 直接走 hit window），
       // dispatchEvent 不重复分发，避免双触发
       return
     default: {

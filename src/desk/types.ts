@@ -168,6 +168,27 @@ export interface SceneTriggerEvent {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// W2-T1：物种切换事件 — /buddy theme <species> 跑后 panda CLI 推送给 on-desk
+// 决策：与 PetStateChangeEvent 同样走 'panda-event' IPC 通道；on-desk hit.html
+//       内 __pandaSetSpecies 接收后 swap SVG（preload 时已 cache 18 物种）
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 18 物种字符串字面量（与 src/buddy/types.ts SPECIES 同源；types.parity 测试守护） */
+export type Species =
+  | 'duck' | 'goose' | 'blob' | 'cat' | 'dragon' | 'octopus' | 'owl'
+  | 'penguin' | 'turtle' | 'snail' | 'ghost' | 'axolotl' | 'capybara'
+  | 'cactus' | 'robot' | 'rabbit' | 'mushroom' | 'chonk'
+
+/** 物种切换推送（panda CLI 端 /buddy theme <species> → desk） */
+export interface SpeciesChangeEvent {
+  type: 'species'
+  species: Species
+  /** panda CLI session id（用于多终端聚合） */
+  sessionId: string
+  ts: number
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Phase 2 P2-T1 — TOP 10 超级助手联动 4 新事件类型
 // 决策：单一 NotificationKind / 复合呈现用多个 event 串联（避免单 event 多通道
 // 状态机复杂度）；BadgeEvent / DragTargetEvent / DndEvent 各自独立。
@@ -264,6 +285,7 @@ export type OnDeskEvent =
   | BadgeEvent
   | DragTargetEvent
   | DndEvent
+  | SpeciesChangeEvent
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HTTP 响应 schema

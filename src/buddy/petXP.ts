@@ -1,14 +1,17 @@
 // Input:  XP 桶 + 增量 / 信号事件（addXP / recordMilestone）；feature('BUDDY') gate
 // Output: 当前等级 / 解锁的 state/hat / 升级回调 / Effective rarity
+//         + W2-T2: 升级时 pushLevelUp → on-desk 烟花动画；周期 pushXpUpdate → on-desk XP 进度条
 // Pos:    src/buddy/CompanionSprite.tsx + petState.ts 等渲染层引用 isStateUnlocked；
 //         信号源（usage.ts/cmd hooks/Stop event）调 addXP / recordMilestone；
 //         严守 anthropic byte-equal — 仅本地计算与本地存储，无网络
 //
 // [NEW-FILE:#20260419-OD-01]
+// 2026-04-19 +08:00 W2-T2 扩展：levelUpHandlers 内置 pushLevelUp + startXpPeriodicPush 30s
 
 import { useSyncExternalStore } from 'react'
 import { feature } from 'bun:bundle'
 
+import { pushLevelUp, pushXpUpdate } from '../desk/bridge.js'
 import {
   type CompanionStatsV1,
   type HistoryEvent,
@@ -203,6 +206,19 @@ function applyLevelUp(s: CompanionStatsV1, fromLevel: number, toLevel: number, n
     } catch {
       /* swallow */
     }
+  }
+
+  // W2-T2：on-desk 升级烟花 IPC — fire-and-forget，feature gate / runtime 缺失内部静默
+  // why call here vs subscribeLevelUp(handler)：避免双源订阅 — 直接在 applyLevelUp 里
+  // 一次性派发，比让外部模块再 subscribe 更稳（bun:bundle feature gate 由 bridge 自管）
+  try {
+    pushLevelUp(fromLevel, toLevel, {
+      states: s.unlocks.states,
+      hats: s.unlocks.hats,
+      eyes: s.unlocks.eyes,
+    })
+  } catch {
+    /* swallow — bridge 内部已永不抛错；此 try 为额外保险 */
   }
 }
 
@@ -496,4 +512,67 @@ export function usePetProgression(bonesRarity: Rarity): ProgressionView {
     }
   }
   return snapshot
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W2-T2 · 周期性 XP 推送 — 默认每 30s 把当前 level/xp/pctToNext/rarity 发给 on-desk
+// 决策：不在 addXP 内同步推（addXP 调用频率高 + 桶变更频繁 — 会刷屏）；
+//      改为定时器节奏推；停机时调用 stopXpPeriodicPush 解绑（生产 CLI 退出由 GC 兜底）
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 默认周期 — 30s（与 task.md 要求一致） */
+export const XP_PERIODIC_PUSH_INTERVAL_MS = 30_000
+
+let _xpPeriodicTimer: ReturnType<typeof setInterval> | null = null
+
+/**
+ * 启动周期性 XP 推送给 panda-on-desk。
+ *
+ * @param bonesRarity 当前 effective rarity 来源（getCompanion().rarity）
+ * @param intervalMs  推送周期（默认 30s）
+ * @returns 停止函数（重复调用安全）
+ */
+export function startXpPeriodicPush(
+  bonesRarity: Rarity,
+  intervalMs: number = XP_PERIODIC_PUSH_INTERVAL_MS,
+): () => void {
+  // 重复启动：先停旧的（防多 timer 叠加）
+  if (_xpPeriodicTimer !== null) {
+    clearInterval(_xpPeriodicTimer)
+    _xpPeriodicTimer = null
+  }
+  const tick = () => {
+    try {
+      const lv = getCurrentLevel()
+      const xp = getCurrentXP()
+      const rarity = getEffectiveRarity(bonesRarity)
+      pushXpUpdate({
+        delta: 0,
+        bucket: 'streak.daily',
+        totalXp: xp.total,
+        level: lv,
+        pctToNext: xp.pctToNext,
+        rarity,
+      })
+    } catch {
+      /* swallow — 永不阻塞 timer */
+    }
+  }
+  // 首次立即执行 — 启动时先同步一次当前快照
+  tick()
+  _xpPeriodicTimer = setInterval(tick, intervalMs)
+  return () => stopXpPeriodicPush()
+}
+
+/** 停止周期性 XP 推送（重复调用安全） */
+export function stopXpPeriodicPush(): void {
+  if (_xpPeriodicTimer !== null) {
+    clearInterval(_xpPeriodicTimer)
+    _xpPeriodicTimer = null
+  }
+}
+
+/** 测试辅助 — 查询当前 timer 是否运行（用于断言生命周期） */
+export function __isXpPeriodicPushRunningForTesting(): boolean {
+  return _xpPeriodicTimer !== null
 }

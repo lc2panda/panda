@@ -272,6 +272,13 @@ export type GlobalConfig = {
   // mini-pet（StatusLine 1×5 字符 face）子开关 — D3 P4 决策点 #6：默认 true 便于回滚
   // 仅 companionMiniPet === false 时不渲染；undefined / true 都视为开启
   companionMiniPet?: boolean
+  // W1-T1 自动启动开关 — npm 安装 panda 后启动 panda 时自动拉起 panda-on-desk 桌面端
+  // 默认 ON：仅 companionOnDesk === false 时跳过；undefined / true 都视为启用
+  // 同时受 feature('BUDDY') + isTTY + --no-desk 三重 gate 保护，详见 src/desk/launcher.ts
+  companionOnDesk?: boolean
+  // Phase 0 P0-T5：CompanionSprite 名字行旁的 "Lv N" 角标子开关 — 默认 ON 便于回滚
+  // 仅 companionShowLevel === false 时不渲染；undefined / true 都视为开启
+  companionShowLevel?: boolean
   // D4 P5-T1：/buddy state <name> 手动覆盖 PetState；expiresAt 到期前 hook 强制返回该 state
   // why: 用 globalConfig 作 single source of truth，避免 hook 内 ref 跨进程 / 跨命令通信复杂度
   companionForcedState?: import('../buddy/types.js').PetState
@@ -736,6 +743,7 @@ export const GLOBAL_CONFIG_KEYS = [
   'prStatusFooterEnabled',
   'remoteControlAtStartup',
   'remoteDialogSeen',
+  'companionOnDesk',
 ] as const
 
 export type GlobalConfigKey = (typeof GLOBAL_CONFIG_KEYS)[number]

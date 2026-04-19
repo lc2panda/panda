@@ -4,10 +4,28 @@
   <meta charset="UTF-8">
   <title>panda</title>
   <!--
-    Input: hitWin loadFile(hit.html)
-    Output: 透明窗内可见 panda 简笔形象 + 整窗 CSS drag
-    Pos: panda-on-desk hit window 渲染入口 — v0.5+ 再接 P3-T5 18 物种 sprite IPC 切换
-    [DESK-PET-VISIBLE-FIX 20260419] 完全重写：内嵌 SVG + drag region，去掉对未编译外部 renderer 脚本的依赖
+    Input: hitWin loadFile(hit.html) + bridge 'panda-event' 通过 preload 注入 window.panda.onEvent
+           + W2-T4: preload 'badge:update' channel 通过 window.pandaBadge.onUpdate 订阅
+    Output: 透明窗内可见精美 panda 形象 + 7 状态切换 (idle/thinking/working/sleeping/error/attention/notification) + 整窗 CSS drag
+            + W2-T4: 双击/4击/长按交互反应 + 右上角红圆 badge + 长按显示 stats 卡片
+    Pos: panda-on-desk hit window 渲染入口 — W1-T2 美工升级（多帧动画 + 渐变 + 阴影 + 高光 + 状态机 UI）
+    [DESK-PET-VISIBLE-FIX 20260419] v0 简笔
+    [W1-T2-ART 20260419] v1 美工升级：linearGradient 立体感 + drop-shadow 多层阴影 + 顶部高光 + 7 状态 CSS 动画 + window.__pandaSetState 接口
+                          严守与 W1-T4 bridge IPC 协议契约 — preload 已 expose window.panda.onEvent('pet-state', ...)
+    [W2-T4-INTERACT 20260419] 双击(poke)/4击(flail)/长按(stats)交互 + 头顶角标 badge（继承 P2-T4 manager）
+                               drag CSS 仍然优先 — 交互层用 .interact-layer (-webkit-app-region: no-drag) 隔离
+                               严守 byte-equal 与 W1-T2 UI 结构隔离
+    [W2-T2-LEVELUP 20260419] 等级显示 + XP 进度条 + 升级烟花动画
+                              window.__pandaSetLevel(level, rarity) / __pandaSetXP(current, total, pctToNext) / __pandaTriggerLevelUp(from, to)
+                              bridge 'level-up' / 'xp-gained' 自动驱动；'sound:play' 通道接 P2-T4 player
+                              algo 与 src/renderer/levelup-fx.ts 1:1 同源（前端镜像 RARITY_HEX 5 档）
+    [W2-T1-SPECIES 20260419] 18 物种 SVG preload + cache + __pandaSetSpecies 实装：
+                              · body[data-species] 标记当前物种（'default'=简笔，其它 17=外置 sprite SVG）
+                              · 启动时异步并行 fetch ../../themes/panda/sprites/{species}.svg → JS Map cache
+                              · setSpecies(s) → cache 取 SVG，替换 .panda-face 节点（保留 .deco/.badge/.stats-card/.panda-face 同级元素）
+                              · 未知 species → fallback 'default'（保留嵌入简笔 SVG）
+                              · pet-state 路径不变（body[data-pet-state] 仍由 __pandaSetState 控制）
+                              · bridge 'species' 事件 → 自动驱动 __pandaSetSpecies（含 pending 缓存回放）
   -->
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -16,65 +34,953 @@
       height: 100%;
       overflow: hidden;
       background: transparent;
-      -webkit-app-region: drag; /* 整窗可拖（Electron transparent window 官方推荐） */
+      -webkit-app-region: drag; /* Electron transparent window 整窗拖拽 */
       user-select: none;
       -webkit-user-select: none;
     }
+    /* 容器：占满 200×200 窗，panda 居中并占 80% */
     #pet {
+      position: relative;
       width: 100%;
       height: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
-      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
       cursor: grab;
       -webkit-app-region: drag;
+      /* 多层 drop-shadow：近层暗影 + 远层柔光（fake ambient occlusion） */
+      filter:
+        drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35))
+        drop-shadow(0 6px 14px rgba(0, 0, 0, 0.28))
+        drop-shadow(0 12px 28px rgba(0, 0, 0, 0.18));
     }
     #pet:active { cursor: grabbing; }
-    #pet svg {
+    .panda-stage {
+      position: relative;
+      width: 80%;
+      height: 80%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .panda-stage svg {
       width: 100%;
       height: 100%;
       max-width: 200px;
       max-height: 200px;
+      overflow: visible;
     }
+    /* 主形象动画原点：中央偏下（脸部中心） */
     .panda-face {
-      transform-origin: 100px 105px;
+      transform-origin: 100px 110px;
+      transform-box: fill-box;
       animation: idle-breath 3s ease-in-out infinite;
     }
+
+    /* ── 装饰元素：默认隐藏，按 state 显形 ───────────────────────────────── */
+    .deco { display: none; pointer-events: none; }
+    .deco-question,
+    .deco-zzz,
+    .deco-bell,
+    .deco-x-eye-l,
+    .deco-x-eye-r {
+      position: absolute;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-weight: bold;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    /* ── State: idle（呼吸 3s）+ 偶尔眨眼 ─────────────────────────────────── */
     @keyframes idle-breath {
       0%, 100% { transform: scale(1); }
-      50%      { transform: scale(1.03); }
+      50%      { transform: scale(1.035); }
+    }
+    @keyframes blink {
+      0%, 92%, 100% { transform: scaleY(1); }
+      94%, 98%      { transform: scaleY(0.1); }
+    }
+    body[data-pet-state="idle"] .panda-eye-group {
+      animation: blink 5s ease-in-out infinite;
+      transform-origin: center;
+      transform-box: fill-box;
+    }
+
+    /* ── State: thinking（呼吸 + 头顶问号上下浮动） ─────────────────────────── */
+    @keyframes question-float {
+      0%, 100% { transform: translateY(0) rotate(-8deg); opacity: 1; }
+      50%      { transform: translateY(-6px) rotate(8deg); opacity: 0.65; }
+    }
+    body[data-pet-state="thinking"] .deco-question {
+      display: block;
+      top: 4%;
+      right: 18%;
+      font-size: 28px;
+      color: #ffff66;
+      animation: question-float 1s ease-in-out infinite;
+    }
+
+    /* ── State: working（左右轻微摇头） ────────────────────────────────────── */
+    @keyframes work-shake {
+      0%, 100% { transform: rotateZ(-3deg) scale(1.02); }
+      50%      { transform: rotateZ(3deg) scale(1.02); }
+    }
+    body[data-pet-state="working"] .panda-face {
+      animation: work-shake 0.8s ease-in-out infinite;
+    }
+
+    /* ── State: sleeping（闭眼 + Z 飘起） ──────────────────────────────────── */
+    @keyframes sleep-breath {
+      0%, 100% { transform: scale(0.97); }
+      50%      { transform: scale(1.0); }
+    }
+    @keyframes zzz-rise {
+      0%   { transform: translate(0, 0)   scale(0.6); opacity: 0; }
+      30%  { opacity: 1; }
+      100% { transform: translate(8px, -22px) scale(1.1); opacity: 0; }
+    }
+    body[data-pet-state="sleeping"] .panda-face {
+      animation: sleep-breath 4s ease-in-out infinite;
+    }
+    body[data-pet-state="sleeping"] .panda-eye-pupil-l,
+    body[data-pet-state="sleeping"] .panda-eye-pupil-r,
+    body[data-pet-state="sleeping"] .panda-eye-white-l,
+    body[data-pet-state="sleeping"] .panda-eye-white-r { opacity: 0; }
+    body[data-pet-state="sleeping"] .panda-eye-closed-l,
+    body[data-pet-state="sleeping"] .panda-eye-closed-r { opacity: 1; }
+    body[data-pet-state="sleeping"] .deco-zzz {
+      display: block;
+      top: 18%;
+      right: 10%;
+      font-size: 22px;
+      color: #aacbff;
+      animation: zzz-rise 2s ease-out infinite;
+    }
+
+    /* ── State: error（摔倒 30deg + X 眼） ─────────────────────────────────── */
+    @keyframes fall-shake {
+      0%   { transform: rotateZ(0); }
+      30%  { transform: rotateZ(30deg); }
+      60%  { transform: rotateZ(28deg) translateY(2px); }
+      100% { transform: rotateZ(30deg); }
+    }
+    body[data-pet-state="error"] .panda-face {
+      animation: fall-shake 0.6s ease-out forwards;
+    }
+    body[data-pet-state="error"] .panda-eye-pupil-l,
+    body[data-pet-state="error"] .panda-eye-pupil-r,
+    body[data-pet-state="error"] .panda-eye-white-l,
+    body[data-pet-state="error"] .panda-eye-white-r { opacity: 0; }
+    body[data-pet-state="error"] .deco-x-eye-l,
+    body[data-pet-state="error"] .deco-x-eye-r { display: block; font-size: 14px; color: #ff3366; }
+    body[data-pet-state="error"] .deco-x-eye-l { top: 44%; left: 30%; }
+    body[data-pet-state="error"] .deco-x-eye-r { top: 44%; right: 30%; }
+
+    /* ── State: attention（上下跳跃） ──────────────────────────────────────── */
+    @keyframes jump-attn {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-10px); }
+    }
+    body[data-pet-state="attention"] .panda-face {
+      animation: jump-attn 0.5s ease-in-out infinite;
+    }
+
+    /* ── State: notification（头顶铃铛 ±15deg 摇晃） ───────────────────────── */
+    @keyframes bell-shake {
+      0%, 100% { transform: rotateZ(-15deg); }
+      50%      { transform: rotateZ(15deg); }
+    }
+    body[data-pet-state="notification"] .deco-bell {
+      display: block;
+      top: 0%;
+      left: 50%;
+      margin-left: -14px;
+      font-size: 26px;
+      color: #ffcc00;
+      transform-origin: 50% 10%;
+      animation: bell-shake 0.4s ease-in-out infinite;
+    }
+    body[data-pet-state="notification"] .panda-face {
+      animation: idle-breath 1.2s ease-in-out infinite;
+    }
+
+    /* ── W2-T4：交互反应（poke 双击 / flail 4 击 / stats 长按） ─────────────── */
+    /* poke：0.3s 一次性轻摇摆 — !important 覆盖任何 state 动画 */
+    @keyframes poke-wiggle {
+      0%   { transform: rotateZ(0)    scale(1); }
+      25%  { transform: rotateZ(-12deg) scale(1.06); }
+      50%  { transform: rotateZ(12deg)  scale(1.06); }
+      75%  { transform: rotateZ(-6deg)  scale(1.04); }
+      100% { transform: rotateZ(0)    scale(1); }
+    }
+    body.reaction-poke .panda-face {
+      animation: poke-wiggle 0.3s ease-out !important;
+    }
+
+    /* flail：1.5s 剧烈摇摆 — !important 覆盖任何 state 动画 */
+    @keyframes flail-shake {
+      0%, 100% { transform: rotateZ(0)    translateY(0); }
+      10%      { transform: rotateZ(-22deg) translateY(-3px); }
+      25%      { transform: rotateZ(22deg)  translateY(2px); }
+      40%      { transform: rotateZ(-18deg) translateY(-2px); }
+      55%      { transform: rotateZ(18deg)  translateY(2px); }
+      70%      { transform: rotateZ(-12deg) translateY(-1px); }
+      85%      { transform: rotateZ(12deg)  translateY(1px); }
+    }
+    body.reaction-flail .panda-face {
+      animation: flail-shake 1.5s ease-in-out !important;
+    }
+
+    /* poke 心形 emoji 飘起 1s */
+    @keyframes heart-rise {
+      0%   { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+      20%  { opacity: 1; }
+      100% { transform: translate(-50%, -36px) scale(1.2); opacity: 0; }
+    }
+    .reaction-heart {
+      position: absolute;
+      top: 12%;
+      left: 50%;
+      font-size: 24px;
+      color: #ff3366;
+      pointer-events: none;
+      display: none;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+      transform: translate(-50%, 0);
+    }
+    body.reaction-poke .reaction-heart {
+      display: block;
+      animation: heart-rise 1s ease-out;
+    }
+
+    /* stats 卡片（长按 1s 显示）— 右下角小卡片 */
+    .stats-card {
+      position: absolute;
+      bottom: 4%;
+      right: 4%;
+      min-width: 76px;
+      padding: 6px 10px;
+      background: rgba(20, 20, 28, 0.88);
+      color: #f4f4f4;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      border: 1px solid rgba(255, 204, 0, 0.55);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+      display: none;
+      -webkit-app-region: no-drag;
+    }
+    .stats-card.visible { display: block; }
+    .stats-card .stats-line { white-space: nowrap; }
+    .stats-card .stats-rarity-N    { color: #cccccc; }
+    .stats-card .stats-rarity-R    { color: #66aaff; }
+    .stats-card .stats-rarity-SR   { color: #cc99ff; }
+    .stats-card .stats-rarity-SSR  { color: #ffcc00; }
+
+    /* badge：右上角红圆 + 数字（继承 P2-T4 BadgeUpdatePayload） */
+    .badge {
+      position: absolute;
+      top: 4%;
+      right: 4%;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      background: #ff2244;
+      color: #ffffff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      font-weight: bold;
+      line-height: 18px;
+      text-align: center;
+      border: 1.5px solid #ffffff;
+      border-radius: 9px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+      pointer-events: none;
+      display: none;
+      -webkit-app-region: no-drag;
+    }
+    .badge.visible { display: block; }
+
+    /* 交互捕获层：放在 #pet 之上，仅接收 pointer，但 -webkit-app-region: no-drag
+       与底层 drag 区共存 — drag CSS 优先（按下后不松开 ≥ threshold 走 drag 路径），
+       但 dblclick / 短按 / 长按由本层 JS 监听并 stopPropagation 防穿透。
+       why: 透明窗中 dblclick 必须命中实际 SVG 区，不能命中整个 200×200 透明 body。 */
+
+    /* ── W2-T2：等级 + XP 进度条 + 升级烟花动画 ────────────────────────────── */
+    /* 等级容器 — 头顶居中，默认隐藏，showLevel=true 时 display:flex */
+    #panda-level-container {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #panda-level-container[data-visible="1"] { display: flex; }
+    /* panda 升级时的跳跃 — translateY 0 → -20px → 0 共 3 次 */
+    @keyframes panda-levelup-jump {
+      0%, 100% { transform: translateY(0); }
+      16%      { transform: translateY(-20px); }
+      33%      { transform: translateY(0); }
+      49%      { transform: translateY(-20px); }
+      66%      { transform: translateY(0); }
+      82%      { transform: translateY(-20px); }
+    }
+    body.panda-levelup .panda-face {
+      animation: panda-levelup-jump 1.2s ease-in-out !important;
+    }
+    /* 烟花粒子径向 burst — 0 → 60px 远，淡出 */
+    @keyframes panda-firework-burst {
+      0% {
+        transform: rotate(var(--angle, 0deg)) translateY(0);
+        opacity: 1;
+      }
+      80% { opacity: 0.9; }
+      100% {
+        transform: rotate(var(--angle, 0deg)) translateY(-60px);
+        opacity: 0;
+      }
+    }
+    /* 中央 Level Up! 文本 — fadeIn 1.5s + fadeOut 1s 共 2.5s */
+    @keyframes panda-levelup-text {
+      0%   { opacity: 0; transform: translate(-50%,-50%) scale(0.6); }
+      30%  { opacity: 1; transform: translate(-50%,-50%) scale(1.1); }
+      60%  { opacity: 1; transform: translate(-50%,-60%) scale(1.0); }
+      100% { opacity: 0; transform: translate(-50%,-80%) scale(0.95); }
     }
   </style>
 </head>
-<body>
+<body data-pet-state="idle" data-species="default">
   <div id="pet">
-    <!-- 内嵌简笔 panda（圆头 + 黑耳 + 黑眼罩 + 鼻嘴）— 与 build/icons/panda.svg 同风格 -->
-    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="panda-face">
-      <!-- 黑耳（两侧） -->
-      <ellipse cx="55" cy="55" rx="22" ry="26" fill="#1a1a1a"/>
-      <ellipse cx="145" cy="55" rx="22" ry="26" fill="#1a1a1a"/>
-      <!-- 白头（圆形） -->
-      <circle cx="100" cy="105" r="65" fill="#f5f5f5" stroke="#222" stroke-width="3"/>
-      <!-- 黑眼罩（两侧椭圆） -->
-      <ellipse cx="75" cy="100" rx="16" ry="20" fill="#1a1a1a" transform="rotate(-15 75 100)"/>
-      <ellipse cx="125" cy="100" rx="16" ry="20" fill="#1a1a1a" transform="rotate(15 125 100)"/>
-      <!-- 白眼（黑眼罩内） -->
-      <circle cx="75" cy="100" r="5" fill="#fff"/>
-      <circle cx="125" cy="100" r="5" fill="#fff"/>
-      <!-- 瞳孔 -->
-      <circle cx="76" cy="101" r="2.5" fill="#000"/>
-      <circle cx="126" cy="101" r="2.5" fill="#000"/>
-      <!-- 鼻子 -->
-      <ellipse cx="100" cy="125" rx="6" ry="4" fill="#1a1a1a"/>
-      <!-- 嘴 -->
-      <path d="M100 130 Q92 140 85 136 M100 130 Q108 140 115 136" stroke="#1a1a1a" stroke-width="2" fill="none" stroke-linecap="round"/>
-    </svg>
+    <div class="panda-stage">
+      <!-- 装饰层（按 state 显形） -->
+      <span class="deco deco-question" aria-hidden="true">?</span>
+      <span class="deco deco-zzz" aria-hidden="true">Z</span>
+      <span class="deco deco-bell" aria-hidden="true">&#x1F514;</span>
+      <span class="deco deco-x-eye-l" aria-hidden="true">x</span>
+      <span class="deco deco-x-eye-r" aria-hidden="true">x</span>
+      <!-- W2-T4 交互反应层 -->
+      <span class="reaction-heart" aria-hidden="true">&#x2764;</span>
+      <!-- W2-T2 等级显示 + XP 进度条容器（默认 display:none；__pandaSetLevel 显形） -->
+      <div id="panda-level-container" data-visible="0" aria-hidden="true"></div>
+      <div id="badge" class="badge" aria-live="polite" aria-label="未读通知">0</div>
+      <div id="stats-card" class="stats-card" aria-hidden="true">
+        <div class="stats-line">Lv <span id="stats-lv">1</span></div>
+        <div class="stats-line">XP <span id="stats-xp">0</span></div>
+        <div class="stats-line stats-rarity-N" id="stats-rarity-line">[<span id="stats-rarity">N</span>]</div>
+      </div>
+
+      <!-- 精美 panda：渐变 + 高光 + 多层阴影 -->
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="panda-face" aria-label="panda companion">
+        <defs>
+          <!-- 黑耳/眼罩：暗到更暗的纵向渐变（立体感） -->
+          <linearGradient id="gradEar" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"  stop-color="#3a3a3a"/>
+            <stop offset="60%" stop-color="#1a1a1a"/>
+            <stop offset="100%" stop-color="#0a0a0a"/>
+          </linearGradient>
+          <linearGradient id="gradMask" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"  stop-color="#2a2a2a"/>
+            <stop offset="100%" stop-color="#0d0d0d"/>
+          </linearGradient>
+          <!-- 白头：从亮白到淡灰（立体球面感） -->
+          <radialGradient id="gradFace" cx="50%" cy="38%" r="62%">
+            <stop offset="0%"  stop-color="#ffffff"/>
+            <stop offset="70%" stop-color="#f4f4f4"/>
+            <stop offset="100%" stop-color="#d8d8d8"/>
+          </radialGradient>
+          <!-- 鼻子：深黑泛光 -->
+          <radialGradient id="gradNose" cx="40%" cy="35%" r="65%">
+            <stop offset="0%"  stop-color="#3a3a3a"/>
+            <stop offset="100%" stop-color="#0a0a0a"/>
+          </radialGradient>
+          <!-- 内嵌 drop-shadow filter（部件级） -->
+          <filter id="filtSoftShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="1.2"/>
+            <feOffset dx="0" dy="1.5" result="off"/>
+            <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
+            <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="filtFaceShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+            <feOffset dx="0" dy="3" result="off"/>
+            <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+            <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- 黑耳（左右）— 渐变 + 阴影 + 内层小耳 -->
+        <ellipse cx="55"  cy="55" rx="22" ry="26" fill="url(#gradEar)"  filter="url(#filtSoftShadow)"/>
+        <ellipse cx="145" cy="55" rx="22" ry="26" fill="url(#gradEar)"  filter="url(#filtSoftShadow)"/>
+        <ellipse cx="55"  cy="58" rx="11" ry="13" fill="#2a2a2a" opacity="0.85"/>
+        <ellipse cx="145" cy="58" rx="11" ry="13" fill="#2a2a2a" opacity="0.85"/>
+
+        <!-- 白头（圆形）— radial 渐变 + 描边 + 投影 -->
+        <circle cx="100" cy="105" r="65" fill="url(#gradFace)" stroke="#1a1a1a" stroke-width="2.5" filter="url(#filtFaceShadow)"/>
+        <!-- 顶部高光：白色椭圆 fill-opacity:0.4 模拟 3D 球面 -->
+        <ellipse cx="86" cy="68" rx="32" ry="14" fill="#ffffff" fill-opacity="0.4"/>
+        <ellipse cx="80" cy="62" rx="14" ry="6"  fill="#ffffff" fill-opacity="0.6"/>
+
+        <!-- 黑眼罩（两侧）— 渐变 + 倾斜 + 阴影 -->
+        <ellipse class="panda-eye-mask-l" cx="75"  cy="100" rx="16" ry="20" fill="url(#gradMask)" transform="rotate(-15 75 100)"  filter="url(#filtSoftShadow)"/>
+        <ellipse class="panda-eye-mask-r" cx="125" cy="100" rx="16" ry="20" fill="url(#gradMask)" transform="rotate(15 125 100)"  filter="url(#filtSoftShadow)"/>
+
+        <!-- 眼组（黑眼罩内的白底 + 瞳孔；眨眼整体 transform）-->
+        <g class="panda-eye-group">
+          <circle class="panda-eye-white-l" cx="75"  cy="100" r="5.5" fill="#ffffff"/>
+          <circle class="panda-eye-white-r" cx="125" cy="100" r="5.5" fill="#ffffff"/>
+          <circle class="panda-eye-pupil-l" cx="76"  cy="101" r="2.8" fill="#0a0a0a"/>
+          <circle class="panda-eye-pupil-r" cx="126" cy="101" r="2.8" fill="#0a0a0a"/>
+          <!-- 眼神高光 -->
+          <circle cx="77.5" cy="99" r="1" fill="#ffffff"/>
+          <circle cx="127.5" cy="99" r="1" fill="#ffffff"/>
+        </g>
+
+        <!-- 闭眼线（sleeping/error 时显形）— 默认 opacity 0 -->
+        <path class="panda-eye-closed-l" d="M 68 100 Q 75 104 82 100" stroke="#0a0a0a" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0"/>
+        <path class="panda-eye-closed-r" d="M 118 100 Q 125 104 132 100" stroke="#0a0a0a" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0"/>
+
+        <!-- 鼻子 -->
+        <ellipse cx="100" cy="125" rx="6.5" ry="4.5" fill="url(#gradNose)" filter="url(#filtSoftShadow)"/>
+        <ellipse cx="98"  cy="123.5" rx="1.4" ry="1.0" fill="#5a5a5a" opacity="0.9"/>
+        <!-- 嘴（W 形） -->
+        <path d="M100 130 L 100 135 M100 135 Q92 142 85 138 M100 135 Q108 142 115 138" stroke="#1a1a1a" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- 腮红 -->
+        <ellipse cx="62"  cy="122" rx="7" ry="3.5" fill="#ffc0c8" opacity="0.55"/>
+        <ellipse cx="138" cy="122" rx="7" ry="3.5" fill="#ffc0c8" opacity="0.55"/>
+      </svg>
+    </div>
   </div>
+
   <script>
-    // 未来若加按钮，需声明 -webkit-app-region: no-drag 以恢复点击
-    // P3-T5 18 物种切换 / IPC state-loader 接入：v0.5+ 再做
-    console.log('[panda-on-desk] hit window ready - panda visible');
+    // ── W1-T2：window.__pandaSetState / __pandaSetSpecies 接口（必须在 bridge 订阅前注入） ──
+    // 7 状态白名单（与 PetState 12 态高频子集对齐）；非法 state 静默忽略。
+    (function () {
+      var ALLOWED = ['idle','thinking','working','sleeping','error','attention','notification'];
+      window.__pandaSetState = function (state) {
+        if (typeof state !== 'string') return;
+        if (ALLOWED.indexOf(state) === -1) return;
+        if (document && document.body) {
+          document.body.dataset.petState = state;
+        }
+      };
+      // ── W2-T1：18 物种 SVG cache + setSpecies 实装 ───────────────────────────
+      // 18 物种白名单（与 src/desk/types.ts SPECIES_WHITELIST + src/buddy/types.ts SPECIES 同源）
+      var SPECIES_LIST = [
+        'duck','goose','blob','cat','dragon','octopus','owl','penguin','turtle',
+        'snail','ghost','axolotl','capybara','cactus','robot','rabbit','mushroom','chonk'
+      ];
+      // 物种 SVG cache：species → svgString | null（null = 加载中或失败）
+      var SPECIES_CACHE = window.__pandaSpeciesCache = window.__pandaSpeciesCache || Object.create(null);
+      // 保留 W1-T2 嵌入的简笔 panda 作为 'default' 物种基线（fallback）
+      var DEFAULT_SPECIES = 'default';
+      // 缓存初始内嵌 .panda-face SVG outerHTML（首次替换前抓取，作 default 还原源）
+      var DEFAULT_FACE_HTML = null;
+      function captureDefaultFace() {
+        if (DEFAULT_FACE_HTML !== null) return;
+        try {
+          var face = document.querySelector('.panda-face');
+          if (face) DEFAULT_FACE_HTML = face.outerHTML;
+        } catch (e) {}
+      }
+      // 异步并行 preload 18 物种 SVG → SPECIES_CACHE
+      // why fetch：renderer 进程 file:// 协议下 fetch 同源相对路径合法，preload 一次后切换零延迟
+      function preloadSpeciesSvgs() {
+        for (var i = 0; i < SPECIES_LIST.length; i++) {
+          (function (sp) {
+            if (SPECIES_CACHE[sp] !== undefined) return; // 已缓存
+            try {
+              var url = '../../themes/panda/sprites/' + sp + '.svg';
+              fetch(url).then(function (r) {
+                if (!r || !r.ok) { SPECIES_CACHE[sp] = null; return; }
+                return r.text();
+              }).then(function (text) {
+                if (typeof text === 'string' && text.indexOf('<svg') !== -1) {
+                  SPECIES_CACHE[sp] = text;
+                } else if (text !== undefined) {
+                  SPECIES_CACHE[sp] = null;
+                }
+              }).catch(function () { SPECIES_CACHE[sp] = null; });
+            } catch (e) { SPECIES_CACHE[sp] = null; }
+          })(SPECIES_LIST[i]);
+        }
+      }
+      // 把 SVG 字符串解析后插入 .panda-stage，替换旧 .panda-face 节点；保留 class 标记（CSS 动画/state 钩子）
+      function applySvgString(svgString, speciesName) {
+        try {
+          var stage = document.querySelector('.panda-stage');
+          if (!stage) return false;
+          var oldFace = stage.querySelector('.panda-face');
+          // 用 DOMParser 解析（避免 innerHTML 把 <svg> 当 HTMLElement）
+          var doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
+          var newSvg = doc && doc.documentElement;
+          if (!newSvg || newSvg.nodeName.toLowerCase() !== 'svg') return false;
+          // 标记 class=panda-face 复用 W1-T2 + W2-T2 + W2-T4 既有 CSS 钩子（呼吸/眨眼/levelup-jump 等）
+          newSvg.setAttribute('class', 'panda-face');
+          newSvg.setAttribute('data-species', speciesName);
+          if (oldFace) {
+            oldFace.parentNode.replaceChild(document.importNode(newSvg, true), oldFace);
+          } else {
+            stage.appendChild(document.importNode(newSvg, true));
+          }
+          return true;
+        } catch (e) {
+          try { console.warn('[panda-on-desk] applySvgString failed:', e && e.message); } catch (_) {}
+          return false;
+        }
+      }
+      window.__pandaSetSpecies = function (species) {
+        if (typeof species !== 'string' || species.length === 0) return;
+        captureDefaultFace();
+        // 未知 species 或 'default' → 还原内嵌简笔
+        var isKnown = SPECIES_LIST.indexOf(species) !== -1;
+        var target = isKnown ? species : DEFAULT_SPECIES;
+        if (!document || !document.body) return;
+        var prev = document.body.dataset.species || DEFAULT_SPECIES;
+        document.body.dataset.species = target;
+        if (target === DEFAULT_SPECIES) {
+          // 还原 W1-T2 内嵌简笔（仅当当前不是 default 时才换 DOM，避免无谓重建）
+          if (prev !== DEFAULT_SPECIES && DEFAULT_FACE_HTML) {
+            applySvgString(DEFAULT_FACE_HTML, DEFAULT_SPECIES);
+          }
+          return;
+        }
+        // 17 真实物种：cache 命中走 swap，否则按需 fetch（可能是 preload 还没回来）
+        var cached = SPECIES_CACHE[target];
+        if (typeof cached === 'string' && cached.length > 0) {
+          applySvgString(cached, target);
+          return;
+        }
+        // cache miss：现场 fetch；失败则回退 default
+        try {
+          var url = '../../themes/panda/sprites/' + target + '.svg';
+          fetch(url).then(function (r) {
+            if (!r || !r.ok) throw new Error('http ' + (r && r.status));
+            return r.text();
+          }).then(function (text) {
+            if (typeof text === 'string' && text.indexOf('<svg') !== -1) {
+              SPECIES_CACHE[target] = text;
+              if (document.body.dataset.species === target) {
+                applySvgString(text, target);
+              }
+            }
+          }).catch(function () {
+            // 失败：回退 default 简笔
+            if (document.body.dataset.species === target && DEFAULT_FACE_HTML) {
+              document.body.dataset.species = DEFAULT_SPECIES;
+              applySvgString(DEFAULT_FACE_HTML, DEFAULT_SPECIES);
+            }
+          });
+        } catch (e) { /* swallow */ }
+      };
+      // 启动时立即触发 preload（不阻塞渲染）
+      try { captureDefaultFace(); preloadSpeciesSvgs(); } catch (e) {}
+      console.log('[panda-on-desk] hit window ready - panda visible (W1-T2 art + W2-T1 species)');
+
+      // 若 W1-T4 bridge 在 __pandaSetState 注入前已收到 pet-state，回放一次
+      try {
+        if (window.__pandaPendingState) {
+          window.__pandaSetState(window.__pandaPendingState);
+          window.__pandaPendingState = null;
+        }
+      } catch (e) {}
+      // 若 bridge 在 __pandaSetSpecies 注入前已收到 species 事件，回放一次
+      try {
+        if (window.__pandaPendingSpecies) {
+          window.__pandaSetSpecies(window.__pandaPendingSpecies);
+          window.__pandaPendingSpecies = null;
+        }
+      } catch (e) {}
+    })();
+
+    // ── W2-T4：交互反应接口（双击 poke / 4 击 flail / 长按 stats）+ badge ─────
+    // 设计：
+    //   1. window.__pandaPoke()       — 添加 body.reaction-poke 0.3s 后清除（CSS 触发摇摆 + heart）
+    //   2. window.__pandaFlail()      — 添加 body.reaction-flail 1.5s + 触发 sound critical（如有 hitAPI）
+    //   3. window.__pandaShowStats()  — 显示 stats-card 2.5s 后自动隐藏（可传 ms 覆盖）
+    //   4. window.__pandaSetBadge(n)  — 更新右上角 badge 数字（0 自动隐藏，>99 显示 99+）
+    //   5. window.__pandaSetStats({lv, xp, rarity}) — 注入 stats 数据（rarity ∈ {N,R,SR,SSR}）
+    //   pointer 监听：dblclick → poke；500ms 内 4 次 pointerdown → flail；按住 1000ms → stats
+    //   不与 drag 冲突：drag 由 CSS -webkit-app-region: drag 处理；pointer/dblclick 监听只是计数 + 计时，
+    //   不调 preventDefault / stopPropagation，Electron 默认 drag 行为继续生效。
+    (function () {
+      function applyReactionClass(cls, ms) {
+        if (!document || !document.body) return;
+        document.body.classList.remove('reaction-poke', 'reaction-flail');
+        // 强制 reflow 重新触发动画（移除/添加同帧 CSS 不会重启）
+        // eslint-disable-next-line no-void
+        void document.body.offsetWidth;
+        document.body.classList.add(cls);
+        setTimeout(function () {
+          if (document && document.body) document.body.classList.remove(cls);
+        }, ms);
+      }
+
+      window.__pandaPoke = function () {
+        applyReactionClass('reaction-poke', 320); // 0.3s + 20ms 缓冲
+      };
+
+      window.__pandaFlail = function () {
+        applyReactionClass('reaction-flail', 1520); // 1.5s + 20ms 缓冲
+        try {
+          if (window.hitAPI && typeof window.hitAPI.playClickReaction === 'function') {
+            window.hitAPI.playClickReaction('critical', 1500);
+          }
+        } catch (e) {}
+      };
+
+      var _statsHideTimer = null;
+      window.__pandaShowStats = function (autoHideMs) {
+        var card = document.getElementById('stats-card');
+        if (!card) return;
+        card.classList.add('visible');
+        if (_statsHideTimer !== null) {
+          clearTimeout(_statsHideTimer);
+          _statsHideTimer = null;
+        }
+        var ms = (typeof autoHideMs === 'number' && autoHideMs > 0) ? autoHideMs : 2500;
+        _statsHideTimer = setTimeout(function () {
+          if (card) card.classList.remove('visible');
+          _statsHideTimer = null;
+        }, ms);
+      };
+
+      var ALLOWED_RARITY_W2T4 = { N: 1, R: 1, SR: 1, SSR: 1 };
+      window.__pandaSetStats = function (stats) {
+        if (!stats || typeof stats !== 'object') return;
+        var lvEl = document.getElementById('stats-lv');
+        var xpEl = document.getElementById('stats-xp');
+        var rarityEl = document.getElementById('stats-rarity');
+        var rarityLine = document.getElementById('stats-rarity-line');
+        if (lvEl && (typeof stats.lv === 'number' || typeof stats.lv === 'string')) {
+          lvEl.textContent = String(stats.lv);
+        }
+        if (xpEl && (typeof stats.xp === 'number' || typeof stats.xp === 'string')) {
+          xpEl.textContent = String(stats.xp);
+        }
+        if (rarityEl && rarityLine && typeof stats.rarity === 'string' && ALLOWED_RARITY_W2T4[stats.rarity]) {
+          rarityEl.textContent = stats.rarity;
+          rarityLine.classList.remove('stats-rarity-N','stats-rarity-R','stats-rarity-SR','stats-rarity-SSR');
+          rarityLine.classList.add('stats-rarity-' + stats.rarity);
+        }
+      };
+
+      window.__pandaSetBadge = function (count) {
+        var el = document.getElementById('badge');
+        if (!el) return;
+        var n = (typeof count === 'number' && isFinite(count)) ? Math.max(0, Math.floor(count)) : 0;
+        if (n <= 0) {
+          el.classList.remove('visible');
+          el.textContent = '0';
+          return;
+        }
+        el.textContent = n > 99 ? '99+' : String(n);
+        el.classList.add('visible');
+      };
+
+      // pointer：4 击窗口 500ms；长按 1000ms；右键不触发
+      var QUAD_WINDOW_MS = 500;
+      var LONG_PRESS_MS = 1000;
+      var clickStamps = [];
+      var longPressTimer = null;
+
+      function onPointerDownW2T4(e) {
+        if (typeof e.button === 'number' && e.button !== 0) return;
+        var now = Date.now();
+        clickStamps.push(now);
+        clickStamps = clickStamps.filter(function (t) { return now - t <= QUAD_WINDOW_MS; });
+        if (clickStamps.length >= 4) {
+          clickStamps = [];
+          try { window.__pandaFlail(); } catch (err) {}
+        }
+        if (longPressTimer !== null) clearTimeout(longPressTimer);
+        longPressTimer = setTimeout(function () {
+          longPressTimer = null;
+          try { window.__pandaShowStats(); } catch (err) {}
+        }, LONG_PRESS_MS);
+      }
+      function cancelLongPressW2T4() {
+        if (longPressTimer !== null) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
+      function onDblClickW2T4() {
+        try { window.__pandaPoke(); } catch (err) {}
+      }
+
+      try {
+        window.addEventListener('pointerdown', onPointerDownW2T4);
+        window.addEventListener('pointerup', cancelLongPressW2T4);
+        window.addEventListener('pointercancel', cancelLongPressW2T4);
+        window.addEventListener('pointerleave', cancelLongPressW2T4);
+        window.addEventListener('dblclick', onDblClickW2T4);
+      } catch (e) {
+        console.warn('[panda-on-desk:hit] interaction listeners failed:', e && e.message);
+      }
+
+      // badge:update IPC 订阅（preload 注入 window.pandaBadge.onUpdate）
+      try {
+        if (window.pandaBadge && typeof window.pandaBadge.onUpdate === 'function') {
+          window.pandaBadge.onUpdate(function (payload) {
+            if (!payload || typeof payload !== 'object') return;
+            var total = (typeof payload.total === 'number') ? payload.total : 0;
+            try { window.__pandaSetBadge(total); } catch (err) {}
+          });
+        }
+      } catch (e) {
+        console.warn('[panda-on-desk:hit] badge subscribe failed:', e && e.message);
+      }
+    })();
+
+    // ── W1-T4：bridge 事件订阅 → window.__pandaSetState 切 UI ──────────────────
+    // 来源：main 进程 forwardBridgeEventToRenderer 通过 'panda-event' 通道转发；
+    // preload/hit.ts 暴露 window.panda.onEvent(handler)。
+    // 不改 UI 结构（W1-T2 已在上方完成）；仅在 __pandaSetState 已注入时调用，否则静默缓存。
+    (function () {
+      try {
+        if (typeof window === 'undefined' || !window.panda || typeof window.panda.onEvent !== 'function') {
+          // preload 未生效（开发态 file:// 直开 / 未通过 Electron）— 静默退出
+          return;
+        }
+        window.panda.onEvent(function (evt) {
+          if (!evt || typeof evt !== 'object' || typeof evt.type !== 'string') return;
+          // pet-state 事件 → 切宠物形象
+          if (evt.type === 'pet-state' && typeof evt.state === 'string') {
+            try {
+              if (typeof window.__pandaSetState === 'function') {
+                window.__pandaSetState(evt.state);
+              } else {
+                // 注入前缓存 — 注入后会自动回放
+                if (!window.__pandaPendingState) window.__pandaPendingState = evt.state;
+                console.debug('[panda-on-desk:hit] pet-state pending (W1-T2 __pandaSetState not yet injected):', evt.state);
+              }
+            } catch (e) {
+              console.warn('[panda-on-desk:hit] __pandaSetState threw:', e && e.message);
+            }
+            return;
+          }
+          // W2-T1：species 事件 → swap 物种 SVG
+          if (evt.type === 'species' && typeof evt.species === 'string') {
+            try {
+              if (typeof window.__pandaSetSpecies === 'function') {
+                window.__pandaSetSpecies(evt.species);
+              } else {
+                if (!window.__pandaPendingSpecies) window.__pandaPendingSpecies = evt.species;
+                console.debug('[panda-on-desk:hit] species pending (W2-T1 __pandaSetSpecies not yet injected):', evt.species);
+              }
+            } catch (e) {
+              console.warn('[panda-on-desk:hit] __pandaSetSpecies threw:', e && e.message);
+            }
+            return;
+          }
+          // W2-T2：xp-gained → 更新 XP 进度条 + 等级颜色（不抛错）
+          if (evt.type === 'xp-gained') {
+            try {
+              if (typeof window.__pandaSetXP === 'function') {
+                // pctToNext 由 panda CLI 推送，desk 不再算
+                window.__pandaSetXP(evt.totalXp || 0, 0, evt.pctToNext || 0);
+              }
+              if (typeof evt.level === 'number' && typeof window.__pandaSetLevel === 'function' &&
+                  typeof evt.rarity === 'string') {
+                window.__pandaSetLevel(evt.level, evt.rarity);
+              }
+            } catch (e) {
+              console.warn('[panda-on-desk:hit] xp-gained handler threw:', e && e.message);
+            }
+            return;
+          }
+          // W2-T2：level-up → 触发烟花 + Level Up! 文本
+          if (evt.type === 'level-up' && typeof evt.fromLevel === 'number' && typeof evt.toLevel === 'number') {
+            try {
+              if (typeof window.__pandaTriggerLevelUp === 'function') {
+                window.__pandaTriggerLevelUp(evt.fromLevel, evt.toLevel);
+              }
+            } catch (e) {
+              console.warn('[panda-on-desk:hit] level-up handler threw:', e && e.message);
+            }
+            return;
+          }
+          // notification / badge / 其它事件 — 当前 hit 窗口仅接 pet-state + species + xp/level-up；
+          // overlay / system notification 由 main 进程 dispatchEvent 路由到独立窗口。
+        });
+      } catch (e) {
+        console.warn('[panda-on-desk:hit] bridge event subscribe failed:', e && e.message);
+      }
+    })();
+
+    // ── W2-T2：__pandaSetLevel / __pandaSetXP / __pandaTriggerLevelUp 接口 ─────
+    // algo 与 packages/panda-on-desk/src/renderer/levelup-fx.ts 1:1 同源；
+    // 0 deps，纯 DOM 操作；非法参数静默吞，不阻塞主路径。
+    (function () {
+      // 5 档 rarity → hex 颜色（与 levelup-fx.ts RARITY_HEX 同步；
+      // src/buddy/types.ts RARITY_COLORS 是终端 ANSI key，desk 端无法直用）
+      var RARITY_HEX = {
+        common:    '#9aa0a6',
+        uncommon:  '#22c55e',
+        rare:      '#3b82f6',
+        epic:      '#a855f7',
+        legendary: '#f59e0b'
+      };
+      var ALLOWED_RARITY = ['common','uncommon','rare','epic','legendary'];
+      var FIREWORK_PARTICLE_COUNT = 12;
+      // 当前 level / rarity / xp 缓存（多次 setLevel/setXP 增量更新用）
+      var _state = { level: 1, rarity: 'common', current: 0, total: 0, pct: 0, visible: false };
+
+      function clampPct(p) {
+        if (typeof p !== 'number' || !isFinite(p)) return 0;
+        if (p < 0) return 0;
+        if (p > 100) return 100;
+        return Math.floor(p);
+      }
+      function normalizeRarity(r) {
+        return ALLOWED_RARITY.indexOf(r) === -1 ? 'common' : r;
+      }
+      function renderBadge(level, rarity) {
+        var lv = (typeof level === 'number' && level > 0) ? Math.floor(level) : 1;
+        var color = RARITY_HEX[rarity] || RARITY_HEX.common;
+        return '<span class="panda-level-badge" data-level="' + lv +
+               '" data-rarity="' + rarity + '" ' +
+               'style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;' +
+               'font-size:11px;font-weight:bold;color:' + color + ';' +
+               'text-shadow:0 1px 2px rgba(0,0,0,0.6);letter-spacing:0.5px;">' +
+               'Lv ' + lv + '</span>';
+      }
+      function renderBar(current, total, pct, rarity) {
+        var color = RARITY_HEX[rarity] || RARITY_HEX.common;
+        var cur = (typeof current === 'number' && current >= 0) ? Math.floor(current) : 0;
+        var tot = (typeof total === 'number' && total > 0) ? Math.floor(total) : 0;
+        return '<div class="panda-xp-bar" data-current="' + cur +
+               '" data-total="' + tot + '" data-pct="' + pct + '" ' +
+               'style="width:60px;height:5px;border-radius:3px;background:rgba(255,255,255,0.18);' +
+               'overflow:hidden;margin-top:2px;">' +
+               '<div class="panda-xp-fill" style="width:' + pct + '%;height:100%;background:' + color + ';' +
+               'border-radius:3px;transition:width 350ms ease-out;"></div>' +
+               '</div>';
+      }
+      function repaintLevel() {
+        var host = document.getElementById('panda-level-container');
+        if (!host) return;
+        host.innerHTML = renderBadge(_state.level, _state.rarity) +
+                         renderBar(_state.current, _state.total, _state.pct, _state.rarity);
+        host.dataset.visible = _state.visible ? '1' : '0';
+      }
+
+      window.__pandaSetLevel = function (level, rarity) {
+        if (typeof level !== 'number' || !isFinite(level) || level <= 0) return;
+        _state.level = Math.floor(level);
+        _state.rarity = normalizeRarity(rarity);
+        _state.visible = true;
+        repaintLevel();
+      };
+      window.__pandaSetXP = function (current, total, pctToNext) {
+        _state.current = (typeof current === 'number' && current >= 0) ? Math.floor(current) : 0;
+        _state.total = (typeof total === 'number' && total > 0) ? Math.floor(total) : 0;
+        _state.pct = clampPct(pctToNext);
+        repaintLevel();
+      };
+      // 外部 toggle visibility（IPC companionShowLevel false → 隐藏）
+      window.__pandaSetLevelVisible = function (visible) {
+        _state.visible = !!visible;
+        var host = document.getElementById('panda-level-container');
+        if (host) host.dataset.visible = _state.visible ? '1' : '0';
+      };
+      window.__pandaTriggerLevelUp = function (fromLevel, toLevel) {
+        var fl = (typeof fromLevel === 'number' && fromLevel > 0) ? Math.floor(fromLevel) : 1;
+        var tl = (typeof toLevel === 'number' && toLevel > 0) ? Math.floor(toLevel) : (fl + 1);
+        // 1) panda 跳跃 — body class 触发 keyframes（1.2s）
+        if (document.body) {
+          document.body.classList.add('panda-levelup');
+          setTimeout(function () {
+            if (document.body) document.body.classList.remove('panda-levelup');
+          }, 1300);
+        }
+        // 2) 烟花容器注入 panda-stage
+        var stage = document.querySelector('.panda-stage');
+        if (!stage) return;
+        var container = document.createElement('div');
+        container.className = 'panda-firework-container';
+        container.setAttribute('data-from', String(fl));
+        container.setAttribute('data-to', String(tl));
+        container.style.cssText =
+          'position:absolute;top:50%;left:50%;width:1px;height:1px;pointer-events:none;z-index:25;';
+        var color = RARITY_HEX[_state.rarity] || RARITY_HEX.legendary;
+        // 12 个粒子径向放射
+        var html = '';
+        for (var i = 0; i < FIREWORK_PARTICLE_COUNT; i++) {
+          var angle = (360 / FIREWORK_PARTICLE_COUNT) * i;
+          html += '<div class="panda-firework-particle" data-index="' + i +
+                  '" data-angle="' + angle + '" ' +
+                  'style="position:absolute;top:50%;left:50%;width:6px;height:6px;' +
+                  'margin:-3px 0 0 -3px;border-radius:50%;background:' + color + ';' +
+                  'box-shadow:0 0 4px ' + color + ',0 0 8px rgba(255,255,255,0.5);' +
+                  'pointer-events:none;--angle:' + angle + 'deg;' +
+                  'transform:rotate(' + angle + 'deg) translateY(0);' +
+                  'animation:panda-firework-burst 1.2s ease-out forwards;"></div>';
+        }
+        // 中央 Level Up! 文本（2.5s 自动淡出）
+        html += '<div class="panda-levelup-text" data-from="' + fl + '" data-to="' + tl + '" ' +
+                'style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);' +
+                'font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;' +
+                'font-size:14px;font-weight:bold;color:' + color + ';' +
+                'text-shadow:0 0 6px rgba(255,255,255,0.7),0 1px 2px rgba(0,0,0,0.7);' +
+                'pointer-events:none;z-index:30;' +
+                'animation:panda-levelup-text 2.5s ease-out forwards;">' +
+                'Level Up! ' + fl + ' \u2192 ' + tl + '</div>';
+        container.innerHTML = html;
+        stage.appendChild(container);
+        // 动画结束后清理（2.7s 余量）
+        setTimeout(function () {
+          if (container && container.parentNode) container.parentNode.removeChild(container);
+        }, 2700);
+        // 升级时也临时强显等级容器（即使 visibility=0）
+        if (!_state.visible) {
+          var host = document.getElementById('panda-level-container');
+          if (host) {
+            host.dataset.visible = '1';
+            setTimeout(function () {
+              if (host && !_state.visible) host.dataset.visible = '0';
+            }, 2700);
+          }
+        }
+        _state.level = tl;
+        repaintLevel();
+      };
+    })();
+
+    // ── W2-T2：sound:play IPC 监听（继承 P2-T4 player）──────────────────────
+    // main 进程 setSoundRendererNotifier(sendToHitWin) 后，hit 窗经 'sound:play' 通道收 base64 dataURL；
+    // 用 invisible <audio> 播放；play() 失败静默（autoplay 政策）。
+    (function () {
+      try {
+        if (!window.pandaSound || typeof window.pandaSound.onPlay !== 'function') {
+          // preload 未暴露 — 静默退出（与 W1-T4 模式一致）
+          return;
+        }
+        var audioEl = null;
+        window.pandaSound.onPlay(function (payload) {
+          if (!payload || typeof payload.src !== 'string') return;
+          try {
+            if (!audioEl) {
+              audioEl = document.createElement('audio');
+              audioEl.style.display = 'none';
+              document.body.appendChild(audioEl);
+            }
+            audioEl.src = payload.src;
+            var p = audioEl.play();
+            if (p && typeof p.catch === 'function') p.catch(function () {});
+          } catch (e) {
+            console.warn('[panda-on-desk:hit] sound:play failed:', e && e.message);
+          }
+        });
+      } catch (e) {
+        console.warn('[panda-on-desk:hit] sound:play subscribe failed:', e && e.message);
+      }
+    })();
   </script>
 </body>
 </html>

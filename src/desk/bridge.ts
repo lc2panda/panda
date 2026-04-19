@@ -7,6 +7,8 @@
 //
 // [NEW-FILE:#20260419-P1-05]
 // 2026-04-19 +08:00 P2-T1 扩展：6 helpers (push/bumpBadge/resetBadge/enableDrag/disableDrag/setDnd)
+// 2026-04-19 +08:00 W1-T4 扩展：pushPetStateChange + throttle 500ms（实测端到端 IPC）
+// 2026-04-19 +08:00 W2-T2 扩展：pushLevelUp / pushXpUpdate / pushLevelChange — 升级烟花动画 IPC
 
 import { feature } from 'bun:bundle'
 import { existsSync, readFileSync } from 'node:fs'
@@ -19,13 +21,19 @@ import {
   type BadgeEvent,
   type DndEvent,
   type DragTargetEvent,
+  type LevelUpEvent,
   type NotificationEvent,
   type OnDeskEvent,
   type PermissionRequestEvent,
+  type PetState,
+  type PetStateChangeEvent,
   type ReverseMessage,
   type RuntimeJson,
   RUNTIME_FILE_NAME,
   SECRET_HEADER,
+  type Species,
+  type SpeciesChangeEvent,
+  type XPGainedEvent,
 } from './types.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -338,6 +346,339 @@ export function setDnd(
   opts: { reason?: DndEvent['reason']; endsAt?: number } = {},
 ): void {
   void pushEventToOnDesk(buildDndEvent(enabled, opts))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 公共 API — 2.6 W1-T4 PetState change 推送（带 throttle 500ms）
+// 决策：throttle 而非 debounce —— state 变化语义是"立刻同步桌面端"，
+// 但同 state 在 500ms 窗口内的重复发送应被合并以避免 hook tick 刷屏。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 构造 PetStateChangeEvent — 纯函数便于单测 */
+export function buildPetStateChangeEvent(
+  state: PetState,
+  sessionId: string,
+  forcedUntilMs?: number,
+): PetStateChangeEvent {
+  return {
+    type: 'pet-state',
+    state,
+    sessionId,
+    ts: Date.now(),
+    ...(forcedUntilMs !== undefined ? { forcedUntilMs } : {}),
+  }
+}
+
+/** Throttle 窗口（ms）— hook tick 500ms / 渲染节拍 500ms 同源 */
+export const PET_STATE_THROTTLE_MS = 500
+
+interface PetStateThrottleState {
+  /** 上一次实发的 state（去重 + 节流判定） */
+  lastSentState: PetState | null
+  /** 上一次实发时间戳 */
+  lastSentAtMs: number
+  /** 节流窗口内挂起的最新 state（窗口结束时落地） */
+  pendingState: PetState | null
+  /** 挂起的 sessionId / forcedUntilMs */
+  pendingSessionId: string | null
+  pendingForcedUntilMs: number | undefined
+  /** 待触发的 setTimeout 句柄 */
+  pendingTimer: ReturnType<typeof setTimeout> | null
+}
+
+const _petStateThrottle: PetStateThrottleState = {
+  lastSentState: null,
+  lastSentAtMs: 0,
+  pendingState: null,
+  pendingSessionId: null,
+  pendingForcedUntilMs: undefined,
+  pendingTimer: null,
+}
+
+export function __resetPetStateThrottleForTesting(): void {
+  if (_petStateThrottle.pendingTimer !== null) {
+    clearTimeout(_petStateThrottle.pendingTimer)
+  }
+  _petStateThrottle.lastSentState = null
+  _petStateThrottle.lastSentAtMs = 0
+  _petStateThrottle.pendingState = null
+  _petStateThrottle.pendingSessionId = null
+  _petStateThrottle.pendingForcedUntilMs = undefined
+  _petStateThrottle.pendingTimer = null
+}
+
+/**
+ * 内部：纯节流+去重核心（与 feature gate 解耦），便于单元测试。
+ *
+ * 不直接调用 isOnDeskEnabled —— 上层 pushPetStateChange 负责 gate；
+ * 测试可注入自定义 emitter 验证 throttle/dedup 行为，无需 mock feature() 。
+ *
+ * @param state         当前 PetState
+ * @param sessionId     会话 id
+ * @param forcedUntilMs 可选 forced TTL
+ * @param emit          事件实发回调（测试可断言调用次数 / 顺序）
+ * @param nowMs         当前时间戳（默认 Date.now；测试可注入控制时间）
+ */
+export function __pushPetStateThrottledCore(
+  state: PetState,
+  sessionId: string,
+  forcedUntilMs: number | undefined,
+  emit: (event: PetStateChangeEvent) => void,
+  nowMs: number = Date.now(),
+): void {
+  // 去重：与上一次实发 state 完全相同则吞
+  if (
+    _petStateThrottle.lastSentState === state &&
+    _petStateThrottle.lastSentAtMs > 0
+  ) {
+    return
+  }
+
+  const elapsed = nowMs - _petStateThrottle.lastSentAtMs
+  if (elapsed >= PET_STATE_THROTTLE_MS || _petStateThrottle.lastSentAtMs === 0) {
+    // 立即发送
+    _petStateThrottle.lastSentState = state
+    _petStateThrottle.lastSentAtMs = nowMs
+    emit(buildPetStateChangeEvent(state, sessionId, forcedUntilMs))
+    return
+  }
+
+  // 节流窗口内：挂起 pending（覆盖之前 pending 取最新）
+  _petStateThrottle.pendingState = state
+  _petStateThrottle.pendingSessionId = sessionId
+  _petStateThrottle.pendingForcedUntilMs = forcedUntilMs
+  if (_petStateThrottle.pendingTimer === null) {
+    const wait = PET_STATE_THROTTLE_MS - elapsed
+    _petStateThrottle.pendingTimer = setTimeout(() => {
+      _petStateThrottle.pendingTimer = null
+      const ps = _petStateThrottle.pendingState
+      const sid = _petStateThrottle.pendingSessionId
+      const fmu = _petStateThrottle.pendingForcedUntilMs
+      _petStateThrottle.pendingState = null
+      _petStateThrottle.pendingSessionId = null
+      _petStateThrottle.pendingForcedUntilMs = undefined
+      if (ps === null || sid === null) return
+      // 二次去重：pending 与 lastSent 相同则不发
+      if (_petStateThrottle.lastSentState === ps) return
+      _petStateThrottle.lastSentState = ps
+      _petStateThrottle.lastSentAtMs = Date.now()
+      emit(buildPetStateChangeEvent(ps, sid, fmu))
+    }, Math.max(0, wait))
+  }
+}
+
+/**
+ * 推送 PetState 变化给 panda-on-desk —— 节流 500ms 防刷屏。
+ *
+ * 行为：
+ *   1. 同 state 重复推送 → 直接吞（去重）
+ *   2. 距上次推送 ≥ 500ms → 立即发送
+ *   3. 距上次推送 < 500ms → 挂起 pending；窗口结束时发送最后一次 pending（取最新值）
+ *
+ * 静默路径：feature 关 / config 关 / runtime.json 不存在 / on-desk 离线 / 鉴权失败。
+ *
+ * @param state 当前 PetState（12 态之一）
+ * @param sessionId panda CLI 会话 id（用于多终端聚合）
+ * @param forcedUntilMs 可选，对应 PetStateChangeEvent.forcedUntilMs
+ */
+export function pushPetStateChange(
+  state: PetState,
+  sessionId: string,
+  forcedUntilMs?: number,
+): void {
+  // why: feature gate 提前短路；isOnDeskEnabled 已含 feature('BUDDY')
+  if (!isOnDeskEnabled()) return
+  __pushPetStateThrottledCore(state, sessionId, forcedUntilMs, ev => {
+    void pushEventToOnDesk(ev)
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 公共 API — 2.7 W2-T1 物种切换推送（去重；无节流 — 用户主动 /buddy theme 频次低）
+// 设计：与 PetStateChangeEvent throttle 同结构，但仅用 dedup（不用 timer pending），
+//       避免引入第二个 setInterval 句柄；物种切换属于"主动事件"，应即时落地。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 18 物种白名单 — 与 src/buddy/types.ts SPECIES 同源（types.ts Species union 守护字面量） */
+export const SPECIES_WHITELIST: readonly Species[] = [
+  'duck', 'goose', 'blob', 'cat', 'dragon', 'octopus', 'owl',
+  'penguin', 'turtle', 'snail', 'ghost', 'axolotl', 'capybara',
+  'cactus', 'robot', 'rabbit', 'mushroom', 'chonk',
+] as const
+
+/** 构造 SpeciesChangeEvent — 纯函数便于单测 */
+export function buildSpeciesChangeEvent(
+  species: Species,
+  sessionId: string,
+): SpeciesChangeEvent {
+  return {
+    type: 'species',
+    species,
+    sessionId,
+    ts: Date.now(),
+  }
+}
+
+/** 上一次实发 species（去重） */
+let _lastSentSpecies: Species | null = null
+
+export function __resetSpeciesDedupForTesting(): void {
+  _lastSentSpecies = null
+}
+
+/**
+ * 内部：去重核心（与 feature gate 解耦），便于单元测试。
+ *
+ * @param species 目标物种
+ * @param sessionId 会话 id
+ * @param emit 实发回调（测试可断言调用次数 / 顺序）
+ */
+export function __pushSpeciesChangeCore(
+  species: Species,
+  sessionId: string,
+  emit: (event: SpeciesChangeEvent) => void,
+): void {
+  if (_lastSentSpecies === species) return
+  _lastSentSpecies = species
+  emit(buildSpeciesChangeEvent(species, sessionId))
+}
+
+/**
+ * 推送物种切换给 panda-on-desk —— /buddy theme <species> 跑后调用。
+ *
+ * 行为：
+ *   1. 同 species 重复推送 → 直接吞（去重）
+ *   2. 物种白名单外 → 直接返回（参数校验）
+ *
+ * 静默路径：feature 关 / config 关 / runtime.json 不存在 / on-desk 离线 / 鉴权失败。
+ *
+ * @param species 18 物种之一
+ * @param sessionId panda CLI 会话 id（用于多终端聚合）
+ */
+export function pushSpeciesChange(species: Species, sessionId: string): void {
+  // why: 参数校验提前 — 防 string 类型断言溜号注入未知 species
+  if (!SPECIES_WHITELIST.includes(species)) return
+  if (!isOnDeskEnabled()) return
+  __pushSpeciesChangeCore(species, sessionId, ev => {
+    void pushEventToOnDesk(ev)
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 公共 API — 2.8 W2-T2 升级动画 / XP 进度推送
+// 决策：3 个 helper 都是 fire-and-forget；不做 throttle / dedup —
+// pushLevelUp 一次性事件天然不会刷屏；pushXpUpdate 由调用方控周期（默认 30s）。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 构造 LevelUpEvent — 纯函数便于单测 */
+export function buildLevelUpEvent(
+  fromLevel: number,
+  toLevel: number,
+  unlocks?: LevelUpEvent['unlocks'],
+): LevelUpEvent {
+  return {
+    type: 'level-up',
+    fromLevel,
+    toLevel,
+    ts: Date.now(),
+    ...(unlocks !== undefined ? { unlocks } : {}),
+  }
+}
+
+/** 构造 XPGainedEvent — 纯函数便于单测 */
+export function buildXpGainedEvent(opts: {
+  delta: number
+  bucket: string
+  totalXp: number
+  level: number
+  /** 可选：到下一级百分比（0-100），desk 端直接用，不再算 */
+  pctToNext?: number
+  /** 可选：当前 effective rarity，desk 端 levelup-fx 用其上色 */
+  rarity?: string
+}): XPGainedEvent {
+  // why: pctToNext / rarity 走 XPGainedEvent 的扩展字段（desk 端按 (any) 读）；
+  // schema 字段保持向后兼容（旧 desk 端忽略未知 key）
+  return {
+    type: 'xp-gained',
+    delta: opts.delta,
+    bucket: opts.bucket,
+    totalXp: opts.totalXp,
+    level: opts.level,
+    ts: Date.now(),
+    ...(opts.pctToNext !== undefined ? { pctToNext: opts.pctToNext } : {}),
+    ...(opts.rarity !== undefined ? { rarity: opts.rarity } : {}),
+  } as XPGainedEvent
+}
+
+/**
+ * 推送等级跳变给 panda-on-desk — 升级烟花动画触发器。
+ *
+ * 静默路径：feature 关 / config 关 / runtime.json 不存在 / on-desk 离线 / 鉴权失败。
+ *
+ * @param fromLevel 升级前等级
+ * @param toLevel   升级后等级
+ * @param unlocks   可选解锁列表（state/hat/eye/rarity 摘要）
+ */
+export function pushLevelUp(
+  fromLevel: number,
+  toLevel: number,
+  unlocks?: LevelUpEvent['unlocks'],
+): void {
+  if (!isOnDeskEnabled()) return
+  if (!Number.isFinite(fromLevel) || !Number.isFinite(toLevel)) return
+  if (toLevel <= fromLevel) return // 防御：非升级不发
+  void pushEventToOnDesk(buildLevelUpEvent(fromLevel, toLevel, unlocks))
+}
+
+/**
+ * 推送 XP 进度更新给 panda-on-desk — desk 端用 pctToNext 直接更新进度条。
+ *
+ * 调用方负责节流（推荐 30s 周期；详 src/buddy/petXP.ts startXpPeriodicPush）。
+ *
+ * @param opts.delta     最近一次入账增量（可 0，表示纯进度刷新）
+ * @param opts.bucket    XP 桶来源；纯进度刷新可填 'streak.daily' / 'time' 等
+ * @param opts.totalXp   累计 XP 总量
+ * @param opts.level     当前等级
+ * @param opts.pctToNext 到下一级百分比（0-100）
+ * @param opts.rarity    当前 effective rarity（'common'..'legendary'）
+ */
+export function pushXpUpdate(opts: {
+  delta: number
+  bucket: string
+  totalXp: number
+  level: number
+  pctToNext?: number
+  rarity?: string
+}): void {
+  if (!isOnDeskEnabled()) return
+  void pushEventToOnDesk(buildXpGainedEvent(opts))
+}
+
+/**
+ * 推送等级变更（不含烟花）— 仅刷新 desk 端等级徽章颜色 / 数字。
+ *
+ * 与 pushLevelUp 的区别：本 helper 用于"加载完成首屏推送当前等级"；
+ * pushLevelUp 用于跨阈值跳变（触发烟花动画）。
+ *
+ * 实现复用 pushXpUpdate（XPGainedEvent 携带 level + rarity 即可让 desk 刷徽章），
+ * delta=0 表示纯刷新；bucket 占位 'streak.daily'。
+ */
+export function pushLevelChange(
+  level: number,
+  rarity: string,
+  totalXp: number = 0,
+  pctToNext: number = 0,
+): void {
+  if (!isOnDeskEnabled()) return
+  if (!Number.isFinite(level) || level <= 0) return
+  pushXpUpdate({
+    delta: 0,
+    bucket: 'streak.daily',
+    totalXp,
+    level,
+    pctToNext,
+    rarity,
+  })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

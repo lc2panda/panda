@@ -181,17 +181,37 @@ function buildOneSpecies(species) {
     buildStateGroup(state, frames),
   ).join('\n')
 
+  // [W1-T2-ART 20260419] 渐变 + drop-shadow filter — 所有物种 SVG 共享 defs，让 ASCII 体也"立体"。
+  // 不动 <text>/<tspan> 排布；仅在容器层注入 <defs> + 顶层 <g filter="url(#spriteShadow)">
+  const defs = [
+    `  <defs>`,
+    `    <linearGradient id="spriteAccent" x1="0%" y1="0%" x2="0%" y2="100%">`,
+    `      <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.95"/>`,
+    `      <stop offset="100%" stop-color="#cfcfff" stop-opacity="0.7"/>`,
+    `    </linearGradient>`,
+    `    <filter id="spriteShadow" x="-15%" y="-15%" width="130%" height="130%">`,
+    `      <feGaussianBlur in="SourceAlpha" stdDeviation="1.4"/>`,
+    `      <feOffset dx="0" dy="2" result="off"/>`,
+    `      <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>`,
+    `      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>`,
+    `    </filter>`,
+    `  </defs>`,
+  ].join('\n')
+
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<!--`,
     `  Input: themes/panda/sprites/${species}.ascii (${frames.length} frames, programmatically embedded)`,
-    `  Output: panda 物种 ${species} SVG sprite — 12 PetState groups (visibility 切换)`,
+    `  Output: panda 物种 ${species} SVG sprite — 12 PetState groups (visibility 切换) + 渐变 + drop-shadow`,
     `  Pos: panda-on-desk Phase 3 P3-T5 美术资产 — 由 scripts/build-sprites.cjs 程序化生成`,
-    `       不要手改本文件 — 重跑脚本会覆盖。改动 ASCII 数据源后重新生成。`,
+    `       [W1-T2-ART 20260419] linearGradient + filter(drop-shadow) 注入 — 不要手改本文件，重跑脚本会覆盖。`,
     `-->`,
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SVG_VIEWBOX_W} ${SVG_VIEWBOX_H}" width="${SVG_VIEWBOX_W}" height="${SVG_VIEWBOX_H}" data-species="${species}" data-frames="${frames.length}">`,
+    defs,
     `  <rect width="${SVG_VIEWBOX_W}" height="${SVG_VIEWBOX_H}" fill="transparent"/>`,
+    `  <g filter="url(#spriteShadow)">`,
     groups,
+    `  </g>`,
     `</svg>`,
     ``,
   ].join('\n')

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Input: 无
 // Output: 向 ~/.pandacc/settings.json 补齐 16 项 PANDA_* 默认 env + 3 项顶层 settings 默认（幂等，不覆盖）
+//         + 检测 packages/panda-on-desk 子包 deps，如未装则打印友好提示（不强制安装）
 // Pos: npm postinstall 钩子，用户 npm/pnpm/yarn 安装 @lc2panda/panda-code 时自动执行
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 //
@@ -147,8 +148,66 @@ function main() {
   }
 }
 
+// 检测 panda-on-desk 子包 deps 是否安装，未装则打印友好提示（不强制装）
+function maybeHintDeskDeps() {
+  if (process.env.PANDA_SKIP_DESK_HINT === '1') {
+    return
+  }
+  try {
+    // postinstall-init.cjs 位置: <pkg>/scripts/postinstall-init.cjs
+    // 子包: <pkg>/packages/panda-on-desk
+    const pkgRoot = path.resolve(__dirname, '..')
+    const deskPkgDir = path.join(pkgRoot, 'packages', 'panda-on-desk')
+    const deskPkgJson = path.join(deskPkgDir, 'package.json')
+    if (!fs.existsSync(deskPkgJson)) {
+      // 子包未随 tarball 分发（极旧版本），静默退出
+      return
+    }
+    // electron 是桌面端必需依赖；通过 require.resolve 检测
+    let electronInstalled = false
+    try {
+      // 优先在子包目录解析（用户自行 cd && npm install）
+      require.resolve('electron', { paths: [deskPkgDir] })
+      electronInstalled = true
+    } catch (_e) {
+      // 兜底：根 node_modules（npm 顶层提升场景）
+      try {
+        require.resolve('electron', { paths: [pkgRoot] })
+        electronInstalled = true
+      } catch (_e2) {
+        electronInstalled = false
+      }
+    }
+    if (electronInstalled) {
+      return
+    }
+    // eslint-disable-next-line no-console
+    console.log('')
+    // eslint-disable-next-line no-console
+    console.log('[Panda] 桌面宠物可选 — 未检测到 electron')
+    // eslint-disable-next-line no-console
+    console.log(
+      '[Panda]   启用方式: cd ' +
+        deskPkgDir +
+        ' && npm install electron@41',
+    )
+    // eslint-disable-next-line no-console
+    console.log(
+      '[Panda]   (CLI 仍可独立运行；缺 electron 时桌面端会静默降级)',
+    )
+  } catch (_e) {
+    // 任何意外都不阻塞 npm install
+  }
+}
+
 try {
   main()
+} catch (_e) {
+  // 绝不让 postinstall 失败阻塞 npm install
+}
+
+try {
+  maybeHintDeskDeps()
 } catch (_e) {
   // 绝不让 postinstall 失败阻塞 npm install
 }

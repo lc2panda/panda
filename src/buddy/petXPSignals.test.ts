@@ -55,7 +55,10 @@ afterEach(() => {
   }
 })
 
-const T0 = Date.UTC(2026, 3, 19, 8, 0, 0)
+// why dynamic T0: 以"真实今天 SG 时区"为基准，避免硬编码日期撞到真实跨日触发
+// applyDailyRollover 用 Date.now() 比较 lastSeenDay；若 T0 与真实当日不一致，
+// 任意 addXP 都会被认作跨日 → 自动 +50 streak XP 污染所有断言（修自 12 fail）
+const T0 = Date.now()
 
 function seedFresh(now: number = T0) {
   __resetCacheForTesting(createDefaultStats(now))

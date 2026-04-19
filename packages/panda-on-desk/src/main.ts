@@ -117,6 +117,19 @@ const permissionMod = _safeRequire<any>('./permission', null)
 const miniMod = _safeRequire<any>('./mini', null)
 const updateBubbleMod = _safeRequire<any>('./update-bubble', null)
 
+// W1-T4：bridge IPC server（P2-T1 已实装协议，W1-T4 在 main 进程实际拉起）
+// why _safeRequire: 子包 build 顺序 / 缺失依赖时不应阻挡 4 BrowserWindow 启动；
+//   IPC bridge 失败时 panda-on-desk 仍可作为纯桌面宠物运行（panda CLI 推送将静默 ECONNREFUSED）。
+const bridgeServerMod = _safeRequire<{
+  startBridgeServer?: (opts: any) => Promise<{ port: number; secret: string; broadcast: (msg: any) => void; close: () => Promise<void> }>
+}>('./bridge/server', {})
+
+// W2-T4：badge 角标 manager — 把 hit 窗 sendToHitWin 注入为 renderer notifier
+// 失败容错：badge module 缺失时不阻挡主路径（仅没有红圆 badge）。
+const badgeManagerMod = _safeRequire<{
+  setBadgeRendererNotifier?: (fn: ((channel: string, payload: any) => void) | null) => void
+}>('./badge/manager', {})
+
 // platform/win-window：Windows koffi user32 FFI 提权（P1-T7 fork）
 // 上游 main.js L37-46 的 AllowSetForegroundWindow 直接 inline；此处提取到 platform/win-window.ts。
 // TODO[P1-T7]: 替换为 import { allowSetForegroundWindow } from './platform/win-window'
@@ -387,6 +400,8 @@ let _server: any = null
 let _perm: any = null
 let _updateBubble: any = null
 let _updater: any = null
+// W1-T4：bridge IPC server handle（startBridgeServer 成功后填入；before-quit 清理）
+let _bridgeHandle: { port: number; secret: string; broadcast: (msg: any) => void; close: () => Promise<void> } | null = null
 
 // hwnd recovery / topmost watchdog（Windows） ─────────────────────────────────
 let hwndRecoveryTimer: any = null
@@ -449,6 +464,17 @@ function sendToRenderer(channel: string, ...args: any[]) {
 function sendToHitWin(channel: string, ...args: any[]) {
   if (hitWin && !hitWin.isDestroyed() && hitWin.webContents && !hitWin.webContents.isDestroyed()) {
     hitWin.webContents.send(channel, ...args)
+  }
+}
+// W1-T4：bridge POST /event → 转发给 hitWin renderer（preload 暴露 panda.onEvent，
+// hit.html 内 handler 调 window.__pandaSetState 切 UI）。同时也广播给主 win 以兼容未来扩展。
+function forwardBridgeEventToRenderer(event: any) {
+  try {
+    sendToHitWin('panda-event', event)
+    sendToRenderer('panda-event', event)
+  } catch (err) {
+    // 静默：renderer 未就绪时不应阻塞 bridge ack
+    console.warn('[panda-on-desk] forwardBridgeEventToRenderer failed:', (err as Error)?.message)
   }
 }
 function syncRendererStateAfterLoad() {
@@ -1124,6 +1150,41 @@ if (!gotTheLock) {
         getActiveTheme: () => activeTheme,
       })
     }
+
+    // ── W2-T4：注入 badge renderer notifier — manager 内 publishSnapshot 时推 'badge:update' 给 hitWin ──
+    // 失败容错：缺失 manager 不阻挡主路径，仅退化为无 badge 显示。
+    if (badgeManagerMod && typeof badgeManagerMod.setBadgeRendererNotifier === 'function') {
+      try {
+        badgeManagerMod.setBadgeRendererNotifier((channel, payload) => sendToHitWin(channel, payload))
+        console.log('[panda-on-desk] badge renderer notifier wired (channel: badge:update)')
+      } catch (err) {
+        console.warn('[panda-on-desk] setBadgeRendererNotifier failed:', (err as Error)?.message)
+      }
+    }
+
+    // ── W1-T4：拉起 bridge IPC server（panda CLI ↔ panda-on-desk 单向桥 + SSE 反向） ──
+    // 端口 1455+ 自动探测；secret 32 字节随机；落盘 ~/.pandacc/runtime.json。
+    // 失败容错：bridge 拉起失败不影响 4 BrowserWindow 主路径，只是 panda CLI 推送会 ECONNREFUSED 静默吞。
+    if (bridgeServerMod && typeof bridgeServerMod.startBridgeServer === 'function') {
+      try {
+        const appVersion = (() => {
+          try { return app.getVersion() } catch { return undefined }
+        })()
+        const startPromise = bridgeServerMod.startBridgeServer({
+          // bridge 收到 /event → 转发给 hitWin renderer 触发 UI
+          onEvent: (event: any) => forwardBridgeEventToRenderer(event),
+          appVersion,
+        })
+        startPromise.then(handle => {
+          _bridgeHandle = handle
+          console.log(`[panda-on-desk] bridge IPC server listening on 127.0.0.1:${handle.port}`)
+        }).catch((err: Error) => {
+          console.warn('[panda-on-desk] bridge IPC server start failed:', err && err.message)
+        })
+      } catch (err) {
+        console.warn('[panda-on-desk] startBridgeServer threw synchronously:', (err as Error)?.message)
+      }
+    }
   })
 
   app.on('before-quit', () => {
@@ -1140,6 +1201,13 @@ if (!gotTheLock) {
     if (hwndRecoveryTimer) { clearTimeout(hwndRecoveryTimer); hwndRecoveryTimer = null }
     if (_focus && typeof _focus.cleanup === 'function') _focus.cleanup()
     if (hitWin && !hitWin.isDestroyed()) hitWin.destroy()
+    // W1-T4：bridge IPC server 关闭 + runtime.json 清理（防 panda CLI 持续连旧端口）
+    if (_bridgeHandle && typeof _bridgeHandle.close === 'function') {
+      try { _bridgeHandle.close() } catch (err) {
+        console.warn('[panda-on-desk] bridge close failed:', (err as Error)?.message)
+      }
+      _bridgeHandle = null
+    }
   })
 
   app.on('window-all-closed', () => {

@@ -910,6 +910,18 @@ async function run(): Promise<CommanderCommand> {
     await init();
     profileCheckpoint('preAction_after_init');
 
+    // W1-T1 panda-on-desk 桌面端自动拉起 — npm 安装 panda 后启动即启动桌面宠物。
+    // 4 重 gate（任一不满足即静默 return）：feature('BUDDY') + companionOnDesk +
+    // isTTY + --no-desk；spawn 子进程 detached + unref，失败完全静默。
+    // dynamic import：launcher 模块加载失败也不能阻塞 panda CLI 主流程。
+    try {
+      const { maybeSpawnOnDesk } = await import('./desk/launcher.js');
+      maybeSpawnOnDesk();
+    } catch {
+      // 静默 — 桌面端可选体验
+    }
+    profileCheckpoint('preAction_after_desk_spawn');
+
     // P0-3 审计日志滚动：启动时清一次 30 天前的条目（幂等，失败静默）。
     try {
       const { rotateAuditLog } = await import('./utils/auditLog.js');
