@@ -90,16 +90,19 @@ function migrateFromClaude() {
 export const init = memoize(async (): Promise<void> => {
   migrateFromClaude()
   installHello2ccHooks()
-  // Panda: 自动补齐 17 项 PANDA_* 默认 env 到 ~/.pandacc/settings.json。
+  // Panda: 自动补齐 16 项 PANDA_* 默认 env + 3 项顶层 settings 默认到
+  // ~/.pandacc/settings.json（v2.21.5 移除 PANDA_CONFIG_DIR，故为 16 而非 17）。
   // 必须在 enableConfigs() 之前 — 否则 settings 已被读入缓存，env 合并无法生效。
   // 写入后 enableConfigs() 会从磁盘重新读取并 merge 到 process.env。
   // 任何失败静默 skip，绝不阻塞启动。
   try {
     const initResult = initDefaultPandaccSettings({ silent: true })
-    if (initResult.newlyAddedKeys.length > 0) {
+    const envCount = initResult.newlyAddedKeys.length
+    const topCount = initResult.newlyAddedTopLevelKeys.length
+    if (envCount > 0 || topCount > 0) {
       // eslint-disable-next-line no-console
       console.error(
-        `[Panda] 初始化 ${initResult.newlyAddedKeys.length} 项默认 env 到 settings.json（首次安装自动补齐）`,
+        `[Panda] 初始化 ${envCount} 项默认 env + ${topCount} 项顶层 settings 到 settings.json（首次安装自动补齐）`,
       )
     }
   } catch {

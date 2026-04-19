@@ -1,0 +1,114 @@
+{
+  "$schema": "https://pandacc.io/schemas/connectors.json",
+  "version": "1.0.0",
+  "feishu": {
+    "enabled": false,
+    "mode": "mcp",
+    "appId": "cli_YOUR_FEISHU_APP_ID_HERE",
+    "appSecret": "keychain:pandacc/feishu/app_secret",
+    "mcpCommand": "npx",
+    "mcpArgs": ["@anthropic-ai/mcp", "feishu-mcp"],
+    "permissions": [
+      "messages.read",
+      "messages.send",
+      "calendar.read",
+      "documents.read",
+      "contacts.read",
+      "tasks.read",
+      "approvals.read",
+      "unread.summary"
+    ],
+    "rateLimitPerMinute": 60,
+    "cacheTtlSeconds": 60
+  },
+  "dingtalk": {
+    "enabled": false,
+    "mode": "mcp",
+    "appId": "YOUR_DINGTALK_APP_KEY_HERE",
+    "appSecret": "keychain:pandacc/dingtalk/app_secret",
+    "mcpCommand": "npx",
+    "mcpArgs": ["@anthropic-ai/mcp", "dingtalk-mcp"],
+    "extra": {
+      "mcpProfiles": "calendar,department,tasks,notice"
+    },
+    "permissions": [
+      "messages.read",
+      "messages.send",
+      "calendar.read",
+      "contacts.read",
+      "tasks.read",
+      "unread.summary"
+    ],
+    "rateLimitPerMinute": 60,
+    "cacheTtlSeconds": 60
+  },
+  "slack": {
+    "enabled": false,
+    "mode": "api",
+    "token": "keychain:pandacc/slack/bot_token",
+    "permissions": [
+      "messages.read",
+      "messages.send",
+      "unread.summary"
+    ],
+    "rateLimitPerMinute": 50,
+    "cacheTtlSeconds": 60
+  },
+  "telegram": {
+    "enabled": false,
+    "mode": "api",
+    "botToken": "keychain:pandacc/telegram/bot_token",
+    "permissions": [
+      "messages.read",
+      "messages.send",
+      "unread.summary"
+    ],
+    "rateLimitPerMinute": 30,
+    "cacheTtlSeconds": 60
+  },
+  "wechat": {
+    "enabled": false,
+    "mode": "local-db",
+    "extra": {
+      "keysFile": "/ABSOLUTE/PATH/TO/wechat_keys.json"
+    },
+    "corpId": "",
+    "agentId": "",
+    "appSecret": "keychain:pandacc/wecom/secret",
+    "permissions": [
+      "messages.read",
+      "contacts.read",
+      "unread.summary"
+    ],
+    "rateLimitPerMinute": 30,
+    "cacheTtlSeconds": 120
+  },
+  "teams": {
+    "enabled": false,
+    "mode": "api",
+    "extra": {
+      "tenantId": "YOUR_AZURE_AD_TENANT_ID_HERE",
+      "clientId": "YOUR_AZURE_AD_CLIENT_ID_HERE"
+    },
+    "appSecret": "keychain:pandacc/teams/client_secret",
+    "permissions": [
+      "messages.read",
+      "messages.send",
+      "calendar.read",
+      "unread.summary"
+    ],
+    "rateLimitPerMinute": 60,
+    "cacheTtlSeconds": 60
+  },
+  "aggregator": {
+    "deduplication": true,
+    "deduplicationWindowMs": 60000,
+    "cacheGlobalTtlSeconds": 30,
+    "maxMessagesPerQuery": 200,
+    "privacy": {
+      "filterPatterns": ["password", "secret", "token", "sk-"],
+      "excludeChannels": [],
+      "excludeSenders": []
+    }
+  }
+}

@@ -4,7 +4,7 @@ const persona = {
   type: 'local',
   name: 'persona',
   description: 'Switch persona mode · 切换人格模式',
-  argumentHint: '[work|companion|study|creative|butler]',
+  argumentHint: '[work|companion|study|creative|butler|auto|off]',
   supportsNonInteractive: false,
   load: () => import('./persona.js'),
 } satisfies Command

@@ -16,6 +16,7 @@ import { join } from 'path'
 import {
   initDefaultPandaccSettings,
   PANDA_DEFAULTS,
+  SETTINGS_DEFAULTS,
 } from './initPandaccSettings.js'
 
 describe('initDefaultPandaccSettings', () => {
@@ -44,13 +45,16 @@ describe('initDefaultPandaccSettings', () => {
     }
   })
 
-  test('settings.json 不存在 → 创建并写入全部 16 项', () => {
+  test('settings.json 不存在 → 创建并写入全部 16 项 env + 顶层 SETTINGS_DEFAULTS', () => {
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
     expect(result.newlyAddedKeys.length).toBe(
       Object.keys(PANDA_DEFAULTS).length,
     )
     expect(result.newlyAddedKeys.length).toBe(16)
+    expect(result.newlyAddedTopLevelKeys.length).toBe(
+      Object.keys(SETTINGS_DEFAULTS).length,
+    )
 
     const path = join(tmpRoot, 'settings.json')
     expect(existsSync(path)).toBe(true)
@@ -60,12 +64,21 @@ describe('initDefaultPandaccSettings', () => {
         PANDA_DEFAULTS[key as keyof typeof PANDA_DEFAULTS],
       )
     }
+    // 顶层默认值 — 全部按 SETTINGS_DEFAULTS 写入
+    for (const [key, val] of Object.entries(SETTINGS_DEFAULTS)) {
+      expect(written[key]).toEqual(val)
+    }
+    // 关键保守默认显式断言
+    expect(written.enableModelRouting).toBe(false)
+    expect(written.autoMemoryEnabled).toBe(true)
+    expect(written.outputCompression).toEqual({ enabled: true })
   })
 
-  test('已有全部 key → 幂等（no write，newlyAddedKeys 为空）', () => {
+  test('已有全部 key（含顶层）→ 幂等（no write，newlyAddedKeys 为空）', () => {
     const path = join(tmpRoot, 'settings.json')
     const preset = {
       env: { ...PANDA_DEFAULTS, PANDA_FORCE_CACHE_STRATEGY: 'implicit' },
+      ...SETTINGS_DEFAULTS,
     }
     writeFileSync(path, JSON.stringify(preset, null, 2), 'utf-8')
     const mtimeBefore = readFileSync(path, 'utf-8')
@@ -73,12 +86,58 @@ describe('initDefaultPandaccSettings', () => {
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
     expect(result.newlyAddedKeys).toEqual([])
+    expect(result.newlyAddedTopLevelKeys).toEqual([])
 
     const mtimeAfter = readFileSync(path, 'utf-8')
     expect(mtimeAfter).toBe(mtimeBefore)
     // 用户自定义的 implicit 不被强制改成 explicit
     const parsed = JSON.parse(mtimeAfter)
     expect(parsed.env.PANDA_FORCE_CACHE_STRATEGY).toBe('implicit')
+  })
+
+  test('用户已显式开启 enableModelRouting=true → 不被覆盖回 false', () => {
+    const path = join(tmpRoot, 'settings.json')
+    const preset = {
+      env: { ...PANDA_DEFAULTS },
+      enableModelRouting: true, // 用户显式开启
+      autoMemoryEnabled: false, // 用户显式关闭
+      outputCompression: { enabled: false, level: 'aggressive' },
+    }
+    writeFileSync(path, JSON.stringify(preset, null, 2), 'utf-8')
+
+    const result = initDefaultPandaccSettings({ silent: true })
+    expect(result.skipped).toBe(false)
+    expect(result.newlyAddedKeys).toEqual([])
+    expect(result.newlyAddedTopLevelKeys).toEqual([])
+
+    const written = JSON.parse(readFileSync(path, 'utf-8'))
+    expect(written.enableModelRouting).toBe(true)
+    expect(written.autoMemoryEnabled).toBe(false)
+    expect(written.outputCompression).toEqual({
+      enabled: false,
+      level: 'aggressive',
+    })
+  })
+
+  test('部分顶层缺失 → 只补缺失项，不动已有顶层字段', () => {
+    const path = join(tmpRoot, 'settings.json')
+    const preset = {
+      env: { ...PANDA_DEFAULTS },
+      autoMemoryEnabled: false, // 用户已设
+      // enableModelRouting / outputCompression 缺失 → 应被补默认
+    }
+    writeFileSync(path, JSON.stringify(preset, null, 2), 'utf-8')
+
+    const result = initDefaultPandaccSettings({ silent: true })
+    expect(result.skipped).toBe(false)
+    expect(result.newlyAddedTopLevelKeys.sort()).toEqual(
+      ['enableModelRouting', 'outputCompression'].sort(),
+    )
+
+    const written = JSON.parse(readFileSync(path, 'utf-8'))
+    expect(written.autoMemoryEnabled).toBe(false) // 用户值保留
+    expect(written.enableModelRouting).toBe(false) // 默认补齐
+    expect(written.outputCompression).toEqual({ enabled: true })
   })
 
   test('部分缺失 → 只补缺失项，不动已有', () => {
@@ -142,15 +201,19 @@ describe('initDefaultPandaccSettings', () => {
     expect(readFileSync(path, 'utf-8')).toBe(arr)
   })
 
-  test('空 settings.json 文件 → 当作 {} 处理并补齐全部', () => {
+  test('空 settings.json 文件 → 当作 {} 处理并补齐全部 env + 顶层', () => {
     const path = join(tmpRoot, 'settings.json')
     writeFileSync(path, '', 'utf-8')
 
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
     expect(result.newlyAddedKeys.length).toBe(16)
+    expect(result.newlyAddedTopLevelKeys.length).toBe(
+      Object.keys(SETTINGS_DEFAULTS).length,
+    )
     const written = JSON.parse(readFileSync(path, 'utf-8'))
     expect(written.env.PANDA_THEME).toBe('matrix')
+    expect(written.enableModelRouting).toBe(false)
   })
 
   test('跨平台路径 — PANDA_CONFIG_DIR 不存在时创建目录递归', () => {

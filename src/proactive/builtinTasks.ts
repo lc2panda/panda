@@ -169,11 +169,9 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
       // dry-run only — just log classification suggestions
       try {
         const { organizeDirectory } = await import('../memdir/memdir.js')
-        const homedir = require('os').homedir()
-        const suggestions = organizeDirectory(
-          require('path').join(homedir, 'Downloads'),
-          true,
-        )
+        // why: 走 platform.DOWNLOADS 跨平台抽象（Win OneDrive 重定向场景能正确解析）
+        const { DOWNLOADS } = await import('./platform.js')
+        const suggestions = organizeDirectory(DOWNLOADS, true)
         logForDebugging(
           `[builtinTasks] file-organizer: ${suggestions.length} files could be organized`,
         )
@@ -216,16 +214,33 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     enabled: true,
     condition: () => true, // Always run — cron already gates timing
     action: async () => {
+      // why: 跨平台 build——Windows cmd.exe 不识别 `2>&1 || true` 复合语法；
+      // 且 MEMORY 规则要求 build 前先 rm -rf dist 避免 stale chunk。
+      // 改为 fs.rmSync + spawnSync 数组形式，绕开 shell 解析。
       logForDebugging('[builtinTasks] code-health: running build check')
       try {
-        const { execSync } = require('child_process')
-        const output = execSync('bun run build 2>&1 || true', {
+        const { rmSync } = require('fs') as typeof import('fs')
+        const { spawnSync } = require('child_process') as typeof import('child_process')
+        const { join } = require('path') as typeof import('path')
+        const distPath = join(process.cwd(), 'dist')
+        // 1) 清理 dist（跨平台，幂等）
+        try {
+          rmSync(distPath, { recursive: true, force: true })
+        } catch {}
+        // 2) 调用 bun run build（数组参数 + shell:false 避免任何 shell 解析差异）
+        const isWin = process.platform === 'win32'
+        const result = spawnSync(isWin ? 'bun.exe' : 'bun', ['run', 'build'], {
           encoding: 'utf-8',
-          timeout: 60000,
+          timeout: 120000,
+          shell: false,
+          cwd: process.cwd(),
         })
-        const hasError = /error/i.test(output) && !/0 errors/i.test(output)
+        const output = `${result.stdout || ''}\n${result.stderr || ''}`
+        const hasError =
+          result.status !== 0 ||
+          (/error/i.test(output) && !/0 errors/i.test(output))
         logForDebugging(
-          `[builtinTasks] code-health: build ${hasError ? 'FAILED' : 'OK'}`,
+          `[builtinTasks] code-health: build ${hasError ? 'FAILED' : 'OK'} (exit=${result.status})`,
         )
         if (hasError) {
           const { setWorkingMemory } = await import(
@@ -391,7 +406,9 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
     cron: '*/30 * * * *', // 每 30 分钟扫描一次
     priority: 'critical',
     enabled: true,
-    condition: () => true, // 始终启用，不依赖 proactive 模式
+    // why: 日历事件源 readCalendarEvents 依赖 macOS osascript，非 darwin 平台直接跳过
+    // 整个任务（避免 cron 触发后 evtTime 永远 null 静默 no-op）。
+    condition: () => process.platform === 'darwin',
     action: async () => {
       logForDebugging(
         '[builtinTasks] calendar-reminder: scanning upcoming events',
@@ -408,7 +425,10 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           try {
             evtTime = new Date(evt.startDate).getTime()
           } catch {
-            // AppleScript 返回的日期格式可能不标准，尝试其他解析
+            evtTime = null
+          }
+          // why: macOS-only 任务，原 date -j 兜底仅在 darwin 生效
+          if ((!evtTime || isNaN(evtTime)) && process.platform === 'darwin') {
             try {
               const { execSync } = require('child_process')
               const parsed = execSync(
@@ -597,12 +617,38 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
         }
       } catch {}
       // 读取 TODO
+      // why: grep -r 在 Windows PowerShell 不可用；改 Node fs 递归 + 正则跨平台
       try {
-        const todoOut = execSync(
-          'grep -r "TODO\\|FIXME" . --include="*.ts" --include="*.tsx" -l 2>/dev/null | head -5',
-          { encoding: 'utf-8', timeout: 5000, cwd: process.cwd() },
-        ).trim()
-        if (todoOut) parts.push(`## 待办文件\n${todoOut}`)
+        const { readdirSync: rd, readFileSync: rf, statSync: st } = require('fs') as typeof import('fs')
+        const { join: jn } = require('path') as typeof import('path')
+        const HEAD_LIMIT = 5
+        const SKIP_DIRS = new Set([
+          'node_modules', '.git', 'dist', 'build', '.next',
+          'coverage', '.cache', '.turbo',
+        ])
+        const matches: string[] = []
+        const walk = (dir: string, depth: number): void => {
+          if (matches.length >= HEAD_LIMIT || depth > 6) return
+          let entries: import('fs').Dirent[] = []
+          try { entries = rd(dir, { withFileTypes: true }) } catch { return }
+          for (const e of entries) {
+            if (matches.length >= HEAD_LIMIT) return
+            const full = jn(dir, e.name)
+            if (e.isDirectory()) {
+              if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue
+              walk(full, depth + 1)
+            } else if (e.isFile() && (/\.tsx?$/.test(e.name))) {
+              try {
+                const sz = st(full).size
+                if (sz > 1_000_000) continue
+                const txt = rf(full, 'utf-8') as string
+                if (/TODO|FIXME/.test(txt)) matches.push(full)
+              } catch {}
+            }
+          }
+        }
+        walk(process.cwd(), 0)
+        if (matches.length > 0) parts.push(`## 待办文件\n${matches.join('\n')}`)
       } catch {}
 
       if (parts.length > 0) {

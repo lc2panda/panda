@@ -229,10 +229,16 @@ const ciFailureAlert: SmartCronTask = {
   condition: () => isScenarioEnabled('ci-failure-alert'),
   skipIf: () => {
     // 没有安装 gh CLI 则跳过
+    // why: Windows 没有 which，需走 where；统一用 spawnSync 数组形式避免 shell 解析差异
     try {
-      const { execSync } = require('child_process')
-      execSync('which gh', { encoding: 'utf-8', timeout: 3000 })
-      return false
+      const { spawnSync } = require('child_process') as typeof import('child_process')
+      const isWin = process.platform === 'win32'
+      const probe = spawnSync(isWin ? 'where' : 'which', ['gh'], {
+        encoding: 'utf-8',
+        timeout: 3000,
+        shell: false,
+      })
+      return probe.status !== 0
     } catch {
       return true
     }

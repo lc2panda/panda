@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Input: 无
-// Output: 向 ~/.pandacc/settings.json 补齐 16 项 PANDA_* 默认 env（幂等，不覆盖）
+// Output: 向 ~/.pandacc/settings.json 补齐 16 项 PANDA_* 默认 env + 3 项顶层 settings 默认（幂等，不覆盖）
 // Pos: npm postinstall 钩子，用户 npm/pnpm/yarn 安装 @lc2panda/panda-code 时自动执行
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 //
@@ -16,8 +16,8 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-// 与 src/utils/initPandaccSettings.ts 的 PANDA_DEFAULTS 保持一致。
-// 任何修改同步两边（rg "PANDA_DEFAULTS" 审查）。
+// 与 src/utils/initPandaccSettings.ts 的 PANDA_DEFAULTS / SETTINGS_DEFAULTS 保持一致。
+// 任何修改同步两边（rg "PANDA_DEFAULTS" / rg "SETTINGS_DEFAULTS" 审查）。
 const PANDA_DEFAULTS = {
   PANDA_SECURITY_RESEARCH: '1',
   PANDA_HIDE_CONTEXT_WARNING: '1',
@@ -35,6 +35,13 @@ const PANDA_DEFAULTS = {
   PANDA_CACHE_TEXT_MIN_SIZE: '1500',
   PANDA_FORCE_CACHE_STRATEGY: 'explicit',
   PANDA_SKILL_LEARNING_TEST: '1',
+}
+
+// 顶层 settings 默认（保守 — 首启不强行启用任何高级功能）
+const SETTINGS_DEFAULTS = {
+  enableModelRouting: false,
+  autoMemoryEnabled: true,
+  outputCompression: { enabled: true },
 }
 
 function resolveConfigDir() {
@@ -97,11 +104,24 @@ function main() {
     }
   }
 
-  if (newlyAddedKeys.length === 0) {
+  // 顶层 settings 默认 — 同样只补缺失，不覆盖用户值
+  const topLevelPatch = {}
+  const newlyAddedTopLevelKeys = []
+  for (const key of Object.keys(SETTINGS_DEFAULTS)) {
+    if (!Object.hasOwn(settings, key)) {
+      topLevelPatch[key] = SETTINGS_DEFAULTS[key]
+      newlyAddedTopLevelKeys.push(key)
+    }
+  }
+
+  if (newlyAddedKeys.length === 0 && newlyAddedTopLevelKeys.length === 0) {
     return
   }
 
-  const nextSettings = Object.assign({}, settings, { env: mergedEnv })
+  // 顶层 patch 在 settings 后展开（已确保 key 不存在），env 最后展开
+  const nextSettings = Object.assign({}, settings, topLevelPatch, {
+    env: mergedEnv,
+  })
 
   try {
     if (!fs.existsSync(configDir)) {
@@ -117,7 +137,9 @@ function main() {
     console.log(
       '[Panda] 初始化 ' +
         newlyAddedKeys.length +
-        ' 项默认 env 到 settings.json (postinstall)',
+        ' 项默认 env + ' +
+        newlyAddedTopLevelKeys.length +
+        ' 项顶层 settings 到 settings.json (postinstall)',
     )
   } catch (_e) {
     // 权限不足等 — 静默 skip，不阻塞 npm install

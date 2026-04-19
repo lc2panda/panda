@@ -36,6 +36,12 @@ export function activateProactive(_source?: string): void {
       .then(({ ensurePandaccDirs }) => ensurePandaccDirs())
       .catch(() => {})
   } catch {}
+  // why: 注册 6 个内置 IM connector factory，否则 registry 永远为空导致 IM 子系统死代码
+  try {
+    void import('../connectors/boot.js')
+      .then(({ bootConnectors }) => bootConnectors())
+      .catch(() => {})
+  } catch {}
   for (const task of BUILTIN_TASKS) {
     registerTask(task)
   }

@@ -26,8 +26,11 @@ const briefConfigSchema = lazySchema(() =>
 )
 type BriefConfig = z.infer<ReturnType<typeof briefConfigSchema>>
 
+// Why: README §2.2 把 `/brief` 列为基础命令，默认应可见。
+// DEFAULT 改为 true 后，未推送 GB 配置的环境（开箱即用）也能使用，
+// 推 GB 时仍可显式关闭 (enable_slash_command:false) 以下线该命令。
 const DEFAULT_BRIEF_CONFIG: BriefConfig = {
-  enable_slash_command: false,
+  enable_slash_command: true,
 }
 
 // No TTL — this gate controls slash-command *visibility*, not a kill switch.

@@ -566,7 +566,7 @@ panda
 
 | 命令              | 说明                                                  |
 | --------------- | --------------------------------------------------- |
-| `/dream`        | 四阶段记忆整合（Orient→Gather→Consolidate→Prune），支持 cron 定时 |
+| `/dream` <sub>· Skill</sub> | 四阶段记忆整合（Harvest→Understand→Consolidate→Anticipate），支持 cron 定时 |
 | `/assistant`    | 启用 KAIROS 助手模式 — 激活主动引擎 + 定时任务                      |
 | `/proactive`    | 切换主动自主模式 — 含 dream/briefing/health 三个内置任务           |
 | `/night-mode`   | 夜间自主模式（22:00-06:00）— 顺序执行 + 错误隔离                    |
@@ -679,7 +679,7 @@ panda
 | **情景记忆** | 每日会话摘要      | ✅ DeepDream | episodes/      |
 | **语义记忆** | 用户画像 + 知识图谱 | ✅ 自动进化      | semantic/      |
 | **程序记忆** | 行为模式 + 工作流  | ✅ 行为学习      | procedural/    |
-| **前瞻记忆** | 预测 + 建议     | ✅ 感知引擎      | working/       |
+| **前瞻记忆** | 预测 + 建议     | ✅ 感知引擎      | dreams/prospective/ |
 
 ### 3.2 主动交互能力（双层架构）
 
@@ -754,7 +754,7 @@ panda
 每轮对话结束后自动检查 8 种条件，在对话内注入建议：
 
 - **上下文压力**：消息 > 50 条 → 建议 `/compact`
-- **重复模式**：连续 3 次相似操作 → 建议创建工作流 `/skillify`
+- **重复模式**：连续 3 次相似操作 → 建议创建工作流 `/skillify` <sub>· Skill 形态，通过 Skill tool 调用</sub>
 - **未提交提醒**：2 小时未 commit + 有未提交文件
 - **画像过期**：`profile.md` > 7 天未更新
 - **晨间简报**：7:00-12:00 有未读简报
@@ -1427,7 +1427,7 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 | `/model` | | 切换模型（Opus/Sonnet/Haiku） | ✅ |
 | `/diff` | | 查看未提交变更和每轮代码差异 | ✅ |
 | `/commit` | | 智能生成 commit message 并提交 | ✅ |
-| `/dream` | | 记忆整合 — 四阶段巩固 | ✅ |
+| `/dream` <sub>· Skill</sub> | | 记忆整合 — 四阶段巩固（Skill 形态，Skill tool 调用） | ✅ |
 | `/exit` | `/quit` | 退出 REPL | ✅ |
 
 #### 高频使用
@@ -1712,9 +1712,9 @@ Panda 自动检测 Windows 终端类型并适配渲染能力：
 
 ### 七、超级助手系统（v2.5 智能助理）
 
-#### `/dream`- **用法**: `/dream`
+#### `/dream` <sub>· Skill 形态</sub>- **用法**: 通过 Skill tool 调用 `dream`（与 slash 命令同名）
 - **说明**: 手动触发记忆整合 — 四阶段流程
-- **四阶段**: Orient(盘点) → Gather(采集) → Consolidate(整合) → Prune(裁剪)
+- **四阶段**: Harvest(采集) → Understand(理解) → Consolidate(整合) → Anticipate(预判)
 - **后台 cron**: 每天 22:00 自动执行（需启用 `/proactive` 或 `/night-mode`）
 - **技巧**:
   - 手动 `/dream` 后自动重置 24h 冷却门控
