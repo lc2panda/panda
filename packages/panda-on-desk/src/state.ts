@@ -182,26 +182,37 @@ export default function initState(ctx: Ctx) {
   }
 
   function refreshTheme() {
-    theme = ctx.theme
-    SVG_IDLE_FOLLOW = theme.states.idle[0]
-    STATE_SVGS = { ...theme.states }
+    // panda-on-desk hotfix v2.24.1 (#20260419-DESK-FIX): main.js _stateCtx 不传 ctx.theme
+    // （只传 ctx.getActiveTheme），且 themeLoader 装载顺序较 _state 早一拍。
+    // 三段 fallback 保证 refreshTheme 永远不抛错（即便 theme 全空也走默认空对象）。
+    theme =
+      ctx.theme ||
+      (typeof ctx.getActiveTheme === 'function' ? ctx.getActiveTheme() : null) ||
+      {}
+    const _states = (theme && theme.states) || {}
+    const _timings = (theme && theme.timings) || {}
+    const _hitBoxes = (theme && theme.hitBoxes) || {}
+    SVG_IDLE_FOLLOW = (_states.idle && _states.idle[0]) || null
+    STATE_SVGS = { ..._states }
     STATE_BINDINGS = buildStateBindings(theme)
-    if (theme.miniMode && theme.miniMode.states) {
+    if (theme && theme.miniMode && theme.miniMode.states) {
       Object.assign(STATE_SVGS, theme.miniMode.states)
     }
-    MIN_DISPLAY_MS = theme.timings.minDisplay
-    AUTO_RETURN_MS = theme.timings.autoReturn
-    DEEP_SLEEP_TIMEOUT = theme.timings.deepSleepTimeout
-    YAWN_DURATION = theme.timings.yawnDuration
-    WAKE_DURATION = theme.timings.wakeDuration
-    DND_SKIP_YAWN = !!theme.timings.dndSkipYawn
-    COLLAPSE_DURATION = theme.timings.collapseDuration || 0
+    MIN_DISPLAY_MS = _timings.minDisplay || {}
+    AUTO_RETURN_MS = _timings.autoReturn || {}
+    DEEP_SLEEP_TIMEOUT = _timings.deepSleepTimeout || 0
+    YAWN_DURATION = _timings.yawnDuration || 0
+    WAKE_DURATION = _timings.wakeDuration || 0
+    DND_SKIP_YAWN = !!_timings.dndSkipYawn
+    COLLAPSE_DURATION = _timings.collapseDuration || 0
     SLEEP_MODE =
-      theme.sleepSequence && theme.sleepSequence.mode === 'direct' ? 'direct' : 'full'
-    DISPLAY_HINT_MAP = theme.displayHintMap || {}
-    HIT_BOXES = theme.hitBoxes
-    WIDE_SVGS = new Set(theme.wideHitboxFiles || [])
-    SLEEPING_SVGS = new Set(theme.sleepingHitboxFiles || [])
+      theme && theme.sleepSequence && theme.sleepSequence.mode === 'direct'
+        ? 'direct'
+        : 'full'
+    DISPLAY_HINT_MAP = (theme && theme.displayHintMap) || {}
+    HIT_BOXES = _hitBoxes
+    WIDE_SVGS = new Set((theme && theme.wideHitboxFiles) || [])
+    SLEEPING_SVGS = new Set((theme && theme.sleepingHitboxFiles) || [])
 
     if (currentSvg && SLEEPING_SVGS.has(currentSvg)) {
       currentHitBox = HIT_BOXES.sleeping

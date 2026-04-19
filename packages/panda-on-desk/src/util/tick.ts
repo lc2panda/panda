@@ -38,15 +38,23 @@ export default function initTick(ctx: Ctx) {
   let SLEEP_MODE: 'full' | 'direct' = 'full'
 
   function refreshTheme() {
-    theme = ctx.theme
-    MOUSE_IDLE_TIMEOUT = theme.timings.mouseIdleTimeout
-    MOUSE_SLEEP_TIMEOUT = theme.timings.mouseSleepTimeout
-    SVG_IDLE_FOLLOW = theme.states.idle[0]
-    IDLE_ANIMS = (theme.idleAnimations || []).map((a: any) => ({
+    // panda-on-desk hotfix v2.24.1 (#20260419-DESK-FIX): main.js 给 tick ctx 用
+    // getActiveTheme，未直传 ctx.theme；同样用三段 fallback 防 crash。
+    theme =
+      ctx.theme ||
+      (typeof ctx.getActiveTheme === 'function' ? ctx.getActiveTheme() : null) ||
+      {}
+    const _timings = (theme && theme.timings) || {}
+    const _states = (theme && theme.states) || {}
+    MOUSE_IDLE_TIMEOUT = _timings.mouseIdleTimeout || 0
+    MOUSE_SLEEP_TIMEOUT = _timings.mouseSleepTimeout || 0
+    SVG_IDLE_FOLLOW = (_states.idle && _states.idle[0]) || null
+    IDLE_ANIMS = ((theme && theme.idleAnimations) || []).map((a: any) => ({
       svg: a.file,
       duration: a.duration,
     }))
-    SLEEP_MODE = theme.sleepSequence && theme.sleepSequence.mode === 'direct' ? 'direct' : 'full'
+    SLEEP_MODE =
+      theme && theme.sleepSequence && theme.sleepSequence.mode === 'direct' ? 'direct' : 'full'
   }
 
   refreshTheme()
