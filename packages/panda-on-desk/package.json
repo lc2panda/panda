@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node launch.cjs",
     "build": "tsc -p tsconfig.json",
+    "build:dist": "node scripts/build-dist.cjs",
     "build:electron": "electron-builder",
     "test": "bun test"
   },

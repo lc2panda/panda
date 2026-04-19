@@ -1,0 +1,21 @@
+# Input: git status / git add 检测 panda-on-desk 子包工作区变更
+# Output: 排除 electron-builder 制品 + tsc emit + node_modules
+# Pos: panda-on-desk 子包 .gitignore — 与根 .gitignore 解耦防止子包构建产物污染
+#
+# [NEW-FILE:#20260419-P3T1-03]
+# 触发原因：bun run build:dist 通过 tsconfig.build.json 在 src/ 旁产出 .js（CommonJS）
+#   electron-builder 通过 dist-electron/ 输出 unpacked/installer 制品
+#   两者皆为生成物，不该入 git，但根 .gitignore 未覆盖 packages/panda-on-desk/src/*.js
+
+# tsc emit (build:dist) — src/ 与 test/ 编译产物
+src/**/*.js
+test/**/*.js
+!src/**/__fixtures__/*.js
+
+# electron-builder output
+dist-electron/
+
+# transient
+node_modules/
+*.log
+.DS_Store

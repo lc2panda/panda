@@ -60,6 +60,10 @@ jobs:
         working-directory: packages/panda-on-desk
         run: bun install
 
+      - name: Compile TypeScript main entry (src/main.ts → src/main.js)
+        working-directory: packages/panda-on-desk
+        run: bun run build:dist
+
       - name: Build (electron-builder mac)
         working-directory: packages/panda-on-desk
         env:
@@ -104,6 +108,10 @@ jobs:
       - name: Install panda-on-desk deps
         working-directory: packages/panda-on-desk
         run: bun install
+
+      - name: Compile TypeScript main entry (src/main.ts → src/main.js)
+        working-directory: packages/panda-on-desk
+        run: bun run build:dist
 
       - name: Build (electron-builder win)
         working-directory: packages/panda-on-desk
@@ -157,6 +165,10 @@ jobs:
       - name: Install panda-on-desk deps
         working-directory: packages/panda-on-desk
         run: bun install
+
+      - name: Compile TypeScript main entry (src/main.ts → src/main.js)
+        working-directory: packages/panda-on-desk
+        run: bun run build:dist
 
       - name: Build (electron-builder linux)
         working-directory: packages/panda-on-desk
@@ -216,28 +228,34 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "panda-on-desk v${{ steps.version.outputs.version }}" \
-            --notes "## panda-on-desk v${{ steps.version.outputs.version }}
+          NOTES_FILE="$(mktemp)"
+          cat > "$NOTES_FILE" <<EOF
+          ## panda-on-desk v${RELEASE_VERSION}
 
-跨平台 Electron GUI 增强 — 与 panda CLI (\`@lc2panda/panda-code\`) 配套使用。
+          跨平台 Electron GUI 增强 — 与 panda CLI (\`@lc2panda/panda-code\`) 配套使用。
 
-### 下载
+          ### 下载
 
-- **macOS**：\`panda-on-desk-${{ steps.version.outputs.version }}-mac.dmg\` (Intel + Apple Silicon)
-- **Windows**：\`panda-on-desk-${{ steps.version.outputs.version }}-Setup.exe\` (NSIS x64)
-- **Linux**：\`panda-on-desk-${{ steps.version.outputs.version }}.AppImage\` 或 \`.deb\`
+          - **macOS**：\`panda-on-desk-${RELEASE_VERSION}-mac.dmg\` (Intel + Apple Silicon)
+          - **Windows**：\`panda-on-desk-${RELEASE_VERSION}-Setup.exe\` (NSIS x64)
+          - **Linux**：\`panda-on-desk-${RELEASE_VERSION}.AppImage\` 或 \`.deb\`
 
-### 安装
+          ### 安装
 
-详见主仓库 [README.md](https://github.com/lc2panda/panda#panda-on-desk) → panda-on-desk 子产品章节。
+          详见主仓库 [README.md](https://github.com/lc2panda/panda#panda-on-desk) → panda-on-desk 子产品章节。
 
-### 与 panda CLI 关系
+          ### 与 panda CLI 关系
 
-panda-on-desk 是 panda CLI 的可选 GUI 增强，通过本地 HTTP (1455+) + SSE 订阅 panda CLI 状态信号。panda CLI 不依赖 panda-on-desk 即可独立运行（\`bun panda\` 仍是 TUI 主体验）。
+          panda-on-desk 是 panda CLI 的可选 GUI 增强，通过本地 HTTP (1455+) + SSE 订阅 panda CLI 状态信号。panda CLI 不依赖 panda-on-desk 即可独立运行（\`bun panda\` 仍是 TUI 主体验）。
 
----
-> 自动生成于 ${{ steps.version.outputs.tag }} tag 推送时。" \
+          ---
+          > 自动生成于 ${RELEASE_TAG} tag 推送时。
+          EOF
+          gh release create "${RELEASE_TAG}" \
+            --title "panda-on-desk v${RELEASE_VERSION}" \
+            --notes-file "$NOTES_FILE" \
             --draft \
             release-assets/*

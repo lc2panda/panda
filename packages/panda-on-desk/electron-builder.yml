@@ -30,18 +30,22 @@ files:
   - "!test/**"
 
 # macOS：dmg + zip 双格式 / x64 + arm64 双架构 / 启用 hardened runtime（公证前置）
+# 注意：electron-builder 25 schema — arch 必须嵌入 target 对象内，不允许顶层 mac.arch
 mac:
   category: public.app-category.developer-tools
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
   hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   icon: build/icons/panda.icns       # Phase 3 P3-T2 占位 → v1.5 替换为真实 .icns
-  arch:
-    - x64
-    - arm64
 
 # Windows：NSIS x64（v0.1-alpha 不签名 — verifyUpdateCodeSignature: false 跳过证书校验）
 win:
@@ -54,14 +58,17 @@ win:
   icon: build/icons/panda.ico        # Phase 3 P3-T2 占位 → v1.5 替换为真实 .ico
 
 # Linux：AppImage（通用） + deb（Debian/Ubuntu）/ x64
+# 注意：electron-builder 25 schema — arch 必须嵌入 target 对象内，不允许顶层 linux.arch
 linux:
   target:
-    - AppImage
-    - deb
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
   category: Development
   icon: build/icons/panda.png        # Phase 3 P3-T2 占位 → v1.5 替换为真实 PNG 512x512
-  arch:
-    - x64
 
 # 自动 publish 到 GitHub release
 # - owner: lc2panda / repo: panda 已对齐（与 .github/workflows/release-panda-on-desk.yml 配套）

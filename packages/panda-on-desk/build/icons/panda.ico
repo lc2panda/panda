@@ -1,11 +1,4 @@
-PLACEHOLDER ICO — v0.1 alpha (Phase 3 P3-T2)
-============================================
-Windows Multi-Resolution ICO 占位。
-
-真实 .ico 生成路径（v1.5 美术后）：
-  bunx png-to-ico panda-256.png panda-128.png panda-64.png panda-48.png panda-32.png panda-16.png > panda.ico
-
-应包含分辨率：
-  16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256
-
-NOTE: electron-builder win 目标在 NSIS 打包前需真实 .ico。v0.1-alpha 阶段仅占位。
+# panda-on-desk icon placeholder
+# Generated: 2026-04-19T14:25:30.350Z
+# Source: build/icons/panda.svg
+# Action required: replace with real panda.icns via iconutil (mac) / png-to-ico (win) at packaging time.

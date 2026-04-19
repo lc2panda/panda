@@ -1,14 +1,17 @@
 {
-  "_comment": "Panda 默认主题 v0.1 — ASCII 占位渲染（A 起步策略，复用 panda 18 物种 5×12 ASCII）；v0.5+ 替换 SVG 美术",
+  "_comment": "Panda 默认主题 v1.5 — 双路径渲染：v0.x ASCII (sprites/*.ascii) 与 v1.5+ SVG (sprites/*.svg)。SVG 由 scripts/build-sprites.cjs 程序化生成（来源仍为 ASCII，仅多嵌一层矢量包装）。",
   "_pandaSpec": {
-    "renderStrategy": "ascii-pre-html",
+    "renderStrategy": "svg-with-ascii-fallback",
     "asciiCanvasRows": 5,
     "asciiCanvasCols": 12,
+    "svgViewBoxWidth": 200,
+    "svgViewBoxHeight": 200,
     "speciesCount": 18,
     "petStateCount": 12,
     "framesPerState": 3,
     "spriteSource": "src/buddy/sprites.ts BODIES (only-read)",
-    "todoMilestone": "v0.5+ 替换为自制 SVG (B 阶段)；v1.5+ 引入美术资产 (C 阶段)"
+    "svgGenerator": "scripts/build-sprites.cjs (P3-T5)",
+    "todoMilestone": "v1.5 已落 SVG 美术（程序化）；v2.0+ 引入手绘美术替换 (D 阶段)"
   },
 
   "schemaVersion": 1,

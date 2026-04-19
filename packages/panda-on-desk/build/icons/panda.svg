@@ -1,25 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Input: 矢量源 — electron-builder 通过 sharp 转 PNG/ICNS/ICO 时的占位输入
-  Output: 512×512 panda 占位图（黑底白字 ASCII art 风）
-  Pos: panda-on-desk 跨平台 icon 占位 god-source — v1.5 美术替换前的临时资产
+  Input: 矢量源 — scripts/build-icons.cjs 通过 sharp 转 PNG 多尺寸（icns/ico 由打包阶段处理）
+  Output: 512×512 panda 主 icon — 简笔熊猫脸正面（圆形 + 黑耳 + 黑眼罩 + 鼻嘴）
+  Pos: panda-on-desk Phase 3 P3-T5 美术资产 — 程序化简笔图标，电子打包入口
 -->
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#0d0d0d"/>
-  <circle cx="256" cy="256" r="200" fill="#ffffff"/>
-  <!-- 黑眼罩 -->
-  <ellipse cx="190" cy="220" rx="38" ry="48" fill="#0d0d0d"/>
-  <ellipse cx="322" cy="220" rx="38" ry="48" fill="#0d0d0d"/>
-  <!-- 眼睛高光 -->
-  <circle cx="190" cy="220" r="10" fill="#ffffff"/>
-  <circle cx="322" cy="220" r="10" fill="#ffffff"/>
-  <!-- 鼻子 -->
-  <ellipse cx="256" cy="290" rx="18" ry="12" fill="#0d0d0d"/>
-  <!-- 嘴 -->
-  <path d="M 240 320 Q 256 340 272 320" stroke="#0d0d0d" stroke-width="6" fill="none" stroke-linecap="round"/>
-  <!-- 耳朵 -->
-  <circle cx="120" cy="120" r="48" fill="#0d0d0d"/>
-  <circle cx="392" cy="120" r="48" fill="#0d0d0d"/>
-  <!-- 标签 -->
-  <text x="256" y="475" font-family="monospace" font-size="36" fill="#ffffff" text-anchor="middle" font-weight="bold">panda-on-desk</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" data-icon="panda-main">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#0d0d0d"/>
+    </radialGradient>
+    <radialGradient id="faceGrad" cx="50%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="85%" stop-color="#f4f4f4"/>
+      <stop offset="100%" stop-color="#e0e0e0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="512" height="512" fill="url(#bgGrad)" rx="64" ry="64"/>
+
+  <!-- 耳朵（黑色椭圆，左右对称） -->
+  <ellipse cx="120" cy="130" rx="56" ry="52" fill="#0d0d0d"/>
+  <ellipse cx="392" cy="130" rx="56" ry="52" fill="#0d0d0d"/>
+  <ellipse cx="120" cy="130" rx="32" ry="28" fill="#1a1a1a"/>
+  <ellipse cx="392" cy="130" rx="32" ry="28" fill="#1a1a1a"/>
+
+  <!-- 脸（白圆） -->
+  <circle cx="256" cy="256" r="200" fill="url(#faceGrad)" stroke="#0d0d0d" stroke-width="4"/>
+
+  <!-- 黑眼罩（椭圆，向内倾斜） -->
+  <ellipse cx="190" cy="220" rx="42" ry="54" fill="#0d0d0d" transform="rotate(-12 190 220)"/>
+  <ellipse cx="322" cy="220" rx="42" ry="54" fill="#0d0d0d" transform="rotate(12 322 220)"/>
+
+  <!-- 眼球白底 -->
+  <circle cx="190" cy="220" r="14" fill="#ffffff"/>
+  <circle cx="322" cy="220" r="14" fill="#ffffff"/>
+  <!-- 瞳孔 -->
+  <circle cx="190" cy="222" r="8" fill="#0d0d0d"/>
+  <circle cx="322" cy="222" r="8" fill="#0d0d0d"/>
+  <!-- 高光 -->
+  <circle cx="194" cy="218" r="3" fill="#ffffff"/>
+  <circle cx="326" cy="218" r="3" fill="#ffffff"/>
+
+  <!-- 鼻子（椭圆） -->
+  <ellipse cx="256" cy="295" rx="20" ry="14" fill="#0d0d0d"/>
+  <ellipse cx="252" cy="291" rx="4" ry="3" fill="#3a3a3a"/>
+
+  <!-- 嘴（W 形） -->
+  <path d="M 256 309 L 256 322 M 240 332 Q 256 348 272 332" stroke="#0d0d0d" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 腮红 -->
+  <ellipse cx="148" cy="290" rx="18" ry="10" fill="#ffd0d0" opacity="0.6"/>
+  <ellipse cx="364" cy="290" rx="18" ry="10" fill="#ffd0d0" opacity="0.6"/>
+
+  <!-- 标签：底部 monospace 小字 -->
+  <text x="256" y="478" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="28" fill="#ffffff" text-anchor="middle" font-weight="bold" letter-spacing="2">panda</text>
 </svg>

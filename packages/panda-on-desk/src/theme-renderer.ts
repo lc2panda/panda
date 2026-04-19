@@ -1,10 +1,12 @@
-// Input: themes/panda/theme.json + sprites/{species}.ascii (read at runtime)
-// Output: HTML <pre> 字符串（按 species/state/frame 三元组）+ 主题元数据 helper
-// Pos: panda-on-desk Phase 1 主题渲染器 — A 起步策略 ASCII 占位实现，
-//      与 theme-loader.ts 协作（loader 解析 schema/sanitize SVG；renderer 转 ASCII→HTML）；
-//      v0.5+ B 阶段会被 SVG renderer 替换/分流。
+// Input: themes/panda/theme.json + sprites/{species}.ascii (旧 ASCII 路径)
+//        + sprites/{species}.svg  (P3-T5 新 SVG 路径，由 scripts/build-sprites.cjs 生成)
+// Output: HTML 字符串（<pre> ASCII 路径 / <div><svg> 矢量路径）+ 主题元数据 helper
+// Pos: panda-on-desk 主题渲染器 — 双路径：
+//      1. renderSpriteToHtml: v0.x ASCII 占位（兼容保留）
+//      2. renderSpriteToSvgHtml: v1.5+ SVG 矢量（P3-T5 美术资产，默认）
+//      与 theme-loader.ts 协作（loader 解析 schema/sanitize SVG；renderer 输出 HTML）。
 //
-// [NEW-FILE:#20260419-P1-10]
+// [NEW-FILE:#20260419-P1-10] [UPDATED:#20260419-P3T5-art]
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -280,6 +282,126 @@ export function renderSpriteToHtml(
     `<pre class="panda-sprite" data-species="${_escapeAttr(speciesForAttr)}" ` +
     `data-state="${_escapeAttr(stateForAttr)}" data-frame="${frame}" ` +
     `style="${style}">${body}</pre>`
+  )
+}
+
+// ── v1.5+ SVG 渲染路径（P3-T5 美术资产）─────────────────────────────────────
+// SVG 资产由 scripts/build-sprites.cjs 程序化生成（每 species 一个 .svg
+// 含 12 个 <g id="state-{state}">）。本路径作为 v1.5+ 默认渲染策略，
+// 旧 ASCII 路径（renderSpriteToHtml）保留向后兼容。
+
+// 缓存：每 themeDir 一个 species → svg 字符串
+type SvgCache = Map<string, string>
+const _svgCache = new WeakMap<object, SvgCache>()
+
+function _getSvgCache(theme: LoadedPandaTheme): SvgCache {
+  let c = _svgCache.get(theme._cacheKey)
+  if (!c) {
+    c = new Map()
+    _svgCache.set(theme._cacheKey, c)
+  }
+  return c
+}
+
+/**
+ * 加载指定 species 的 SVG 文件原始字符串（不解析）。
+ * 找不到 → fallback 到 default.svg；再找不到 → 返回 null。
+ */
+export function loadSpeciesSvg(
+  theme: LoadedPandaTheme,
+  species: string,
+): string | null {
+  const cache = _getSvgCache(theme)
+  const cached = cache.get(species)
+  if (cached) return cached
+
+  const candidates = [
+    path.join(theme.themeDir, 'sprites', `${species}.svg`),
+    path.join(theme.themeDir, 'sprites', 'default.svg'),
+  ]
+  for (const file of candidates) {
+    if (!fs.existsSync(file)) continue
+    try {
+      const text = fs.readFileSync(file, 'utf8')
+      if (text && text.includes('<svg')) {
+        cache.set(species, text)
+        return text
+      }
+    } catch {
+      // 读取失败兜底到下一个候选
+    }
+  }
+  return null
+}
+
+/**
+ * SVG 渲染选项 — state group visibility 切换 + 颜色覆盖。
+ */
+export interface SvgRenderOptions {
+  /** 高亮哪个 state（其它 group 设 visibility="hidden"）；默认 'idle' */
+  state?: string
+  /** 容器 CSS class（默认 'panda-sprite-svg'） */
+  className?: string
+  /** 容器内联宽度（默认 unset — 跟随 viewBox） */
+  width?: string | number
+  /** 容器内联高度 */
+  height?: string | number
+}
+
+/**
+ * 把 species SVG 嵌入 HTML 容器，并按 state 切换 group visibility。
+ * 与 renderSpriteToHtml 不同：本路径是 SVG 矢量（v1.5+ 美术资产），
+ * 旧 ASCII 路径仅用于无 SVG 资产或 v0.x 兼容场景。
+ *
+ * @param theme    loadPandaTheme 返回值
+ * @param species  18 物种之一（未知 → default）
+ * @param state    12 PetState 之一（未知 → idle）
+ * @param frame    向后兼容入参（SVG 路径下 frame 由 build-sprites 生成期决定，
+ *                 运行期仅作 data-attr 透传，不再选帧）
+ * @param opts     可选 SVG 渲染参数
+ * @returns        HTML 字符串；若 SVG 资产缺失，自动降级到 ASCII 路径
+ */
+export function renderSpriteToSvgHtml(
+  theme: LoadedPandaTheme,
+  species: string,
+  state: string,
+  frame: number = 0,
+  opts: SvgRenderOptions = {},
+): string {
+  const stateForAttr = _isKnownState(state) ? state : 'idle'
+  const speciesForAttr = _isKnownSpecies(species) ? species : 'default'
+
+  const svgRaw = loadSpeciesSvg(theme, speciesForAttr)
+  if (!svgRaw) {
+    // 资产缺失 → 降级到 ASCII 路径，保证不抛错
+    return renderSpriteToHtml(theme, species, state, frame)
+  }
+
+  // 切 visibility — 把 visibility="visible" 整体替换为 hidden，再把目标 state 设为 visible。
+  // 安全：仅替换 group 标签上的 visibility 属性（不动 group 内的 <text>）。
+  const allHidden = svgRaw.replace(
+    /(<g\s+id="state-[a-z]+"[^>]*?)\s+visibility="(?:visible|hidden)"/g,
+    '$1 visibility="hidden"',
+  )
+  const targetMarker = `id="state-${stateForAttr}"`
+  const enabled = allHidden.replace(
+    new RegExp(
+      `(<g\\s+${targetMarker.replace(/"/g, '"')}[^>]*?)\\s+visibility="hidden"`,
+    ),
+    '$1 visibility="visible"',
+  )
+
+  const className = opts.className ?? 'panda-sprite-svg'
+  const styleParts: string[] = ['display:inline-block', 'line-height:0']
+  if (opts.width != null) styleParts.push(`width:${_escapeCssValue(opts.width)}`)
+  if (opts.height != null)
+    styleParts.push(`height:${_escapeCssValue(opts.height)}`)
+  const style = styleParts.join(';')
+
+  return (
+    `<div class="${_escapeAttr(className)}" data-species="${_escapeAttr(speciesForAttr)}" ` +
+    `data-state="${_escapeAttr(stateForAttr)}" data-frame="${frame}" ` +
+    `style="${style}">${enabled}</div>`
   )
 }
 

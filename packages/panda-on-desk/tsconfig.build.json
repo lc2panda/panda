@@ -1,0 +1,25 @@
+// Input: tsc -p tsconfig.build.json — electron-builder 打包前编译 src/main.ts → src/main.js
+// Output: src/**/*.js (CommonJS, electron 主进程入口运行时)
+// Pos: panda-on-desk 打包专用 tsconfig — 与 tsconfig.json (type-check only, noEmit) 分离
+//
+// [NEW-FILE:#20260419-P3T1-01]
+// 触发原因：electron-builder 25 在 packaging 阶段校验 package.json#main → src/main.js 存在
+//   但根 tsconfig.json 设 noEmit:true (test/IDE type-check 用)，无法产出 .js 入口。
+//   不动根 tsconfig.json，新增 build profile 走独立 emit 路径。
+// 不可仅修改 tsconfig.json：noEmit:true 是 bun test + IDE 的契约，翻转将影响 9 处 test 与 18 文件。
+// 证据：electron-builder 25.1.8 sanityCheckPackage 路径 → src/asar/asarFileChecker.ts:7
+// 影响：仅 CI release-panda-on-desk.yml 调用 bun run build:dist；本地开发不受影响。
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "noEmitOnError": false,
+    "rootDir": "src",
+    "outDir": "src",
+    "module": "commonjs",
+    "target": "es2022",
+    "moduleResolution": "node"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test", "src/**/*.test.ts"]
+}

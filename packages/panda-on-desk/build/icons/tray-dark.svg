@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Input: 矢量源 — scripts/build-icons.cjs 转 256×256 PNG 给托盘使用
+  Output: tray-dark.png — 深色背景下使用的亮色 panda tray icon
+  Pos: panda-on-desk Phase 3 P3-T5 美术资产 — 系统托盘图标（深色版）
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" data-icon="tray-dark">
+  <!-- 透明背景 -->
+  <rect width="256" height="256" fill="transparent"/>
+  <!-- 耳朵 -->
+  <ellipse cx="68" cy="76" rx="32" ry="30" fill="#ffffff"/>
+  <ellipse cx="188" cy="76" rx="32" ry="30" fill="#ffffff"/>
+  <!-- 脸 -->
+  <circle cx="128" cy="138" r="100" fill="#f4f4f4" stroke="#ffffff" stroke-width="4"/>
+  <!-- 眼罩 -->
+  <ellipse cx="96" cy="120" rx="22" ry="28" fill="#0d0d0d" transform="rotate(-12 96 120)"/>
+  <ellipse cx="160" cy="120" rx="22" ry="28" fill="#0d0d0d" transform="rotate(12 160 120)"/>
+  <!-- 眼球 -->
+  <circle cx="96" cy="120" r="7" fill="#ffffff"/>
+  <circle cx="160" cy="120" r="7" fill="#ffffff"/>
+  <!-- 鼻 -->
+  <ellipse cx="128" cy="160" rx="10" ry="7" fill="#0d0d0d"/>
+  <!-- 嘴 -->
+  <path d="M 120 178 Q 128 188 136 178" stroke="#0d0d0d" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>
