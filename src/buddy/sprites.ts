@@ -10,15 +10,21 @@ import {
   duck,
   ghost,
   goose,
+  kungFuPanda,
   mushroom,
   octopus,
   owl,
+  panda,
   penguin,
   rabbit,
+  redPanda,
   robot,
   snail,
   turtle,
 } from './types.js'
+import { KUNG_FU_PANDA_BODIES } from './sprites/kungFuPanda.js'
+import { PANDA_BODIES } from './sprites/panda.js'
+import { RED_PANDA_BODIES } from './sprites/redPanda.js'
 
 // Each sprite is 5 lines tall, 12 wide (after {E}→1char substitution).
 // Multiple frames per species for idle fidget animation.
@@ -520,14 +526,14 @@ export function renderFace(bones: CompanionBones): string {
 // 结构：Species → PetState → frames（每帧 5 行 ≤ 12 字符 + {E} 眼位占位）
 // ─────────────────────────────────────────────────────────────────────────────
 
-// why: Partial<Record<...>> 让占位阶段能 export 空 {}，D2 增量填充而不破类型
+// why: Partial<Record<...>> 让 panda 系子集渐进式填充而不破类型；旧 18 物种走 BODIES 不影响
+// D3 P2-T5 合流：D2 三个 sprite agent 已落盘 panda.ts / redPanda.ts / kungFuPanda.ts
 export const PANDA_SPECIES_BODIES: Partial<
   Record<Species, Partial<Record<PetState, string[][]>>>
 > = {
-  // 等 D2 填充：
-  //   [panda]:       { idle: [...], thinking: [...], working: [...], ... }
-  //   [redPanda]:    { ... }
-  //   [kungFuPanda]: { ... }
+  [panda]: PANDA_BODIES,
+  [redPanda]: RED_PANDA_BODIES,
+  [kungFuPanda]: KUNG_FU_PANDA_BODIES,
 }
 
 // 取指定 (species, state, frameIndex) 的 sprite，无则 fallback 到 idle frame 0
