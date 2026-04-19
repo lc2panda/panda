@@ -1753,7 +1753,7 @@ Panda 自动检测 Windows 终端类型并适配渲染能力：
 
 #### `/buddy`
 - **用法**: `/buddy [show|hide|mute|unmute|info|state|wake|sleep|theme]`
-- **说明**: 编程伙伴 — 终端中的虚拟宠物（21 物种，含 panda/redPanda/kungFuPanda 三 panda 系；12 态状态机驱动 sprite 帧切换）
+- **说明**: 编程伙伴 — 终端中的虚拟宠物（18 物种，12 态状态机驱动 sprite 帧切换 + StatusLine 1×5 字符 mini-pet）
 - **子命令**:
   - `show` / `hide` — 切换显示
   - `mute` / `unmute` — 静音不影响显示
@@ -1761,8 +1761,9 @@ Panda 自动检测 Windows 终端类型并适配渲染能力：
   - `state <name>` — 手动覆盖状态 5s（name ∈ error/notification/sweeping/attention/juggling/carrying/working/thinking/waking/idle/dozing/sleeping）
   - `wake` — 强制唤醒（清 sleeping/dozing）
   - `sleep` — 强制 60s 睡眠
-  - `theme <species>` — 切换 panda 系物种（panda / redPanda / kungFuPanda）
-- **示例**: `/buddy state working` `/buddy theme kungFuPanda`
+  - `theme <species>` — 切换物种（duck / goose / blob / cat / dragon / octopus / owl / penguin / turtle / snail / ghost / axolotl / capybara / cactus / robot / rabbit / mushroom / chonk）
+  - 旧 alias 向后兼容：`theme panda` → `chonk` 圆胖治愈系；`theme redPanda` → `cat` 小型灵巧；`theme kungFuPanda` → `robot` 机械武术（v2.21.27-29 panda 系实装因画布太小退役）
+- **示例**: `/buddy state working` `/buddy theme robot`
 
 #### `/brief`
 - **用法**: `/brief [on|off]`

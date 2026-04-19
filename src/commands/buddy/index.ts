@@ -1,6 +1,7 @@
 // Input:  /buddy 子命令字符串（show/hide/mute/unmute/info/state/wake/sleep/theme）+ globalConfig + AppState
 // Output: 单一 LocalJSXCommand — display:'system' 文案；落盘 globalConfig.companion* 字段
-// Pos:    panda 形象宠物 D4 P5-T1 — 9 子命令实装；旧 5 文案 byte-equal 守护见 buddy.test.ts
+// Pos:    A+B 项目精华 — 9 子命令实装；旧 5 文案 byte-equal 守护见 buddy.test.ts
+//         v2.21.30 方向 A：theme 接 18 物种全集 + 旧 panda/redPanda/kungFuPanda alias
 //         一旦本文件被修改，请同步更新头注释 + src/commands/buddy/README.md
 import { feature } from 'bun:bundle'
 import type { Command, LocalJSXCommandContext, LocalJSXCommandOnDone } from '../../types/command.js'
@@ -156,26 +157,57 @@ const buddy = {
           return null
         }
 
-        // D4 P5-T1：切 panda 系物种（panda / redPanda / kungFuPanda）
-        // why: getCompanion() 已在 companionForcedSpecies 存在时后置覆盖 bones.species
+        // v2.21.30 方向 A：theme 接 18 物种全集 + 旧 panda 系 alias 向后兼容
+        // why: v2.21.27-29 panda/redPanda/kungFuPanda 实装因 5×12 ASCII 画布太小退役；
+        //   旧命令 alias → 替代物种（panda→chonk 圆胖治愈系 / redPanda→cat 小型灵巧 /
+        //   kungFuPanda→robot 机械武术），输出系统消息说明替代关系，避免用户惊讶。
         if (head === 'theme') {
-          const { PANDA_SPECIES } = await import('../../buddy/types.js')
+          const { SPECIES } = await import('../../buddy/types.js')
+          // 旧 panda 系 alias 表（key 全小写匹配）→ 替代物种
+          const PANDA_ALIASES: Record<string, { target: string; reason: string }> = {
+            panda: { target: 'chonk', reason: '圆胖治愈系替代' },
+            redpanda: { target: 'cat', reason: '小型灵巧替代' },
+            kungfupanda: { target: 'robot', reason: '机械武术替代' },
+          }
           const target = tail
           if (!target) {
             onDone(
-              `Usage: /buddy theme <${PANDA_SPECIES.join('|')}>`,
+              `Usage: /buddy theme <${SPECIES.join('|')}>`,
               { display: 'system' },
             )
             return null
           }
-          const matched = (PANDA_SPECIES as readonly string[]).find(
-            s => s.toLowerCase() === target.toLowerCase(),
-          ) as (typeof PANDA_SPECIES)[number] | undefined
+          const lowered = target.toLowerCase()
+          // 1) 先匹配旧 panda 系 alias（v2.21.27-29 用户向后兼容）
+          const alias = PANDA_ALIASES[lowered]
+          if (alias) {
+            const aliasMatched = (SPECIES as readonly string[]).find(
+              s => s === alias.target,
+            ) as (typeof SPECIES)[number] | undefined
+            if (aliasMatched) {
+              saveGlobalConfig(prev => ({
+                ...prev,
+                companionForcedSpecies: aliasMatched,
+              }))
+              logEvent('tengu_buddy_theme', {
+                species: aliasMatched,
+                alias: lowered,
+              })
+              onDone(
+                `${target} 系物种已退役，已切到 ${aliasMatched} 替代物种（${alias.reason}）。`,
+                { display: 'system' },
+              )
+              return null
+            }
+          }
+          // 2) 18 物种全集匹配（大小写不敏感）
+          const matched = (SPECIES as readonly string[]).find(
+            s => s.toLowerCase() === lowered,
+          ) as (typeof SPECIES)[number] | undefined
           if (!matched) {
-            // why 保留旧物种 fallback 提示：避免无效输入静默失败
             const current = config.companionForcedSpecies ?? config.companion?.name ?? 'unset'
             onDone(
-              `Unknown species: ${target}. Valid: ${PANDA_SPECIES.join(', ')}. Current forced: ${current}`,
+              `Unknown species: ${target}. Valid: ${SPECIES.join(', ')}. Current forced: ${current}`,
               { display: 'system' },
             )
             return null

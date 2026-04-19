@@ -210,46 +210,86 @@ describe('/buddy sleep（P5-T1 新增）', () => {
   })
 })
 
-describe('/buddy theme <species>（P5-T1 新增）', () => {
-  test('theme panda → 写 companionForcedSpecies=panda', async () => {
-    const { result, display } = await runBuddy('theme panda')
-    expect(display).toBe('system')
-    expect(result).toBe('Companion theme set to panda.')
-    expect(configState.companionForcedSpecies).toBe('panda')
-  })
-
-  test('theme redPanda → 写 companionForcedSpecies=redPanda', async () => {
-    const { result, display } = await runBuddy('theme redPanda')
-    expect(display).toBe('system')
-    expect(result).toBe('Companion theme set to redPanda.')
-    expect(configState.companionForcedSpecies).toBe('redPanda')
-  })
-
-  test('theme kungFuPanda → 写 companionForcedSpecies=kungFuPanda', async () => {
-    const { result, display } = await runBuddy('theme kungFuPanda')
-    expect(display).toBe('system')
-    expect(result).toBe('Companion theme set to kungFuPanda.')
-    expect(configState.companionForcedSpecies).toBe('kungFuPanda')
-  })
-
-  test('theme PANDA（大小写不敏感）→ 仍匹配 panda', async () => {
-    const { result } = await runBuddy('theme PANDA')
-    expect(result).toBe('Companion theme set to panda.')
-    expect(configState.companionForcedSpecies).toBe('panda')
-  })
-
-  test('theme duck（非 panda 系）→ 错误提示，不写 forced', async () => {
+// v2.21.30 方向 A：theme 接 18 物种全集 + 旧 panda 系 alias 向后兼容
+describe('/buddy theme — 18 物种全集 + alias（v2.21.30 方向 A）', () => {
+  // 18 物种白名单 — 各物种均可被切换
+  test('theme duck → 写 companionForcedSpecies=duck', async () => {
     const { result, display } = await runBuddy('theme duck')
     expect(display).toBe('system')
-    expect(result).toContain('Unknown species: duck')
+    expect(result).toBe('Companion theme set to duck.')
+    expect(configState.companionForcedSpecies).toBe('duck')
+  })
+
+  test('theme robot → 写 companionForcedSpecies=robot', async () => {
+    const { result } = await runBuddy('theme robot')
+    expect(result).toBe('Companion theme set to robot.')
+    expect(configState.companionForcedSpecies).toBe('robot')
+  })
+
+  test('theme owl → 写 companionForcedSpecies=owl', async () => {
+    const { result } = await runBuddy('theme owl')
+    expect(result).toBe('Companion theme set to owl.')
+    expect(configState.companionForcedSpecies).toBe('owl')
+  })
+
+  test('theme chonk → 写 companionForcedSpecies=chonk', async () => {
+    const { result } = await runBuddy('theme chonk')
+    expect(result).toBe('Companion theme set to chonk.')
+    expect(configState.companionForcedSpecies).toBe('chonk')
+  })
+
+  test('theme DUCK（大小写不敏感）→ 仍匹配 duck', async () => {
+    const { result } = await runBuddy('theme DUCK')
+    expect(result).toBe('Companion theme set to duck.')
+    expect(configState.companionForcedSpecies).toBe('duck')
+  })
+
+  // 旧 panda 系 alias 向后兼容
+  test('theme panda（alias）→ 切到 chonk 替代物种', async () => {
+    const { result, display } = await runBuddy('theme panda')
+    expect(display).toBe('system')
+    expect(result).toContain('panda 系物种已退役')
+    expect(result).toContain('chonk')
+    expect(configState.companionForcedSpecies).toBe('chonk')
+  })
+
+  test('theme redPanda（alias）→ 切到 cat 替代物种', async () => {
+    const { result, display } = await runBuddy('theme redPanda')
+    expect(display).toBe('system')
+    expect(result).toContain('redPanda 系物种已退役')
+    expect(result).toContain('cat')
+    expect(configState.companionForcedSpecies).toBe('cat')
+  })
+
+  test('theme kungFuPanda（alias）→ 切到 robot 替代物种', async () => {
+    const { result, display } = await runBuddy('theme kungFuPanda')
+    expect(display).toBe('system')
+    expect(result).toContain('kungFuPanda 系物种已退役')
+    expect(result).toContain('robot')
+    expect(configState.companionForcedSpecies).toBe('robot')
+  })
+
+  test('theme PANDA（alias 大小写不敏感）→ 切到 chonk', async () => {
+    const { result } = await runBuddy('theme PANDA')
+    expect(result).toContain('chonk')
+    expect(configState.companionForcedSpecies).toBe('chonk')
+  })
+
+  // 错误路径
+  test('theme nonsense（非 18 物种 + 非 alias）→ 错误提示，不写 forced', async () => {
+    const { result, display } = await runBuddy('theme nonsense')
+    expect(display).toBe('system')
+    expect(result).toContain('Unknown species: nonsense')
     expect(result).toContain('Current forced')
     expect(configState.companionForcedSpecies).toBeUndefined()
   })
 
-  test('theme（无参数）→ Usage 提示', async () => {
+  test('theme（无参数）→ Usage 提示含 18 物种', async () => {
     const { result, display } = await runBuddy('theme')
     expect(display).toBe('system')
     expect(result).toContain('Usage: /buddy theme <')
+    expect(result).toContain('duck')
+    expect(result).toContain('robot')
     expect(configState.companionForcedSpecies).toBeUndefined()
   })
 })

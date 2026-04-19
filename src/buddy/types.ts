@@ -51,32 +51,9 @@ export const mushroom = c(
 ) as 'mushroom'
 export const chonk = c(0x63, 0x68, 0x6f, 0x6e, 0x6b) as 'chonk'
 
-// panda 系（D1 P1-T2）：append 末尾保旧 18 物种 hash 不漂移；沿用 fromCharCode 模式与既有 species 一致
-export const panda = c(0x70, 0x61, 0x6e, 0x64, 0x61) as 'panda'
-export const redPanda = c(
-  0x72,
-  0x65,
-  0x64,
-  0x50,
-  0x61,
-  0x6e,
-  0x64,
-  0x61,
-) as 'redPanda'
-export const kungFuPanda = c(
-  0x6b,
-  0x75,
-  0x6e,
-  0x67,
-  0x46,
-  0x75,
-  0x50,
-  0x61,
-  0x6e,
-  0x64,
-  0x61,
-) as 'kungFuPanda'
-
+// why v2.21.30 方向 A：v2.21.27/28/29 panda 系 5×12 ASCII 画布太小重画 N 次仍"不像熊猫"，
+//   指挥官批方案 A — 退役 panda/redPanda/kungFuPanda 三物种实装，复用旧 18 物种做 /buddy theme 切换；
+//   PetState 状态机 + MiniPet + idle/sleeping 等 A+B 项目精华保留，让所有物种都享受。
 export const SPECIES = [
   duck,
   goose,
@@ -96,19 +73,8 @@ export const SPECIES = [
   rabbit,
   mushroom,
   chonk,
-  // append 末尾：mulberry32 是 deterministic，旧 18 物种 hash 落点不变
-  panda,
-  redPanda,
-  kungFuPanda,
 ] as const
 export type Species = (typeof SPECIES)[number] // biome-ignore format: keep compact
-
-// panda 系子集，渲染层用以 gate state-driven sprite 切换（旧 18 物种走 IDLE_SEQUENCE 兼容）
-export const PANDA_SPECIES = [panda, redPanda, kungFuPanda] as const
-export type PandaSpecies = (typeof PANDA_SPECIES)[number]
-export function isPandaSpecies(s: Species): s is PandaSpecies {
-  return (PANDA_SPECIES as readonly Species[]).includes(s)
-}
 
 // PetState 12 态枚举（D1 P1-T1）— 优先级数值越大越高
 // 排序原则：异常/通知 > 系统操作 > 多任务并发 > 单任务 > 待机梯度

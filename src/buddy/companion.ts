@@ -1,6 +1,6 @@
 // Input:  userId（来自 oauthAccount/userID/3p apiKey）+ globalConfig.companion / companionForcedSpecies
 // Output: Companion（bones + soul 合并；forced species 后置覆盖）；roll() PRNG 装配
-// Pos:    panda 形象宠物 — 装配核心；D4 P5-T1 增 companionForcedSpecies 后置覆盖路径
+// Pos:    A+B 项目精华 — 装配核心；v2.21.30 方向 A：companionForcedSpecies 接 18 物种全集
 //         一旦本文件被修改，请同步更新头注释 + src/buddy/README.md
 import { getGlobalConfig } from '../utils/config.js'
 import {
@@ -142,8 +142,9 @@ export function getCompanion(): Companion | undefined {
   const { bones } = roll(companionUserId())
   // bones last so stale bones fields in old-format configs get overridden
   const merged: Companion = { ...stored, ...bones }
-  // D4 P5-T1：/buddy theme <species> 强制覆盖 species（panda 系切换）
-  // why: bones.species 由 userId hash 决定；forced 字段允许用户主动选 panda/redPanda/kungFuPanda
+  // v2.21.30 方向 A：/buddy theme <species> 强制覆盖 species（18 物种全集）
+  // why: bones.species 由 userId hash 决定不可控；forced 字段允许用户主动选任意 18 物种 +
+  //   旧 panda/redPanda/kungFuPanda alias 在 commands/buddy/index.ts 已映射到替代物种
   if (config.companionForcedSpecies) {
     return { ...merged, species: config.companionForcedSpecies }
   }

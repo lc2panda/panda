@@ -276,9 +276,10 @@ export type GlobalConfig = {
   // why: 用 globalConfig 作 single source of truth，避免 hook 内 ref 跨进程 / 跨命令通信复杂度
   companionForcedState?: import('../buddy/types.js').PetState
   companionForcedStateExpiresAt?: number
-  // D4 P5-T1：/buddy theme <species> 切换 panda 系物种；getCompanion 后置覆盖 bones.species
-  // why: bones 由 userId hash 决定不可变；forced 字段独立保存以便 reset 回 hash 决定
-  companionForcedSpecies?: import('../buddy/types.js').PandaSpecies
+  // v2.21.30 方向 A：/buddy theme <species> 切 18 物种；getCompanion 后置覆盖 bones.species
+  // why: bones 由 userId hash 决定不可变；forced 字段独立保存以便 reset 回 hash 决定；
+  //   v2.21.27-29 panda 系实装退役后类型由 PandaSpecies 升级为 Species（18 物种全集）
+  companionForcedSpecies?: import('../buddy/types.js').Species
 
   // Feedback survey tracking
   feedbackSurveyState?: {

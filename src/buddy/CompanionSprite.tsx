@@ -13,7 +13,7 @@ import type { Theme } from '../utils/theme.js';
 import { getCompanion } from './companion.js';
 import { useCurrentPetState } from './petState.js';
 import { getStateSprite, renderFace, renderSprite, spriteFrameCount } from './sprites.js';
-import { isPandaSpecies, RARITY_COLORS, type PetState } from './types.js';
+import { RARITY_COLORS, type PetState } from './types.js';
 const TICK_MS = 500;
 const BUBBLE_SHOW = 20; // ticks → ~10s at 500ms
 const FADE_WINDOW = 6; // last ~3s the bubble dims so you know it's about to go
@@ -21,16 +21,18 @@ const PET_BURST_MS = 2500; // how long hearts float after /buddy pet
 
 // Idle sequence: mostly rest (frame 0), occasional fidget (frames 1-2), rare blink.
 // Sequence indices map to sprite frames; -1 means "blink on frame 0".
-// why preserved as-is: 旧 18 物种走 IDLE_SEQUENCE 兼容；STATE_SEQUENCES.idle byte-equal 引用同一数组
+// why preserved as-is: 18 物种 byte-equal IDLE_SEQUENCE 节奏；STATE_SEQUENCES.idle 同数组引用
 const IDLE_SEQUENCE = [0, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 2, 0, 0, 0];
 
-// State-driven 帧序列（P3-T1）— 仅 panda 系物种走此表；旧 18 物种继续走 IDLE_SEQUENCE
+// State-driven 帧序列 — 当 species 在 STATE_SPECIES_BODIES 注册了特化 sprite 时走此表，
+//   否则 fallback 到旧 IDLE_SEQUENCE（renderSprite 走 BODIES 旧 18 物种 byte-equal 路径）。
 // 约定：-1 = blink-on-frame-0（与 IDLE_SEQUENCE 一致）；其余非负数 = sprite frame index
-// why: idle 引用 IDLE_SEQUENCE 同一数组保 byte-equal；其他 11 态按 sprite 子文件帧密度设计
+// why v2.21.30 方向 A：panda 系实装退役后 STATE_SPECIES_BODIES 当前为空；序列表保留供未来
+//   给特定物种加 state-driven 帧时复用，避免再次发明轮子。
 const STATE_SEQUENCES: Record<PetState, number[]> = {
   // idle 与旧 IDLE_SEQUENCE byte-equal（同一数组引用）
   idle: IDLE_SEQUENCE,
-  // 思考：3 帧轻摇头 + 摸下巴回环（panda.ts thinking 3 帧）
+  // 思考：3 帧轻摇头 + 摸下巴回环
   thinking: [0, 1, 2, 1, 0, 1, 2, 1],
   // 工作：3 帧打字/操作循环
   working: [0, 1, 2, 1],
@@ -46,7 +48,7 @@ const STATE_SEQUENCES: Record<PetState, number[]> = {
   notification: [0, 1, 0, 1],
   // 苏醒：3 帧渐睁眼
   waking: [0, 1, 2],
-  // 待机梯度：dozing 偶尔晃头；sleeping 全静帧 + 闭眼标记（sprite 子文件已闭眼）
+  // 待机梯度：dozing 偶尔晃头；sleeping 全静帧
   dozing: [0, 0, 0, 1, 0, 0],
   sleeping: [0],
 };
@@ -272,16 +274,18 @@ export function CompanionSprite(): React.ReactNode {
   }
   const frameCount = spriteFrameCount(companion.species);
   const heartFrame = petting ? PET_HEARTS[petAge % PET_HEARTS.length] : null;
-  // why: panda 系走 state-driven STATE_SEQUENCES + getStateSprite；旧 18 物种保 IDLE_SEQUENCE byte-equal
-  const usePandaState = isPandaSpecies(companion.species) && !reaction && !petting;
+  // why v2.21.30 方向 A：所有物种统一走 state-driven path —— 先查 getStateSprite 特化帧，
+  //   缺失自动 fallback 到旧 renderSprite + IDLE_SEQUENCE（旧 18 物种 byte-equal 守护）。
+  //   reaction/petting 优先级最高（excited 全帧 cycle），与方向 A 退役 panda 实装无关。
+  const useStateDriven = !reaction && !petting;
   let spriteFrame: number;
   let blink = false;
-  let pandaBody: string[] | null = null;
+  let stateBody: string[] | null = null;
   if (reaction || petting) {
     // Excited: cycle all fidget frames fast
     spriteFrame = tick % frameCount;
-  } else if (usePandaState) {
-    // panda 系：按 petState 取序列；缺失序列回退 idle 序列；缺失 sprite 回退旧 renderSprite
+  } else if (useStateDriven) {
+    // state-driven：按 petState 取序列；缺失序列回退 idle 序列；缺失 sprite 回退旧 renderSprite
     const seq = STATE_SEQUENCES[petState] ?? STATE_SEQUENCES.idle;
     const step = seq[tick % seq.length]!;
     if (step === -1) {
@@ -296,10 +300,9 @@ export function CompanionSprite(): React.ReactNode {
       const eyed = stateSprite.map(line => line.replaceAll('{E}', companion.eye));
       const lines = [...eyed];
       // 与 renderSprite 一致：line 0 为空且有 hat 则覆盖 hat；全帧 line 0 全空则去掉
-      // why: panda sprite 子文件首行恒 12 空格，遵循同约定，直接复用渲染等价路径
-      pandaBody = lines.map(line => blink ? line.replaceAll(companion.eye, '-') : line);
+      stateBody = lines.map(line => blink ? line.replaceAll(companion.eye, '-') : line);
     } else {
-      // fallback：缺帧时走旧 renderSprite（保稳定不崩）
+      // fallback：缺帧时走旧 renderSprite（保稳定不崩；18 物种当前全走此路径 byte-equal）
       spriteFrame = spriteFrame % frameCount;
     }
   } else {
@@ -311,7 +314,7 @@ export function CompanionSprite(): React.ReactNode {
       spriteFrame = step % frameCount;
     }
   }
-  const body = pandaBody ?? renderSprite(companion, spriteFrame!).map(line => blink ? line.replaceAll(companion.eye, '-') : line);
+  const body = stateBody ?? renderSprite(companion, spriteFrame!).map(line => blink ? line.replaceAll(companion.eye, '-') : line);
   const sprite = heartFrame ? [heartFrame, ...body] : body;
 
   // Name row doubles as hint row — unfocused shows dim name + ↓ discovery,

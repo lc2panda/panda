@@ -1,17 +1,19 @@
 // Input:  MINI_FACES 字符表 + shouldRenderMiniPetFor() 隐藏判定
-// Output: bun test 用例集 — 12 态字符完整性 / 长度恒等 / 隐藏条件 / 物种 gate
-// Pos:    panda 形象宠物 D3 P4-T3 — MiniPet 单元测试 [NEW-FILE:#20260419-AB-06]
+// Output: bun test 用例集 — 12 态字符完整性 / 长度恒等 / 隐藏条件 / 18 物种通用渲染
+// Pos:    A+B 项目精华 — MiniPet 单元测试 [NEW-FILE:#20260419-AB-06]
+//         v2.21.30 方向 A：物种 gate 移除（18 物种均可渲染），保留隐藏条件 3 项
 //
 // 一旦本测试或 src/buddy/MiniPet.tsx 被修改，请同步更新 src/buddy/README.md 的 mini-pet 章节。
 //
 // 设计目标（D3 DoD）：
 //   - 12 态字符表完整且非空
 //   - 每个 face 长度恒等 = 5（StatusLine 单行布局稳定）
-//   - companionMuted=true / companionMiniPet=false / 非 panda 物种 / 无 companion → 不渲染
+//   - companionMuted=true / companionMiniPet=false / 无 companion → 不渲染
+//   - 18 物种全部走渲染路径（v2.21.30 方向 A：panda 系实装退役后无物种 gate）
 //
 // 注意：feature('BUDDY') 在 bun test 下默认 false，组件本体永远 null；
 //   测试主要走纯函数 shouldRenderMiniPetFor + getMiniFace + MINI_FACES，
-//   绕开 React 渲染管线（项目其他测试如 sprites.panda.test.ts 同此风格）。
+//   绕开 React 渲染管线。
 
 import { describe, expect, test } from 'bun:test'
 import {
@@ -24,11 +26,8 @@ import {
 import {
   duck,
   goose,
-  kungFuPanda,
-  panda,
-  PANDA_SPECIES,
   PET_STATES,
-  redPanda,
+  SPECIES,
   type Species,
 } from './types.js'
 
@@ -90,23 +89,31 @@ describe('getMiniFace', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. MINI_PET_COLORS — panda 系 3 物种映射
+// 3. MINI_PET_COLORS — 18 物种全集映射（v2.21.30 方向 A）
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('MINI_PET_COLORS', () => {
-  test('panda → white', () => {
-    expect(MINI_PET_COLORS[panda]).toBe('white')
-  })
-  test('redPanda → red', () => {
-    expect(MINI_PET_COLORS[redPanda]).toBe('red')
-  })
-  test('kungFuPanda → yellow', () => {
-    expect(MINI_PET_COLORS[kungFuPanda]).toBe('yellow')
-  })
-  test('PANDA_SPECIES 3 个全部覆盖', () => {
-    for (const s of PANDA_SPECIES) {
+describe('MINI_PET_COLORS — 18 物种全集', () => {
+  test('SPECIES 18 物种全部就位', () => {
+    expect(SPECIES.length).toBe(18)
+    for (const s of SPECIES) {
       expect(MINI_PET_COLORS[s]).toBeDefined()
+      expect(typeof MINI_PET_COLORS[s]).toBe('string')
     }
+  })
+
+  test('MINI_PET_COLORS key 数 = 18（无遗漏 / 无多余）', () => {
+    expect(Object.keys(MINI_PET_COLORS)).toHaveLength(18)
+  })
+
+  // 抽样验证几个代表物种保证常量稳定
+  test('duck → yellow', () => {
+    expect(MINI_PET_COLORS[duck]).toBe('yellow')
+  })
+  test('robot → cyan', () => {
+    expect(MINI_PET_COLORS.robot).toBe('cyan')
+  })
+  test('chonk → white', () => {
+    expect(MINI_PET_COLORS.chonk).toBe('white')
   })
 })
 
@@ -114,13 +121,12 @@ describe('MINI_PET_COLORS', () => {
 // 4. shouldRenderMiniPetFor — 隐藏条件全集（注入版纯函数，无 fs 副作用）
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PANDA_COMPANION = { species: panda } as { species: Species }
-const RED_PANDA_COMPANION = { species: redPanda } as { species: Species }
-const KUNG_FU_COMPANION = { species: kungFuPanda } as { species: Species }
 const DUCK_COMPANION = { species: duck } as { species: Species }
 const GOOSE_COMPANION = { species: goose } as { species: Species }
+const ROBOT_COMPANION = { species: 'robot' as Species } as { species: Species }
+const CHONK_COMPANION = { species: 'chonk' as Species } as { species: Species }
 
-describe('shouldRenderMiniPetFor — 隐藏条件', () => {
+describe('shouldRenderMiniPetFor — 隐藏条件（v2.21.30 方向 A）', () => {
   test('无 companion → 不渲染', () => {
     expect(shouldRenderMiniPetFor(undefined, {})).toBe(false)
     expect(
@@ -131,9 +137,9 @@ describe('shouldRenderMiniPetFor — 隐藏条件', () => {
     ).toBe(false)
   })
 
-  test('companionMuted=true → 不渲染（即便 panda companion 存在）', () => {
+  test('companionMuted=true → 不渲染（即便 companion 存在）', () => {
     expect(
-      shouldRenderMiniPetFor(PANDA_COMPANION, {
+      shouldRenderMiniPetFor(DUCK_COMPANION, {
         companionMuted: true,
         companionMiniPet: true,
       }),
@@ -142,7 +148,7 @@ describe('shouldRenderMiniPetFor — 隐藏条件', () => {
 
   test('companionMiniPet=false → 不渲染（子 flag 回滚通道）', () => {
     expect(
-      shouldRenderMiniPetFor(PANDA_COMPANION, {
+      shouldRenderMiniPetFor(DUCK_COMPANION, {
         companionMuted: false,
         companionMiniPet: false,
       }),
@@ -151,59 +157,65 @@ describe('shouldRenderMiniPetFor — 隐藏条件', () => {
 
   test('companionMiniPet=undefined（默认）→ 视作 true，不被短路', () => {
     expect(
-      shouldRenderMiniPetFor(PANDA_COMPANION, {
+      shouldRenderMiniPetFor(DUCK_COMPANION, {
         companionMuted: false,
         // companionMiniPet 未设置
       }),
     ).toBe(true)
   })
 
-  test('panda companion + 全开 → 渲染', () => {
-    expect(
-      shouldRenderMiniPetFor(PANDA_COMPANION, {
-        companionMuted: false,
-        companionMiniPet: true,
-      }),
-    ).toBe(true)
-  })
-
-  test('redPanda companion + 全开 → 渲染', () => {
-    expect(
-      shouldRenderMiniPetFor(RED_PANDA_COMPANION, {
-        companionMuted: false,
-        companionMiniPet: true,
-      }),
-    ).toBe(true)
-  })
-
-  test('kungFuPanda companion + 全开 → 渲染', () => {
-    expect(
-      shouldRenderMiniPetFor(KUNG_FU_COMPANION, {
-        companionMuted: false,
-        companionMiniPet: true,
-      }),
-    ).toBe(true)
-  })
-
-  test('非 panda 物种（duck）→ 不渲染（即便全开）', () => {
+  // v2.21.30 方向 A：18 物种均渲染（旧"非 panda 系→不渲染"行为已退役）
+  test('duck companion + 全开 → 渲染', () => {
     expect(
       shouldRenderMiniPetFor(DUCK_COMPANION, {
         companionMuted: false,
         companionMiniPet: true,
       }),
-    ).toBe(false)
+    ).toBe(true)
   })
 
-  test('非 panda 物种（goose）→ 不渲染', () => {
+  test('goose companion + 全开 → 渲染（v2.21.30 方向 A：物种 gate 移除）', () => {
     expect(
       shouldRenderMiniPetFor(GOOSE_COMPANION, {
         companionMuted: false,
         companionMiniPet: true,
       }),
-    ).toBe(false)
+    ).toBe(true)
   })
 
-  test('全空 config → panda 系仍渲染（默认值兜底）', () => {
-    expect(shouldRenderMiniPetFor(PANDA_COMPANION, {})).toBe(true)
+  test('robot companion + 全开 → 渲染', () => {
+    expect(
+      shouldRenderMiniPetFor(ROBOT_COMPANION, {
+        companionMuted: false,
+        companionMiniPet: true,
+      }),
+    ).toBe(true)
+  })
+
+  test('chonk companion + 全开 → 渲染', () => {
+    expect(
+      shouldRenderMiniPetFor(CHONK_COMPANION, {
+        companionMuted: false,
+        companionMiniPet: true,
+      }),
+    ).toBe(true)
+  })
+
+  test('全空 config → 任意物种仍渲染（默认值兜底）', () => {
+    expect(shouldRenderMiniPetFor(DUCK_COMPANION, {})).toBe(true)
+    expect(shouldRenderMiniPetFor(ROBOT_COMPANION, {})).toBe(true)
+  })
+
+  // 18 物种全集守护：循环验证全部渲染
+  test('18 物种 + 全开 → 全部渲染（无任何物种 gate）', () => {
+    for (const s of SPECIES) {
+      const companion = { species: s } as { species: Species }
+      expect(
+        shouldRenderMiniPetFor(companion, {
+          companionMuted: false,
+          companionMiniPet: true,
+        }),
+      ).toBe(true)
+    }
   })
 })

@@ -1,6 +1,6 @@
-// Input:  useCurrentPetState() 12 态信号 + getCompanion() panda 系物种 + GlobalConfig 子开关
+// Input:  useCurrentPetState() 12 态信号 + getCompanion() 物种 + GlobalConfig 子开关
 // Output: StatusLine 左侧 1×5 字符 face（如 "(o.o)"），按 PetState 切表 + 按 species 上色
-// Pos:    panda 形象宠物 D3 P4-T2 — StatusLine mini-pet 嵌入组件
+// Pos:    A+B 项目精华 — StatusLine mini-pet 嵌入组件（v2.21.30 方向 A 改造：18 物种通用）
 //         严守 anthropic byte-equal — 仅订阅 buddy 域 + GlobalConfig，不触 services/api 或 oauth
 // [NEW-FILE:#20260419-AB-06]
 
@@ -10,11 +10,7 @@ import { Text } from '../ink.js'
 import { getGlobalConfig } from '../utils/config.js'
 import { getCompanion } from './companion.js'
 import { useCurrentPetState } from './petState.js'
-import {
-  isPandaSpecies,
-  type PandaSpecies,
-  type PetState,
-} from './types.js'
+import type { PetState, Species } from './types.js'
 
 // 12 态 → 5 字符 face 映射表
 // why 5 字符恒等：StatusLine 是单行布局，face 长度漂移会让 statusLineText 抖动；
@@ -44,16 +40,30 @@ export const MINI_FACES: Record<PetState, string> = {
 // 字符长度恒等校验常量（测试用）— 见 MiniPet.test.tsx
 export const MINI_FACE_LENGTH = 5 as const
 
-// panda 系物种 → ink Color（ansi 名）映射
-// why 直接 ansi 名：mini-pet 是 1×5 字符的强标识，需稳定可视的高对比颜色；
-//   RARITY_COLORS 走 Theme key 在 Matrix 主题下会被覆盖为绿色统一调，丢失物种区分；
-//   按计划决策点 #4 + 任务原文："panda 'white'，redPanda 'red'，kungFuPanda 'yellow'"
-export const MINI_PET_COLORS: Record<PandaSpecies, 'white' | 'red' | 'yellow'> =
-  {
-    panda: 'white',
-    redPanda: 'red',
-    kungFuPanda: 'yellow',
-  } as Record<PandaSpecies, 'white' | 'red' | 'yellow'>
+// why v2.21.30 方向 A：panda 系退役后 mini-pet 改"全 18 物种通用"——
+//   按物种简单分组上色，保留高对比可视；ESC 直 ANSI 名（与旧 panda 系做法一致）。
+//   分组依据：水鸟系蓝调 / 哺乳类暖调 / 爬虫两栖中性 / 怪奇/机械冷调 — 视觉上易区分。
+type MiniColor = 'white' | 'red' | 'yellow' | 'cyan' | 'magenta' | 'green'
+export const MINI_PET_COLORS: Record<Species, MiniColor> = {
+  duck: 'yellow',
+  goose: 'white',
+  blob: 'magenta',
+  cat: 'yellow',
+  dragon: 'red',
+  octopus: 'magenta',
+  owl: 'cyan',
+  penguin: 'cyan',
+  turtle: 'green',
+  snail: 'green',
+  ghost: 'white',
+  axolotl: 'magenta',
+  capybara: 'yellow',
+  cactus: 'green',
+  robot: 'cyan',
+  rabbit: 'white',
+  mushroom: 'red',
+  chonk: 'white',
+}
 
 /**
  * 纯函数：根据 PetState 取 face 字符串（测试用，绕开 React/feature gate）。
@@ -67,20 +77,19 @@ export function getMiniFace(state: PetState): string {
 /**
  * 纯函数（可注入版）：基于显式入参判定 mini-pet 是否应渲染。
  * why 拆出注入版：bun test 下 getCompanion() 的 species 由 userID hash 决定不可控；
- *   独立纯版本让测试能直接断言"非 panda 物种 ⇒ 不渲染"分支。
+ *   独立纯版本让测试能直接断言隐藏条件分支。
  *
- * 隐藏条件：1) 无 companion；2) companionMuted=true；3) companionMiniPet=false；
- *         4) species 非 panda 系。
+ * 隐藏条件（v2.21.30 方向 A 调整）：1) 无 companion；2) companionMuted=true；
+ *   3) companionMiniPet=false。物种 gate 移除——18 物种均可渲染。
  */
 export function shouldRenderMiniPetFor(
-  companion: { species: import('./types.js').Species } | undefined,
+  companion: { species: Species } | undefined,
   config: { companionMuted?: boolean; companionMiniPet?: boolean },
 ): boolean {
   if (!companion) return false
   if (config.companionMuted) return false
   // 子 feature flag — 默认 true（按计划决策点 #6 锁定，便于回滚）
   if (config.companionMiniPet === false) return false
-  if (!isPandaSpecies(companion.species)) return false
   return true
 }
 
@@ -117,7 +126,7 @@ function MiniPetInner(): React.ReactNode {
   //   不会引发 hook 顺序漂移；放在 hook 调用之后确保 React 严格模式不报警
   if (!shouldRenderMiniPet()) return null
   const companion = getCompanion()!
-  const color = MINI_PET_COLORS[companion.species as PandaSpecies] ?? 'white'
+  const color = MINI_PET_COLORS[companion.species] ?? 'white'
   const face = getMiniFace(petState)
   return <Text color={color}>{face}</Text>
 }
