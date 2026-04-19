@@ -1,0 +1,13 @@
+PLACEHOLDER PNG — v0.1 alpha
+============================
+本文件为 v1.0 GA 占位（Phase 3 P3-T2）。
+真实 PNG（512×512 sRGB）将在 v1.5 美术冲刺时由设计稿导出替换。
+
+转换路径：
+  panda.svg --[sharp/imagemagick]--> panda.png (512x512 PNG-32)
+
+参考命令（v1.5 出图后执行）：
+  bunx sharp-cli -i panda.svg -o panda.png --resize 512 512
+
+NOTE: electron-builder 在 build:electron 步骤前需要真实 PNG 才能成功打包。
+v0.1-alpha 阶段不实际打包，仅占位。

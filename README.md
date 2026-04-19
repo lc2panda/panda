@@ -1765,6 +1765,44 @@ Panda 自动检测 Windows 终端类型并适配渲染能力：
   - 旧 alias 向后兼容：`theme panda` → `chonk` 圆胖治愈系；`theme redPanda` → `cat` 小型灵巧；`theme kungFuPanda` → `robot` 机械武术（v2.21.27-29 panda 系实装因画布太小退役）
 - **示例**: `/buddy state working` `/buddy theme robot`
 
+##### panda-on-desk · 桌面 GUI 增强（v1.0 GA · 子产品）
+
+> **panda-on-desk** 是 `/buddy` 的桌面端 GUI 兄弟产品 — 基于 Electron 41 的 透明 overlay 浮窗 + 宠物养成可视化 + 通知聚合。
+> panda CLI（Ink TUI）依然是主体验，panda-on-desk 是**可选增强**：CLI 不依赖 GUI 即可独立运行。
+
+| 维度 | 说明 |
+|------|------|
+| 子包路径 | `packages/panda-on-desk/`（panda monorepo 子包） |
+| 源码协议 | Apache-2.0（基于 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) MIT 81% 吸收 + 改造 fork） |
+| 平台 | macOS (dmg / zip · Intel + Apple Silicon) · Windows (NSIS x64) · Linux (AppImage / deb x64) |
+| 与 CLI 通信 | 本地 HTTP `127.0.0.1:1455+` + SSE 订阅 `~/.config/panda/runtime.json` 信号 |
+| 9 子模块 | main · preload · renderer · bridge · state · theme · platform · i18n · updater |
+
+**安装方式**
+
+```bash
+# 方式 1：GitHub Release 下载（推荐）
+# 访问 https://github.com/lc2panda/panda/releases?q=desk-v
+# - macOS：下载 panda-on-desk-X.Y.Z-mac.dmg → 双击安装
+# - Windows：下载 panda-on-desk-X.Y.Z-Setup.exe → 双击安装
+# - Linux：下载 panda-on-desk-X.Y.Z.AppImage → chmod +x 后运行
+
+# 方式 2：源码运行（开发者）
+cd packages/panda-on-desk
+bun install
+bun start                        # === node launch.cjs（spawn electron GUI 模式）
+```
+
+**与 panda CLI 的关系**
+
+```
+panda CLI（authoritative）        ──HTTP/SSE─▶        panda-on-desk（reactive）
+  Ink TUI + PetState 12 态状态机                          Electron GUI overlay
+  103 主动场景 + StatusLine mini-pet  ◀──ack/op──        宠物可视化 + 通知聚合
+```
+
+详见子包 [packages/panda-on-desk/README.md](./packages/panda-on-desk/README.md)。
+
 #### `/brief`
 - **用法**: `/brief [on|off]`
 - **说明**: 简报模式 — AI 只输出简洁摘要

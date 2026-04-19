@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Input: 矢量源 — electron-builder 通过 sharp 转 PNG/ICNS/ICO 时的占位输入
+  Output: 512×512 panda 占位图（黑底白字 ASCII art 风）
+  Pos: panda-on-desk 跨平台 icon 占位 god-source — v1.5 美术替换前的临时资产
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0d0d0d"/>
+  <circle cx="256" cy="256" r="200" fill="#ffffff"/>
+  <!-- 黑眼罩 -->
+  <ellipse cx="190" cy="220" rx="38" ry="48" fill="#0d0d0d"/>
+  <ellipse cx="322" cy="220" rx="38" ry="48" fill="#0d0d0d"/>
+  <!-- 眼睛高光 -->
+  <circle cx="190" cy="220" r="10" fill="#ffffff"/>
+  <circle cx="322" cy="220" r="10" fill="#ffffff"/>
+  <!-- 鼻子 -->
+  <ellipse cx="256" cy="290" rx="18" ry="12" fill="#0d0d0d"/>
+  <!-- 嘴 -->
+  <path d="M 240 320 Q 256 340 272 320" stroke="#0d0d0d" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <!-- 耳朵 -->
+  <circle cx="120" cy="120" r="48" fill="#0d0d0d"/>
+  <circle cx="392" cy="120" r="48" fill="#0d0d0d"/>
+  <!-- 标签 -->
+  <text x="256" y="475" font-family="monospace" font-size="36" fill="#ffffff" text-anchor="middle" font-weight="bold">panda-on-desk</text>
+</svg>

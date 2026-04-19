@@ -1,0 +1,243 @@
+# Input: git tag desk-vX.Y.Z 推送 触发跨平台 electron 打包 + GitHub Release 发布
+# Output: dist-electron/{*.dmg, *-Setup.exe, *.AppImage, *.deb, *.zip} → GH Release assets
+# Pos: panda-on-desk Phase 3 GA Release pipeline god-workflow — 与 packages/panda-on-desk/electron-builder.yml 配套
+#
+# [NEW-FILE:#20260419-P3-01]
+#
+# 触发约定：
+#   1. 在 packages/panda-on-desk/package.json 更新 version 后，
+#   2. 创建并推送 tag desk-vX.Y.Z（X.Y.Z 与 panda-on-desk 子包版本对齐）
+#   3. 本 workflow 自动 build mac/win/linux 三平台并 publish 到 GitHub Release
+#
+# 与主 panda CLI 发版 (`v2.x.y` tag) 解耦：
+#   - 本 workflow 仅 desk-v* tag 触发
+#   - 主 CI (`.github/workflows/ci.yml`) 仍走 push/PR 路径
+#
+# v1.0 GA 阶段 dry-run 注意事项：
+#   - 实际跑 CI 前需先 `cd packages/panda-on-desk && bun add electron@41 electron-builder@25 electron-updater@6.8 -d`
+#   - icon 资产为占位文本，真打包前需替换 build/icons/panda.{png,icns,ico} 为真实图像
+#   - GH_TOKEN: 由 GitHub Actions 自动注入 secrets.GITHUB_TOKEN
+
+name: Release panda-on-desk
+
+on:
+  push:
+    tags:
+      - 'desk-v*'
+
+# 并发控制：同 tag 重复触发时取消旧 run
+concurrency:
+  group: release-panda-on-desk-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # 创建 Release 需要
+
+jobs:
+  # ─────────── macOS 打包（dmg + zip / x64 + arm64）───────────
+  build-mac:
+    name: Build macOS (dmg + zip)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install root deps
+        run: bun install --frozen-lockfile
+
+      - name: Install panda-on-desk deps
+        working-directory: packages/panda-on-desk
+        run: bun install
+
+      - name: Build (electron-builder mac)
+        working-directory: packages/panda-on-desk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # v1.0 不签名 — v1.5 后引入证书
+        run: bunx electron-builder --mac --publish never
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: panda-on-desk-mac
+          path: |
+            packages/panda-on-desk/dist-electron/*.dmg
+            packages/panda-on-desk/dist-electron/*.zip
+            packages/panda-on-desk/dist-electron/*.blockmap
+            packages/panda-on-desk/dist-electron/latest-mac.yml
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ─────────── Windows 打包（NSIS x64）───────────
+  build-win:
+    name: Build Windows (NSIS)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install root deps
+        run: bun install --frozen-lockfile
+
+      - name: Install panda-on-desk deps
+        working-directory: packages/panda-on-desk
+        run: bun install
+
+      - name: Build (electron-builder win)
+        working-directory: packages/panda-on-desk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bunx electron-builder --win --publish never
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: panda-on-desk-win
+          path: |
+            packages/panda-on-desk/dist-electron/*.exe
+            packages/panda-on-desk/dist-electron/*.blockmap
+            packages/panda-on-desk/dist-electron/latest.yml
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ─────────── Linux 打包（AppImage + deb x64）───────────
+  build-linux:
+    name: Build Linux (AppImage + deb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Linux build deps (rpmbuild + libxss)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            rpm \
+            libxss1 \
+            libnss3 \
+            libgtk-3-0 \
+            libgbm1
+
+      - name: Install root deps
+        run: bun install --frozen-lockfile
+
+      - name: Install panda-on-desk deps
+        working-directory: packages/panda-on-desk
+        run: bun install
+
+      - name: Build (electron-builder linux)
+        working-directory: packages/panda-on-desk
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bunx electron-builder --linux --publish never
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: panda-on-desk-linux
+          path: |
+            packages/panda-on-desk/dist-electron/*.AppImage
+            packages/panda-on-desk/dist-electron/*.deb
+            packages/panda-on-desk/dist-electron/latest-linux.yml
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ─────────── 汇总三平台制品 → 创建 GitHub Release ───────────
+  publish:
+    name: Publish GitHub Release
+    needs: [build-mac, build-win, build-linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          # tag 格式 desk-v1.0.0 → version=1.0.0
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#desk-v}"
+          echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-release/
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-assets
+          find dist-release -type f \( \
+            -name '*.dmg' -o \
+            -name '*.zip' -o \
+            -name '*.exe' -o \
+            -name '*.AppImage' -o \
+            -name '*.deb' -o \
+            -name '*.blockmap' -o \
+            -name 'latest*.yml' \
+          \) -exec cp -v {} release-assets/ \;
+          ls -lh release-assets/
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "panda-on-desk v${{ steps.version.outputs.version }}" \
+            --notes "## panda-on-desk v${{ steps.version.outputs.version }}
+
+跨平台 Electron GUI 增强 — 与 panda CLI (\`@lc2panda/panda-code\`) 配套使用。
+
+### 下载
+
+- **macOS**：\`panda-on-desk-${{ steps.version.outputs.version }}-mac.dmg\` (Intel + Apple Silicon)
+- **Windows**：\`panda-on-desk-${{ steps.version.outputs.version }}-Setup.exe\` (NSIS x64)
+- **Linux**：\`panda-on-desk-${{ steps.version.outputs.version }}.AppImage\` 或 \`.deb\`
+
+### 安装
+
+详见主仓库 [README.md](https://github.com/lc2panda/panda#panda-on-desk) → panda-on-desk 子产品章节。
+
+### 与 panda CLI 关系
+
+panda-on-desk 是 panda CLI 的可选 GUI 增强，通过本地 HTTP (1455+) + SSE 订阅 panda CLI 状态信号。panda CLI 不依赖 panda-on-desk 即可独立运行（\`bun panda\` 仍是 TUI 主体验）。
+
+---
+> 自动生成于 ${{ steps.version.outputs.tag }} tag 推送时。" \
+            --draft \
+            release-assets/*

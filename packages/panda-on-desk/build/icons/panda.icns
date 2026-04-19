@@ -1,0 +1,15 @@
+PLACEHOLDER ICNS — v0.1 alpha (Phase 3 P3-T2)
+=============================================
+macOS Apple Icon Image 占位。
+
+真实 .icns 生成路径（v1.5 美术后）：
+  iconutil -c icns panda.iconset/
+
+iconset 需含：
+  icon_16x16.png      icon_16x16@2x.png   (32x32)
+  icon_32x32.png      icon_32x32@2x.png   (64x64)
+  icon_128x128.png    icon_128x128@2x.png (256x256)
+  icon_256x256.png    icon_256x256@2x.png (512x512)
+  icon_512x512.png    icon_512x512@2x.png (1024x1024)
+
+NOTE: electron-builder mac 目标在打包前需真实 .icns。v0.1-alpha 阶段仅占位。

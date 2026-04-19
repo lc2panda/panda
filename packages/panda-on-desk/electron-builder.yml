@@ -38,6 +38,7 @@ mac:
   hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  icon: build/icons/panda.icns       # Phase 3 P3-T2 占位 → v1.5 替换为真实 .icns
   arch:
     - x64
     - arm64
@@ -50,6 +51,7 @@ win:
         - x64
   publisherName: lc2panda
   verifyUpdateCodeSignature: false
+  icon: build/icons/panda.ico        # Phase 3 P3-T2 占位 → v1.5 替换为真实 .ico
 
 # Linux：AppImage（通用） + deb（Debian/Ubuntu）/ x64
 linux:
@@ -57,12 +59,17 @@ linux:
     - AppImage
     - deb
   category: Development
+  icon: build/icons/panda.png        # Phase 3 P3-T2 占位 → v1.5 替换为真实 PNG 512x512
   arch:
     - x64
 
-# 自动 publish 到 GitHub release（需 GH_TOKEN 环境变量；v0.1-alpha 不自动 publish）
+# 自动 publish 到 GitHub release
+# - owner: lc2panda / repo: panda 已对齐（与 .github/workflows/release-panda-on-desk.yml 配套）
+# - 由 desk-vX.Y.Z tag 触发；workflow 自身用 gh release create 创建 draft，本配置仅用于 electron-updater feedURL 解析
+# - GH_TOKEN 环境变量：CI 注入 secrets.GITHUB_TOKEN
 publish:
   provider: github
   owner: lc2panda
   repo: panda
   releaseType: release
+  vPrefixedTagName: false   # tag 名 `desk-v1.0.0` 自身已含 v 前缀，关闭 electron-updater 二次拼接
