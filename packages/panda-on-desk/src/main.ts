@@ -741,13 +741,38 @@ function createWindow() {
   }
   if (isWin) win.setAlwaysOnTop(true, WIN_TOPMOST_LEVEL)
 
-  // TODO[P1-T6]: index.html 待 renderer 任务落地
-  const indexHtml = path.join(__dirname, '..', 'renderer', 'index.html')
-  if (fs.existsSync(indexHtml)) {
-    win.loadFile(indexHtml)
+  // v2.24.3 hotfix: 路径改为 src/renderer/hit.html（hit.html 已含 panda SVG + drag CSS）
+  // 旧路径 '../renderer/' 错位一级（main.js 在 src/，renderer/ 也在 src/，应直接 './renderer/'）
+  // fallback URL 也内嵌完整 panda SVG（双保险，无 hit.html 也显示宠物）
+  const hitHtmlPath = path.join(__dirname, 'renderer', 'hit.html')
+  if (fs.existsSync(hitHtmlPath)) {
+    win.loadFile(hitHtmlPath)
   } else {
+    // why: 双保险 fallback — 即使 hit.html 缺失也能看到 panda 形象 + 拖拽
     win.loadURL(
-      'data:text/html,<body style="margin:0;background:transparent"><h1 style="color:white;font-family:monospace;text-align:center;margin:50px">panda v0.1</h1></body>'
+      'data:text/html;charset=utf-8,' + encodeURIComponent(
+        '<!DOCTYPE html><html><head><style>' +
+        '*{margin:0;padding:0;box-sizing:border-box}' +
+        'html,body{width:100%;height:100%;overflow:hidden;background:transparent;-webkit-app-region:drag;user-select:none}' +
+        '#pet{width:100%;height:100%;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3));cursor:grab}' +
+        '#pet:active{cursor:grabbing}' +
+        '#pet svg{width:80%;height:80%;animation:breath 3s ease-in-out infinite}' +
+        '@keyframes breath{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}' +
+        '</style></head><body><div id="pet">' +
+        '<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">' +
+        '<ellipse cx="55" cy="55" rx="22" ry="26" fill="#1a1a1a"/>' +
+        '<ellipse cx="145" cy="55" rx="22" ry="26" fill="#1a1a1a"/>' +
+        '<circle cx="100" cy="105" r="65" fill="#f5f5f5" stroke="#222" stroke-width="3"/>' +
+        '<ellipse cx="75" cy="100" rx="16" ry="20" fill="#1a1a1a" transform="rotate(-15 75 100)"/>' +
+        '<ellipse cx="125" cy="100" rx="16" ry="20" fill="#1a1a1a" transform="rotate(15 125 100)"/>' +
+        '<circle cx="75" cy="100" r="5" fill="#fff"/>' +
+        '<circle cx="125" cy="100" r="5" fill="#fff"/>' +
+        '<circle cx="76" cy="101" r="2.5" fill="#000"/>' +
+        '<circle cx="126" cy="101" r="2.5" fill="#000"/>' +
+        '<ellipse cx="100" cy="125" rx="6" ry="4" fill="#1a1a1a"/>' +
+        '<path d="M100 130 Q92 140 85 136 M100 130 Q108 140 115 136" stroke="#1a1a1a" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+        '</svg></div></body></html>'
+      )
     )
   }
   applyPetWindowBounds(startBounds)
