@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<!-- Forked from clawd-on-desk@4b07658:src/bubble.html (MIT License) - Panda branded
+     No textual brand strings (UI is Permission Request / tool labels). i18n strings
+     (en/zh/ko) are generic and reused as-is. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ── Theme variables ── */
+:root {
+  --ease-spring: var(--ease-spring);
+  --card-bg: #ffffff;
+  --card-border: rgba(0, 0, 0, 0.08);
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --card-inset: none;
+  --text-primary: #18181b;
+  --header-color: #374151;
+  --cmd-bg: #f4f4f5;
+  --cmd-border: rgba(0, 0, 0, 0.06);
+  --cmd-color: #374151;
+  --cmd-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+  --scroll-thumb: rgba(0, 0, 0, 0.15);
+  --scroll-thumb-hover: rgba(0, 0, 0, 0.25);
+  --deny-bg: #ffffff;
+  --deny-color: #52525b;
+  --deny-border: #d1d5db;
+  --deny-hover-bg: #f9fafb;
+  --deny-hover-border: #9ca3af;
+  --sug-bg: #ffffff;
+  --sug-color: #71717a;
+  --sug-border: #e5e7eb;
+  --sug-hover-bg: #f9fafb;
+  --sug-hover-border: #d1d5db;
+  --sug-hover-color: #374151;
+  --sug-arrow: #9ca3af;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --card-bg: #18181b;
+    --card-border: rgba(255, 255, 255, 0.1);
+    --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    --card-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --text-primary: #f4f4f5;
+    --header-color: #e4e4e7;
+    --cmd-bg: #09090b;
+    --cmd-border: rgba(255, 255, 255, 0.06);
+    --cmd-color: #a1a1aa;
+    --cmd-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    --scroll-thumb: rgba(255, 255, 255, 0.1);
+    --scroll-thumb-hover: rgba(255, 255, 255, 0.2);
+    --deny-bg: rgba(255, 255, 255, 0.05);
+    --deny-color: #e4e4e7;
+    --deny-border: rgba(255, 255, 255, 0.1);
+    --deny-hover-bg: rgba(255, 255, 255, 0.1);
+    --deny-hover-border: rgba(255, 255, 255, 0.15);
+    --sug-bg: rgba(255, 255, 255, 0.03);
+    --sug-color: #a1a1aa;
+    --sug-border: rgba(255, 255, 255, 0.06);
+    --sug-hover-bg: rgba(255, 255, 255, 0.08);
+    --sug-hover-border: rgba(255, 255, 255, 0.15);
+    --sug-hover-color: #e4e4e7;
+    --sug-arrow: #d4d4d8;
+  }
+}
+
+html, body {
+  width: 100%; height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body { padding: 6px; }
+
+.card {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--card-shadow), var(--card-inset, none);
+  color: var(--text-primary);
+  opacity: 0;
+  transform: translateX(60px);
+  transition: opacity 0.35s var(--ease-spring), transform 0.4s var(--ease-spring);
+  overflow: hidden;
+}
+
+.card.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+.card.hiding {
+  opacity: 0;
+  transform: translateX(60px);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+}
+.header-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--header-color);
+  letter-spacing: 0.02em;
+}
+
+/* ── Tool pill ── */
+.tool-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #fff;
+  letter-spacing: 0.05em;
+  background: #52525b;
+}
+.tool-pill[data-tool="Bash"]  { background: #d97757; }
+.tool-pill[data-tool="Edit"]  { background: #5b8dd9; }
+.tool-pill[data-tool="Write"] { background: #8b7ec7; }
+.tool-pill[data-tool="Read"]  { background: #5a9e6f; }
+.tool-pill[data-tool="Glob"]  { background: #5a9eab; }
+.tool-pill[data-tool="Grep"]  { background: #5a9eab; }
+.tool-pill[data-tool="Agent"] { background: #c47a9a; }
+.tool-pill[data-tool="Shell"] { background: #d97757; }
+.tool-pill[data-tool="CodexExec"] { background: #2563eb; }
+
+/* ── Session tag (folder + short id, hidden when absent) ── */
+.session-tag {
+  display: none;
+  font-size: 11px;
+  color: var(--cmd-color);
+  opacity: 0.7;
+  font-family: "SF Mono", "ui-monospace", "Cascadia Code", "Fira Code", monospace;
+  letter-spacing: 0.02em;
+  margin-top: -2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.session-tag.visible { display: block; }
+
+/* ── Command block ── */
+.command-block {
+  padding: 12px;
+  background: var(--cmd-bg);
+  border: 1px solid var(--cmd-border);
+  border-radius: 10px;
+  font-family: "SF Mono", "ui-monospace", "Cascadia Code", "Fira Code", monospace;
+  font-size: 12px;
+  color: var(--cmd-color);
+  line-height: 1.5;
+  max-height: 80px;
+  overflow-y: auto;
+  word-break: break-all;
+  box-shadow: var(--cmd-shadow);
+}
+.command-block::-webkit-scrollbar { width: 6px; }
+.command-block::-webkit-scrollbar-track { background: transparent; }
+.command-block::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 3px; }
+.command-block::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+
+/* ── Elicitation form ── */
+.elicitation-form {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+.elicitation-form.visible { display: flex; }
+
+.question-card {
+  padding: 12px;
+  background: var(--cmd-bg);
+  border: 1px solid var(--cmd-border);
+  border-radius: 10px;
+  box-shadow: var(--cmd-shadow);
+}
+
+.question-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cmd-color);
+  opacity: 0.85;
+}
+
+.question-text {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.question-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--cmd-color);
+  opacity: 0.85;
+}
+
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.option-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cmd-border);
+  background: rgba(255, 255, 255, 0.28);
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  .option-item {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.option-item input {
+  margin-top: 2px;
+  accent-color: #d97757;
+}
+
+.option-item-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option-item-label {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.option-item-description {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--cmd-color);
+}
+
+/* ── Action buttons ── */
+.actions {
+  display: flex;
+  gap: 8px;
+}
+.btn {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s var(--ease-spring);
+  outline: none;
+}
+.btn:active:not(:disabled) { transform: scale(0.96); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-allow {
+  background: #d97757;
+  color: #fff;
+  border: 1px solid transparent;
+}
+.btn-allow:hover:not(:disabled) {
+  background: #c4684a;
+}
+
+.btn-deny {
+  background: var(--deny-bg);
+  color: var(--deny-color);
+  border: 1px solid var(--deny-border);
+}
+.btn-deny:hover:not(:disabled) {
+  background: var(--deny-hover-bg);
+  border-color: var(--deny-hover-border);
+}
+
+/* ── Suggestion buttons (dynamic) ── */
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-suggestion {
+  display: block;
+  width: 100%;
+  padding: 7px 12px;
+  background: var(--sug-bg);
+  color: var(--sug-color);
+  border: 1px solid var(--sug-border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-spring);
+  outline: none;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+}
+.btn-suggestion::after {
+  content: '→';
+  position: absolute;
+  right: 14px;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: all 0.2s ease;
+  color: var(--sug-arrow);
+}
+.btn-suggestion:hover:not(:disabled) {
+  background: var(--sug-hover-bg);
+  border-color: var(--sug-hover-border);
+  color: var(--sug-hover-color);
+  padding-right: 34px;
+}
+.btn-suggestion:hover:not(:disabled)::after {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.btn-suggestion:active:not(:disabled) { transform: scale(0.98); }
+.btn-suggestion:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="header">
+    <span class="header-title">Permission Request</span>
+    <span class="tool-pill" id="toolPill"></span>
+  </div>
+
+  <div class="session-tag" id="sessionTag"></div>
+
+  <div class="command-block" id="commandBlock"></div>
+  <div class="elicitation-form" id="elicitationForm"></div>
+  
+  <div class="actions">
+    <button class="btn btn-allow" id="btnAllow">Allow</button>
+    <button class="btn btn-deny" id="btnDeny">Deny</button>
+  </div>
+  
+  <div class="suggestions" id="suggestions"></div>
+</div>
+
+<script>
+const card = document.getElementById("card");
+const toolPill = document.getElementById("toolPill");
+const commandBlock = document.getElementById("commandBlock");
+const elicitationForm = document.getElementById("elicitationForm");
+const btnAllow = document.getElementById("btnAllow");
+const btnDeny = document.getElementById("btnDeny");
+const suggestionsContainer = document.getElementById("suggestions");
+const headerTitle = document.querySelector(".header-title");
+const sessionTag = document.getElementById("sessionTag");
+let elicitationMode = false;
+let elicitationQuestions = [];
+let currentLang = "en";
+
+function setSessionTag(data) {
+  const parts = [];
+  if (data.sessionFolder) parts.push(data.sessionFolder);
+  if (data.sessionShortId) parts.push("#" + data.sessionShortId);
+  if (parts.length) {
+    sessionTag.textContent = parts.join(" \u00B7 ");
+    sessionTag.classList.add("visible");
+  } else {
+    sessionTag.textContent = "";
+    sessionTag.classList.remove("visible");
+  }
+}
+
+function formatDetail(name, input) {
+  if (!input || typeof input !== "object") return "";
+  if (name === "Bash" && input.command) return truncate(input.command, 120);
+  if ((name === "Edit" || name === "Write" || name === "Read") && input.file_path)
+    return truncate(input.file_path, 120);
+  if ((name === "Glob" || name === "Grep") && input.pattern)
+    return truncate(input.pattern, 120);
+  for (const v of Object.values(input)) {
+    if (typeof v === "string") return truncate(v, 100);
+  }
+  return truncate(JSON.stringify(input), 100);
+}
+
+function truncate(s, max) {
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1) + "\u2026";
+}
+
+const BUBBLE_STRINGS = {
+  en: {
+    autoAcceptEdits: "Auto-accept edits",
+    switchToPlanMode: "Switch to plan mode",
+    allowInDir: "Allow {tool} in {dir}/",
+    alwaysAllowRule: "Always allow `{rule}`",
+    alwaysAllow: "Always allow",
+    permissionRequest: "Permission Request",
+    allow: "Allow",
+    deny: "Deny",
+    alwaysAllowBlanket: "Always Allow (blanket)",
+    alwaysAllowBlanketTitle: "Warning: opencode's 'always' rule auto-approves every subsequent tool call of the same category in this session (including rm and similar destructive commands). The rule lives only in memory — restart opencode to revoke.",
+    needsInput: "Needs Input",
+    goToTerminal: "Go to Terminal",
+    submitAnswer: "Submit Answer",
+    chooseOneOption: "Choose one option",
+    chooseAtLeastOneOption: "Multi-select, choose at least one",
+    questionLabel: "Question {index}",
+    codexPermission: "Codex Permission",
+    gotIt: "Got it",
+    planReview: "Plan Review",
+    approve: "Approve",
+    reject: "Reject",
+  },
+  zh: {
+    autoAcceptEdits: "\u81EA\u52A8\u63A5\u53D7\u7F16\u8F91",
+    switchToPlanMode: "\u5207\u6362\u5230 Plan \u6A21\u5F0F",
+    allowInDir: "\u5141\u8BB8 {tool} \u5728 {dir}/",
+    alwaysAllowRule: "\u59CB\u7EC8\u5141\u8BB8 `{rule}`",
+    alwaysAllow: "\u59CB\u7EC8\u5141\u8BB8",
+    permissionRequest: "\u6743\u9650\u8BF7\u6C42",
+    allow: "\u6279\u51C6",
+    deny: "\u62D2\u7EDD",
+    alwaysAllowBlanket: "\u59CB\u7EC8\u5141\u8BB8\uFF08\u901A\u914D\uFF09",
+    alwaysAllowBlanketTitle: "\u8B66\u544A\uFF1Aopencode \u7684 always \u89C4\u5219\u4F1A\u8BA9\u672C\u6B21 session \u5185\u4E0B\u4E00\u6B21\u6240\u6709\u540C\u7C7B\u5DE5\u5177\u8C03\u7528\u81EA\u52A8\u653E\u884C\uFF08\u5305\u62EC rm \u7B49\u5371\u9669\u547D\u4EE4\uFF09\u3002\u8BE5\u89C4\u5219\u53EA\u5728\u5185\u5B58\u4E2D\uFF0C\u91CD\u542F opencode \u5373\u6062\u590D\u3002",
+    needsInput: "\u9700\u8981\u8F93\u5165",
+    goToTerminal: "\u524D\u5F80\u7EC8\u7AEF",
+    submitAnswer: "\u63D0\u4EA4\u56DE\u7B54",
+    chooseOneOption: "\u8BF7\u9009\u62E9\u4E00\u9879",
+    chooseAtLeastOneOption: "\u53EF\u591A\u9009\uFF0C\u81F3\u5C11\u9009\u62E9\u4E00\u9879",
+    questionLabel: "\u95EE\u9898 {index}",
+    codexPermission: "Codex \u6743\u9650\u8BF7\u6C42",
+    gotIt: "\u77E5\u9053\u4E86",
+    planReview: "\u8BA1\u5212\u5BA1\u6279",
+    approve: "\u6279\u51C6",
+    reject: "\u62D2\u7EDD",
+  },
+  ko: {
+    autoAcceptEdits: "\uD3B8\uC9D1 \uC790\uB3D9 \uC2B9\uC778",
+    switchToPlanMode: "Plan \uBAA8\uB4DC\uB85C \uC804\uD658",
+    allowInDir: "{dir}/\uC5D0\uC11C {tool} \uD5C8\uC6A9",
+    alwaysAllowRule: "\uD56D\uC0C1 \uD5C8\uC6A9 `{rule}`",
+    alwaysAllow: "\uD56D\uC0C1 \uD5C8\uC6A9",
+    permissionRequest: "\uAD8C\uD55C \uC694\uCCAD",
+    allow: "\uD5C8\uC6A9",
+    deny: "\uAC70\uBD80",
+    alwaysAllowBlanket: "\uD56D\uC0C1 \uD5C8\uC6A9 (\uC804\uCCB4)",
+    alwaysAllowBlanketTitle: "\uACBD\uACE0: opencode\uC758 'always' \uADDC\uCE59\uC740 \uC774 \uC138\uC158\uC5D0\uC11C \uAC19\uC740 \uC885\uB958\uC758 \uC774\uD6C4 \uBAA8\uB4E0 \uB3C4\uAD6C \uD638\uCD9C\uC744 \uC790\uB3D9 \uC2B9\uC778\uD569\uB2C8\uB2E4. (rm \uAC19\uC740 \uD30C\uAD34\uC801 \uBA85\uB839 \uD3EC\uD568) \uC774 \uADDC\uCE59\uC740 \uBA54\uBAA8\uB9AC\uC5D0\uB9CC \uB0A8\uC73C\uBA70, opencode\uB97C \uC7AC\uC2DC\uC791\uD558\uBA74 \uD574\uC81C\uB429\uB2C8\uB2E4.",
+    needsInput: "\uC785\uB825 \uD544\uC694",
+    goToTerminal: "\uD130\uBBF8\uB110\uB85C \uC774\uB3D9",
+    submitAnswer: "\uB2F5\uBCC0 \uC81C\uCD9C",
+    chooseOneOption: "\uD56D\uBAA9 \uD558\uB098\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    chooseAtLeastOneOption: "\uC5EC\uB7EC \uD56D\uBAA9 \uC120\uD0DD \uAC00\uB2A5, \uCD5C\uC18C \uD558\uB098 \uC120\uD0DD",
+    questionLabel: "\uC9C8\uBB38 {index}",
+    codexPermission: "Codex \uAD8C\uD55C \uC694\uCCAD",
+    gotIt: "\uD655\uC778",
+    planReview: "\uACC4\uD68D \uAC80\uD1A0",
+    approve: "\uC2B9\uC778",
+    reject: "\uAC70\uBD80",
+  },
+};
+
+function bubbleText(lang, key, vars) {
+  const dict = BUBBLE_STRINGS[lang] || BUBBLE_STRINGS.en;
+  let value = dict[key] || BUBBLE_STRINGS.en[key] || key;
+  if (!vars) return value;
+  for (const [name, replacement] of Object.entries(vars)) {
+    value = value.replace(`{${name}}`, replacement);
+  }
+  return value;
+}
+
+function getSuggestionLabel(s, lang) {
+  if (s.type === "setMode") {
+    if (s.mode === "acceptEdits") return bubbleText(lang, "autoAcceptEdits");
+    if (s.mode === "plan") return bubbleText(lang, "switchToPlanMode");
+    return s.mode;
+  }
+  if (s.type === "addRules") {
+    // Support both flat (toolName/ruleContent) and nested (rules:[]) formats
+    const rule = Array.isArray(s.rules) && s.rules[0] ? s.rules[0] : s;
+    const rc = rule.ruleContent || s.ruleContent;
+    const tn = rule.toolName || s.toolName || "";
+    if (rc) {
+      if (rc.includes("**")) {
+        const dir = rc.split("**")[0].replace(/[\\/]$/, "").split(/[\\/]/).pop() || rc;
+        return bubbleText(lang, "allowInDir", { tool: tn, dir });
+      }
+      const short = rc.length > 30 ? rc.slice(0, 29) + "\u2026" : rc;
+      return bubbleText(lang, "alwaysAllowRule", { rule: short });
+    }
+  }
+  return bubbleText(lang, "alwaysAllow");
+}
+
+function disableAll() {
+  btnAllow.disabled = true;
+  btnDeny.disabled = true;
+  for (const btn of suggestionsContainer.children) btn.disabled = true;
+  for (const input of elicitationForm.querySelectorAll("input")) input.disabled = true;
+}
+
+function revealCard() {
+  card.classList.remove("hiding");
+  card.classList.add("visible");
+  // 12 = 6px padding top + 6px padding bottom
+  requestAnimationFrame(() => {
+    window.bubbleAPI.reportHeight(card.offsetHeight + 12);
+  });
+}
+
+function resetBubbleContent() {
+  elicitationMode = false;
+  elicitationQuestions = [];
+  commandBlock.style.display = "";
+  commandBlock.textContent = "";
+  elicitationForm.innerHTML = "";
+  elicitationForm.classList.remove("visible");
+  toolPill.style.display = "";
+  btnAllow.style.display = "";
+  btnAllow.disabled = false;
+  btnDeny.style.display = "";
+  btnDeny.disabled = false;
+  suggestionsContainer.innerHTML = "";
+}
+
+function isQuestionAnswered(questionCard) {
+  if (!questionCard) return false;
+  return [...questionCard.querySelectorAll("input")].some(input => input.checked);
+}
+
+function updateElicitationSubmitState() {
+  if (!elicitationMode) return;
+  const questionCards = [...elicitationForm.querySelectorAll(".question-card")];
+  const isComplete = elicitationQuestions.length > 0
+    && questionCards.length === elicitationQuestions.length
+    && questionCards.every(isQuestionAnswered);
+  btnAllow.disabled = !isComplete;
+}
+
+function collectElicitationAnswers() {
+  const answers = {};
+  const questionCards = [...elicitationForm.querySelectorAll(".question-card")];
+
+  for (let i = 0; i < elicitationQuestions.length; i++) {
+    const question = elicitationQuestions[i];
+    const questionCard = questionCards[i];
+    if (!question || typeof question.question !== "string" || !question.question || !questionCard) return null;
+    const selectedAnswers = [...questionCard.querySelectorAll("input:checked")]
+      .map(input => input.getAttribute("data-answer") || input.value)
+      .filter(Boolean);
+    if (!selectedAnswers.length) return null;
+    answers[question.question] = selectedAnswers.join(", ");
+  }
+
+  return answers;
+}
+
+function renderElicitationForm(data) {
+  elicitationQuestions = data.toolInput && Array.isArray(data.toolInput.questions)
+    ? data.toolInput.questions
+    : [];
+  elicitationForm.innerHTML = "";
+  elicitationForm.classList.add("visible");
+  commandBlock.style.display = "none";
+
+  elicitationQuestions.forEach((question, questionIndex) => {
+    const questionCard = document.createElement("div");
+    questionCard.className = "question-card";
+
+    const header = document.createElement("div");
+    header.className = "question-header";
+    header.textContent = question.header || bubbleText(data.lang, "questionLabel", { index: questionIndex + 1 });
+    questionCard.appendChild(header);
+
+    const text = document.createElement("div");
+    text.className = "question-text";
+    text.textContent = question.question || "";
+    questionCard.appendChild(text);
+
+    const hint = document.createElement("div");
+    hint.className = "question-hint";
+    hint.textContent = question.multiSelect
+      ? bubbleText(data.lang, "chooseAtLeastOneOption")
+      : bubbleText(data.lang, "chooseOneOption");
+    questionCard.appendChild(hint);
+
+    const optionList = document.createElement("div");
+    optionList.className = "option-list";
+
+    const options = Array.isArray(question.options) ? question.options : [];
+    options.forEach((option, optionIndex) => {
+      const label = document.createElement("label");
+      label.className = "option-item";
+
+      const input = document.createElement("input");
+      input.type = question.multiSelect ? "checkbox" : "radio";
+      input.name = `elicitation-${questionIndex}`;
+      input.value = option.label || "";
+      input.setAttribute("data-answer", option.label || "");
+      input.addEventListener("change", updateElicitationSubmitState);
+
+      const copy = document.createElement("span");
+      copy.className = "option-item-copy";
+
+      const optionLabel = document.createElement("span");
+      optionLabel.className = "option-item-label";
+      optionLabel.textContent = option.label || String(optionIndex + 1);
+      copy.appendChild(optionLabel);
+
+      if (option.description) {
+        const optionDescription = document.createElement("span");
+        optionDescription.className = "option-item-description";
+        optionDescription.textContent = option.description;
+        copy.appendChild(optionDescription);
+      }
+
+      label.appendChild(input);
+      label.appendChild(copy);
+      optionList.appendChild(label);
+    });
+
+    questionCard.appendChild(optionList);
+    elicitationForm.appendChild(questionCard);
+  });
+
+  updateElicitationSubmitState();
+}
+
+function show(data) {
+  resetBubbleContent();
+  currentLang = data.lang || "en";
+  elicitationMode = data.isElicitation || false;
+  setSessionTag(data);
+
+  // opencode branch — Phase 2. Three differences from CC:
+  //   1. tool names are lowercase (edit/bash/write) — we PascalCase them so
+  //      existing tool-pill CSS rules match (data-tool="Edit" etc).
+  //   2. toolInput shape is opencode-native ({filepath,diff}/{command}/{url}),
+  //      not CC's {file_path,command,pattern}. Custom picker below.
+  //   3. "Always Allow" button maps to reply="always" via "opencode-always"
+  //      behavior (handleDecide special-cases this).
+  if (data.isOpencode) {
+    headerTitle.textContent = bubbleText(data.lang, "permissionRequest");
+
+    const rawName = data.toolName || "unknown";
+    const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+    toolPill.textContent = displayName;
+    toolPill.setAttribute("data-tool", displayName);
+    toolPill.style.display = "";
+
+    // Command block preview: prefer concrete fields, then dedupe patterns,
+    // then fall back to raw JSON. opencode edit metadata often repeats the
+    // filepath (e.g. "foo.md, foo.md") — the Set dedupes that.
+    const input = (data.toolInput && typeof data.toolInput === "object") ? data.toolInput : {};
+    let detail = "";
+    if (typeof input.filepath === "string" && input.filepath) {
+      detail = [...new Set(input.filepath.split(",").map(s => s.trim()).filter(Boolean))].join(", ");
+    } else if (typeof input.command === "string" && input.command) {
+      detail = input.command;
+    } else if (typeof input.url === "string" && input.url) {
+      detail = input.url;
+    } else if (Array.isArray(data.opencodePatterns) && data.opencodePatterns.length) {
+      detail = [...new Set(data.opencodePatterns)].join(", ");
+    } else {
+      try { detail = JSON.stringify(input); } catch { detail = "(n/a)"; }
+    }
+    commandBlock.textContent = truncate(detail, 200);
+
+    btnAllow.textContent = bubbleText(data.lang, "allow");
+    btnDeny.textContent = bubbleText(data.lang, "deny");
+    btnAllow.style.display = "";
+    btnDeny.style.display = "";
+    btnAllow.disabled = false;
+    btnDeny.disabled = false;
+
+    // Always Allow button — shown only when opencode provided persist candidates.
+    // ⚠ opencode's reply="always" is a BLANKET session rule: a single click
+    // auto-approves every subsequent tool call of the same category in this
+    // session (e.g. ALL bash commands including rm -rf). Unlike Claude Code,
+    // opencode does not scope "always" to the specific pattern of this request.
+    // We keep the button to respect opencode's native UX, but the label + tooltip
+    // make the blast radius explicit.
+    suggestionsContainer.innerHTML = "";
+    if (Array.isArray(data.opencodeAlways) && data.opencodeAlways.length > 0) {
+      const btn = document.createElement("button");
+      btn.className = "btn-suggestion";
+      btn.textContent = bubbleText(data.lang, "alwaysAllowBlanket");
+      btn.title = bubbleText(data.lang, "alwaysAllowBlanketTitle");
+      btn.addEventListener("click", () => {
+        disableAll();
+        window.bubbleAPI.decide("opencode-always");
+      });
+      suggestionsContainer.appendChild(btn);
+    }
+
+    revealCard();
+    return;
+  }
+
+  if (elicitationMode) {
+    // Elicitation mode — answer directly in the bubble, with terminal fallback.
+    headerTitle.textContent = bubbleText(data.lang, "needsInput");
+    toolPill.style.display = "none";
+    renderElicitationForm(data);
+    btnAllow.textContent = bubbleText(data.lang, "submitAnswer");
+    btnDeny.textContent = bubbleText(data.lang, "goToTerminal");
+    revealCard();
+    return;
+  }
+
+  // Codex notify mode — informational bubble with Dismiss button only
+  if (data.toolName === "CodexExec") {
+    headerTitle.textContent = bubbleText(data.lang, "codexPermission");
+    toolPill.textContent = "CODEX";
+    toolPill.setAttribute("data-tool", "CodexExec");
+    toolPill.style.display = "";
+    commandBlock.textContent = (data.toolInput && data.toolInput.command) || "(unknown)";
+    btnAllow.textContent = bubbleText(data.lang, "gotIt");
+    btnAllow.disabled = false;
+    btnDeny.style.display = "none";
+    suggestionsContainer.innerHTML = "";
+    revealCard();
+    return;
+  }
+
+  const isPlanReview = data.toolName === "ExitPlanMode";
+
+  // Header
+  headerTitle.textContent = isPlanReview
+    ? bubbleText(data.lang, "planReview")
+    : bubbleText(data.lang, "permissionRequest");
+  toolPill.style.display = isPlanReview ? "none" : "";
+  btnDeny.style.display = isPlanReview ? "none" : "";
+
+  // Tool pill
+  toolPill.textContent = data.toolName || "Unknown";
+  toolPill.setAttribute("data-tool", data.toolName || "");
+
+  // Command block (textContent only — never innerHTML)
+  commandBlock.textContent = formatDetail(data.toolName, data.toolInput);
+
+  // Button labels
+  btnAllow.textContent = isPlanReview ? bubbleText(data.lang, "approve") : bubbleText(data.lang, "allow");
+  btnDeny.textContent = isPlanReview ? bubbleText(data.lang, "reject") : bubbleText(data.lang, "deny");
+
+  // Dynamic suggestion buttons
+  suggestionsContainer.innerHTML = "";
+  if (isPlanReview) {
+    // "Go to Terminal" button — deny + focus terminal
+    const btn = document.createElement("button");
+    btn.className = "btn-suggestion";
+    btn.textContent = bubbleText(data.lang, "goToTerminal");
+    btn.addEventListener("click", () => {
+      disableAll();
+      window.bubbleAPI.decide("deny-and-focus");
+    });
+    suggestionsContainer.appendChild(btn);
+  } else if (Array.isArray(data.suggestions)) {
+    const seenLabels = new Set();
+    data.suggestions.forEach((s, i) => {
+      const label = getSuggestionLabel(s, data.lang);
+      if (seenLabels.has(label)) return;
+      seenLabels.add(label);
+      const btn = document.createElement("button");
+      btn.className = "btn-suggestion";
+      btn.textContent = label;
+      btn.addEventListener("click", () => {
+        disableAll();
+        window.bubbleAPI.decide("suggestion:" + i);
+      });
+      suggestionsContainer.appendChild(btn);
+    });
+  }
+
+  // Re-enable buttons
+  btnAllow.disabled = false;
+  btnDeny.disabled = false;
+
+  revealCard();
+}
+
+function hide() {
+  card.classList.remove("visible");
+  card.classList.add("hiding");
+}
+
+btnAllow.addEventListener("click", () => {
+  btnAllow.textContent = "...";
+  disableAll();
+  if (elicitationMode) {
+    const answers = collectElicitationAnswers();
+    if (!answers) {
+      btnAllow.textContent = bubbleText(currentLang, "submitAnswer");
+      btnDeny.disabled = false;
+      for (const input of elicitationForm.querySelectorAll("input")) input.disabled = false;
+      updateElicitationSubmitState();
+      return;
+    }
+    window.bubbleAPI.decide({ type: "elicitation-submit", answers });
+    return;
+  }
+  window.bubbleAPI.decide("allow");
+});
+
+btnDeny.addEventListener("click", () => {
+  btnDeny.textContent = "...";
+  disableAll();
+  window.bubbleAPI.decide("deny");
+});
+
+window.bubbleAPI.onPermissionShow(show);
+window.bubbleAPI.onPermissionHide(hide);
+</script>
+</body>
+</html>
