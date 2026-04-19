@@ -29,6 +29,7 @@ import { getCurrentWorktreeSession } from '../utils/worktree.js';
 import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
 import { MATRIX_UI } from './MatrixTheme/matrixPalette.js';
 import { isVimModeEnabled } from './PromptInput/utils.js';
+import { MiniPet } from '../buddy/MiniPet.js';
 export function statusLineShouldDisplay(settings: ReadonlySettings): boolean {
   // Assistant mode: statusline fields (model, permission mode, cwd) reflect the
   // REPL/daemon process, not what the agent child is actually running. Hide it.
@@ -340,7 +341,9 @@ function StatusLineInner({
   // (same trick as PromptInputFooterLeftSide).
   // Matrix theme: green text, no extra border (双线框太重，占行且视觉噪音)
   if (isMatrixTheme()) {
+    // why MiniPet 左侧 prepend：D3 P4-T1 决策点 #4 — 视觉权重靠左，复合 statusline 场景下右侧已挤
     return <Box paddingX={paddingX} gap={2}>
+        <MiniPet />
         {statusLineText ? <>
           <Text color={MATRIX_UI.divider}>▐</Text>
           <Text color={MATRIX_UI.statusLine} wrap="truncate">
@@ -350,6 +353,7 @@ function StatusLineInner({
       </Box>;
   }
   return <Box paddingX={paddingX} gap={2}>
+      <MiniPet />
       {statusLineText ? <Text dimColor wrap="truncate">
           <Ansi>{statusLineText}</Ansi>
         </Text> : isFullscreenEnvEnabled() ? <Text> </Text> : null}

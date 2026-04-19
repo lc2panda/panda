@@ -269,6 +269,9 @@ export type GlobalConfig = {
   // /buddy companion soul — bones regenerated from userId on read. See src/buddy/.
   companion?: import('../buddy/types.js').StoredCompanion
   companionMuted?: boolean
+  // mini-pet（StatusLine 1×5 字符 face）子开关 — D3 P4 决策点 #6：默认 true 便于回滚
+  // 仅 companionMiniPet === false 时不渲染；undefined / true 都视为开启
+  companionMiniPet?: boolean
 
   // Feedback survey tracking
   feedbackSurveyState?: {
