@@ -7,6 +7,12 @@ import { getDiskInfo, getMemoryInfo, checkNetwork, IS_WIN } from '../platform.js
 import { platform as osPlatform } from 'os'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { pushNotification } from '../../assistant/sense.js'
+// P2-T7: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+import {
+  pushNotification as pushDeskNotification,
+  bumpBadge as bumpDeskBadge,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { logForDebugging } from '../../utils/debug.js'
 
 interface SmartCronTask extends ProactiveTask {
@@ -43,6 +49,21 @@ const diskSpaceAlert: SmartCronTask = {
           body: `${mount} 剩余 ${freeGB.toFixed(1)}GB（${freePercent}%），建议清理空间`,
           channel: 'system',
         })
+        // why: P2-T7 panda-on-desk 联动 — 磁盘告警，system 横幅 + 状态栏角标累加
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'warning',
+              scenarioId: 'disk-low',
+              title: 'Panda · 磁盘空间不足',
+              body: `${mount} 剩余 ${freeGB.toFixed(1)}GB（${freePercent}%）`,
+            })
+            bumpDeskBadge('disk-low', 1)
+          }
+        } catch {
+          // 桥接失败不阻塞 proactive 主路径
+        }
         logForDebugging(`[systemHealth] disk-space-alert: 告警触发 — ${mount} 剩余 ${freeGB.toFixed(1)}GB (${freePercent}%)`)
       }
     } catch (e) {
@@ -108,6 +129,21 @@ const memoryPressureAlert: SmartCronTask = {
           body: `内存使用 ${info.usedPercent}%（阈值 ${config.memoryUsedPercent}%）${processInfo}`,
           channel: 'system',
         })
+        // why: P2-T7 panda-on-desk 联动 — 内存压力告警 system 横幅 + 角标
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'warning',
+              scenarioId: 'memory-pressure',
+              title: 'Panda · 内存压力过高',
+              body: `使用 ${info.usedPercent}%（阈值 ${config.memoryUsedPercent}%）`,
+            })
+            bumpDeskBadge('memory-pressure', 1)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[systemHealth] memory-pressure-alert: 告警触发 — 使用 ${info.usedPercent}%`)
       }
     } catch (e) {
@@ -137,6 +173,21 @@ const networkAnomaly: SmartCronTask = {
           body: '无法连接到外部网络，请检查网络连接',
           channel: 'system',
         })
+        // why: P2-T7 panda-on-desk 联动 — 网络断开 system 横幅 + 角标
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'warning',
+              scenarioId: 'network-anomaly',
+              title: 'Panda · 网络断开',
+              body: '无法连接到外部网络',
+            })
+            bumpDeskBadge('network-anomaly', 1)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging('[systemHealth] network-anomaly: 网络断开')
         return
       }
@@ -156,6 +207,21 @@ const networkAnomaly: SmartCronTask = {
           body: `检测到网络问题：${issues.join('、')}`,
           channel: 'system',
         })
+        // why: P2-T7 panda-on-desk 联动 — 网络指标异常 system 横幅 + 角标
+        try {
+          if (isDeskOnDeskEnabled()) {
+            pushDeskNotification({
+              kind: 'system',
+              level: 'warning',
+              scenarioId: 'network-anomaly',
+              title: 'Panda · 网络异常',
+              body: issues.join('、'),
+            })
+            bumpDeskBadge('network-anomaly', 1)
+          }
+        } catch {
+          // 桥接失败不阻塞主路径
+        }
         logForDebugging(`[systemHealth] network-anomaly: 告警触发 — ${issues.join(', ')}`)
       }
     } catch (e) {

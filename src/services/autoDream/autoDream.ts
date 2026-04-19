@@ -288,6 +288,33 @@ ${sessionIds.map(id => `- ${id}`).join('\n')}`
       })
       // why here: DeepDream 完成是 epic 级正反馈事件 — +200 XP + first_deepdream 里程碑
       recordDeepDreamSignal()
+
+      // why: P2-T7 panda-on-desk 联动 — DeepDream 完成 system 横幅 + overlay + 切 PetState=notification
+      try {
+        const { pushNotification: pushDeskNotification, isOnDeskEnabled } =
+          await import('../../desk/bridge.js')
+        if (isOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'system',
+            level: 'success',
+            scenarioId: 'deepdream-done',
+            title: 'Panda · DeepDream 完成',
+            body: `已整合 ${sessionIds.length} 个会话到长期记忆`,
+            petStateOverride: 'notification',
+          })
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'success',
+            scenarioId: 'deepdream-done',
+            title: '🌙 DeepDream 整合完成',
+            body: `${sessionIds.length} 个会话已整合，${Math.round(hoursSince)}h 数据已落盘`,
+            ttlMs: 8_000,
+            petStateOverride: 'notification',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞主路径
+      }
     } catch (e: unknown) {
       // If the user killed from the bg-tasks dialog, DreamTask.kill already
       // aborted, rolled back the lock, and set status=killed. Don't overwrite

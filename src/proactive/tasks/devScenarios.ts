@@ -3,6 +3,12 @@
 // Pos: proactive/tasks/ 开发者场景层，由 taskRegistry 注册调度
 
 import { pushNotification } from '../../assistant/sense.js'
+// P2-T7: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
+import {
+  pushNotification as pushDeskNotification,
+  bumpBadge as bumpDeskBadge,
+  isOnDeskEnabled as isDeskOnDeskEnabled,
+} from '../../desk/bridge.js'
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { logForDebugging } from '../../utils/debug.js'
 
@@ -134,6 +140,15 @@ const gitUpstreamChanges: SmartCronTask = {
         body,
         channel: 'system',
       })
+
+      // why: P2-T7 panda-on-desk 联动 — Git 远程变更仅累加角标，不弹 system 横幅（不打扰）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          bumpDeskBadge('git-remote-changed', 1)
+        }
+      } catch {
+        // 桥接失败不阻塞主路径
+      }
 
       logForDebugging(`[devScenarios] git-upstream-changes: behind=${behindCount}, hasUpdates=${hasUpdates}`)
     } catch (e) {
@@ -286,6 +301,37 @@ const ciFailureAlert: SmartCronTask = {
         body: `最近 24 小时内有 ${recent.length} 个管道失败：\n${detail}`,
         channel: 'system',
       })
+
+      // why: P2-T7 panda-on-desk 联动 — CI 失败 system 横幅 + overlay 卡片 + critical 音效（最高优先级）
+      try {
+        if (isDeskOnDeskEnabled()) {
+          pushDeskNotification({
+            kind: 'system',
+            level: 'error',
+            scenarioId: 'ci-failed',
+            title: 'Panda · CI/CD 失败',
+            body: `${recent.length} 个管道 24h 内失败`,
+            soundCue: 'critical',
+          })
+          pushDeskNotification({
+            kind: 'overlay',
+            level: 'error',
+            scenarioId: 'ci-failed',
+            title: 'CI/CD 失败',
+            body: detail.slice(0, 200),
+            ttlMs: 10_000,
+          })
+          pushDeskNotification({
+            kind: 'sound',
+            level: 'error',
+            scenarioId: 'ci-failed',
+            title: 'ci-failed-sound',
+            soundCue: 'critical',
+          })
+        }
+      } catch {
+        // 桥接失败不阻塞主路径
+      }
 
       logForDebugging(`[devScenarios] ci-failure-alert: ${recent.length} recent failures`)
     } catch (e) {

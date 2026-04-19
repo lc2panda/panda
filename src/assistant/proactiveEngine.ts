@@ -210,6 +210,16 @@ function _checkContextPressure(context: {
 }): ProactiveSuggestion | null {
   const msgCount = context.messages.length
   if (msgCount > 50) {
+    // why: P2-T7 panda-on-desk 联动 — 上下文压力仅累加角标（不打扰）
+    try {
+      const { bumpBadge, isOnDeskEnabled } =
+        require('../desk/bridge.js') as typeof import('../desk/bridge.js')
+      if (isOnDeskEnabled()) {
+        bumpBadge('context-pressure', 1)
+      }
+    } catch {
+      // 桥接失败不阻塞 proactive 检查
+    }
     return {
       type: 'alert',
       priority: 'high',
@@ -253,6 +263,16 @@ function _checkRepetitivePattern(context: {
     const allSame = prefixes.every(p => p === prefixes[0]) && prefixes[0].length > 3
 
     if (allSame) {
+      // why: P2-T7 panda-on-desk 联动 — 重复模式仅累加角标（不打扰）
+      try {
+        const { bumpBadge, isOnDeskEnabled } =
+          require('../desk/bridge.js') as typeof import('../desk/bridge.js')
+        if (isOnDeskEnabled()) {
+          bumpBadge('repetitive-pattern', 1)
+        }
+      } catch {
+        // 桥接失败不阻塞 proactive 检查
+      }
       return {
         type: 'insight',
         priority: 'medium',

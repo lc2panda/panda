@@ -143,6 +143,37 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
             const lines = content.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 8)
             pushViaChannelMCP('📋 晨间简报', lines.join('\n'))
           } catch {}
+
+          // why: P2-T7 panda-on-desk 联动 — 晨间简报 system 横幅 + overlay 卡片（10s TTL）
+          try {
+            const { pushNotification: pushDeskNotification, isOnDeskEnabled } =
+              await import('../desk/bridge.js')
+            if (isOnDeskEnabled()) {
+              pushDeskNotification({
+                kind: 'system',
+                level: 'info',
+                scenarioId: 'morning-brief',
+                title: 'Panda · 晨间简报',
+                body: `今日简报 ${content.length} 字已生成`,
+              })
+              const preview = content
+                .split('\n')
+                .filter(l => l.trim() && !l.startsWith('#'))
+                .slice(0, 3)
+                .join('\n')
+                .slice(0, 200)
+              pushDeskNotification({
+                kind: 'overlay',
+                level: 'info',
+                scenarioId: 'morning-brief',
+                title: '📋 晨间简报',
+                body: preview,
+                ttlMs: 10_000,
+              })
+            }
+          } catch {
+            // 桥接失败不阻塞主路径
+          }
         }
       } catch (e) {
         logForDebugging(
@@ -469,6 +500,41 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
               body,
               channel: 'all',
             })
+
+            // why: P2-T7 panda-on-desk 联动 — 日历提醒 system 横幅 + overlay + short 音效
+            try {
+              const {
+                pushNotification: pushDeskNotification,
+                isOnDeskEnabled,
+              } = await import('../desk/bridge.js')
+              if (isOnDeskEnabled()) {
+                pushDeskNotification({
+                  kind: 'system',
+                  level: 'info',
+                  scenarioId: 'calendar-reminder',
+                  title: 'Panda · 日历提醒',
+                  body,
+                  soundCue: 'short',
+                })
+                pushDeskNotification({
+                  kind: 'overlay',
+                  level: 'info',
+                  scenarioId: 'calendar-reminder',
+                  title: '📅 ' + evt.title,
+                  body,
+                  ttlMs: 5_000,
+                })
+                pushDeskNotification({
+                  kind: 'sound',
+                  level: 'info',
+                  scenarioId: 'calendar-reminder',
+                  title: 'calendar-reminder-sound',
+                  soundCue: 'short',
+                })
+              }
+            } catch {
+              // 桥接失败不阻塞主路径
+            }
 
             // 同时记录到工作记忆，下次对话时模型可见
             try {
