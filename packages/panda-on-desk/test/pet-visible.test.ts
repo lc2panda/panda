@@ -71,4 +71,27 @@ describe('panda-on-desk · pet 显示 + 拖拽 hotfix', () => {
     expect(rNoHit).not.toBeNull()
     expect(Number.isFinite(rNoHit.left)).toBe(true)
   })
+
+  // v2.25 polish-e2e 回归：main.ts hitWin loadFile 路径修复
+  // 旧代码用 path.join(__dirname, '..', 'renderer', 'hit.html')，
+  // 由于 __dirname 是 src/，会解析到 <pkg>/renderer/hit.html（不存在）→
+  // hitWin loadURL 兜底到空白 data: URL，sprite/state 切换信号收不到。
+  // 修复后：候选 [src/renderer/hit.html, ../renderer/hit.html, ../src/renderer/hit.html] 任一存在即可。
+  it('regression v2.25: main.ts hitWin 加载 hit.html 候选含 src/renderer/ 路径', () => {
+    const mainTs = path.join(PKG_ROOT, 'src', 'main.ts')
+    expect(fs.existsSync(mainTs)).toBe(true)
+    const src = fs.readFileSync(mainTs, 'utf8')
+    // 必须含正确的候选数组（path.join(__dirname, 'renderer', 'hit.html')）
+    expect(src).toContain("path.join(__dirname, 'renderer', 'hit.html')")
+    // 仍保留兼容 ASAR 的兜底候选
+    expect(src).toMatch(/hitHtmlCandidates/)
+    // 存在校验函数（find）
+    expect(src).toMatch(/hitHtmlCandidates\.find/)
+    // 旧路径不再单独使用 — 必须出现在候选数组里而非裸 path.join + loadFile
+    // （断言：'..renderer/hit.html' 不再是唯一来源）
+    const onlyOldUsage =
+      src.includes("const hitHtml = path.join(__dirname, '..', 'renderer', 'hit.html')") &&
+      !src.includes('hitHtmlCandidates')
+    expect(onlyOldUsage).toBe(false)
+  })
 })

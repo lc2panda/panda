@@ -9,10 +9,21 @@
 //   - W3C UI Events pointer + dblclick 规范
 //
 // 2026-04-19 +08:00 agent-δ-W2-interact · W2-T4 交付
+// 2026-04-19 +08:00 agent-α-W2T4-complete · v2 补全 — 追加 Group E badge 行为型用例（manager → notifier 端到端）
 
-import { describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+
+import {
+  BADGE_UPDATE_CHANNEL,
+  bumpBadge,
+  dispatchBadge,
+  getTotalCount,
+  resetBadge,
+  setBadgeRendererNotifier,
+  __resetBadgeCountsForTesting,
+} from '../src/badge/manager.js'
 
 const PKG_ROOT = path.resolve(__dirname, '..')
 const HIT_HTML = path.join(PKG_ROOT, 'src', 'renderer', 'hit.html')
@@ -157,5 +168,90 @@ describe('W2-T4 · preload + main wiring', () => {
     // P2-T4 已定义 'badge:update'；W2-T4 接入不应改动
     expect(ts).toContain("'badge:update'")
     expect(ts).toContain('BADGE_UPDATE_CHANNEL')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group E · v2 补全 — badge manager → notifier 端到端行为
+// 真正运行 setBadgeRendererNotifier + bumpBadge / resetBadge / dispatchBadge，
+// 验证 'badge:update' channel + payload 形状（total / entries / ts）。
+// 与 Group D 文本扫描互补：扫描查"接线存在"，本组验"接线工作正常"。
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W2-T4 v2 · badge manager → notifier 端到端', () => {
+  type CapturedCall = { channel: string; payload: any }
+  let calls: CapturedCall[]
+
+  beforeEach(() => {
+    __resetBadgeCountsForTesting()
+    calls = []
+    setBadgeRendererNotifier((channel, payload) => {
+      calls.push({ channel, payload })
+    })
+  })
+
+  afterEach(() => {
+    __resetBadgeCountsForTesting()
+  })
+
+  it('bumpBadge 触发 notifier — channel 为 BADGE_UPDATE_CHANNEL，payload.total 累加正确', () => {
+    bumpBadge('s1', 1)
+    expect(calls.length).toBe(1)
+    expect(calls[0]!.channel).toBe(BADGE_UPDATE_CHANNEL)
+    expect(calls[0]!.channel).toBe('badge:update')
+    expect(calls[0]!.payload.total).toBe(1)
+    expect(calls[0]!.payload.entries.length).toBe(1)
+    expect(calls[0]!.payload.entries[0].scenarioId).toBe('s1')
+    expect(calls[0]!.payload.entries[0].count).toBe(1)
+    expect(typeof calls[0]!.payload.ts).toBe('number')
+
+    bumpBadge('s1', 2)
+    bumpBadge('s2', 5)
+    expect(calls.length).toBe(3)
+    // 第 3 次：s1=3, s2=5, total=8
+    expect(calls[2]!.payload.total).toBe(8)
+    expect(getTotalCount()).toBe(8)
+  })
+
+  it('resetBadge 触发 notifier — count 归零；dispatchBadge(reset:true) 委派路径同此', () => {
+    bumpBadge('s1', 7)
+    expect(calls.at(-1)!.payload.total).toBe(7)
+
+    resetBadge('s1')
+    expect(calls.length).toBe(2)
+    expect(calls.at(-1)!.payload.total).toBe(0)
+    // 保留 entry（lastUpdated 可观察）但 count=0 → hit 窗 __pandaSetBadge(0) 走 0 隐藏分支
+    expect(calls.at(-1)!.payload.entries.find((e: any) => e.scenarioId === 's1').count).toBe(0)
+
+    // dispatchBadge(reset) 应等价 resetBadge — P2-T1 兼容入口
+    bumpBadge('s2', 3)
+    dispatchBadge({ type: 'badge', scenarioId: 's2', reset: true, ts: Date.now() })
+    expect(calls.at(-1)!.payload.total).toBe(0)
+    expect(getTotalCount()).toBe(0)
+  })
+
+  it('setBadgeRendererNotifier(null) 解绑后不再触发 — 防 hit 窗销毁后泄漏', () => {
+    bumpBadge('s1', 1)
+    expect(calls.length).toBe(1)
+
+    setBadgeRendererNotifier(null)
+    bumpBadge('s1', 1)
+    bumpBadge('s2', 1)
+    resetBadge('s1')
+    // notifier 已解绑，后续 3 次操作不应触发任何回调
+    expect(calls.length).toBe(1)
+    // 但 manager 内部 state 仍正常累加
+    expect(getTotalCount()).toBe(1) // s1=0(reset), s2=1
+  })
+
+  it('notifier 抛错不应破坏 manager state — try/catch 吞错保健壮', () => {
+    setBadgeRendererNotifier(() => {
+      throw new Error('hit window destroyed')
+    })
+    // 不应抛出
+    expect(() => bumpBadge('s1', 4)).not.toThrow()
+    expect(() => resetBadge('s1')).not.toThrow()
+    // state 仍按预期演进
+    expect(getTotalCount()).toBe(0)
   })
 })

@@ -895,8 +895,18 @@ function createWindow() {
     if (isLinux) hitWin.setSkipTaskbar(true)
     if (isWin) hitWin.setAlwaysOnTop(true, WIN_TOPMOST_LEVEL)
     reapplyMacVisibility()
-    const hitHtml = path.join(__dirname, '..', 'renderer', 'hit.html')
-    if (fs.existsSync(hitHtml)) {
+    // v2.25 polish-e2e 实测修复：__dirname 是 src/，hit.html 在 src/renderer/，
+    // 旧路径 '__dirname/../renderer/hit.html' 错位一级（解析到 <pkg>/renderer/，文件不存在）
+    // → hitWin loadURL 兜底到空白页，sprite/state 切换信号收不到。
+    // 与 win loadFile 路径（line 806）保持一致：__dirname/renderer/hit.html。
+    // 兼容 dev 与 packaged ASAR：候选两条，存在哪条用哪条。
+    const hitHtmlCandidates = [
+      path.join(__dirname, 'renderer', 'hit.html'),
+      path.join(__dirname, '..', 'renderer', 'hit.html'),
+      path.join(__dirname, '..', 'src', 'renderer', 'hit.html'),
+    ]
+    const hitHtml = hitHtmlCandidates.find((p) => fs.existsSync(p))
+    if (hitHtml) {
       hitWin.loadFile(hitHtml)
     } else {
       hitWin.loadURL('data:text/html,<body style="margin:0;background:transparent"></body>')
