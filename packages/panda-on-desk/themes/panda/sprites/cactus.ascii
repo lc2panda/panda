@@ -1,0 +1,20 @@
+# panda cactus sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[cactus] (read-only)
+
+
+ n  ____  n
+ | |{E}  {E}| |
+ |_|    |_|
+   |    |
+---
+
+    ____
+ n |{E}  {E}| n
+ |_|    |_|
+   |    |
+---
+ n        n
+ |  ____  |
+ | |{E}  {E}| |
+ |_|    |_|
+   |    |

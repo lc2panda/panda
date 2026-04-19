@@ -1,0 +1,20 @@
+# panda mushroom sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[mushroom] (read-only)
+
+
+ .-o-OO-o-.
+(__________)
+   |{E}  {E}|
+   |____|
+---
+
+ .-O-oo-O-.
+(__________)
+   |{E}  {E}|
+   |____|
+---
+   . o  .
+ .-o-OO-o-.
+(__________)
+   |{E}  {E}|
+   |____|

@@ -1,0 +1,21 @@
+# panda duck sprite — 3 frames idle fidget
+# Format: frames separated by `---`; lines starting with `#` are comments
+# Source: src/buddy/sprites.ts BODIES[duck] (read-only)
+
+
+    __
+  <({E} )___
+   (  ._>
+    `--´
+---
+
+    __
+  <({E} )___
+   (  ._>
+    `--´~
+---
+
+    __
+  <({E} )___
+   (  .__>
+    `--´

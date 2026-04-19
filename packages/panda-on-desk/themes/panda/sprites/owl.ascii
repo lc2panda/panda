@@ -1,0 +1,20 @@
+# panda owl sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[owl] (read-only)
+
+
+   /\  /\
+  (({E})({E}))
+  (  ><  )
+   `----´
+---
+
+   /\  /\
+  (({E})({E}))
+  (  ><  )
+   .----.
+---
+
+   /\  /\
+  (({E})(-))
+  (  ><  )
+   `----´

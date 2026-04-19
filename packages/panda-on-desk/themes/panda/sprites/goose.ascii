@@ -1,0 +1,20 @@
+# panda goose sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[goose] (read-only)
+
+
+     ({E}>
+     ||
+   _(__)_
+    ^^^^
+---
+
+    ({E}>
+     ||
+   _(__)_
+    ^^^^
+---
+
+     ({E}>>
+     ||
+   _(__)_
+    ^^^^

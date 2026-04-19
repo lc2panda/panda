@@ -1,0 +1,21 @@
+# panda default sprite (fallback when species file not found)
+# Format: frames separated by `---`; lines starting with `#` are comments
+# {E} = eye placeholder, replaced at render time by CompanionBones.eye
+# Source: src/buddy/sprites.ts BODIES[duck] (read-only)
+
+    __
+  <({E} )___
+   (  ._>
+    `--´
+---
+
+    __
+  <({E} )___
+   (  ._>
+    `--´~
+---
+
+    __
+  <({E} )___
+   (  .__>
+    `--´

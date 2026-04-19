@@ -1,0 +1,20 @@
+# panda turtle sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[turtle] (read-only)
+
+
+   _,--._
+  ( {E}  {E} )
+ /[______]\
+  ``    ``
+---
+
+   _,--._
+  ( {E}  {E} )
+ /[______]\
+   ``  ``
+---
+
+   _,--._
+  ( {E}  {E} )
+ /[======]\
+  ``    ``

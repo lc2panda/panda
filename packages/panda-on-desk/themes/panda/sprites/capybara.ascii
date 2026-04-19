@@ -1,0 +1,20 @@
+# panda capybara sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[capybara] (read-only)
+
+
+  n______n
+ ( {E}    {E} )
+ (   oo   )
+  `------´
+---
+
+  n______n
+ ( {E}    {E} )
+ (   Oo   )
+  `------´
+---
+    ~  ~
+  u______n
+ ( {E}    {E} )
+ (   oo   )
+  `------´

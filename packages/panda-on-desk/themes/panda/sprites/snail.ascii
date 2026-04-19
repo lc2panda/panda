@@ -1,0 +1,20 @@
+# panda snail sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[snail] (read-only)
+
+
+ {E}    .--.
+  \  ( @ )
+   \_`--´
+  ~~~~~~~
+---
+
+  {E}   .--.
+  |  ( @ )
+   \_`--´
+  ~~~~~~~
+---
+
+ {E}    .--.
+  \  ( @  )
+   \_`--´
+   ~~~~~~

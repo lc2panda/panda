@@ -1,0 +1,20 @@
+# panda rabbit sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[rabbit] (read-only)
+
+
+   (\__/)
+  ( {E}  {E} )
+ =(  ..  )=
+  (")__(")
+---
+
+   (|__/)
+  ( {E}  {E} )
+ =(  ..  )=
+  (")__(")
+---
+
+   (\__/)
+  ( {E}  {E} )
+ =( .  . )=
+  (")__(")

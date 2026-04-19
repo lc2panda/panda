@@ -1,0 +1,20 @@
+# panda cat sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[cat] (read-only)
+
+
+   /\_/\
+  ( {E}   {E})
+  (  ω  )
+  (")_(")
+---
+
+   /\_/\
+  ( {E}   {E})
+  (  ω  )
+  (")_(")~
+---
+
+   /\-/\
+  ( {E}   {E})
+  (  ω  )
+  (")_(")

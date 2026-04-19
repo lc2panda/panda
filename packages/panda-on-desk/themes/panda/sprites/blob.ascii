@@ -1,0 +1,20 @@
+# panda blob sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[blob] (read-only)
+
+
+   .----.
+  ( {E}  {E} )
+  (      )
+   `----´
+---
+
+  .------.
+ (  {E}  {E}  )
+ (        )
+  `------´
+---
+
+    .--.
+   ({E}  {E})
+   (    )
+    `--´

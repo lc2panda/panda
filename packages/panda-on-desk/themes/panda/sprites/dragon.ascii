@@ -1,0 +1,20 @@
+# panda dragon sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[dragon] (read-only)
+
+
+  /^\  /^\
+ <  {E}  {E}  >
+ (   ~~   )
+  `-vvvv-´
+---
+
+  /^\  /^\
+ <  {E}  {E}  >
+ (        )
+  `-vvvv-´
+---
+   ~    ~
+  /^\  /^\
+ <  {E}  {E}  >
+ (   ~~   )
+  `-vvvv-´

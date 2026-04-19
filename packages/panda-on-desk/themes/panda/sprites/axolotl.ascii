@@ -1,0 +1,20 @@
+# panda axolotl sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[axolotl] (read-only)
+
+
+}~(______)~{
+}~({E} .. {E})~{
+  ( .--. )
+  (_/  \_)
+---
+
+~}(______){~
+~}({E} .. {E}){~
+  ( .--. )
+  (_/  \_)
+---
+
+}~(______)~{
+}~({E} .. {E})~{
+  (  --  )
+  ~_/  \_~

@@ -89,10 +89,11 @@ function _safeRequire<T = any>(modPath: string, fallback: T): T {
   }
 }
 
-// mac-window：macOS NSWindowCollectionBehavior 注入入口（P1-T7 fork）
+// mac-window：macOS NSWindowCollectionBehavior 注入入口（P1-T7 已 fork 到 platform/mac-window.ts）
+// TODO[P1-T9]: 改为 import { applyPlatformSpecific } from './platform' 一行调用替代 reapplyMacVisibility
 const macWindowMod = _safeRequire<{
   applyStationaryCollectionBehavior?: (w: any) => boolean
-}>('./mac-window', {})
+}>('./platform/mac-window', {})
 const applyStationaryCollectionBehavior = macWindowMod.applyStationaryCollectionBehavior
   ?? ((_w: any) => false)
 

@@ -1,0 +1,20 @@
+# panda chonk sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[chonk] (read-only)
+
+
+  /\    /\
+ ( {E}    {E} )
+ (   ..   )
+  `------´
+---
+
+  /\    /|
+ ( {E}    {E} )
+ (   ..   )
+  `------´
+---
+
+  /\    /\
+ ( {E}    {E} )
+ (   ..   )
+  `------´~

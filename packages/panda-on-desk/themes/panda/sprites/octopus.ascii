@@ -1,0 +1,20 @@
+# panda octopus sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[octopus] (read-only)
+
+
+   .----.
+  ( {E}  {E} )
+  (______)
+  /\/\/\/\
+---
+
+   .----.
+  ( {E}  {E} )
+  (______)
+  \/\/\/\/
+---
+     o
+   .----.
+  ( {E}  {E} )
+  (______)
+  /\/\/\/\

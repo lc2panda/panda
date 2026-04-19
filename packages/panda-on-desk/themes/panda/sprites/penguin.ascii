@@ -1,0 +1,20 @@
+# panda penguin sprite — 3 frames idle fidget
+# Source: src/buddy/sprites.ts BODIES[penguin] (read-only)
+
+
+  .---.
+  ({E}>{E})
+ /(   )\
+  `---´
+---
+
+  .---.
+  ({E}>{E})
+ |(   )|
+  `---´
+---
+  .---.
+  ({E}>{E})
+ /(   )\
+  `---´
+   ~ ~
