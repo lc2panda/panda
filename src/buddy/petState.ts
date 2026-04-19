@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { feature } from 'bun:bundle'
 import { useAppState } from '../state/AppState.js'
 import {
+  ONE_SHOT_STATES,
   PET_STATE_PRIORITY,
   PET_STATES,
   type PetState,
@@ -132,21 +133,47 @@ export { PET_STATES, PET_STATE_PRIORITY, type PetState } from './types.js'
 export { ONE_SHOT_STATES } from './types.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// React hook（P1-T4）— 订阅 AppState 派生信号 + 500ms tick 推进 nowMs
-// 初版只实现 getCurrentPetState 的纯计算驱动；one-shot 自动回退 + idle timer
-// 的"前后帧记忆"留 P3 阶段加（占位 TODO 见下）
+// React hook（P1-T4 + P3-T3/T4）— 订阅 AppState 派生信号 + 500ms tick 推进 nowMs
+//   P3-T3: one-shot 自动回退（attention/error/notification ≤ 5 tick 后强制 idle）
+//   P3-T4: idle timer + waking 触发（sleeping → 用户输入 / isLoading 转 true → waking）
 // ─────────────────────────────────────────────────────────────────────────────
 
 const HOOK_TICK_MS = 500
+// One-shot 状态最长展示时长：5 个 tick ≈ 2.5s（与 CompanionSprite TICK_MS=500 同源）
+// why: 防止 attention/error/notification 长时间锁死；纯 UI 兜底，不影响业务逻辑
+export const ONE_SHOT_TTL_MS = 5 * HOOK_TICK_MS
+
+/**
+ * 纯 P3-T3 辅助：根据"raw 计算结果 + one-shot 进入时间"决定是否回退 idle。
+ * 抽离为纯函数便于单元测试不依赖 React。
+ *
+ * why pure: hook 的 useRef 难以直接 unit-test；纯函数可在 petState.test.ts 直接验证。
+ *
+ * @param raw 原始 getCurrentPetState 结果
+ * @param oneShotEnteredAtMs 上次进入 one-shot 状态的时间戳（同一 raw 持续期间不刷新）
+ * @param nowMs 当前时间戳
+ * @returns 最终 PetState（若超时强制 idle）
+ */
+export function applyOneShotFallback(
+  raw: PetState,
+  oneShotEnteredAtMs: number | null,
+  nowMs: number,
+): PetState {
+  if (!ONE_SHOT_STATES.has(raw)) return raw
+  if (oneShotEnteredAtMs == null) return raw
+  if (nowMs - oneShotEnteredAtMs >= ONE_SHOT_TTL_MS) return 'idle'
+  return raw
+}
 
 /**
  * 订阅 AppState 派生 PetState；500ms tick 推进 nowMs。
  *
  * 当前订阅 5+ 字段（见函数体），但 AppState 没有原生 isLoading/hasError 等字段，
  * 通过派生信号近似（companionReaction / notifications / tasks / 等）。
- * TODO(P3): subAgentCount + isCompacting fallback 0/false，待 AppState 补齐字段后接入
- * TODO(P3): one-shot 自动回退（attention/error/notification 5 tick 后强制 idle）
- * TODO(P3): wasSleeping 跨帧记忆（useRef 维护上一帧 PetState）
+ * TODO(P3+): subAgentCount + isCompacting fallback 0/false，待 AppState 补齐字段后接入
+ *
+ * P3-T3：one-shot 自动回退由 applyOneShotFallback + lastOneShotAtMs ref 维护
+ * P3-T4：idle timer 由 lastInputAtRef 推进；waking 由 prevStateRef 跨帧追踪
  */
 export function useCurrentPetState(): PetState {
   // why feature gate: BUDDY 关闭时直接返 idle 短路；feature() 限制只能在 if/三元中直接用
@@ -162,15 +189,26 @@ export function useCurrentPetState(): PetState {
   // 派生信号 4：companionPetAt — 用户刚 /buddy pet 视作 lastInputAtMs 刷新
   const petAt = useAppState(s => s.companionPetAt)
 
-  // TODO(P3): 以下字段 AppState 当前未暴露，先 fallback；接入 owner（REPL.tsx）后接 prop 传入
-  const isLoading = false // TODO(P3): isLoading 由 REPL.tsx 维护，需通过 AppState 字段或 context 暴露
-  const hasError = false // TODO(P3): 需接 query 错误信号
-  const isCompacting = false // TODO(P3): 接 compaction 状态
-  const toolUseCount = 0 // TODO(P3): 接当前 turn 的工具调用计数
+  // TODO(P3+): 以下字段 AppState 当前未暴露，先 fallback；接入 owner（REPL.tsx）后接 prop 传入
+  const isLoading = false // TODO: isLoading 由 REPL.tsx 维护，需通过 AppState 字段或 context 暴露
+  const hasError = false // TODO: 需接 query 错误信号
+  const isCompacting = false // TODO: 接 compaction 状态
+  const toolUseCount = 0 // TODO: 接当前 turn 的工具调用计数
 
   // tick 状态：500ms 推进 nowMs；同时收集 lastInputAtMs（reaction/petAt 变化即刷新）
   const [now, setNow] = useState(() => Date.now())
   const lastInputAtRef = useRef(Date.now())
+
+  // P3-T3 跨帧记忆：one-shot 状态首次进入时间戳；离开 one-shot 后置 null
+  // why: useRef 不触发 re-render，纯渲染期记账；hook 重渲染读取以决定 TTL
+  const lastOneShotAtMsRef = useRef<number | null>(null)
+  const lastOneShotKindRef = useRef<PetState | null>(null)
+
+  // P3-T4 跨帧记忆：上一帧最终 PetState；用于 sleeping → waking 触发判断
+  // why: getCurrentPetState 接受 wasSleeping 输入，但纯函数无法跨帧追踪；hook 维护
+  const prevStateRef = useRef<PetState>('idle')
+  // waking 窗口结束时间戳；sleeping 离开后维持 WAKING_WINDOW_MS 内仍可触发 waking
+  const wakingUntilMsRef = useRef<number>(0)
 
   // 任意"用户活动"信号变化 → 刷新 lastInputAt
   useEffect(() => {
@@ -186,7 +224,19 @@ export function useCurrentPetState(): PetState {
   // why: feature('BUDDY') 守护必须直接在 if 中（bun:bundle 限制）
   if (!feature('BUDDY')) return 'idle'
 
-  return getCurrentPetState({
+  // P3-T4：sleeping → 用户输入或 isLoading 转 true → 触发 waking 窗口
+  // why: prev=sleeping 且本帧 lastInputAt 刚刷新（idleMs 小）或 isLoading 转 true 即视作"被叫醒"
+  const idleMs = Math.max(0, now - lastInputAtRef.current)
+  const justWokeFromSleep =
+    prevStateRef.current === 'sleeping' &&
+    (idleMs < WAKING_WINDOW_MS || isLoading)
+  if (justWokeFromSleep) {
+    wakingUntilMsRef.current = now + WAKING_WINDOW_MS
+  }
+  const inWakingWindow = now < wakingUntilMsRef.current
+
+  // 计算 raw state（喂入 wasSleeping 给纯函数判断 waking 候选）
+  const raw = getCurrentPetState({
     isLoading,
     hasError,
     hasNotification: notification != null || reaction != null,
@@ -195,7 +245,28 @@ export function useCurrentPetState(): PetState {
     nowMs: now,
     subAgentCount,
     isCompacting,
-    // wasSleeping 在初版未跨帧追踪 — TODO(P3) 加 useRef<PetState>
-    wasSleeping: false,
+    wasSleeping: inWakingWindow,
   })
+
+  // P3-T3：one-shot 进入/续期/离开记账（同 kind 持续期间锚点不刷新）
+  // why: 防止"同一次 attention 持续 3s 又刷新一次记 0s"导致永远不超时
+  if (ONE_SHOT_STATES.has(raw)) {
+    if (lastOneShotKindRef.current !== raw) {
+      lastOneShotAtMsRef.current = now
+      lastOneShotKindRef.current = raw
+    }
+  } else {
+    lastOneShotAtMsRef.current = null
+    lastOneShotKindRef.current = null
+  }
+
+  const finalState = applyOneShotFallback(
+    raw,
+    lastOneShotAtMsRef.current,
+    now,
+  )
+
+  // 跨帧记账：保存 final state 供下一帧 waking 判断
+  prevStateRef.current = finalState
+  return finalState
 }

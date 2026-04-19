@@ -1,10 +1,12 @@
 // Input:  PetStateInput 派生信号（isLoading/hasError/...）
 // Output: PetState 12 态枚举之一
-// Pos:    panda 形象宠物 D1 P1-T3 纯函数测试 [NEW-FILE:#20260419-AB-01]
+// Pos:    panda 形象宠物 D1 P1-T3 纯函数测试 + D3 P3-T3/T4 one-shot/idle timer 追加 [NEW-FILE:#20260419-AB-01]
 import { describe, expect, test } from 'bun:test'
 import {
+  applyOneShotFallback,
   getCurrentPetState,
   ONE_SHOT_STATES,
+  ONE_SHOT_TTL_MS,
   PET_STATE_PRIORITY,
   PET_STATES,
 } from './petState.js'
@@ -201,5 +203,120 @@ describe('getCurrentPetState — 优先级聚合（同时多信号）', () => {
     // carrying 优先级更高（"具象的搬运动作"压过"抽象的工作态"）
     const input = baseInput({ toolUseCount: 2, isLoading: true })
     expect(getCurrentPetState(input)).toBe('carrying')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P3-T3：applyOneShotFallback — attention/error/notification 5 tick (~2.5s) 后回退 idle
+// ─────────────────────────────────────────────────────────────────────────────
+describe('applyOneShotFallback — one-shot 自动回退（P3-T3）', () => {
+  test('error 持续 < TTL → 保持 error', () => {
+    const enteredAt = 1_000_000
+    const now = enteredAt + ONE_SHOT_TTL_MS - 1
+    expect(applyOneShotFallback('error', enteredAt, now)).toBe('error')
+  })
+
+  test('error 持续 ≥ TTL → 回退 idle', () => {
+    const enteredAt = 1_000_000
+    const now = enteredAt + ONE_SHOT_TTL_MS
+    expect(applyOneShotFallback('error', enteredAt, now)).toBe('idle')
+  })
+
+  test('attention 持续 ≥ TTL → 回退 idle', () => {
+    const enteredAt = 2_000_000
+    const now = enteredAt + ONE_SHOT_TTL_MS + 100
+    expect(applyOneShotFallback('attention', enteredAt, now)).toBe('idle')
+  })
+
+  test('notification 持续 ≥ TTL → 回退 idle', () => {
+    const enteredAt = 3_000_000
+    const now = enteredAt + ONE_SHOT_TTL_MS + 500
+    expect(applyOneShotFallback('notification', enteredAt, now)).toBe('idle')
+  })
+
+  test('非 one-shot 状态（working）不受 TTL 影响', () => {
+    // working 不在 ONE_SHOT_STATES，无论持续多久都返回原值
+    expect(applyOneShotFallback('working', 1_000_000, 1_000_000 + 60_000)).toBe(
+      'working',
+    )
+  })
+
+  test('oneShotEnteredAtMs = null 时返回 raw（hook 首次进入未记录锚点）', () => {
+    // 防御：刚进入 one-shot 第一帧，锚点尚未写入 → 不应误回退
+    expect(applyOneShotFallback('error', null, 1_000_000)).toBe('error')
+  })
+
+  test('TTL 边界值 = ONE_SHOT_TTL_MS (2500ms)', () => {
+    // 守护：TTL 与渲染层 TICK_MS=500 × 5 tick 对齐
+    expect(ONE_SHOT_TTL_MS).toBe(2_500)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P3-T4：idle timer 梯度 — 30s → dozing / 60s → sleeping / recover
+// （纯函数 getCurrentPetState 已支持；本节验证阈值边界与恢复路径）
+// ─────────────────────────────────────────────────────────────────────────────
+describe('idle timer 梯度（P3-T4）', () => {
+  const T0 = 1_000_000
+
+  test('idle 29.9s（< 30s）→ idle', () => {
+    expect(
+      getCurrentPetState(
+        baseInput({ lastInputAtMs: T0, nowMs: T0 + 29_900 }),
+      ),
+    ).toBe('idle')
+  })
+
+  test('idle 30s 整 → dozing（边界值已含）', () => {
+    expect(
+      getCurrentPetState(
+        baseInput({ lastInputAtMs: T0, nowMs: T0 + 30_000 }),
+      ),
+    ).toBe('dozing')
+  })
+
+  test('idle 60s 整 → sleeping（边界值已含）', () => {
+    expect(
+      getCurrentPetState(
+        baseInput({ lastInputAtMs: T0, nowMs: T0 + 60_000 }),
+      ),
+    ).toBe('sleeping')
+  })
+
+  test('从 sleeping 恢复（lastInputAtMs 推进到 nowMs 附近）→ idle', () => {
+    // 用户输入后 lastInputAtMs 刷新；idleMs 重新归零 → idle
+    const nowMs = T0 + 90_000
+    expect(
+      getCurrentPetState(
+        baseInput({ lastInputAtMs: nowMs, nowMs }),
+      ),
+    ).toBe('idle')
+  })
+
+  test('waking：wasSleeping=true 且 idleMs < WAKING_WINDOW_MS → waking', () => {
+    // P3-T4 触发条件：上一帧 sleeping + 本帧用户刚输入
+    const nowMs = T0 + 90_000
+    expect(
+      getCurrentPetState(
+        baseInput({
+          lastInputAtMs: nowMs - 500, // 0.5s 前刚输入，仍在 1.5s 窗口内
+          nowMs,
+          wasSleeping: true,
+        }),
+      ),
+    ).toBe('waking')
+  })
+
+  test('waking 窗口超时（idleMs ≥ WAKING_WINDOW_MS）→ 回 idle', () => {
+    const nowMs = T0 + 90_000
+    expect(
+      getCurrentPetState(
+        baseInput({
+          lastInputAtMs: nowMs - 2_000, // 2s 前输入，超出 1.5s waking 窗口
+          nowMs,
+          wasSleeping: true,
+        }),
+      ),
+    ).toBe('idle')
   })
 })
