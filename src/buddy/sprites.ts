@@ -1,4 +1,4 @@
-import type { CompanionBones, Eye, Hat, Species } from './types.js'
+import type { CompanionBones, Eye, Hat, PetState, Species } from './types.js'
 import {
   axolotl,
   blob,
@@ -511,4 +511,35 @@ export function renderFace(bones: CompanionBones): string {
     case chonk:
       return `(${eye}.${eye})`
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// panda 系 state-driven sprite 主索引（D1 P2-T1 占位）
+// 旧 18 物种 BODIES 上方保持 byte-equal；下方为新增 panda 系扩展点
+// 由 D2 sprite agent (β/γ/δ) 填充 panda.ts / redPanda.ts / kungFuPanda.ts
+// 结构：Species → PetState → frames（每帧 5 行 ≤ 12 字符 + {E} 眼位占位）
+// ─────────────────────────────────────────────────────────────────────────────
+
+// why: Partial<Record<...>> 让占位阶段能 export 空 {}，D2 增量填充而不破类型
+export const PANDA_SPECIES_BODIES: Partial<
+  Record<Species, Partial<Record<PetState, string[][]>>>
+> = {
+  // 等 D2 填充：
+  //   [panda]:       { idle: [...], thinking: [...], working: [...], ... }
+  //   [redPanda]:    { ... }
+  //   [kungFuPanda]: { ... }
+}
+
+// 取指定 (species, state, frameIndex) 的 sprite，无则 fallback 到 idle frame 0
+// why: 渲染层 P3-T2 接入时需要稳定 fallback 链，避免 panda sprite 缺帧导致渲染崩溃
+export function getStateSprite(
+  species: Species,
+  state: PetState,
+  frame: number,
+): string[] | undefined {
+  const speciesFrames = PANDA_SPECIES_BODIES[species]
+  if (!speciesFrames) return undefined
+  const stateFrames = speciesFrames[state] ?? speciesFrames.idle
+  if (!stateFrames || stateFrames.length === 0) return undefined
+  return stateFrames[frame % stateFrames.length]
 }

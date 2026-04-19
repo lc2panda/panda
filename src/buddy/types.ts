@@ -51,6 +51,32 @@ export const mushroom = c(
 ) as 'mushroom'
 export const chonk = c(0x63, 0x68, 0x6f, 0x6e, 0x6b) as 'chonk'
 
+// panda 系（D1 P1-T2）：append 末尾保旧 18 物种 hash 不漂移；沿用 fromCharCode 模式与既有 species 一致
+export const panda = c(0x70, 0x61, 0x6e, 0x64, 0x61) as 'panda'
+export const redPanda = c(
+  0x72,
+  0x65,
+  0x64,
+  0x50,
+  0x61,
+  0x6e,
+  0x64,
+  0x61,
+) as 'redPanda'
+export const kungFuPanda = c(
+  0x6b,
+  0x75,
+  0x6e,
+  0x67,
+  0x46,
+  0x75,
+  0x50,
+  0x61,
+  0x6e,
+  0x64,
+  0x61,
+) as 'kungFuPanda'
+
 export const SPECIES = [
   duck,
   goose,
@@ -70,8 +96,60 @@ export const SPECIES = [
   rabbit,
   mushroom,
   chonk,
+  // append 末尾：mulberry32 是 deterministic，旧 18 物种 hash 落点不变
+  panda,
+  redPanda,
+  kungFuPanda,
 ] as const
 export type Species = (typeof SPECIES)[number] // biome-ignore format: keep compact
+
+// panda 系子集，渲染层用以 gate state-driven sprite 切换（旧 18 物种走 IDLE_SEQUENCE 兼容）
+export const PANDA_SPECIES = [panda, redPanda, kungFuPanda] as const
+export type PandaSpecies = (typeof PANDA_SPECIES)[number]
+export function isPandaSpecies(s: Species): s is PandaSpecies {
+  return (PANDA_SPECIES as readonly Species[]).includes(s)
+}
+
+// PetState 12 态枚举（D1 P1-T1）— 优先级数值越大越高
+// 排序原则：异常/通知 > 系统操作 > 多任务并发 > 单任务 > 待机梯度
+export const PET_STATES = [
+  'error',
+  'notification',
+  'sweeping',
+  'attention',
+  'juggling',
+  'carrying',
+  'working',
+  'thinking',
+  'waking',
+  'idle',
+  'dozing',
+  'sleeping',
+] as const
+export type PetState = (typeof PET_STATES)[number]
+
+// 优先级表：数值越大越高；getCurrentPetState 取最大者
+export const PET_STATE_PRIORITY: Record<PetState, number> = {
+  error: 120,
+  notification: 110,
+  sweeping: 100,
+  attention: 90,
+  juggling: 80,
+  carrying: 70,
+  working: 60,
+  thinking: 50,
+  waking: 40,
+  idle: 30,
+  dozing: 20,
+  sleeping: 10,
+}
+
+// 一次性状态：触发后短暂展示后自动回退 idle（idle timer + one-shot 在 P3 加）
+export const ONE_SHOT_STATES: ReadonlySet<PetState> = new Set<PetState>([
+  'error',
+  'notification',
+  'attention',
+])
 
 export const EYES = ['·', '✦', '×', '◉', '@', '°'] as const
 export type Eye = (typeof EYES)[number]
