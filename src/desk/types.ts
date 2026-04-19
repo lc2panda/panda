@@ -1,9 +1,11 @@
-// Input:  panda CLI 内部事件（PetState 变化 / XP 增量 / 升级 / 权限请求 / 会话生命周期）
+// Input:  panda CLI 内部事件（PetState 变化 / XP 增量 / 升级 / 权限请求 / 会话生命周期 /
+//         P2-T1 新增：notification / badge / drag-target / dnd 4 类）
 // Output: 跨进程 IPC 协议字段 — panda CLI ↔ panda-on-desk 共用 schema
 // Pos:    src/desk/bridge.ts 与 packages/panda-on-desk/src/bridge/types.ts 同源
 //         严守 anthropic byte-equal — 无 anthropic 通道引用
 //
 // [NEW-FILE:#20260419-P1-06]
+// 2026-04-19 +08:00 P2-T1 扩展：4 新事件 + NotificationKind/Level 枚举（agent-α-P2-protocol）
 
 // 注意：故意不 `import type from '../buddy/types.js'` —
 // buddy/types.ts 通过 `import('../utils/theme.js').Theme` 触发整条根 src 编译链，
@@ -165,6 +167,90 @@ export interface SceneTriggerEvent {
   ts: number
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 2 P2-T1 — TOP 10 超级助手联动 4 新事件类型
+// 决策：单一 NotificationKind / 复合呈现用多个 event 串联（避免单 event 多通道
+// 状态机复杂度）；BadgeEvent / DragTargetEvent / DndEvent 各自独立。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 通知呈现形式 — A3 §2 表中 A/B/F/E/D 五类 */
+export type NotificationKind = 'system' | 'overlay' | 'badge' | 'sound' | 'drag-target'
+
+/** 通知严重等级 — 影响默认 ttlMs / 颜色 / DND 行为 */
+export type NotificationLevel = 'info' | 'warning' | 'error' | 'success'
+
+/** overlay 浮卡可携带的快捷动作按钮（最多 3 个） */
+export interface NotificationAction {
+  /** 动作 id（点回执 reverse 通道带回此 id） */
+  id: string
+  /** 按钮文字（已 i18n） */
+  label: string
+  /** 主按钮高亮（最多 1 个） */
+  primary?: boolean
+  /** 全局快捷键提示文本（如 "Ctrl+Shift+Y"），不在此处注册 */
+  shortcut?: string
+}
+
+/**
+ * 通知事件 — A3 TOP 10 场景统一出口
+ * 单 event 单 kind；同时弹横幅 + overlay + badge 时 → 业务方串发 3 个 event。
+ */
+export interface NotificationEvent {
+  type: 'notification'
+  kind: NotificationKind
+  level: NotificationLevel
+  /** 场景 id — 见 panda-on-desk/src/scene/registry.ts SCENE_REGISTRY 键 */
+  scenarioId: string
+  /** 横幅标题 / overlay 卡片标题 */
+  title: string
+  /** overlay 详情正文（kind=overlay 必填） */
+  body?: string
+  /** overlay 自动消失时间（默认 5000；error 级 10000；critical 持久） */
+  ttlMs?: number
+  /** overlay 按钮 — 最多 3 个 */
+  actions?: NotificationAction[]
+  /** kind=badge 时叠加的角标信息 */
+  badge?: { count?: number; color?: string }
+  /** kind=sound 时的音效线索 */
+  soundCue?: 'short' | 'critical' | 'gentle'
+  /** 触发 PetState 切换（与 PetStateChangeEvent 解耦：业务侧也可单独发） */
+  petStateOverride?: PetState
+  ts: number
+}
+
+/** 状态栏角标累加 / 清零 — A3 §3 #5 / #6 / #7 等场景 */
+export interface BadgeEvent {
+  type: 'badge'
+  scenarioId: string
+  /** 增量；正负均可，默认 +1 */
+  delta?: number
+  /** true = 清零；与 delta 互斥（同时给则以 reset 优先） */
+  reset?: boolean
+  ts: number
+}
+
+/** 拖拽接收开关 — A3 §3 #6 file-organizer / screenshot-snippet */
+export interface DragTargetEvent {
+  type: 'drag-target'
+  /** true = 进入接收模式；false = 退出 */
+  enable: boolean
+  /** 接受的 dnd 类别（'file'/'text'/'image'）；enable=false 时可空数组 */
+  acceptKinds: string[]
+  scenarioId: string
+  ts: number
+}
+
+/** Do Not Disturb 全局开关 — A3 §5 DND/Focus 模式 */
+export interface DndEvent {
+  type: 'dnd'
+  enabled: boolean
+  /** 触发原因 — 'manual' 用户手动 / 'schedule' 时段触发 / 'focus-mode' 专注模式 */
+  reason?: 'manual' | 'schedule' | 'focus-mode'
+  /** 自动恢复时刻 epoch ms；不传则常驻直到再次手动关闭 */
+  endsAt?: number
+  ts: number
+}
+
 /** 完整事件联合体 — discriminated by `type` */
 export type OnDeskEvent =
   | PetStateChangeEvent
@@ -174,6 +260,10 @@ export type OnDeskEvent =
   | PermissionRequestEvent
   | SessionLifecycleEvent
   | SceneTriggerEvent
+  | NotificationEvent
+  | BadgeEvent
+  | DragTargetEvent
+  | DndEvent
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HTTP 响应 schema

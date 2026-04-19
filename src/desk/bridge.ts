@@ -1,10 +1,12 @@
-// Input:  panda CLI 内部信号（PetState / XP / 升级 / 权限请求 / scene / session）
+// Input:  panda CLI 内部信号（PetState / XP / 升级 / 权限请求 / scene / session
+//         + P2-T1 helpers: notification / badge / drag-target / dnd）
 // Output: HTTP POST → http://127.0.0.1:<port>/event（端口/secret 从 ~/.pandacc/runtime.json 读）
 // Pos:    panda CLI → panda-on-desk 单向桥（SSE 反向订阅可选）；
 //         feature('BUDDY') + companionOnDesk gate；on-desk 离线时静默忽略
 //         严守 anthropic byte-equal — 仅 node 内置 http/fs，无 anthropic 通道
 //
 // [NEW-FILE:#20260419-P1-05]
+// 2026-04-19 +08:00 P2-T1 扩展：6 helpers (push/bumpBadge/resetBadge/enableDrag/disableDrag/setDnd)
 
 import { feature } from 'bun:bundle'
 import { existsSync, readFileSync } from 'node:fs'
@@ -14,6 +16,10 @@ import { join } from 'node:path'
 import { getClaudeConfigHomeDir } from '../utils/envUtils.js'
 import {
   APP_IDENTITY,
+  type BadgeEvent,
+  type DndEvent,
+  type DragTargetEvent,
+  type NotificationEvent,
   type OnDeskEvent,
   type PermissionRequestEvent,
   type ReverseMessage,
@@ -221,6 +227,117 @@ export async function pushPermissionRequest(
   req: Omit<PermissionRequestEvent, 'type' | 'ts'>,
 ): Promise<boolean> {
   return pushEventToOnDesk({ type: 'permission', ts: Date.now(), ...req })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 公共 API — 2.5 P2-T1 高层 helpers（A3 TOP 10 场景统一调用入口）
+// 设计：纯 build* 构造器（易测）+ 薄 helper 包装 fire-and-forget。
+// 这样测试可直接断言 buildXxxEvent 字段，不必绕过 feature gate / mock HTTP server。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 构造 NotificationEvent — 纯函数，便于单测验证字段。
+ * why: helper 内部 push 是 fire-and-forget，单测难直接观测；分离 build 后纯函数验证。
+ */
+export function buildNotificationEvent(
+  opts: Omit<NotificationEvent, 'type' | 'ts'>,
+): NotificationEvent {
+  return { type: 'notification', ts: Date.now(), ...opts }
+}
+
+/** 构造 BadgeEvent（delta 模式）— delta 默认 +1，正负均可 */
+export function buildBadgeBumpEvent(scenarioId: string, delta = 1): BadgeEvent {
+  return { type: 'badge', scenarioId, delta, ts: Date.now() }
+}
+
+/** 构造 BadgeEvent（reset 模式）— 清零角标 */
+export function buildBadgeResetEvent(scenarioId: string): BadgeEvent {
+  return { type: 'badge', scenarioId, reset: true, ts: Date.now() }
+}
+
+/** 构造 DragTargetEvent — enable 模式 */
+export function buildDragTargetEnableEvent(
+  scenarioId: string,
+  kinds: string[],
+): DragTargetEvent {
+  return {
+    type: 'drag-target',
+    enable: true,
+    acceptKinds: kinds,
+    scenarioId,
+    ts: Date.now(),
+  }
+}
+
+/** 构造 DragTargetEvent — disable 模式 */
+export function buildDragTargetDisableEvent(scenarioId: string): DragTargetEvent {
+  return {
+    type: 'drag-target',
+    enable: false,
+    acceptKinds: [],
+    scenarioId,
+    ts: Date.now(),
+  }
+}
+
+/** 构造 DndEvent — A3 §5 Focus 模式 / 时段静音 */
+export function buildDndEvent(
+  enabled: boolean,
+  opts: { reason?: DndEvent['reason']; endsAt?: number } = {},
+): DndEvent {
+  return {
+    type: 'dnd',
+    enabled,
+    reason: opts.reason,
+    endsAt: opts.endsAt,
+    ts: Date.now(),
+  }
+}
+
+/**
+ * 推送通知事件 — A/B/F/E/D 五类呈现统一入口。
+ *
+ * 业务方按 A3 §3 TOP 10 表选 kind；同时弹横幅 + overlay + badge 时串发 3 次。
+ * why: helper 屏蔽 type+ts 字段，让调用点无需感知 OnDeskEvent union。
+ */
+export function pushNotification(opts: Omit<NotificationEvent, 'type' | 'ts'>): void {
+  void pushEventToOnDesk(buildNotificationEvent(opts))
+}
+
+/**
+ * 角标累加 — A3 #5/#6/#7 场景"未读 +1"。delta 默认 +1，正负均可。
+ */
+export function bumpBadge(scenarioId: string, delta = 1): void {
+  void pushEventToOnDesk(buildBadgeBumpEvent(scenarioId, delta))
+}
+
+/** 角标清零 — overlay 已读 / 用户进入对应面板时调。 */
+export function resetBadge(scenarioId: string): void {
+  void pushEventToOnDesk(buildBadgeResetEvent(scenarioId))
+}
+
+/** 进入拖拽接收模式 — A3 #6 file-organizer / screenshot-snippet。 */
+export function enableDragTarget(scenarioId: string, kinds: string[]): void {
+  void pushEventToOnDesk(buildDragTargetEnableEvent(scenarioId, kinds))
+}
+
+/** 退出拖拽接收模式。 */
+export function disableDragTarget(scenarioId: string): void {
+  void pushEventToOnDesk(buildDragTargetDisableEvent(scenarioId))
+}
+
+/**
+ * 切换 DND 全局状态 — A3 §5 Focus 模式 / 时段静音。
+ *
+ * @param enabled true 开启 DND（累积 badge，抑制 overlay/system）
+ * @param opts.reason  'manual' | 'schedule' | 'focus-mode'
+ * @param opts.endsAt  自动恢复时刻 epoch ms；不传则常驻
+ */
+export function setDnd(
+  enabled: boolean,
+  opts: { reason?: DndEvent['reason']; endsAt?: number } = {},
+): void {
+  void pushEventToOnDesk(buildDndEvent(enabled, opts))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@
 //         源协议同 panda CLI src/desk/types.ts；严守 anthropic byte-equal
 //
 // [NEW-FILE:#20260419-P1-07]
+// 2026-04-19 +08:00 P2-T1 扩展：dispatchEvent 场景分发器 + 4 新事件白名单（agent-α-P2-protocol）
 
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, renameSync, writeFileSync, unlinkSync } from 'node:fs'
@@ -11,6 +12,10 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import { dispatchBadge } from '../badge/manager.js'
+import { dispatchDnd } from '../dnd/state.js'
+import { dispatchDragTarget } from '../dnd/target.js'
+import { dispatchNotification } from '../notification/dispatcher.js'
 import {
   APP_IDENTITY,
   type EventAck,
@@ -223,19 +228,69 @@ function jsonResponse(res: ServerResponse, status: number, body: unknown): void 
   res.end(payload)
 }
 
+// why: P2-T1 扩展 — 把 4 新事件类型纳入白名单，dispatcher 才能路由
+const VALID_EVENT_TYPES: ReadonlySet<string> = new Set([
+  'pet-state',
+  'xp-gained',
+  'level-up',
+  'milestone',
+  'permission',
+  'session',
+  'scene',
+  // P2-T1 新增 4 类
+  'notification',
+  'badge',
+  'drag-target',
+  'dnd',
+])
+
 function isValidEvent(body: unknown): body is OnDeskEvent {
   if (!body || typeof body !== 'object') return false
   const t = (body as { type?: unknown }).type
   if (typeof t !== 'string') return false
-  return [
-    'pet-state',
-    'xp-gained',
-    'level-up',
-    'milestone',
-    'permission',
-    'session',
-    'scene',
-  ].includes(t)
+  return VALID_EVENT_TYPES.has(t)
+}
+
+/**
+ * P2-T1 场景分发器 — bridge 收到 /event 后按 type 路由到 4 个子模块。
+ *
+ * 每个 sub-dispatcher 当前为占位 stub（P2-T2~T5 实装）。未知 type 警告日志不崩。
+ * 与 BridgeServerOptions.onEvent 并行调用：onEvent 给业务层（如 state machine
+ * 同步 PetState），dispatchEvent 给本进程内的 desk 子系统。
+ */
+export function dispatchEvent(event: OnDeskEvent): void {
+  switch (event.type) {
+    case 'notification':
+      dispatchNotification(event)
+      return
+    case 'badge':
+      dispatchBadge(event)
+      return
+    case 'drag-target':
+      dispatchDragTarget(event)
+      return
+    case 'dnd':
+      dispatchDnd(event)
+      return
+    case 'pet-state':
+    case 'xp-gained':
+    case 'level-up':
+    case 'milestone':
+    case 'permission':
+    case 'session':
+    case 'scene':
+      // why: 这 7 类由 BridgeServerOptions.onEvent 业务层处理（state.ts / xp.ts），
+      // dispatchEvent 不重复分发，避免双触发
+      return
+    default: {
+      // 未知事件 — 已被 isValidEvent 拦截，但 dispatchEvent 可单测调用，留兜底
+      const _exhaustive: never = event
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[on-desk:dispatchEvent] unknown event type: ${(_exhaustive as { type?: string }).type ?? 'undefined'}`,
+      )
+    }
+  }
 }
 
 export async function startBridgeServer(
@@ -282,6 +337,12 @@ export async function startBridgeServer(
           opts.onEvent?.(body)
         } catch {
           // dispatcher 异常不影响 ack；on-desk 不让 panda CLI 因下游 bug 重试
+        }
+        // why: P2-T1 — 业务 onEvent 之外，再走内部场景分发器（notification/badge/dnd/drag）
+        try {
+          dispatchEvent(body)
+        } catch {
+          // 占位 stub 不应抛错；万一 P2-T2+ 实装后抛错也吞，保证 ack
         }
         const ack: EventAck = { ok: true, receivedAt: Date.now() }
         jsonResponse(res, 200, ack)
