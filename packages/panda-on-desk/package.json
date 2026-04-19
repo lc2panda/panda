@@ -1,0 +1,24 @@
+{
+  "name": "@lc2panda/panda-on-desk",
+  "version": "0.1.0-alpha",
+  "private": true,
+  "description": "panda 桌面端 — 感知 panda CLI 状态 + 宠物养成可视化（基于 clawd-on-desk 81% 吸收）",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node launch.cjs",
+    "build": "tsc -p tsconfig.json",
+    "build:electron": "electron-builder",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "electron": "^41.0.0",
+    "electron-updater": "^6.8.3",
+    "electron-builder": "^25.0.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "htmlparser2": "^12.0.0",
+    "koffi": "^2.15.2"
+  }
+}

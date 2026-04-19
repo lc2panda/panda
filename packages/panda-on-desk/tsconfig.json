@@ -1,0 +1,24 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": false,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "allowJs": true,
+        "resolveJsonModule": true,
+        "ignoreDeprecations": "6.0",
+        "types": ["bun"],
+        "lib": ["ESNext", "DOM"],
+        "baseUrl": ".",
+        "paths": {
+            "@panda/buddy/*": ["../../src/buddy/*"],
+            "@panda/desk/*": ["./src/*"]
+        }
+    },
+    "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts"],
+    "exclude": ["node_modules", "dist"]
+}
