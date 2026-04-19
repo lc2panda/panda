@@ -1,6 +1,7 @@
 import { feature } from 'bun:bundle';
 import type { ContentBlockParam, TextBlockParam } from '@anthropic-ai/sdk/resources';
 import { randomUUID } from 'crypto';
+import { recordCommandSignal } from 'src/buddy/petXPSignals.js';
 import { setPromptId } from 'src/bootstrap/state.js';
 import { builtInCommandNames, type Command, type CommandBase, findCommand, getCommand, getCommandName, hasCommand, type PromptCommand } from 'src/commands.js';
 import { NO_CONTENT_MESSAGE } from 'src/constants/messages.js';
@@ -508,6 +509,8 @@ export async function processSlashCommand(inputString: string, precedingInputBlo
       })
     })
   });
+  // why here: tengu_input_command 是有效命令的统一调度成功锚点（heavy/basic 由 commandName 判定）
+  recordCommandSignal(commandName);
 
   // Check if this is a compact result which handle their own synthetic caveat message ordering
   const isCompactResult = newMessages.length > 0 && newMessages[0] && isCompactBoundaryMessage(newMessages[0]);

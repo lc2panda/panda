@@ -1,7 +1,8 @@
-// Input:  /buddy 子命令字符串（show/hide/mute/unmute/info/state/wake/sleep/theme）+ globalConfig + AppState
+// Input:  /buddy 子命令字符串（show/hide/mute/unmute/info/state/wake/sleep/theme/stats/milestones）+ globalConfig + AppState
 // Output: 单一 LocalJSXCommand — display:'system' 文案；落盘 globalConfig.companion* 字段
-// Pos:    A+B 项目精华 — 9 子命令实装；旧 5 文案 byte-equal 守护见 buddy.test.ts
+// Pos:    A+B 项目精华 — 11 子命令实装；旧 9 文案 byte-equal 守护见 buddy.test.ts
 //         v2.21.30 方向 A：theme 接 18 物种全集 + 旧 panda/redPanda/kungFuPanda alias
+//         Phase 0 P0-T5（agent-γ）：新增 stats / milestones 子命令；info 兼容追加 Level/XP/Unlocks
 //         一旦本文件被修改，请同步更新头注释 + src/commands/buddy/README.md
 import { feature } from 'bun:bundle'
 import type { Command, LocalJSXCommandContext, LocalJSXCommandOnDone } from '../../types/command.js'
@@ -16,7 +17,7 @@ const buddy = {
     if (feature('BUDDY')) { return false }
     return true
   },
-  argumentHint: '[show|hide|mute|unmute|info|state|wake|sleep|theme]',
+  argumentHint: '[show|hide|mute|unmute|info|state|wake|sleep|theme|stats|milestones]',
   immediate: true,
   load: () =>
     Promise.resolve({
@@ -49,14 +50,166 @@ const buddy = {
             saveGlobalConfig(prev => ({ ...prev, companion: defaultCompanion }))
             companion = defaultCompanion
           }
-          const info = [
+          // why 旧 3 行 byte-equal：保留原来的 Species/Name/Rarity 三行格式，仅追加 Level/XP/Unlocks
+          // grep 守护：buddy.test.ts 的 info 用例 toMatch /^Your companion:\n {2}Species: panda/
+          //   + toContain('Name: Bamboo') + toContain('Rarity: rare')
+          const lines: (string | null)[] = [
             `Species: ${companion.species ?? 'unknown'}`,
             `Name: ${companion.name ?? 'unnamed'}`,
             companion.rarity ? `Rarity: ${companion.rarity}` : null,
           ]
-            .filter(Boolean)
-            .join('\n  ')
+          // Phase 0 P0-T5：追加 Level/XP/Unlocks
+          // why 不查 feature gate：getCurrentLevel/getCurrentXP/getEffectiveRarity 等是纯函数（无 React），
+          //   bun test 也跑通；feature gate 仅守 React hook 与 saveStats 持久化路径，CLI 路径无需短路
+          try {
+            const { getCurrentLevel, getCurrentXP, getEffectiveRarity, getUnlockedStates } =
+              await import('../../buddy/petXP.js')
+            const { MAX_LEVEL, PETSTATE_UNLOCK_LEVEL } = await import(
+              '../../buddy/types.js'
+            )
+            const lv = getCurrentLevel()
+            const xp = getCurrentXP()
+            const eff = getEffectiveRarity(companion.rarity ?? 'common')
+            const states = getUnlockedStates()
+            const totalStates = Object.keys(PETSTATE_UNLOCK_LEVEL).length
+            lines.push(`Level: ${lv} / ${MAX_LEVEL}`)
+            lines.push(
+              `XP: ${xp.total} (today ${xp.today}, ${xp.pctToNext}% to next)`,
+            )
+            lines.push(`Effective rarity: ${eff}`)
+            lines.push(`Unlocks: ${states.length} / ${totalStates} states`)
+          } catch (e) {
+            // why warn-not-throw: petXP 读盘失败也不应卡 /buddy info 旧路径
+            const msg = e instanceof Error ? e.message : String(e)
+            console.warn(`[panda] /buddy info progression read failed: ${msg}`)
+          }
+          const info = lines.filter(Boolean).join('\n  ')
           onDone(`Your companion:\n  ${info}`, { display: 'system' })
+          return null
+        }
+
+        // Phase 0 P0-T5：/buddy stats — 全量养成进度面板
+        // why 单独子命令：info 保 byte-equal 旧 3 行 + 4 新行；stats 是"展开"视图含进度条 + 里程碑摘要
+        // why 不查 feature gate：仅调用 petXP 纯函数，无 React hook；与 info 同源策略
+        if (subcommand === 'stats') {
+          const {
+            getCurrentLevel,
+            getCurrentXP,
+            getEffectiveRarity,
+            getUnlockedStates,
+            getCompletedMilestones,
+            getShinyEarned,
+          } = await import('../../buddy/petXP.js')
+          const {
+            MAX_LEVEL,
+            MILESTONES,
+            MILESTONE_XP,
+            EPIC_MILESTONE_XP_THRESHOLD,
+            PETSTATE_UNLOCK_LEVEL,
+            LEVEL_RARITY_THRESHOLDS,
+            SHINY_EPIC_MILESTONE_COUNT,
+            xpRequiredForLevel,
+          } = await import('../../buddy/types.js')
+          const lv = getCurrentLevel()
+          const xpInfo = getCurrentXP()
+          const companion = config.companion
+          const bonesRarity = companion?.rarity ?? 'common'
+          const eff = getEffectiveRarity(bonesRarity)
+          const states = getUnlockedStates()
+          const totalStates = Object.keys(PETSTATE_UNLOCK_LEVEL).length
+          const completed = getCompletedMilestones()
+          const shiny = getShinyEarned()
+
+          // 进度条（10 格 ▓░）
+          const required = xpRequiredForLevel(lv)
+          const intoLevel = required === Infinity ? 0 : required - xpInfo.toNextLevel
+          const barWidth = 10
+          const filled = Math.max(
+            0,
+            Math.min(barWidth, Math.round((xpInfo.pctToNext / 100) * barWidth)),
+          )
+          const bar = '▓'.repeat(filled) + '░'.repeat(barWidth - filled)
+
+          // 下一档稀有度跃迁提示
+          // why scan thresholds: LEVEL_RARITY_THRESHOLDS 已 frozen，按顺序找首个 lv < threshold
+          let nextRarityHint = ''
+          for (const t of LEVEL_RARITY_THRESHOLDS) {
+            if (lv < t.level) {
+              nextRarityHint = ` (auto-upgrade at Lv ${t.level} → ${t.rarity})`
+              break
+            }
+          }
+
+          // shiny 进度（epic 里程碑 = XP ≥ EPIC_MILESTONE_XP_THRESHOLD）
+          const epicCount = completed.filter(
+            id => (MILESTONE_XP[id] ?? 0) >= EPIC_MILESTONE_XP_THRESHOLD,
+          ).length
+          const shinyHint = shiny
+            ? 'Yes'
+            : `No (${epicCount}/${SHINY_EPIC_MILESTONE_COUNT} epic milestones to unlock)`
+
+          // 里程碑摘要：完成数 + 前几条；详细列表交给 /buddy milestones
+          const headerLines = [
+            'Companion Progression',
+            `  Level:    ${lv} / ${MAX_LEVEL}`,
+            `  XP:       ${intoLevel} / ${required === Infinity ? '∞' : required}  (${xpInfo.pctToNext}%)`,
+            `  [${bar}] ${xpInfo.pctToNext}%`,
+            `  Total XP: ${xpInfo.total}`,
+            `  Today:    ${xpInfo.today} XP`,
+            `  Rarity:   ${eff}${nextRarityHint}`,
+            `  Shiny:    ${shinyHint}`,
+            `  Unlocked: ${states.join(', ')} (${states.length}/${totalStates} states)`,
+            '',
+            `Milestones (${completed.length}/${MILESTONES.length} completed)`,
+          ]
+          const completedSet = new Set(completed)
+          const milestoneLines = MILESTONES.map(id => {
+            if (completedSet.has(id)) {
+              return `  ✓ ${id}`
+            }
+            return `  □ ${id}                    (pending)`
+          })
+          onDone([...headerLines, ...milestoneLines].join('\n'), {
+            display: 'system',
+          })
+          return null
+        }
+
+        // Phase 0 P0-T5：/buddy milestones — 详细 13 行清单（每条带 hint）
+        // why 不查 feature gate：仅调用 petXP 纯函数；与 stats / info 同源策略
+        if (subcommand === 'milestones') {
+          const { getCompletedMilestones } = await import('../../buddy/petXP.js')
+          const { MILESTONES, MILESTONE_XP } = await import(
+            '../../buddy/types.js'
+          )
+          const completed = new Set(getCompletedMilestones())
+          // 每个 milestone 的解锁 hint（怎么得）
+          // why 表内置：解锁条件是用户文档级别契约，应该集中维护；信号源由 agent-β 接入
+          const HINTS: Record<typeof MILESTONES[number], string> = {
+            first_1m_tokens: 'cumulative 1M tokens used',
+            first_100_commits: '100 git commits authored',
+            streak_7: 'use Panda 7 consecutive days',
+            streak_30: 'use Panda 30 consecutive days',
+            first_deepdream: 'first deepdream session',
+            first_fix_bug: 'first /fix-bug invocation',
+            first_pr_merged: 'first PR merged via Panda',
+            first_skill_created: 'create your first skill',
+            epic_marathon_4h: 'a single 4h coding marathon',
+            midnight_owl: 'work past midnight (00:00-04:00)',
+            lv_10: 'reach Lv 10',
+            lv_25: 'reach Lv 25',
+            lv_50: 'reach Lv 50',
+          }
+          const lines: string[] = [
+            `Milestones (${completed.size}/${MILESTONES.length} completed)`,
+          ]
+          for (const id of MILESTONES) {
+            const mark = completed.has(id) ? '✓' : '□'
+            const xp = MILESTONE_XP[id] ?? 0
+            const hint = HINTS[id]
+            lines.push(`  ${mark} ${id}  [+${xp} XP]  — ${hint}`)
+          }
+          onDone(lines.join('\n'), { display: 'system' })
           return null
         }
 

@@ -41,6 +41,7 @@ import {
   getContextWindowForModel,
   getModelMaxOutputTokens,
 } from './utils/context.js'
+import { recordTokenUsageSignal } from './buddy/petXPSignals.js'
 import { isFastModeEnabled } from './utils/fastMode.js'
 import { formatDuration, formatNumber } from './utils/format.js'
 import type { FpsMetrics } from './utils/fpsTracker.js'
@@ -319,5 +320,11 @@ export function addToTotalSessionCost(
       advisorUsage.model,
     )
   }
+
+  // why here: 所有 provider（Anthropic claude.ts + OpenAI 经 adapter 回主路径 + vcr.ts
+  // replay）都过 addToTotalSessionCost — 唯一统一汇聚点。fire-and-forget；信号失败
+  // 不影响主路径（recordTokenUsageSignal 内部已 try/catch + feature gate）。
+  recordTokenUsageSignal(usage)
+
   return totalCost
 }

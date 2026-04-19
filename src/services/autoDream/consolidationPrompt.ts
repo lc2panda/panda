@@ -31,9 +31,15 @@ export function buildConsolidationPrompt(
   try {
     const prospDir = join(memoryRoot, 'dreams', 'prospective')
     if (existsSync(prospDir)) {
-      const files = readdirSync(prospDir).filter(f => f.endsWith('.md')).sort().reverse()
+      const files = readdirSync(prospDir)
+        .filter(f => f.endsWith('.md'))
+        .sort()
+        .reverse()
       if (files.length > 0) {
-        const prosp = readFileSync(join(prospDir, files[0]), 'utf-8').slice(0, 500)
+        const prosp = readFileSync(join(prospDir, files[0]), 'utf-8').slice(
+          0,
+          500,
+        )
         prospectiveSection = '\n\n## Upcoming Events\n' + prosp
       }
     }

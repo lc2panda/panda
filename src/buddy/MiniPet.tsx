@@ -10,7 +10,22 @@ import { Text } from '../ink.js'
 import { getGlobalConfig } from '../utils/config.js'
 import { getCompanion } from './companion.js'
 import { useCurrentPetState } from './petState.js'
+import { usePetProgression } from './petXP.js'
 import type { PetState, Species } from './types.js'
+
+// Phase 0 P0-T5：StatusLine 列宽紧张 — 仅 Lv ≥ MINI_LEVEL_THRESHOLD 才追加数字角标
+// why ≥10：1 位数字也占 1 cell，在窄状态栏太显眼且新手感不强；2 位"Lv 12"成长感更明显
+export const MINI_LEVEL_THRESHOLD = 10 as const
+
+/**
+ * 纯函数：根据 level 决定是否在 face 后追加数字角标。
+ * why pure: bun test 下 feature() 默认 false，组件本体永远 null；
+ *   阈值逻辑必须独立可断言，与 shouldRenderMiniPetFor 同源设计。
+ */
+export function miniPetLevelBadge(level: number): string {
+  if (!Number.isFinite(level) || level < MINI_LEVEL_THRESHOLD) return ''
+  return String(Math.floor(level))
+}
 
 // 12 态 → 5 字符 face 映射表
 // why 5 字符恒等：StatusLine 是单行布局，face 长度漂移会让 statusLineText 抖动；
@@ -122,11 +137,16 @@ export function MiniPet(): React.ReactNode {
 // 拆出 inner：feature gate 通过后，hook 调用顺序在 inner 内部稳定
 function MiniPetInner(): React.ReactNode {
   const petState = useCurrentPetState()
+  // Phase 0 P0-T5：等级订阅必须在 early return 之前；usePetProgression 内部 feature gate
+  // why bonesRarity fallback：getCompanion() 可能为空，hook 必须无条件调用 — fallback 只用于
+  //   首启短瞬不渲染的场景，不影响视觉
+  const progression = usePetProgression(getCompanion()?.rarity ?? 'common')
   // why 渲染前再判隐藏条件：getCompanion() / getGlobalConfig() 是同步读取，
   //   不会引发 hook 顺序漂移；放在 hook 调用之后确保 React 严格模式不报警
   if (!shouldRenderMiniPet()) return null
   const companion = getCompanion()!
   const color = MINI_PET_COLORS[companion.species] ?? 'white'
   const face = getMiniFace(petState)
-  return <Text color={color}>{face}</Text>
+  const badge = miniPetLevelBadge(progression.level)
+  return <Text color={color}>{badge ? `${face}${badge}` : face}</Text>
 }

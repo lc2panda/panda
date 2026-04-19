@@ -90,12 +90,13 @@ async function runBuddy(args: string): Promise<{
 
 // ─── argumentHint 守护 ───────────────────────────────────────────────────────
 
-describe('argumentHint 同步 9 子命令', () => {
-  test('argumentHint 含全部 9 子命令', async () => {
+describe('argumentHint 同步 11 子命令（D4 9 + Phase 0 P0-T5 +2）', () => {
+  test('argumentHint 含全部 11 子命令', async () => {
     const mod = await import('./index.js?hint=1')
     const cmd = mod.default
+    // why D4 9 + Phase 0 P0-T5：旧 9 子命令 byte-equal 出现在前；新增 stats / milestones 追加在末尾
     expect(cmd.argumentHint).toBe(
-      '[show|hide|mute|unmute|info|state|wake|sleep|theme]',
+      '[show|hide|mute|unmute|info|state|wake|sleep|theme|stats|milestones]',
     )
   })
 })

@@ -12,6 +12,7 @@ import { isFullscreenActive } from '../utils/fullscreen.js';
 import type { Theme } from '../utils/theme.js';
 import { getCompanion } from './companion.js';
 import { useCurrentPetState } from './petState.js';
+import { subscribeLevelUp, usePetProgression } from './petXP.js';
 import { getStateSprite, renderFace, renderSprite, spriteFrameCount } from './sprites.js';
 import { RARITY_COLORS, type PetState } from './types.js';
 const TICK_MS = 500;
@@ -243,12 +244,43 @@ export function CompanionSprite(): React.ReactNode {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tick intentionally captured at reaction-change, not tracked
   }, [reaction, setAppState]);
+  // Phase 0 P0-T5：升级反馈 — 订阅 subscribeLevelUp，触发时
+  //   1) console.log 系统消息 "🎉 Level Up! Lv N → N+1"
+  //   2) globalConfig.companionForcedState = 'notification' + 1.5s TTL（hook 下一帧渲染 notification face）
+  // why globalConfig：与 /buddy state 复用同一推进路径；on-desk P1 阶段会接入更丰富动画
+  useEffect(() => {
+    const unsub = subscribeLevelUp((from, to) => {
+      try {
+        // why dynamic import：避免编译期循环依赖；config.ts 已 lazy
+        import('../utils/config.js').then(({ saveGlobalConfig }) => {
+          const LEVEL_UP_NOTIFICATION_MS = 1_500;
+          saveGlobalConfig(prev => ({
+            ...prev,
+            companionForcedState: 'notification',
+            companionForcedStateExpiresAt: Date.now() + LEVEL_UP_NOTIFICATION_MS,
+          }));
+        });
+        console.log(`[panda] 🎉 Level Up! Lv ${from} → ${to}`);
+      } catch {
+        /* swallow — 升级反馈失败不应阻塞 XP 累积 */
+      }
+    });
+    return () => { unsub(); };
+  }, []);
   // why: 必须在任意 early return 之前调用 hook（React rules of hooks）；feature gate 在 hook 内短路
   const petState = useCurrentPetState();
+  // Phase 0 P0-T5：等级订阅 — usePetProgression 内部 feature gate；即使 BUDDY 关也安全
+  // why bonesRarity fallback 'common'：companion 可能在首启时还未生成；hook 必须无条件调用
+  const progression = usePetProgression(getCompanion()?.rarity ?? 'common');
   if (!feature('BUDDY')) return null;
   const companion = getCompanion();
   if (!companion || getGlobalConfig().companionMuted) return null;
   const color = RARITY_COLORS[companion.rarity];
+  // Phase 0 P0-T5：Lv 角标 — 默认 ON；可关 flag globalConfig.companionShowLevel = false
+  // why effective rarity color：等级跃迁后稀有度颜色升级（Lv 25 → rare → permission 色）
+  //   提供"成长视觉反馈"；用 progression.rarity（已含 effective 计算）保持配色一致
+  const showLevelBadge = getGlobalConfig().companionShowLevel !== false;
+  const lvColor = RARITY_COLORS[progression.rarity];
   const colWidth = spriteColWidth(stringWidth(companion.name));
   const bubbleAge = reaction ? tick - lastSpokeTick.current : 0;
   const fading = reaction !== undefined && bubbleAge >= BUBBLE_SHOW - FADE_WINDOW;
@@ -269,6 +301,7 @@ export function CompanionSprite(): React.ReactNode {
           <Text italic dimColor={!focused && !reaction} bold={focused} inverse={focused && !reaction} color={reaction ? fading ? 'inactive' : color : focused ? color : undefined}>
             {label}
           </Text>
+          {showLevelBadge && !quip && <Text bold color={lvColor}>{` Lv ${progression.level}`}</Text>}
         </Text>
       </Box>;
   }
@@ -329,6 +362,7 @@ export function CompanionSprite(): React.ReactNode {
       <Text italic bold={focused} dimColor={!focused} color={focused ? color : undefined} inverse={focused}>
         {focused ? ` ${companion.name} ` : companion.name}
       </Text>
+      {showLevelBadge && <Text bold color={lvColor} dimColor={!focused}>{`Lv ${progression.level}`}</Text>}
     </Box>;
   if (!reaction) {
     return <Box paddingX={1}>{spriteColumn}</Box>;

@@ -23,6 +23,7 @@ import {
   logEvent,
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
 } from 'src/services/analytics/index.js'
+import { recordTurnSignal } from './buddy/petXPSignals.js'
 import { ImageSizeError } from './utils/imageValidation.js'
 import { ImageResizeError } from './utils/imageResizer.js'
 import { findToolByName, type ToolUseContext } from './Tool.js'
@@ -1071,6 +1072,8 @@ async function* queryLoop(
 
       // To help track down bugs, log loudly for ants
       logAntError('Query error', error)
+      // why here: 标记上一 turn 抛错；下次 success 触发 error.recover bonus（+25 XP）
+      recordTurnSignal('error')
       return { reason: 'model_error', error }
     }
 
@@ -1503,6 +1506,9 @@ async function* queryLoop(
         }
       }
 
+      // why here: 真正的 turn-success 锚点 — 走到这里说明无 tool_use、无 stop-hook block、
+      // 无 token-budget 中断；上一 turn 若有 error 标记则触发 error.recover bonus
+      recordTurnSignal('success')
       return { reason: 'completed' }
     }
 

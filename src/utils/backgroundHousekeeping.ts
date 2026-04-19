@@ -1,4 +1,8 @@
 import { feature } from 'bun:bundle'
+import {
+  recordStreakStartupSignal,
+  startTimeTickSignal,
+} from '../buddy/petXPSignals.js'
 import { initAutoDream } from '../services/autoDream/autoDream.js'
 import { initMagicDocs } from '../services/MagicDocs/magicDocs.js'
 import { initSkillImprovement } from './hooks/skillImprovement.js'
@@ -35,6 +39,10 @@ export function startBackgroundHousekeeping(): void {
     extractMemoriesModule!.initExtractMemories()
   }
   initAutoDream()
+  // why here: 单次启动钩子 — streak 跨日检测一次；time tick 起 60s setInterval（unref'd）
+  // 失败完全 swallow（信号源内部已守护），不影响其他 housekeeping 任务
+  recordStreakStartupSignal()
+  startTimeTickSignal()
   void autoUpdateMarketplacesAndPluginsInBackground()
   if (feature('LODESTONE') && getIsInteractive()) {
     void registerProtocolModule!.ensureDeepLinkProtocolRegistered()

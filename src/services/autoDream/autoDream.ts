@@ -14,6 +14,7 @@ import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
 import { join } from 'path'
 import { readdirSync, readFileSync, statSync } from 'fs'
 import { writeFile, mkdir } from 'fs/promises'
+import { recordDeepDreamSignal } from '../../buddy/petXPSignals.js'
 import type { REPLHookContext } from '../../utils/hooks/postSamplingHooks.js'
 import {
   createCacheSafeParams,
@@ -66,8 +67,8 @@ type AutoDreamConfig = {
 }
 
 const DEFAULTS: AutoDreamConfig = {
-  minHours: 1,        // SA-P1-01: 用户离开 1 小时即可触发
-  minSessions: 2,     // SA-P1-01: 2 个会话就够
+  minHours: 1, // SA-P1-01: 用户离开 1 小时即可触发
+  minSessions: 2, // SA-P1-01: 2 个会话就够
 }
 
 /**
@@ -251,10 +252,16 @@ ${sessionIds.map(id => `- ${id}`).join('\n')}`
           const dreamsDir = join(memoryRoot, 'dreams')
           await mkdir(dreamsDir, { recursive: true })
           const dateStr = localDateStr()
-          await writeFile(join(dreamsDir, `${dateStr}.md`), dreamReport, 'utf-8')
+          await writeFile(
+            join(dreamsDir, `${dateStr}.md`),
+            dreamReport,
+            'utf-8',
+          )
         }
       } catch (e) {
-        logForDebugging(`[autoDream] DeepDream v2 report failed: ${(e as Error).message}`)
+        logForDebugging(
+          `[autoDream] DeepDream v2 report failed: ${(e as Error).message}`,
+        )
       }
 
       // Inline completion summary in the main transcript (same surface as
@@ -279,6 +286,8 @@ ${sessionIds.map(id => `- ${id}`).join('\n')}`
         output: result.totalUsage.output_tokens,
         sessions_reviewed: sessionIds.length,
       })
+      // why here: DeepDream 完成是 epic 级正反馈事件 — +200 XP + first_deepdream 里程碑
+      recordDeepDreamSignal()
     } catch (e: unknown) {
       // If the user killed from the bg-tasks dialog, DreamTask.kill already
       // aborted, rolled back the lock, and set status=killed. Don't overwrite
@@ -341,15 +350,25 @@ function makeDreamProgressWatcher(
 // SA-P1-01: DeepDream v2 四阶段报告生成
 // ═══════════════════════════════════════════════════════════════════
 
-async function generateDeepDreamReport(memoryDir: string): Promise<string | null> {
-  const { scanMdFiles, decayAndPruneMemories, readBrowserHistory, readAppleNotes, captureClipboard } = await import('../../memdir/memdir.js')
+async function generateDeepDreamReport(
+  memoryDir: string,
+): Promise<string | null> {
+  const {
+    scanMdFiles,
+    decayAndPruneMemories,
+    readBrowserHistory,
+    readAppleNotes,
+    captureClipboard,
+  } = await import('../../memdir/memdir.js')
 
   const dateStr = localDateStr()
   const sections: string[] = [`# DeepDream Report — ${dateStr}\n`]
 
   // Phase 1: Harvest — 扫描当日数据 + 数据连接器
   const episodes = join(memoryDir, 'episodes')
-  const todayEpisodes = scanMdFiles(episodes).filter((f: string) => f.includes(dateStr))
+  const todayEpisodes = scanMdFiles(episodes).filter((f: string) =>
+    f.includes(dateStr),
+  )
   if (scanMdFiles(memoryDir).length === 0) return null
 
   sections.push('## Harvest')
@@ -358,7 +377,10 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
 
   // 数据连接器：浏览记录
   try {
-    const browserHistory = await readBrowserHistory(new Date(Date.now() - 86400000), 20)
+    const browserHistory = await readBrowserHistory(
+      new Date(Date.now() - 86400000),
+      20,
+    )
     sections.push(`- 浏览记录: ${browserHistory.length} 个页面`)
     if (browserHistory.length > 0) {
       sections.push('  Top 5:')
@@ -377,7 +399,8 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
   // 数据连接器：剪贴板
   try {
     const clipboard = await captureClipboard()
-    if (clipboard) sections.push(`- 剪贴板最近内容: ${clipboard.slice(0, 50)}...`)
+    if (clipboard)
+      sections.push(`- 剪贴板最近内容: ${clipboard.slice(0, 50)}...`)
   } catch {}
 
   // 读取最近 7 天的情景记忆
@@ -386,11 +409,17 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
     const cutoff = Date.now() - 7 * 86400000
     const recentEpisodes = readdirSync(episodesDir)
       .filter((f: string) => f.endsWith('.md'))
-      .map((f: string) => ({ name: f, path: join(episodesDir, f), mtime: statSync(join(episodesDir, f)).mtimeMs }))
+      .map((f: string) => ({
+        name: f,
+        path: join(episodesDir, f),
+        mtime: statSync(join(episodesDir, f)).mtimeMs,
+      }))
       .filter((f: { mtime: number }) => f.mtime > cutoff)
       .sort((a: { mtime: number }, b: { mtime: number }) => b.mtime - a.mtime)
       .slice(0, 10)
-      .map((f: { path: string }) => (readFileSync(f.path, 'utf-8') as string).slice(0, 500))
+      .map((f: { path: string }) =>
+        (readFileSync(f.path, 'utf-8') as string).slice(0, 500),
+      )
 
     if (recentEpisodes.length > 0) {
       sections.push('\n## Recent Episodes (last 7 days)')
@@ -400,11 +429,20 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
 
   // 读取情感记忆
   try {
-    const { getRecentEmotionalEvents } = require('../../assistant/emotionalMemory.js')
+    const {
+      getRecentEmotionalEvents,
+    } = require('../../assistant/emotionalMemory.js')
     const events = getRecentEmotionalEvents()
     if (events && events.length > 0) {
       sections.push('\n## Recent Emotional Events')
-      sections.push(events.map((e: { type: string; trigger: string; timestamp?: string }) => `- ${e.type}: ${e.trigger} (${e.timestamp || 'recent'})`).join('\n'))
+      sections.push(
+        events
+          .map(
+            (e: { type: string; trigger: string; timestamp?: string }) =>
+              `- ${e.type}: ${e.trigger} (${e.timestamp || 'recent'})`,
+          )
+          .join('\n'),
+      )
     }
   } catch {}
 
@@ -431,7 +469,9 @@ async function generateDeepDreamReport(memoryDir: string): Promise<string | null
   }
   const duplicateThemes = [...titleFreq.entries()].filter(([, c]) => c > 1)
   if (duplicateThemes.length > 0) {
-    sections.push(`- 重复主题: ${duplicateThemes.map(([t, c]) => `${t}(${c})`).join(', ')}`)
+    sections.push(
+      `- 重复主题: ${duplicateThemes.map(([t, c]) => `${t}(${c})`).join(', ')}`,
+    )
   }
 
   // Phase 3: Consolidate — 调用衰减清理

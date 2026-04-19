@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { feature } from 'bun:bundle'
 import { useAppState } from '../state/AppState.js'
 import { getGlobalConfig } from '../utils/config.js'
+import { isStateUnlocked } from './petXP.js'
 import {
   ONE_SHOT_STATES,
   PET_STATE_PRIORITY,
@@ -134,6 +135,21 @@ export function getCurrentPetState(input: PetStateInput): PetState {
 // 兜底守护：导出 PET_STATES 给测试用（同时确保 tree-shake 不误删）
 export { PET_STATES, PET_STATE_PRIORITY, type PetState } from './types.js'
 export { ONE_SHOT_STATES } from './types.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 0 P0-T6：宠物等级 PetState 解锁阶梯接入
+// 未解锁状态一律降级 idle —— "低级宠不会做事"养成感（A2 §4.1）
+// 纯函数便于单测；hook 渲染层调用 isStateUnlocked 喂入第二参数
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function applyUnlockGate(
+  derived: PetState,
+  isUnlocked: (s: PetState) => boolean,
+): PetState {
+  // why idle 兜底：idle 在 PETSTATE_UNLOCK_LEVEL 总是 Lv 1 解锁，安全降级目标
+  if (isUnlocked(derived)) return derived
+  return 'idle'
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // React hook（P1-T4 + P3-T3/T4）— 订阅 AppState 派生信号 + 500ms tick 推进 nowMs
@@ -296,12 +312,16 @@ export function useCurrentPetState(): PetState {
   // D4 P5-T1：globalConfig.companionForcedState 覆盖（/buddy state/wake/sleep 写入）
   // why: 每 tick 重读 globalConfig 保命令落盘后下一帧即生效；过期后自动透传 derivedState
   const cfg = getGlobalConfig()
-  const finalState = applyForcedState(
+  const forcedState = applyForcedState(
     derivedState,
     cfg.companionForcedState,
     cfg.companionForcedStateExpiresAt,
     now,
   )
+
+  // Phase 0 P0-T6：等级解锁 gate —— 未解锁 state 降级 idle
+  // why 在最末: forced state 也要受等级限制（防低级用户 /buddy state sweeping 偷渲染）
+  const finalState = applyUnlockGate(forcedState, isStateUnlocked)
 
   // 跨帧记账：保存 final state 供下一帧 waking 判断
   prevStateRef.current = finalState
