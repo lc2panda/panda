@@ -145,6 +145,12 @@ const badgeManagerMod = _safeRequire<{
 const trayModule = _safeRequire<{
   initPandaTray?: (ctx: any) => { tray: any; rebuild: () => void; destroy: () => void }
 }>('./tray', {})
+// W12-T2：DND 单一状态源 — tray 切换 DND 时需写穿到 dnd/state.ts（dispatcher gate 才生效）
+// 失败容错：dnd/state 模块缺失（极端 build 异常）时退回纯内存 _dndEnabled，不阻断 tray。
+const dndStateMod = _safeRequire<{
+  setDnd?: (opts: { enabled: boolean; reason?: 'manual' | 'schedule' | 'focus-mode'; endsAt?: number }) => void
+  isInDnd?: () => boolean
+}>('./dnd/state', {})
 const deskPrefsMod = _safeRequire<{
   loadDeskPrefs?: (p?: string) => any
   saveDeskPrefs?: (data: any, p?: string) => any
@@ -443,6 +449,15 @@ let _dndEnabled: boolean = false
 function getDoNotDisturb(): boolean { return _dndEnabled }
 function setDoNotDisturb(enabled: boolean): void {
   _dndEnabled = !!enabled
+  // W12-T2：写穿 dnd/state.ts —— 单一状态源，dispatcher / bridge gate 共用同一开关
+  // why: tray 之前只更新 main.ts 内存镜像 + 广播 IPC，dispatcher.isInDnd() 读不到，导致 DND 视觉切换但通知未抑制
+  try {
+    if (typeof dndStateMod.setDnd === 'function') {
+      dndStateMod.setDnd({ enabled: _dndEnabled, reason: 'manual' })
+    }
+  } catch (err) {
+    console.warn('[panda-on-desk] dnd/state.setDnd failed:', (err as Error)?.message)
+  }
   try { sendToRenderer('dnd-change', _dndEnabled) } catch {}
   try { sendToHitWin('dnd-change', _dndEnabled) } catch {}
   if (_trayHandle && typeof _trayHandle.rebuild === 'function') _trayHandle.rebuild()

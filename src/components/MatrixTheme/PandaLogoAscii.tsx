@@ -10,10 +10,10 @@
 //  - 6 行亮度按 FLASH/GLOW/BRIGHT/GLOW/FLASH/GLOW 错落（电影 CRT scanline 感）
 //  - 底部一行 tagline `// reality is a construct`（hint dim）
 
-import * as React from 'react'
-import { Box, Text } from '../../ink.js'
-import { MATRIX_SCALE, MATRIX_SCALE_LIGHT } from './matrixPalette.js'
-import { isMatrixLight } from './isMatrixTheme.js'
+import * as React from 'react';
+import { Box, Text } from '../../ink.js';
+import { MATRIX_SCALE, MATRIX_SCALE_LIGHT } from './matrixPalette.js';
+import { isMatrixLight } from './isMatrixTheme.js';
 
 const PANDA_LOGO = [
   '██████╗  █████╗ ███╗   ██╗██████╗  █████╗ ',
@@ -22,7 +22,7 @@ const PANDA_LOGO = [
   '██╔═══╝ ██╔══██║██║╚██╗██║██║  ██║██╔══██║',
   '██║     ██║  ██║██║ ╚████║██████╔╝██║  ██║',
   '╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚═╝  ╚═╝',
-]
+];
 
 // CRT scanline: alternate FLASH (bright) / GLOW (slightly dimmer)
 // 与 MatrixBootSequence 同一节奏，确保两屏过渡视觉连续
@@ -33,7 +33,7 @@ const SCANLINE_DARK = [
   MATRIX_SCALE.GLOW,
   MATRIX_SCALE.FLASH,
   MATRIX_SCALE.GLOW,
-]
+];
 const SCANLINE_LIGHT = [
   MATRIX_SCALE_LIGHT.FLASH,
   MATRIX_SCALE_LIGHT.GLOW,
@@ -41,17 +41,17 @@ const SCANLINE_LIGHT = [
   MATRIX_SCALE_LIGHT.GLOW,
   MATRIX_SCALE_LIGHT.FLASH,
   MATRIX_SCALE_LIGHT.GLOW,
-]
+];
 
 interface Props {
   /** 是否显示 tagline（默认 true） */
-  tagline?: boolean
+  tagline?: boolean;
 }
 
 export function PandaLogoAscii({ tagline = true }: Props = {}): React.ReactNode {
-  const lightMode = isMatrixLight()
-  const colors = lightMode ? SCANLINE_LIGHT : SCANLINE_DARK
-  const S = lightMode ? MATRIX_SCALE_LIGHT : MATRIX_SCALE
+  const lightMode = isMatrixLight();
+  const colors = lightMode ? SCANLINE_LIGHT : SCANLINE_DARK;
+  const S = lightMode ? MATRIX_SCALE_LIGHT : MATRIX_SCALE;
 
   return (
     <Box flexDirection="column">
@@ -66,5 +66,5 @@ export function PandaLogoAscii({ tagline = true }: Props = {}): React.ReactNode 
         </Text>
       )}
     </Box>
-  )
+  );
 }

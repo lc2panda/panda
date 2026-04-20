@@ -354,5 +354,13 @@ export const EPIC_MILESTONE_XP_THRESHOLD = 500
 export const SHINY_EPIC_MILESTONE_COUNT = 3
 
 // 持久化 schema 版本号（迁移用；任何字段语义变更必须 +1）
+// 当前 written version = 1；reader 同时兼容未来 v2（仅前瞻，不启用 write）
+// W12-T3: 暴露 V2 标识符 + seasons 桶常量供 reader / migration 引用
 export const COMPANION_STATS_SCHEMA_VERSION = 1
+export const COMPANION_STATS_SCHEMA_VERSION_NEXT = 2
+
+// SEASONS 4 桶（v2 前瞻字段）— 季节 XP 累积，便于未来季节限定彩蛋／皮肤解锁
+// reader 兼容：v1 reader 见到 seasons 字段会忽略（passthrough），v2 reader 缺则补 0
+export const SEASON_BUCKETS = ['spring', 'summer', 'autumn', 'winter'] as const
+export type SeasonBucket = (typeof SEASON_BUCKETS)[number]
 

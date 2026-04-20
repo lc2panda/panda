@@ -7,20 +7,20 @@
 // 用途：MessageResponse 等位于消息子树深处的组件不必接收 role prop，
 // 通过 useTurnRole() 即可读取最近一层 TurnGutterProvider 提供的 role。
 
-import * as React from 'react'
-import type { TurnRole } from './TurnGutter.js'
+import * as React from 'react';
+import type { TurnRole } from './TurnGutter.js';
 
-const Ctx = React.createContext<TurnRole | null>(null)
+const Ctx = React.createContext<TurnRole | null>(null);
 
 interface Props {
-  role: TurnRole
-  children: React.ReactNode
+  role: TurnRole;
+  children: React.ReactNode;
 }
 
 export function TurnGutterProvider({ role, children }: Props): React.ReactNode {
-  return <Ctx.Provider value={role}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={role}>{children}</Ctx.Provider>;
 }
 
 export function useTurnRole(): TurnRole | null {
-  return React.useContext(Ctx)
+  return React.useContext(Ctx);
 }

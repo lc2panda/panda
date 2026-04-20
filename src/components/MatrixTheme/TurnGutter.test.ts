@@ -25,13 +25,23 @@ afterEach(() => {
 })
 
 test('palette — MATRIX_UI 4 新 token 都为合法 hex', () => {
-  for (const k of ['userGutter', 'pandaGutter', 'toolGutter', 'thinkingGutter'] as const) {
+  for (const k of [
+    'userGutter',
+    'pandaGutter',
+    'toolGutter',
+    'thinkingGutter',
+  ] as const) {
     expect(MATRIX_UI[k]).toMatch(/^#[0-9A-Fa-f]{6}$/)
   }
 })
 
 test('palette — MATRIX_UI_LIGHT 4 新 token 都为合法 hex', () => {
-  for (const k of ['userGutter', 'pandaGutter', 'toolGutter', 'thinkingGutter'] as const) {
+  for (const k of [
+    'userGutter',
+    'pandaGutter',
+    'toolGutter',
+    'thinkingGutter',
+  ] as const) {
     expect(MATRIX_UI_LIGHT[k]).toMatch(/^#[0-9A-Fa-f]{6}$/)
   }
 })

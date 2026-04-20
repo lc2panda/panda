@@ -3,17 +3,17 @@
 // Pos: MatrixTheme 渲染核心，被 MatrixBanner / MatrixBootSequence 消费
 // 一旦我被修改，请更新 MatrixTheme/README.md
 
-import * as React from 'react'
-import { useRef } from 'react'
-import { Box, Text } from '../../ink.js'
-import { useAnimationFrame } from '../../ink/hooks/use-animation-frame.js'
-import { type CharSet, pickChar } from './matrixCharSets.js'
-import { ageToHex, ageToHexLight } from './matrixPalette.js'
-import { getMatrixWindowsDefaults } from '../../utils/terminalCapability.js'
-import { isMatrixLight } from './isMatrixTheme.js'
+import * as React from 'react';
+import { useRef } from 'react';
+import { Box, Text } from '../../ink.js';
+import { useAnimationFrame } from '../../ink/hooks/use-animation-frame.js';
+import { type CharSet, pickChar } from './matrixCharSets.js';
+import { ageToHex, ageToHexLight } from './matrixPalette.js';
+import { getMatrixWindowsDefaults } from '../../utils/terminalCapability.js';
+import { isMatrixLight } from './isMatrixTheme.js';
 
 // Windows 低能力终端降级参数（模块级缓存，只检测一次）
-const _winDefaults = getMatrixWindowsDefaults()
+const _winDefaults = getMatrixWindowsDefaults();
 
 // ─── 深度层定义 ─────────────────────────────────────────────
 // 3 层深度制造视觉空间感（基于 Rezmason/matrix 异步滚动模型）
@@ -23,40 +23,40 @@ const _winDefaults = getMatrixWindowsDefaults()
 
 interface DepthLayer {
   /** 激活比例（density 基准 × 此比例） */
-  activationChance: number
+  activationChance: number;
   /** 速度范围 [min, max) 行/秒 */
-  speedMin: number
-  speedMax: number
+  speedMin: number;
+  speedMax: number;
   /** 亮度偏移（+值使 age 更暗，-值更亮） */
-  brightnessOffset: number
+  brightnessOffset: number;
   /** 字符闪烁基准概率（每帧变异率） */
-  flickerRate: number
+  flickerRate: number;
   /** 微闪光触发概率（临时提亮 1 帧） */
-  sparkleRate: number
+  sparkleRate: number;
 }
 
 const DEPTH_LAYERS: DepthLayer[] = [
   // 前景 — 10% 列，快 5-8 行/s，100% 亮度，低闪烁（v2.19 降低闪烁减轻视觉负担）
-  { activationChance: 0.10, speedMin: 5, speedMax: 8, brightnessOffset: 0, flickerRate: 0.02, sparkleRate: 0.005 },
+  { activationChance: 0.1, speedMin: 5, speedMax: 8, brightnessOffset: 0, flickerRate: 0.02, sparkleRate: 0.005 },
   // 中景 — 60% 列，中速 8-15 行/s，70% 有效亮度，极低闪烁
-  { activationChance: 0.60, speedMin: 8, speedMax: 15, brightnessOffset: 0.15, flickerRate: 0.025, sparkleRate: 0.008 },
+  { activationChance: 0.6, speedMin: 8, speedMax: 15, brightnessOffset: 0.15, flickerRate: 0.025, sparkleRate: 0.008 },
   // 背景 — 30% 列，慢 15-20 行/s，40% 有效亮度，几乎不闪烁
-  { activationChance: 0.30, speedMin: 15, speedMax: 20, brightnessOffset: 0.35, flickerRate: 0.015, sparkleRate: 0.003 },
-]
+  { activationChance: 0.3, speedMin: 15, speedMax: 20, brightnessOffset: 0.35, flickerRate: 0.015, sparkleRate: 0.003 },
+];
 
 interface MatrixCharRainProps {
-  rows: number
-  cols: number
+  rows: number;
+  cols: number;
   /** 0..1: 密度，0.2 = 每 5 列一道雨 */
-  density?: number
+  density?: number;
   /** 帧率，默认 20 */
-  fps?: number
+  fps?: number;
   /** 字符池 */
-  charSet?: CharSet
+  charSet?: CharSet;
   /** 雨头长度（亮的部分），默认 4 */
-  headLength?: number
+  headLength?: number;
   /** 雨尾长度（消散），默认 8 */
-  tailLength?: number
+  tailLength?: number;
 }
 
 /**
@@ -64,19 +64,19 @@ interface MatrixCharRainProps {
  */
 interface ColumnState {
   /** 雨头当前 y 坐标（可超 rows，循环） */
-  headY: number
+  headY: number;
   /** 速度（y 每秒下降多少行） */
-  speed: number
+  speed: number;
   /** 字符历史，长度 = rows，记录每行字符（停留态） */
-  chars: string[]
+  chars: string[];
   /** 是否激活 */
-  active: boolean
+  active: boolean;
   /** 深度层索引 */
-  depth: number
+  depth: number;
   /** 上次更新 time */
-  lastTime: number
+  lastTime: number;
   /** 列间速度微调（-15%~+15% 随机） */
-  speedJitter: number
+  speedJitter: number;
 }
 
 /**
@@ -97,124 +97,124 @@ export function MatrixCharRain(props: MatrixCharRainProps): React.ReactNode {
     fps = _winDefaults?.fps ?? 20,
     charSet = _winDefaults?.charSet ?? 'mixed',
     tailLength = _winDefaults?.tailLength ?? 8,
-  } = props
+  } = props;
 
   // useRef 持久化每列状态，每帧更新
-  const columnsRef = useRef<ColumnState[] | null>(null)
-  const initializedColsRef = useRef(0)
+  const columnsRef = useRef<ColumnState[] | null>(null);
+  const initializedColsRef = useRef(0);
 
   // 初始化或 cols 变化时重建
   if (columnsRef.current === null || initializedColsRef.current !== cols) {
-    const next: ColumnState[] = []
+    const next: ColumnState[] = [];
     for (let i = 0; i < cols; i++) {
-      next.push(createColumn(rows, density, charSet))
+      next.push(createColumn(rows, density, charSet));
     }
-    columnsRef.current = next
-    initializedColsRef.current = cols
+    columnsRef.current = next;
+    initializedColsRef.current = cols;
   }
 
   // 拿到帧时钟
-  const intervalMs = Math.max(16, Math.floor(1000 / fps))
-  const [ref, time] = useAnimationFrame(intervalMs)
+  const intervalMs = Math.max(16, Math.floor(1000 / fps));
+  const [ref, time] = useAnimationFrame(intervalMs);
 
   // 每帧推进所有列
-  const columns = columnsRef.current
-  const firstLastTime = columns[0]?.lastTime ?? time
-  const dt = Math.max(0, (time - firstLastTime) / 1000)
+  const columns = columnsRef.current;
+  const firstLastTime = columns[0]?.lastTime ?? time;
+  const dt = Math.max(0, (time - firstLastTime) / 1000);
   for (const col of columns) {
-    if (!col.active) continue
-    const layer = DEPTH_LAYERS[col.depth]
-    const jitteredSpeed = col.speed * (1 + col.speedJitter)
-    col.headY += jitteredSpeed * dt
-    col.lastTime = time
+    if (!col.active) continue;
+    const layer = DEPTH_LAYERS[col.depth];
+    const jitteredSpeed = col.speed * (1 + col.speedJitter);
+    col.headY += jitteredSpeed * dt;
+    col.lastTime = time;
 
     // 当雨头落到底部下方 + tail 距离时，重新从顶部开始
     if (col.headY > rows + tailLength) {
-      col.headY = -Math.floor(Math.random() * 5)
+      col.headY = -Math.floor(Math.random() * 5);
       // 从所属层重新取速度
-      col.speed = layer.speedMin + Math.random() * (layer.speedMax - layer.speedMin)
+      col.speed = layer.speedMin + Math.random() * (layer.speedMax - layer.speedMin);
       // 偶尔重新装填字符
       if (Math.random() < 0.3) {
         for (let y = 0; y < rows; y++) {
-          col.chars[y] = pickChar(charSet)
+          col.chars[y] = pickChar(charSet);
         }
       }
     }
 
     // 雨头位置字符变异（每帧 3-5%）
-    const headInt = Math.floor(col.headY)
+    const headInt = Math.floor(col.headY);
     if (headInt >= 0 && headInt < rows && Math.random() < layer.flickerRate) {
-      col.chars[headInt] = pickChar(charSet)
+      col.chars[headInt] = pickChar(charSet);
     }
   }
 
   // 渲染 rows × cols 的字符矩阵
-  const lines: React.ReactNode[] = []
+  const lines: React.ReactNode[] = [];
   for (let y = 0; y < rows; y++) {
-    const segments: React.ReactNode[] = []
+    const segments: React.ReactNode[] = [];
     for (let x = 0; x < cols; x++) {
-      const col = columns[x]
+      const col = columns[x];
       if (!col || !col.active) {
-        segments.push(<Text key={x}> </Text>)
-        continue
+        segments.push(<Text key={x}> </Text>);
+        continue;
       }
-      const headY = col.headY
-      const distance = headY - y // 0 = 正在下落，>0 = 已经过去
+      const headY = col.headY;
+      const distance = headY - y; // 0 = 正在下落，>0 = 已经过去
       if (distance < 0 || distance > tailLength) {
-        segments.push(<Text key={x}> </Text>)
-        continue
+        segments.push(<Text key={x}> </Text>);
+        continue;
       }
 
-      const layer = DEPTH_LAYERS[col.depth]
-      const rawAge = distance / tailLength
+      const layer = DEPTH_LAYERS[col.depth];
+      const rawAge = distance / tailLength;
       // 深度亮度偏移 + 微闪光（降低概率减轻视觉负担）
-      let age = rawAge + layer.brightnessOffset
+      let age = rawAge + layer.brightnessOffset;
       if (Math.random() < layer.sparkleRate) {
-        age = Math.max(0, age - 0.3) // 临时提亮，更亮
+        age = Math.max(0, age - 0.3); // 临时提亮，更亮
       }
       // 明暗模式使用不同色彩插值
-      const colorFn = isMatrixLight() ? ageToHexLight : ageToHex
-      const color = colorFn(age)
-      const char = col.chars[y] || pickChar(charSet)
+      const colorFn = isMatrixLight() ? ageToHexLight : ageToHex;
+      const color = colorFn(age);
+      const char = col.chars[y] || pickChar(charSet);
 
       segments.push(
         <Text key={x} color={color}>
           {char}
         </Text>,
-      )
+      );
     }
     lines.push(
       <Box key={y} flexDirection="row">
         {segments}
       </Box>,
-    )
+    );
   }
 
   return (
     <Box ref={ref} flexDirection="column">
       {lines}
     </Box>
-  )
+  );
 }
 
 function createColumn(rows: number, density: number, charSet: CharSet): ColumnState {
   // 深度层选择：根据随机值决定
-  const depthRoll = Math.random()
-  let depth: number
+  const depthRoll = Math.random();
+  let depth: number;
   // 10% 前景 / 60% 中景 / 30% 背景
-  if (depthRoll < 0.10) depth = 0
-  else if (depthRoll < 0.70) depth = 1
-  else depth = 2
+  if (depthRoll < 0.1) depth = 0;
+  else if (depthRoll < 0.7) depth = 1;
+  else depth = 2;
 
-  const layer = DEPTH_LAYERS[depth]
+  const layer = DEPTH_LAYERS[depth];
   // 是否激活（受 density 和层激活比例共同控制）
   // 前景 10% 稀有，中景 60% 主力，背景 30% 补充
-  const effectiveDensity = density * layer.activationChance * 4 // ×4 补偿使总密度 ~density
-  const active = Math.random() < effectiveDensity
+  const effectiveDensity = density * layer.activationChance * 4; // ×4 补偿使总密度 ~density
+  const active = Math.random() < effectiveDensity;
 
-  const chars: string[] = []
+  const chars: string[] = [];
   for (let y = 0; y < rows; y++) {
-    chars.push(pickChar(charSet))
+    chars.push(pickChar(charSet));
   }
 
   return {
@@ -225,6 +225,5 @@ function createColumn(rows: number, density: number, charSet: CharSet): ColumnSt
     depth,
     lastTime: 0,
     speedJitter: (Math.random() - 0.5) * 0.3, // -15% ~ +15% 速度微调
-  }
+  };
 }
-

@@ -20,7 +20,12 @@ export type TurnRole = 'user' | 'panda' | 'tool' | 'thinking'
  * TurnRole → MATRIX_UI[token] 的 palette key 映射。
  * 值必须是 MATRIX_UI / MATRIX_UI_LIGHT 都存在的 key。
  */
-export const ROLE_TOKEN: Readonly<Record<TurnRole, 'userGutter' | 'pandaGutter' | 'toolGutter' | 'thinkingGutter'>> = {
+export const ROLE_TOKEN: Readonly<
+  Record<
+    TurnRole,
+    'userGutter' | 'pandaGutter' | 'toolGutter' | 'thinkingGutter'
+  >
+> = {
   user: 'userGutter',
   panda: 'pandaGutter',
   tool: 'toolGutter',

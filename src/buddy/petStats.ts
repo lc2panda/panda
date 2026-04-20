@@ -22,11 +22,14 @@ import { join } from 'node:path'
 import { getClaudeConfigHomeDir } from '../utils/envUtils.js'
 import {
   COMPANION_STATS_SCHEMA_VERSION,
+  COMPANION_STATS_SCHEMA_VERSION_NEXT,
   type Eye,
   type Hat,
   type MilestoneId,
   MILESTONES,
   type PetState,
+  SEASON_BUCKETS,
+  type SeasonBucket,
   type StatName,
   STAT_NAMES,
   type XpBucket,
@@ -75,6 +78,66 @@ export type CompanionStatsV1 = {
 
 // 历史环形缓冲上限（防止 history 无限增长拖慢 JSON parse）
 export const HISTORY_MAX_LEN = 200
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Schema v2（前瞻 — reader 兼容，writer 暂未启用）
+// W12-T3: v2 在 v1 基础上叠加 `seasons: Record<SeasonBucket, number>` 4 桶 XP
+// 设计原则：
+//   1) v2 reader 见到 v1 数据 → seasons 缺失，自动补 0（forward migration）
+//   2) v1 reader 见到 v2 数据 → 透传未知字段被 stableStringify 全收（HMAC 仍校验通过）
+//      但 normalize 路径会丢 seasons —— 故 v1 reader 只读核心字段，v2 字段通过
+//      readSeasonsForward(s) 这条独立辅助函数取（向前兼容）
+//   3) writer 仍写 v1（version=1, 不含 seasons）—— 保证 byte-equal 与旧二进制兼容
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type CompanionStatsV2 = CompanionStatsV1 & {
+  version: 2
+  seasons: Record<SeasonBucket, number>
+}
+
+// reader-only：判断 raw schema 版本（不抛错；未知 → 'unknown'）
+export type DetectedSchema = 'v0' | 'v1' | 'v2' | 'unknown'
+
+export function detectSchemaVersion(raw: unknown): DetectedSchema {
+  if (!raw || typeof raw !== 'object') return 'unknown'
+  const v = (raw as { version?: unknown }).version
+  if (v === COMPANION_STATS_SCHEMA_VERSION) return 'v1'
+  if (v === COMPANION_STATS_SCHEMA_VERSION_NEXT) return 'v2'
+  if (v === undefined || v === null) return 'v0'
+  return 'unknown'
+}
+
+// 构造空 seasons（4 桶 = 0）
+function emptySeasons(): Record<SeasonBucket, number> {
+  const s = {} as Record<SeasonBucket, number>
+  for (const b of SEASON_BUCKETS) s[b] = 0
+  return s
+}
+
+// 校正 seasons：缺字段补 0、非数字 → 0、负数 → 0
+function normalizeSeasons(input: unknown): Record<SeasonBucket, number> {
+  const out = emptySeasons()
+  if (!input || typeof input !== 'object') return out
+  const r = input as Record<string, unknown>
+  for (const b of SEASON_BUCKETS) {
+    const v = r[b]
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
+      out[b] = v
+    }
+  }
+  return out
+}
+
+// 前向兼容 reader：从 v1 / v2 数据中提取 seasons 桶（v1 → 全 0；v2 → 校正读取）
+// why 独立辅助：v1 reader 主路径不感知 seasons，避免污染 HMAC stableStringify
+//   排序行为；调用方按需取 seasons 时才走这里
+export function readSeasonsForward(
+  raw: CompanionStatsV1 | CompanionStatsV2 | unknown,
+): Record<SeasonBucket, number> {
+  if (!raw || typeof raw !== 'object') return emptySeasons()
+  const seasons = (raw as { seasons?: unknown }).seasons
+  return normalizeSeasons(seasons)
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HMAC：tier-1 软防护（详 A2 §6）
@@ -183,6 +246,13 @@ export function migrateStats(raw: unknown, now: number = Date.now()): CompanionS
     return r as CompanionStatsV1
   }
 
+  // W12-T3: v2 written 数据 → 自动降级到 v1（向后兼容路径，丢 seasons 但保留核心字段）
+  // why: 让此版 panda CLI 能读未来 v2 用户存档；seasons 仅作为 reader-side 增强
+  //   字段，丢弃后核心 XP/level/milestones 全保留
+  if (versionRaw === COMPANION_STATS_SCHEMA_VERSION_NEXT) {
+    return migrateStatsV2toV1(r as unknown as CompanionStatsV2, now)
+  }
+
   // v0（无 version 字段） → 尽量保留 createdAt / level / xp.total，其余补 default
   // why explicit pick: def 含 hmac 字段，spread 进 merged 会污染 signHMAC 输入
   //   （signHMAC 用 stableStringify 编码全部 own keys），必须手动剥离
@@ -200,6 +270,43 @@ export function migrateStats(raw: unknown, now: number = Date.now()): CompanionS
         : defNoHmac.level,
   }
   return { ...merged, hmac: signHMAC(merged) }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Migration v1 ↔ v2 — 双向（W12-T3 前瞻）
+// 注意：writer 仍只写 v1；这两个函数仅供 reader/未来升级路径使用
+// ─────────────────────────────────────────────────────────────────────────────
+
+// v1 → v2：补 seasons 桶（全 0）+ 升 version；HMAC 重签
+// why: 若未来开关启用 v2 写入，此函数即一次性升档入口
+export function migrateStatsV1toV2(
+  v1: CompanionStatsV1,
+  now: number = Date.now(),
+): CompanionStatsV2 {
+  const seasons = readSeasonsForward(v1) // 兼容 v1 已被外部加 seasons 字段的极端情况
+  const { hmac: _ignored, ...rest } = v1
+  const upgraded: Omit<CompanionStatsV2, 'hmac'> = {
+    ...rest,
+    version: COMPANION_STATS_SCHEMA_VERSION_NEXT as 2,
+    lastUpdatedAt: now,
+    seasons,
+  }
+  return { ...upgraded, hmac: signHMAC(upgraded as unknown as Omit<CompanionStatsV1, 'hmac'>) }
+}
+
+// v2 → v1：丢 seasons 字段降回 v1（向后兼容 — 旧 binary 读 v2 数据时调用）
+// why: 旧版本 panda CLI 读到未来 v2 数据时，先降为 v1 再走原 reader 路径，零破坏
+export function migrateStatsV2toV1(
+  v2: CompanionStatsV2,
+  now: number = Date.now(),
+): CompanionStatsV1 {
+  const { hmac: _ignored, seasons: _drop, version: _v, ...rest } = v2
+  const downgraded: Omit<CompanionStatsV1, 'hmac'> = {
+    ...rest,
+    version: COMPANION_STATS_SCHEMA_VERSION,
+    lastUpdatedAt: now,
+  }
+  return { ...downgraded, hmac: signHMAC(downgraded) }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="gradEar" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#3a3a3a"/>
+      <stop offset="60%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#0a0a0a"/>
+    </linearGradient>
+    <linearGradient id="gradMask" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#2a2a2a"/>
+      <stop offset="100%" stop-color="#0d0d0d"/>
+    </linearGradient>
+    <radialGradient id="gradFace" cx="50%" cy="38%" r="62%">
+      <stop offset="0%"  stop-color="#ffffff"/>
+      <stop offset="70%" stop-color="#f4f4f4"/>
+      <stop offset="100%" stop-color="#d8d8d8"/>
+    </radialGradient>
+    <radialGradient id="gradNose" cx="40%" cy="35%" r="65%">
+      <stop offset="0%"  stop-color="#3a3a3a"/>
+      <stop offset="100%" stop-color="#0a0a0a"/>
+    </radialGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#FFE060"/>
+      <stop offset="50%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#C8A100"/>
+    </linearGradient>
+    <filter id="filtSoftShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.2"/>
+      <feOffset dx="0" dy="1.5" result="off"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="filtFaceShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+      <feOffset dx="0" dy="3" result="off"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="filtGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <ellipse cx="100" cy="172" rx="46" ry="6" fill="#000000" fill-opacity="0.18"/>
+  
+  <g>
+    <g>
+    <ellipse cx="55"  cy="55" rx="22" ry="26" fill="url(#gradEar)" filter="url(#filtSoftShadow)"/>
+    <ellipse cx="145" cy="55" rx="22" ry="26" fill="url(#gradEar)" filter="url(#filtSoftShadow)"/>
+    <ellipse cx="55"  cy="58" rx="11" ry="13" fill="#2a2a2a" opacity="0.85"/>
+    <ellipse cx="145" cy="58" rx="11" ry="13" fill="#2a2a2a" opacity="0.85"/>
+    <circle cx="100" cy="105" r="65" fill="url(#gradFace)" stroke="#1a1a1a" stroke-width="2.5" filter="url(#filtFaceShadow)"/>
+    <ellipse cx="86" cy="68" rx="32" ry="14" fill="#ffffff" fill-opacity="0.4"/>
+    <ellipse cx="80" cy="62" rx="14" ry="6"  fill="#ffffff" fill-opacity="0.6"/>
+    <ellipse cx="75"  cy="100" rx="16" ry="20" fill="url(#gradMask)" transform="rotate(-15 75 100)" filter="url(#filtSoftShadow)"/>
+    <ellipse cx="125" cy="100" rx="16" ry="20" fill="url(#gradMask)" transform="rotate(15 125 100)" filter="url(#filtSoftShadow)"/>
+    <path d="M 70 95 L 80 105 M 80 95 L 70 105" stroke="#ff3366" stroke-width="2.6" stroke-linecap="round"/>
+           <path d="M 120 95 L 130 105 M 130 95 L 120 105" stroke="#ff3366" stroke-width="2.6" stroke-linecap="round"/>
+    <ellipse cx="100" cy="125" rx="6.5" ry="4.5" fill="url(#gradNose)" filter="url(#filtSoftShadow)"/>
+    <ellipse cx="98"  cy="123.5" rx="1.4" ry="1.0" fill="#5a5a5a" opacity="0.9"/>
+    <path d="M100 130 L 100 135 M100 135 Q92 142 85 138 M100 135 Q108 142 115 138" stroke="#1a1a1a" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <ellipse cx="62"  cy="122" rx="7" ry="3.5" fill="#ffc0c8" opacity="0.55"/>
+    <ellipse cx="138" cy="122" rx="7" ry="3.5" fill="#ffc0c8" opacity="0.55"/>
+  </g>
+    <animateTransform attributeName="transform" attributeType="XML" type="rotate"
+      values="0 100 110;30 100 110;28 100 112;30 100 110;30 100 110;0 100 110"
+      keyTimes="0;0.15;0.25;0.35;0.85;1" dur="4s" repeatCount="indefinite"/>
+  </g>
+  <text x="100" y="22" font-family="ui-monospace, Menlo, Consolas, monospace"
+    font-size="20" fill="#ff3366" text-anchor="middle" font-weight="bold">&#10005;
+    <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.85;1"
+      dur="4s" repeatCount="indefinite"/>
+  </text>
+</svg>

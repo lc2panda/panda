@@ -28,8 +28,12 @@ test('turnRole — ROLE_TOKEN 映射到正确的 palette key', async () => {
 })
 
 test('palette — v3 新 token 存在且合法', async () => {
-  const { MATRIX_UI, MATRIX_UI_LIGHT, MATRIX_BREATH_PULSE, MATRIX_BREATH_PULSE_LIGHT } =
-    await import('./matrixPalette.js')
+  const {
+    MATRIX_UI,
+    MATRIX_UI_LIGHT,
+    MATRIX_BREATH_PULSE,
+    MATRIX_BREATH_PULSE_LIGHT,
+  } = await import('./matrixPalette.js')
   expect(MATRIX_UI.userBg).toMatch(/^#[0-9A-Fa-f]{6}$/)
   expect(MATRIX_UI.roleSeparator).toMatch(/^#[0-9A-Fa-f]{6}$/)
   expect(MATRIX_UI_LIGHT.userBg).toMatch(/^#[0-9A-Fa-f]{6}$/)

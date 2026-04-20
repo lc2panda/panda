@@ -10,36 +10,36 @@
 //  - GLOW 色（最常被瞳孔吸引的高亮带，与 NEON/BRIGHT 区隔）
 //  - reducedMotion 时退化成静态 ◌（与 SpinnerGlyph 的 ● 区别开避免与已激活 spinner 重叠）
 
-import * as React from 'react'
-import { Box, Text } from '../../ink.js'
-import { MATRIX_SCALE, MATRIX_SCALE_LIGHT } from './matrixPalette.js'
-import { isMatrixLight, isMatrixTheme } from './isMatrixTheme.js'
+import * as React from 'react';
+import { Box, Text } from '../../ink.js';
+import { MATRIX_SCALE, MATRIX_SCALE_LIGHT } from './matrixPalette.js';
+import { isMatrixLight, isMatrixTheme } from './isMatrixTheme.js';
 
-const FRAMES = ['\u2591', '\u2592', '\u2593', '\u2588', '\u2593', '\u2592', '\u2591', '\u25CC']
-const FRAME_MS = 80
+const FRAMES = ['\u2591', '\u2592', '\u2593', '\u2588', '\u2593', '\u2592', '\u2591', '\u25CC'];
+const FRAME_MS = 80;
 
 interface Props {
   /** 当前时间（毫秒，通常来自 useAnimationFrame）。未提供时静态。 */
-  time?: number
+  time?: number;
   /** 用户偏好低动效。展示静态 ◌ */
-  reducedMotion?: boolean
+  reducedMotion?: boolean;
 }
 
 export function MatrixSpinner({ time = 0, reducedMotion = false }: Props): React.ReactNode {
-  if (!isMatrixTheme()) return null
-  const S = isMatrixLight() ? MATRIX_SCALE_LIGHT : MATRIX_SCALE
+  if (!isMatrixTheme()) return null;
+  const S = isMatrixLight() ? MATRIX_SCALE_LIGHT : MATRIX_SCALE;
   if (reducedMotion) {
     return (
       <Box width={2} height={1}>
         <Text color={S.GLOW}>{'\u25CC'}</Text>
       </Box>
-    )
+    );
   }
-  const frame = Math.floor(time / FRAME_MS) % FRAMES.length
-  const ch = FRAMES[frame]
+  const frame = Math.floor(time / FRAME_MS) % FRAMES.length;
+  const ch = FRAMES[frame];
   return (
     <Box width={2} height={1}>
       <Text color={S.GLOW}>{ch}</Text>
     </Box>
-  )
+  );
 }

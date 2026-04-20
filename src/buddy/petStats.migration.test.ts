@@ -157,11 +157,16 @@ describe('W7-T3 · petStats migration · version 守护', () => {
     expect(m).toBe(orig as unknown as CompanionStatsV1)
   })
 
-  test('version=2 (未来 schema 版本) → 当作 v0 处理 + 不抛错', () => {
-    const future = { version: 2, createdAt: 1_000, level: 99 }
+  test('version=2 (未来 schema 版本) → v2→v1 降级 + 不抛错', () => {
+    // W12-T3: v2 reader 兼容路径 — 透传核心字段，丢弃 seasons，version 降至 1
+    const future = { version: 2, createdAt: 1_000, level: 99, seasons: { spring: 100 } }
     const m = migrateStats(future, 4_000_000)
     expect(m.version).toBe(COMPANION_STATS_SCHEMA_VERSION)
     expect(m.createdAt).toBe(1_000)
+    // level 99 是 v2 中合法字段（v2 reader 不强制验证），透传保留
+    expect(m.level).toBe(99)
+    // seasons 字段降级时被丢弃
+    expect((m as unknown as { seasons?: unknown }).seasons).toBeUndefined()
   })
 
   test('version=null 显式 → 当作 v0 处理', () => {

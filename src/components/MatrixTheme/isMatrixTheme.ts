@@ -27,21 +27,16 @@ const MATRIX_THEMES = new Set(['matrix', 'matrix-dark', 'matrix-light'])
 
 function getConfigPath(): string {
   const dir =
-    process.env.PANDA_CONFIG_DIR ||
-    process.env.CLAUDE_CONFIG_DIR ||
-    homedir()
+    process.env.PANDA_CONFIG_DIR || process.env.CLAUDE_CONFIG_DIR || homedir()
   // 大多数情况文件在 ~/.pandacc.json（dir=homedir 时）
   // PANDA_CONFIG_DIR 模式下文件在 <dir>/.config.json（getGlobalClaudeFile 行为）
-  if (
-    process.env.PANDA_CONFIG_DIR ||
-    process.env.CLAUDE_CONFIG_DIR
-  ) {
+  if (process.env.PANDA_CONFIG_DIR || process.env.CLAUDE_CONFIG_DIR) {
     return join(dir, '.config.json')
   }
   return join(dir, '.pandacc.json')
 }
 
-let cachedTheme: string | undefined = undefined  // undefined = 尚未成功读到
+let cachedTheme: string | undefined // undefined = 尚未成功读到
 
 import { appendFileSync } from 'node:fs'
 
@@ -86,7 +81,6 @@ const _gt = globalThis as unknown as {
 function readEnv(name: string): string | undefined {
   return _gt.process?.env?.[name]
 }
-
 // Module load 时同步 prefetch — 在 React Compiler 编译的组件代码运行之前
 // 就把结果写到 globalThis，确保**首次 mount** 时 isMatrixTheme() 立即返回正确值。
 // 这是绕过 React Compiler cache key 不依赖 isMatrixTheme() 的关键修复。

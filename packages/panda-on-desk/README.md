@@ -4,19 +4,24 @@
 > Output：透明 overlay 浮窗 + 宠物养成可视化 + 通知聚合（Electron 41 GUI）
 > Pos：panda monorepo 子包 — 与 panda CLI（根目录）解耦，独立打包分发；与 panda CLI 的关系是「感知端 ↔ 信号源」，不替代 CLI
 
-[![version](https://img.shields.io/badge/version-2.25.7-brightgreen)](https://github.com/lc2panda/panda/releases)
+[![version](https://img.shields.io/badge/version-2.25.15-brightgreen)](https://github.com/lc2panda/panda/releases)
 [![electron](https://img.shields.io/badge/electron-41.0-blue)](https://www.electronjs.org/)
-[![license](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+[![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![platform](https://img.shields.io/badge/platform-mac%20%7C%20win%20%7C%20linux-lightgrey)](#安装方式v10-ga)
+[![status](https://img.shields.io/badge/status-W12--T4%20audited-blue)](./STATUS.md)
 
 ## Quick Links
 
 | 文档 | 适用读者 | 内容 |
 |------|---------|------|
 | [README.md](./README.md) (本文) | 普通用户 | 安装 + 启动 + 18 物种 × 12 PetState + 故障排查 |
+| [STATUS.md](./STATUS.md) | 全员（一键看板） | 当前版本 + 测试基线 + 性能基线 + 17+ 版本端到端 + 已知 bugs + 排查表 |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | 贡献者 | 本地开发 + 资产替换 + 添加 PetState/物种/IPC + PR checklist |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 架构师 | 进程模型 + IPC 链路 + 状态机优先级 + 跨平台抽象 |
-| [CHANGELOG](../../CHANGELOG.md) | 全员 | 版本变更与里程碑 |
+| [PRIVACY.md](./PRIVACY.md) | 隐私敏感用户 | 0 telemetry · 数据本地化 · 未来 opt-in 路线契约 |
+| [LICENSE](./LICENSE) / [NOTICE](./NOTICE) | 法务 | MIT + clawd-on-desk 上游致谢 |
+| [docs/INSTALL_TEST.md](./docs/INSTALL_TEST.md) | QA / 新用户 | 安装实测 walkthrough + 5+ 类常见报错排查 |
+| [CHANGELOG](../../CHANGELOG.md) | 全员 | 版本变更与里程碑（v2.22.0 → v2.25.15） |
 
 ## Demo
 

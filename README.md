@@ -1898,6 +1898,22 @@ panda CLI 的每一次状态变化，都会**实时同步**到桌面端 sprite �
 
 ---
 
+### 🎞️ 动起来的 panda（SVG SMIL 实时动画）
+
+静态截图只是一帧 — 真正的桌面 panda 是**会呼吸、会眨眼、会摇头**的活物。下方 7 个 SVG 在 GitHub 浏览器里**直接播放**（W3C SMIL 原生支持，0 JS / 0 视频文件 / 0 GIF 体积）：
+
+| idle 呼吸+眨眼 | thinking 头顶 ? 浮动 | working 摇头工作 | sleeping Z 飘起 |
+|:---:|:---:|:---:|:---:|
+| <img src="packages/panda-on-desk/build/screenshots/animations/panda-idle.svg" alt="idle animation" width="120"/> | <img src="packages/panda-on-desk/build/screenshots/animations/panda-thinking.svg" alt="thinking animation" width="120"/> | <img src="packages/panda-on-desk/build/screenshots/animations/panda-working.svg" alt="working animation" width="120"/> | <img src="packages/panda-on-desk/build/screenshots/animations/panda-sleeping.svg" alt="sleeping animation" width="120"/> |
+
+| error 摔倒 X 眼 | attention 跳跃 | notification 摇铃 |
+|:---:|:---:|:---:|
+| <img src="packages/panda-on-desk/build/screenshots/animations/panda-error.svg" alt="error animation" width="120"/> | <img src="packages/panda-on-desk/build/screenshots/animations/panda-attention.svg" alt="attention animation" width="120"/> | <img src="packages/panda-on-desk/build/screenshots/animations/panda-notification.svg" alt="notification animation" width="120"/> |
+
+> 7 SVG 动画由 `packages/panda-on-desk/scripts/build-animations.cjs` 程序化生成（W12-T1，纯 SVG SMIL `<animate>` / `<animateTransform>`，单文件 ≤ 5 KB ≈ 32 KB 总），与 hit.html CSS 动画同源参数（呼吸 3s、眨眼 5s、思考 1s、工作 0.8s、跳跃 0.5s、铃铛 0.4s）。
+
+---
+
 ### 🚀 桌面宠物能力
 
 - **形象**：圆头 + 黑耳 + 黑眼罩 + 鼻嘴的简笔 panda（**可拖拽**，**呼吸动画**，**透明无边框**）

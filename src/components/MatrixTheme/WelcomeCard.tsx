@@ -8,86 +8,66 @@
 //  - borderColor 接 usePhosphorBreath 5s 周期 BASE→NEON→BASE 慢呼吸（CRT phosphor 衰减仿真）
 // 仅 Matrix 主题生效。
 
-import * as React from 'react'
-import { Box, Text } from '../../ink.js'
-import { useMatrixUI } from '../../hooks/useMatrixUI.js'
-import { usePhosphorBreath } from '../../hooks/usePhosphorBreath.js'
-import { isMatrixTheme, isMatrixLight } from './isMatrixTheme.js'
-import {
-  MATRIX_SCALE,
-  MATRIX_SCALE_LIGHT,
-  MATRIX_BREATH_PULSE,
-  MATRIX_BREATH_PULSE_LIGHT,
-} from './matrixPalette.js'
-import { getGlobalConfig } from '../../utils/config.js'
-import { getCwd } from '../../utils/cwd.js'
-import { getMainLoopModel, renderModelName } from '../../utils/model/model.js'
-import { isZh } from '../../utils/i18n.js'
+import * as React from 'react';
+import { Box, Text } from '../../ink.js';
+import { useMatrixUI } from '../../hooks/useMatrixUI.js';
+import { usePhosphorBreath } from '../../hooks/usePhosphorBreath.js';
+import { isMatrixTheme, isMatrixLight } from './isMatrixTheme.js';
+import { MATRIX_SCALE, MATRIX_SCALE_LIGHT, MATRIX_BREATH_PULSE, MATRIX_BREATH_PULSE_LIGHT } from './matrixPalette.js';
+import { getGlobalConfig } from '../../utils/config.js';
+import { getCwd } from '../../utils/cwd.js';
+import { getMainLoopModel, renderModelName } from '../../utils/model/model.js';
+import { isZh } from '../../utils/i18n.js';
 
 // 4 行精简 PANDA logo（取自 Block 字体的简化版，宽度约 22）
-const MINI_LOGO = [
-  '┌─ ┌─┐ ┌┐  ┬─┐ ┌─┐ ',
-  '├─┘├─┤ ││ ││ │├─┤ ',
-  '│  │ │ │└┘│└─┘│ │ ',
-  '┘  ┘ ┘ ┘  ┘   ┘ ┘ ',
-]
+const MINI_LOGO = ['┌─ ┌─┐ ┌┐  ┬─┐ ┌─┐ ', '├─┘├─┤ ││ ││ │├─┤ ', '│  │ │ │└┘│└─┘│ │ ', '┘  ┘ ┘ ┘  ┘   ┘ ┘ '];
 
 function truncatePath(p: string, max: number): string {
-  if (p.length <= max) return p
-  return '…' + p.slice(-(max - 1))
+  if (p.length <= max) return p;
+  return '…' + p.slice(-(max - 1));
 }
 
 export function WelcomeCard(): React.ReactNode {
-  if (!isMatrixTheme()) return null
-  const ui = useMatrixUI()
-  const lightMode = isMatrixLight()
-  const S = lightMode ? MATRIX_SCALE_LIGHT : MATRIX_SCALE
-  const palette = lightMode ? MATRIX_BREATH_PULSE_LIGHT : MATRIX_BREATH_PULSE
+  if (!isMatrixTheme()) return null;
+  const ui = useMatrixUI();
+  const lightMode = isMatrixLight();
+  const S = lightMode ? MATRIX_SCALE_LIGHT : MATRIX_SCALE;
+  const palette = lightMode ? MATRIX_BREATH_PULSE_LIGHT : MATRIX_BREATH_PULSE;
 
   // P9.3: 5s 慢呼吸 — borderColor BASE → NEON → BRIGHT → NEON → BASE
-  const breathT = usePhosphorBreath(5000, 100)
-  const idx = Math.min(palette.length - 1, Math.floor(breathT * palette.length))
-  const breathBorder = palette[idx]
+  const breathT = usePhosphorBreath(5000, 100);
+  const idx = Math.min(palette.length - 1, Math.floor(breathT * palette.length));
+  const breathBorder = palette[idx];
 
-  const config = getGlobalConfig()
+  const config = getGlobalConfig();
   const account =
-    config.oauthAccount?.displayName ||
-    config.oauthAccount?.emailAddress ||
-    (isZh() ? '未登录' : 'guest')
+    config.oauthAccount?.displayName || config.oauthAccount?.emailAddress || (isZh() ? '未登录' : 'guest');
   const modelName = (() => {
     try {
-      return renderModelName(getMainLoopModel())
+      return renderModelName(getMainLoopModel());
     } catch {
-      return '—'
+      return '—';
     }
-  })()
-  const cwd = truncatePath(getCwd(), 38)
-  const version = MACRO.VERSION
+  })();
+  const cwd = truncatePath(getCwd(), 38);
+  const version = MACRO.VERSION;
 
-  const labelW = isZh() ? 4 : 8
+  const labelW = isZh() ? 4 : 8;
   const kv = (label: string, value: string): React.ReactNode => (
     <Text>
-      <Text color={ui.hint} dimColor>{label.padEnd(labelW)}</Text>
+      <Text color={ui.hint} dimColor>
+        {label.padEnd(labelW)}
+      </Text>
       <Text color={ui.statusLine}>{value}</Text>
     </Text>
-  )
+  );
 
-  const tribute = isZh()
-    ? '▸ 醒来吧，指挥官。Matrix 已为你接入。'
-    : '\u25B8 Wake up, Operator. The Matrix has you.'
+  const tribute = isZh() ? '▸ 醒来吧，指挥官。Matrix 已为你接入。' : '\u25B8 Wake up, Operator. The Matrix has you.';
 
-  const hint = isZh()
-    ? '输入 / 看命令 · ? 看快捷键 · ⏎ 发送'
-    : 'type / for commands · ? for shortcuts · ⏎ to send'
+  const hint = isZh() ? '输入 / 看命令 · ? 看快捷键 · ⏎ 发送' : 'type / for commands · ? for shortcuts · ⏎ to send';
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="double"
-      borderColor={breathBorder}
-      paddingX={2}
-      paddingY={1}
-    >
+    <Box flexDirection="column" borderStyle="double" borderColor={breathBorder} paddingX={2} paddingY={1}>
       <Box flexDirection="row" gap={3}>
         <Box flexDirection="column">
           {MINI_LOGO.map((line, i) => (
@@ -115,5 +95,5 @@ export function WelcomeCard(): React.ReactNode {
         </Text>
       </Box>
     </Box>
-  )
+  );
 }

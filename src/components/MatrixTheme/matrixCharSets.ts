@@ -7,7 +7,9 @@
  * Half-width katakana — 标志性 Matrix 字符
  * 单字节宽度，渲染稳定，无字宽问题
  */
-export const KATAKANA = 'ｦｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ'.split('')
+export const KATAKANA = 'ｦｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ'.split(
+  '',
+)
 
 /**
  * 数字 0-9
@@ -27,7 +29,11 @@ export const MIXED = [...KATAKANA, ...DIGITS, ...SYMBOLS]
 /**
  * 纯 ASCII fallback（终端不支持 Unicode 时）
  */
-export const ASCII_ONLY = [...DIGITS, ...SYMBOLS, ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')]
+export const ASCII_ONLY = [
+  ...DIGITS,
+  ...SYMBOLS,
+  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+]
 
 export type CharSet = 'katakana' | 'digits' | 'symbols' | 'mixed' | 'ascii'
 
@@ -42,7 +48,10 @@ const SET_MAP: Record<CharSet, string[]> = {
 /**
  * 从指定字符集随机取一个字符。
  */
-export function pickChar(set: CharSet = 'mixed', rng: () => number = Math.random): string {
+export function pickChar(
+  set: CharSet = 'mixed',
+  rng: () => number = Math.random,
+): string {
   const pool = SET_MAP[set] || MIXED
   return pool[Math.floor(rng() * pool.length)]!
 }

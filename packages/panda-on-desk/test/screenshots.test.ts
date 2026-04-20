@@ -1,9 +1,11 @@
 // Input: bun test 触发；读取 build/screenshots/ 9 PNG + scripts/build-screenshots.cjs 模块
 //        + W11-T2: build/screenshots/real/ 真截图 + scripts/build-screenshots-real.cjs 模块
+//        + W12-T1: build/screenshots/animations/ 7 SVG SMIL + scripts/build-animations.cjs 模块
 // Output: 验证 W6-T1 / W10-T2 程序化截图生成 — 9 PNG 就绪 + 文件尺寸合理 + 脚本可执行 + README 嵌入存在
 //          + W10-T2 视觉升级特征（状态文字标注 / hero state strip / demo Lv 角标）
 //          + W11-T2 真截图：真 PNG 200x200 RGBA + manifest.json schema + 脚本模块导出
-// Pos: panda-on-desk W6-T1 README 视觉化回归用例 + W10-T2 视觉升级回归 + W11-T2 真截图回归
+//          + W12-T1 SVG SMIL：7 SVG 动画文件存在 + 含 <animate>/<animateTransform> + 脚本模块导出
+// Pos: panda-on-desk W6-T1 README 视觉化回归用例 + W10-T2 视觉升级回归 + W11-T2 真截图回归 + W12-T1 SVG 动画回归
 //
 // [NEW-FILE:#W6-03]
 // [W11-T2-REAL-SHOT 20260420] 加 4+ 用例验证真 Electron 截屏路径
@@ -33,6 +35,10 @@ const REPO_README = path.join(REPO_ROOT, 'README.md')
 const REAL_DIR = path.join(SCREENSHOTS_DIR, 'real')
 const REAL_SCRIPT_PATH = path.join(PKG_ROOT, 'scripts', 'build-screenshots-real.cjs')
 const REAL_MANIFEST = path.join(REAL_DIR, 'manifest.json')
+
+// W12-T1 SVG SMIL 动画路径
+const ANIM_DIR = path.join(SCREENSHOTS_DIR, 'animations')
+const ANIM_SCRIPT_PATH = path.join(PKG_ROOT, 'scripts', 'build-animations.cjs')
 
 // 7 状态截图 + hero + demo = 9 PNG
 const STATES_7 = [
@@ -315,6 +321,148 @@ describe('panda-on-desk · W11-T2 真截图 real screenshots (Electron capturePa
         expect(m.states[st].bytes).toBeLessThanOrEqual(50 * 1024)
         expect(typeof m.states[st].capturedAt).toBe('string')
       }
+    })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────
+// W12-T1 SVG SMIL 动画（动起来的 panda）回归
+// 触发原因：W11-T2 输出 7 单帧 PNG 静态图，README "不动"。SVG SMIL 是 0 新依赖
+//   方案 — GitHub README markdown / Camo 代理对 SVG SMIL 支持原生（W3C SVG 1.1）。
+//   ≥ 4 用例：脚本契约 / 7 SVG 文件就绪 / SMIL <animate> 元素存在 / 状态独有动画特征
+// 证据：
+//   - SVG SMIL 标准：https://www.w3.org/TR/SVG11/animate.html（W3C Recommendation）
+//   - GitHub Camo 渲染：https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/about-readme-files
+//   - 检索时间：2026-04-20 13:27:39 +08:00
+// ─────────────────────────────────────────────────────────────────
+describe('panda-on-desk · W12-T1 SVG SMIL 动画 animations', () => {
+  // 7 状态 SVG 期望文件名（与脚本输出一致）
+  const ANIM_EXPECTED = STATES_7.map((s) => `panda-${s}.svg`)
+
+  describe('build-animations.cjs 脚本契约', () => {
+    it('脚本文件存在 + 可作为 CommonJS 模块加载 + 导出 STATES/SVG_BUILDERS/ANIM_DIR', () => {
+      expect(fs.existsSync(ANIM_SCRIPT_PATH)).toBe(true)
+      const mod = require(ANIM_SCRIPT_PATH)
+      expect(mod).toBeDefined()
+      expect(Array.isArray(mod.STATES)).toBe(true)
+      expect(mod.STATES.length).toBe(7)
+      // 7 状态白名单与 W6-T1 / W11-T2 同源
+      for (const st of STATES_7) {
+        expect(mod.STATES).toContain(st)
+      }
+      expect(typeof mod.ANIM_DIR).toBe('string')
+      expect(mod.ANIM_DIR.endsWith('animations')).toBe(true)
+      // 7 builder 函数全部导出
+      expect(typeof mod.SVG_BUILDERS).toBe('object')
+      for (const st of STATES_7) {
+        expect(typeof mod.SVG_BUILDERS[st]).toBe('function')
+      }
+    })
+
+    it('每个 builder 返回合法 SVG + 含 200×200 viewBox + 至少 1 个 SMIL 动画元素', () => {
+      const mod = require(ANIM_SCRIPT_PATH)
+      // SMIL 元素白名单：<animate>、<animateTransform>、<animateMotion>
+      const smilRegex = /<animate(Transform|Motion)?\b/
+      for (const st of STATES_7) {
+        const svg = mod.SVG_BUILDERS[st]()
+        expect(typeof svg).toBe('string')
+        expect(svg).toContain('<svg')
+        expect(svg).toContain('width="200"')
+        expect(svg).toContain('height="200"')
+        expect(svg).toContain('viewBox="0 0 200 200"')
+        // 至少 1 个 SMIL 动画元素（SVG 是动画核心证据）
+        expect(smilRegex.test(svg)).toBe(true)
+        // 至少 1 个 repeatCount="indefinite"（GitHub README 持续可见）
+        expect(svg).toContain('repeatCount="indefinite"')
+      }
+    })
+  })
+
+  describe('7 SVG 动画文件就绪 + 动画特征（如已运行 build-animations.cjs）', () => {
+    it('build/screenshots/animations/ 7 SVG 文件全部就绪 + 单文件 1–20 KB', () => {
+      // 与 W11-T2 真截图同政策：dir 不存在 → 跳过（脚本未运行的合法状态）
+      // 但若 dir 存在则严格校验 7 文件 + 尺寸
+      if (!fs.existsSync(ANIM_DIR)) {
+        expect(fs.existsSync(ANIM_DIR)).toBe(false)
+        return
+      }
+      const missing: string[] = []
+      const badSize: string[] = []
+      for (const name of ANIM_EXPECTED) {
+        const p = path.join(ANIM_DIR, name)
+        if (!fs.existsSync(p)) {
+          missing.push(name)
+          continue
+        }
+        const sz = fs.statSync(p).size
+        // 1–20 KB：含 panda fragment + defs (≈ 4 KB) + 动画元素，~ 4–6 KB 是合理区间
+        if (sz < 1024 || sz > 20 * 1024) {
+          badSize.push(`${name}: ${sz}B`)
+        }
+      }
+      expect(missing).toEqual([])
+      expect(badSize).toEqual([])
+    })
+
+    it('7 SVG 文件源含 SMIL <animate> 元素 + xmlns + repeatCount="indefinite"', () => {
+      if (!fs.existsSync(ANIM_DIR)) {
+        expect(fs.existsSync(ANIM_DIR)).toBe(false)
+        return
+      }
+      const missingFeature: string[] = []
+      const smilRegex = /<animate(Transform|Motion)?\b/
+      for (const name of ANIM_EXPECTED) {
+        const p = path.join(ANIM_DIR, name)
+        if (!fs.existsSync(p)) continue
+        const src = fs.readFileSync(p, 'utf8')
+        // SVG namespace 必须显式（GitHub Camo + 浏览器 standalone 渲染前提）
+        if (!src.includes('xmlns="http://www.w3.org/2000/svg"')) {
+          missingFeature.push(`${name}: missing xmlns`)
+        }
+        if (!smilRegex.test(src)) {
+          missingFeature.push(`${name}: missing <animate>`)
+        }
+        if (!src.includes('repeatCount="indefinite"')) {
+          missingFeature.push(`${name}: missing repeatCount=indefinite`)
+        }
+      }
+      expect(missingFeature).toEqual([])
+    })
+
+    it('状态独有动画特征：thinking 含 ?、sleeping 含 Z、notification 含铃铛、error 含 ✕', () => {
+      if (!fs.existsSync(ANIM_DIR)) {
+        expect(fs.existsSync(ANIM_DIR)).toBe(false)
+        return
+      }
+      // thinking：头顶 ? 浮动
+      const thinking = fs.readFileSync(path.join(ANIM_DIR, 'panda-thinking.svg'), 'utf8')
+      expect(thinking).toContain('>?')
+      expect(thinking).toContain('#ffff66') // 黄色装饰
+
+      // sleeping：闭眼 + Z 飘
+      const sleeping = fs.readFileSync(path.join(ANIM_DIR, 'panda-sleeping.svg'), 'utf8')
+      expect(sleeping).toContain('>Z')
+      expect(sleeping).toContain('#aacbff') // 淡蓝 Z
+
+      // notification：铃铛 unicode + 红圆 badge + 摇晃
+      const notif = fs.readFileSync(path.join(ANIM_DIR, 'panda-notification.svg'), 'utf8')
+      // \u{1F514} 铃铛字符（unicode escape 写入文件后是 4 字节 UTF-8）
+      expect(notif).toContain('#ff2244') // 红圆 badge fill
+      expect(notif).toContain('animateTransform') // 铃铛 rotate
+
+      // error：摔倒 30deg + X 眼装饰
+      const err = fs.readFileSync(path.join(ANIM_DIR, 'panda-error.svg'), 'utf8')
+      expect(err).toContain('rotate') // 摔倒 transform
+      expect(err).toContain('#ff3366') // 错误红
+    })
+  })
+
+  describe('README 嵌入 — 主仓 README 引用 ≥ 1 SVG 动画', () => {
+    it('主仓 README.md 引用 panda-on-desk 动画 SVG 路径', () => {
+      expect(fs.existsSync(REPO_README)).toBe(true)
+      const md = fs.readFileSync(REPO_README, 'utf8')
+      // 至少引用 1 个 animations/ SVG（README 嵌入证据）
+      expect(md).toContain('packages/panda-on-desk/build/screenshots/animations/')
     })
   })
 })

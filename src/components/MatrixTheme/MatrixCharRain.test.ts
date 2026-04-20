@@ -1,6 +1,11 @@
 import { expect, test } from 'bun:test'
 import { getSetSize, KATAKANA, MIXED, pickChar } from './matrixCharSets.js'
-import { ageToHex, getColorByAge, MATRIX_COLORS, toHex } from './matrixPalette.js'
+import {
+  ageToHex,
+  getColorByAge,
+  MATRIX_COLORS,
+  toHex,
+} from './matrixPalette.js'
 
 test('matrixCharSets — KATAKANA 非空', () => {
   expect(KATAKANA.length).toBeGreaterThan(40)
