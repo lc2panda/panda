@@ -3,6 +3,7 @@
 // Pos: guards the prefix-cache-hit invariant (multi-read must be byte-identical)
 
 import { beforeEach, expect, test } from 'bun:test'
+import { sep } from 'path'
 import {
   freezeFile,
   getFrozenStats,
@@ -45,9 +46,10 @@ test('getFrozenStats — 统计', () => {
   const stats = getFrozenStats()
   expect(stats.count).toBe(2)
   expect(stats.totalBytes).toBe(7)
-  // Stats normalizes paths so compare via resolve
-  expect(stats.files.some(f => f.endsWith('/a'))).toBe(true)
-  expect(stats.files.some(f => f.endsWith('/b'))).toBe(true)
+  // Stats normalizes paths via resolve() — uses platform-native separator (sep)
+  // so on Windows the suffix becomes '\a', on POSIX it stays '/a'.
+  expect(stats.files.some(f => f.endsWith(`${sep}a`))).toBe(true)
+  expect(stats.files.some(f => f.endsWith(`${sep}b`))).toBe(true)
 })
 
 test('byte stability — 多次 readFrozen 字节完全一致', () => {

@@ -105,6 +105,14 @@ function readEnv(name: string): string | undefined {
 })()
 
 export function isMatrixTheme(): boolean {
+  // env 显式设置时优先 env（PANDA_THEME 为运行期临时覆盖最高优先），
+  // 哪怕值不是 'matrix'（如 'light' / 'dark'）也以 env 为准 → false。
+  // W13-T3 修复：先于 prefetch 读 env，避免用户 ~/.pandacc.json
+  // 已设 theme=matrix 时 prefetch=true 永远盖过运行期 env 切换。
+  const envTheme = readEnv('PANDA_THEME')
+  if (envTheme !== undefined && envTheme !== '') {
+    return envTheme === 'matrix'
+  }
   // 优先从 module load 时 prefetch 的 globalThis 缓存读取（最快 + 100% 准确）
   if (_gt.__PANDA_IS_MATRIX_PREFETCH !== undefined) {
     const v = _gt.__PANDA_IS_MATRIX_PREFETCH
@@ -112,7 +120,6 @@ export function isMatrixTheme(): boolean {
     return v
   }
   // 兜底（理论上 prefetch 一定会 run，永远不会到此）
-  if (readEnv('PANDA_THEME') === 'matrix') return true
   if (cachedTheme !== undefined) return MATRIX_THEMES.has(cachedTheme)
   try {
     const path = getConfigPath()
