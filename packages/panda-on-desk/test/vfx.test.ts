@@ -46,6 +46,8 @@ import {
 } from '../src/sound/player.js'
 import { dispatchNotification } from '../src/notification/dispatcher.js'
 import { dispatchEvent } from '../src/bridge/server.js'
+// why: 默认计划 22:00-08:00 在 UTC 测试环境下可能误判 → 强制关闭，避免 dispatcher 抑制 sound/badge
+import { __setScheduleForTesting } from '../src/dnd/schedule.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 测试隔离
@@ -55,6 +57,8 @@ beforeEach(() => {
   __resetBadgeCountsForTesting()
   __resetDragTargetsForTesting()
   __resetSoundForTesting()
+  // why: 强制关闭计划 DND，避免 UTC 测试环境下默认 22:00-08:00 误判抑制 dispatcher 路由
+  __setScheduleForTesting({ startHHmm: '22:00', endHHmm: '08:00', enabled: false })
 })
 
 afterEach(() => {

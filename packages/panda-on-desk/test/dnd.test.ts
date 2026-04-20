@@ -93,6 +93,9 @@ beforeEach(() => {
   __setDndPersistenceForTesting(true)
   __setSchedulePersistenceForTesting(true)
   __setPersistenceForTesting(false) // 队列 jsonl 测试不必落盘
+  // why: 默认 22:00-08:00 在 UTC 测试环境下可能误判 → 在 reset 后强制关闭 schedule，
+  //      privacy/dispatcher 测试组不依赖时段 DND；schedule 组内会显式 __setScheduleForTesting 重新注入
+  __setScheduleForTesting({ startHHmm: '22:00', endHHmm: '08:00', enabled: false })
 })
 
 afterEach(() => {

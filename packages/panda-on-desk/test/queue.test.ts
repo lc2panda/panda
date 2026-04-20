@@ -43,6 +43,8 @@ import {
   startQueueOrchestrator,
 } from '../src/queue/orchestrator.js'
 import { dispatchNotification } from '../src/notification/dispatcher.js'
+// why: 默认计划 22:00-08:00 在 UTC 测试环境下可能误判 → 强制关闭，避免 dispatcher 走 privacy gate 抑制
+import { __setScheduleForTesting } from '../src/dnd/schedule.js'
 import type { NotificationEvent } from '../src/bridge/types.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,6 +68,8 @@ beforeEach(() => {
   __resetOnlineDetectorForTesting()
   __resetOrchestratorForTesting()
   __setPersistenceForTesting(true)
+  // why: 强制关闭计划 DND，避免 dispatcher 在 UTC 测试环境下因默认 22:00-08:00 误判而走 privacy gate
+  __setScheduleForTesting({ startHHmm: '22:00', endHHmm: '08:00', enabled: false })
 })
 
 afterEach(() => {

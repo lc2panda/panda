@@ -48,6 +48,8 @@ import {
 import {
   __resetOnlineDetectorForTesting,
 } from '../src/queue/online-detector.js'
+// why: 默认计划 22:00-08:00 在 UTC 测试环境下可能误判 → 强制关闭，避免 dispatcher 抑制 overlay
+import { __setScheduleForTesting } from '../src/dnd/schedule.js'
 import type { NotificationEvent, PermissionRequestEvent } from '../src/bridge/types.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,6 +136,8 @@ beforeEach(() => {
   createdWindows.length = 0
   setBubbleWindowFactory(trackingFactory)
   setOverlayWorkAreaProvider(() => ({ x: 0, y: 0, width: 1920, height: 1080 }))
+  // why: 强制关闭计划 DND，避免 UTC 测试环境下默认 22:00-08:00 误判抑制 overlay
+  __setScheduleForTesting({ startHHmm: '22:00', endHHmm: '08:00', enabled: false })
 })
 
 afterEach(() => {

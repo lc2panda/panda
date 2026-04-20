@@ -36,6 +36,8 @@ import {
 } from '../src/dnd/state.js'
 import { __resetPrivacyForTesting } from '../src/dnd/privacy.js'
 import { __resetAggregatorForTesting } from '../src/dnd/aggregator.js'
+// why: 默认计划 22:00-08:00 在 UTC 测试环境下可能误判 → 强制关闭，避免 dispatcher 走 privacy/aggregator 抑制
+import { __setScheduleForTesting } from '../src/dnd/schedule.js'
 import { __resetDragTargetsForTesting } from '../src/dnd/target.js'
 import {
   __resetOnlineDetectorForTesting,
@@ -186,6 +188,8 @@ beforeEach(() => {
   __resetQueueForTesting()
   // why: 关闭持久化避免污染 TMP_DIR jsonl 落盘断言其他用例
   __setPersistenceForTesting(false)
+  // why: 强制关闭计划 DND，避免 UTC 测试环境下默认 22:00-08:00 误判抑制通知
+  __setScheduleForTesting({ startHHmm: '22:00', endHHmm: '08:00', enabled: false })
 
   createdWindows.length = 0
   setBubbleWindowFactory(opts => {
