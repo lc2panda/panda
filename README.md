@@ -1865,6 +1865,47 @@ panda --no-desk    # 单次不拉
 >
 > 详见 [packages/panda-on-desk/README.md](packages/panda-on-desk/README.md)。
 
+### 架构示意（panda CLI ↔ HTTP IPC ↔ panda-on-desk）
+
+```
+   ┌──────────────────────────┐                                 ┌──────────────────────────┐
+   │   panda CLI (Ink TUI)    │  HTTP POST 127.0.0.1:1455+      │  panda-on-desk (Electron)│
+   │   @lc2panda/panda-code    │  ─────── /state ──────────────▶ │  @lc2panda/panda-on-desk │
+   │                          │                                 │                          │
+   │   PetState 12 态状态机    │  SSE GET /events                │  4 BrowserWindow         │
+   │   103 主动场景调度        │  ◀────────────────────────────── │  (hit/bubble/settings/   │
+   │   StatusLine mini-pet     │                                 │   update-bubble)         │
+   │   src/desk/bridge.ts     │  runtime.json (secret + port)   │  tray (6 项菜单)         │
+   │                          │  ~/.pandacc/runtime.json        │  dispatcher (103 场景)   │
+   └──────────────────────────┘                                 └──────────────────────────┘
+        信号源（authoritative）         共享 desk-state.json              感知端（reactive）
+        终端体验主体                    (XP / level / species)            桌面 GUI 增强
+```
+
+主要 IPC 通道（命名规约 `panda:<domain>:<action>`）：
+- 状态推送：`panda:state:set` / `panda:state:current`
+- 设置面板：`panda:desk-prefs:get` / `panda:desk-prefs:save` / `panda:species:list`
+- 托盘联动：`panda:tray:show-hide` / `panda:dnd:toggle` / `panda:settings:open`
+- 交互事件：`panda:badge:double-click` / `panda:badge:flail`
+- CLI 通信：HTTP `127.0.0.1:1455+`（auto-fallback +1）+ SSE 订阅
+
+> byte-equal 守护：panda-on-desk 0 触碰 `src/services/api/{claude.ts,oauth/*,providers.ts}`。
+
+### 如何贡献
+
+panda-on-desk 是 panda monorepo 的子包，欢迎贡献：
+
+| 类型 | 路径 | 说明 |
+|------|------|------|
+| Bug / Feature Request | [Issues](https://github.com/lc2panda/panda/issues) | 标题加 `[panda-on-desk]` 前缀便于分流 |
+| Pull Request | [Pulls](https://github.com/lc2panda/panda/pulls) | 仅修改 `packages/panda-on-desk/` 子树；遵守 byte-equal 守护 |
+| 美术资产替换 | `packages/panda-on-desk/themes/panda/sprites/` | 替换 18 物种 SVG / 调色板；commit 标 `[ART]` |
+| 截图重生 | `packages/panda-on-desk/scripts/build-screenshots.cjs` | `bun run scripts/build-screenshots.cjs` 重生 9 PNG |
+| 主题模板 | `packages/panda-on-desk/themes/template/` | 新主题派生 — 参照 panda 主题结构 |
+| i18n 词条 | `packages/panda-on-desk/src/i18n.ts` | zh/en/ko 三语；缺 key fallback en |
+
+贡献流程：fork → branch (`feat/desk-xxx`) → 改 `packages/panda-on-desk/` → `bun test` ≤ 4 fail 基线 → PR。详见子包 [README §贡献](packages/panda-on-desk/README.md)。
+
 #### `/brief`
 - **用法**: `/brief [on|off]`
 - **说明**: 简报模式 — AI 只输出简洁摘要

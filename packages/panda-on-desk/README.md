@@ -4,6 +4,26 @@
 > Output：透明 overlay 浮窗 + 宠物养成可视化 + 通知聚合（Electron 41 GUI）
 > Pos：panda monorepo 子包 — 与 panda CLI（根目录）解耦，独立打包分发；与 panda CLI 的关系是「感知端 ↔ 信号源」，不替代 CLI
 
+[![version](https://img.shields.io/badge/version-2.25.7-brightgreen)](https://github.com/lc2panda/panda/releases)
+[![electron](https://img.shields.io/badge/electron-41.0-blue)](https://www.electronjs.org/)
+[![license](https://img.shields.io/badge/license-MIT-green)](../../LICENSE)
+[![platform](https://img.shields.io/badge/platform-mac%20%7C%20win%20%7C%20linux-lightgrey)](#安装方式v10-ga)
+
+## Quick Links
+
+| 文档 | 适用读者 | 内容 |
+|------|---------|------|
+| [README.md](./README.md) (本文) | 普通用户 | 安装 + 启动 + 18 物种 × 12 PetState + 故障排查 |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | 贡献者 | 本地开发 + 资产替换 + 添加 PetState/物种/IPC + PR checklist |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | 架构师 | 进程模型 + IPC 链路 + 状态机优先级 + 跨平台抽象 |
+| [CHANGELOG](../../CHANGELOG.md) | 全员 | 版本变更与里程碑 |
+
+## Demo
+
+![panda-on-desk demo](./build/screenshots/panda-demo-600x400.png)
+
+> 截图占位：`build/screenshots/panda-demo-600x400.png`（W6-T1 落盘 · 真实美术 v1.5 替换）
+
 ## 架构总览（panda CLI ↔ HTTP IPC ↔ panda-on-desk）
 
 ```

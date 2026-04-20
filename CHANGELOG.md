@@ -1,10 +1,40 @@
 # Changelog · panda-on-desk
 
-> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 17 版本演进（v2.22.0 → v2.25.5）。
+> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 19 版本演进（v2.22.0 → v2.25.7）。
 > panda CLI 主体的更早版本演进（v0.x → v2.21.x）见 git log 与 monitor/ 目录归档。
 > 时间锚点：2026-04-19 ~ 2026-04-20 (Asia/Singapore +08:00)
 
 ---
+
+## v2.25.7 — 2026-04-20 · 波 6 收尾（9 PNG 截图 + bundle 优化 5 项）
+- W6-T1 截图程序化生成：`packages/panda-on-desk/build/screenshots/` 9 张 PNG（[NEW-FILE:#W6-01]）
+  - `panda-200x200-{idle,thinking,working,sleeping,error,attention,notification}.png`（7 状态 · 11–13 KB/张）
+  - `panda-hero-1200x600.png`（README hero 横幅 · 56 KB）
+  - `panda-demo-600x400.png`（功能演示 · 22 KB）
+  - 总计 ~158 KB；通过 `packages/panda-on-desk/scripts/build-screenshots.cjs` 程序化生成（sharp + 内嵌 SVG，无需 designer）
+- W6-T1 主仓 README 嵌入 7 状态 + hero 截图 + demo 图（panda-on-desk 章节 3 处图片引用）
+- W6-T1 测试加固：`packages/panda-on-desk/test/screenshots.test.ts`（[NEW-FILE:#W6-03]）8 用例 pass
+- W6-T4 bundle 分析 + 性能优化 v2：npm tarball 6.4 MB（含 9 截图 + 14 svg + scripts）
+  - SVG sprites 压缩（去注释 + 缩进规整）
+  - package.json `files` 字段精简
+  - launcher.cjs 减少冷启动 require
+  - BadgeManager 内存上限
+  - IPC bridge throttle 自适应 v2
+- W6-T4 性能基线：`packages/panda-on-desk/test/perf-v2.test.ts`（[NEW-FILE:#W6-05]）10 用例 pass
+- bun test 全量 1158 pass / 4 fail（预存基线：MatrixTheme env / getFrozenStats）
+- bun run build 0 error；anthropic byte-equal `claude.ts` / `oauth/*` / `providers.ts` 0 触碰；0 新依赖
+- 23h 无人值守持续推进 — 已发版 v2.25.0 → v2.25.7 共 8 次更新
+
+## v2.25.6 — 2026-04-20 · 波 6 部分（CI workflow 加固 + 用户文档加强）
+- W6-T2 CI workflow 加固 `.github/workflows/release-panda-on-desk.yml`（3 处加固）：
+  - mac job 加 `panda.icns` 自动 sips+iconutil 重生（避免占位 icns 导致 dmg 失败）
+  - win job 加 `panda.ico` 自动 PowerShell System.Drawing 重生
+  - build job 加 `version-sync-with-tag`（package.json version 同步 tag）
+- W6-T3 用户文档加强：`packages/panda-on-desk/docs/` 用户 guide（5 分钟上手 / 18 物种 / 12 状态 / 13 milestone / 60 级养成 / 自动启动配置 / 10+ FAQ）
+- W6-T3 子包 README 加架构图 + 7 状态切换流程图（92 行扩充）
+- W6-T3 CHANGELOG 同步 v2.25.4–5 条目
+- 注：lc2panda/panda repo 公网 HTTP 404 → CI 状态需 GitHub UI 看（desk-v1.0.0 tag 已推 → CI 应已触发跑）
+- bun test 全量 fail ≤ 4 预存基线；anthropic byte-equal 0 触碰；0 新依赖
 
 ## v2.25.5 — 2026-04-20 · W5-T2 GitHub Release 链接接入主 README
 - 主仓 `README.md` 新增 `desk-v1.0.0` GitHub Release 直链段（macOS arm64/x64 dmg、Windows NSIS、Linux AppImage/deb）。
