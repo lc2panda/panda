@@ -78,12 +78,14 @@ describe('panda-on-desk · W16-T3 settings 面板真读写', () => {
       expect(html).toContain('data-key="autoLaunch"')
       // 6) language select（W5-T3）
       expect(html).toContain('id="sel-language"')
+      // 7) display select（W22-T1 多屏）
+      expect(html).toContain('id="sel-display"')
     })
 
-    test('settings.html 精简到 < 600 行（上游 1259 行的 < 50%）', () => {
+    test('settings.html 精简到 < 700 行（上游 1259 行的 < 56%；W22-T1 加 Display 行后阈值上调）', () => {
       const html = readFileSync(SETTINGS_HTML, 'utf8')
       const lineCount = html.split('\n').length
-      expect(lineCount).toBeLessThan(600)
+      expect(lineCount).toBeLessThan(700)
     })
 
     test('ESC 键盘关闭委派 api.closeWindow（WCAG 2.1.2 无键盘陷阱）', () => {

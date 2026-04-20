@@ -186,6 +186,10 @@ export const i18n: Record<LangCode, Dict> = {
     settingsAutoLaunchDesc: 'Auto-launch panda-on-desk after login · registered via OS login items API',
     settingsLanguage: 'Language',
     settingsLanguageDesc: 'Switch UI language for tray, settings, and pet bubbles',
+    // W22-T1 多屏选择
+    settingsDisplay: 'Display',
+    settingsDisplayDesc: 'Choose which monitor shows the panda (Main = primary; external monitors switch instantly)',
+    settingsDisplayMain: 'Main',
     settingsToastSaved: 'Saved',
     settingsToastSaveFailed: 'Save failed',
     settingsBridgeNotReady: 'preload bridge not ready',
@@ -406,6 +410,10 @@ export const i18n: Record<LangCode, Dict> = {
     settingsAutoLaunchDesc: '登录系统后自动启动 panda-on-desk · 通过 OS 登录项 API 注册',
     settingsLanguage: '语言',
     settingsLanguageDesc: '切换托盘 / 设置 / 宠物气泡的 UI 语言',
+    // W22-T1 多屏选择
+    settingsDisplay: '显示器',
+    settingsDisplayDesc: '选择 panda 显示在哪个屏幕（Main = 主屏 · 外接屏即时跳转）',
+    settingsDisplayMain: '主屏 (Main)',
     settingsToastSaved: '已保存',
     settingsToastSaveFailed: '保存失败',
     settingsBridgeNotReady: 'preload 桥未就绪',
@@ -623,6 +631,10 @@ export const i18n: Record<LangCode, Dict> = {
     settingsAutoLaunchDesc: '로그인 후 panda-on-desk 자동 실행 · OS 로그인 항목 API 로 등록',
     settingsLanguage: '언어',
     settingsLanguageDesc: '트레이, 설정, 펫 말풍선의 UI 언어를 전환합니다',
+    // W22-T1 다중 디스플레이 선택
+    settingsDisplay: '디스플레이',
+    settingsDisplayDesc: 'panda 를 표시할 모니터를 선택합니다 (Main = 기본 화면 · 외부 모니터 즉시 전환)',
+    settingsDisplayMain: '기본 화면 (Main)',
     settingsToastSaved: '저장됨',
     settingsToastSaveFailed: '저장 실패',
     settingsBridgeNotReady: 'preload 브리지 준비 안 됨',

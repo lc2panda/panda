@@ -10,6 +10,7 @@ import { feature } from 'bun:bundle'
 
 import { addXP, getStreakLastSeenDay, recordMilestone } from './petXP.js'
 import { todayKey } from './petStats.js'
+import { safeUsage } from '../utils/usage-safe.js'
 
 // why feature gate centralized here: 避免每个调用方都写 if(!feature('BUDDY')) return
 // 测试可设置 __setSignalsEnabledForTesting() 强制关闭 / 开启
@@ -45,11 +46,12 @@ type TokenUsageLike = {
 export function recordTokenUsageSignal(usage: TokenUsageLike | null | undefined): void {
   if (!isEnabled() || !usage) return
   try {
-    const inTokens = Number(usage.input_tokens) || 0
-    const outTokens = Number(usage.output_tokens) || 0
+    // W13-T3: 用 safeUsage 统一兜底（防 string / NaN / 缺字段）
+    const u = safeUsage(usage)
+    const inTokens = u.input_tokens
+    const outTokens = u.output_tokens
     const cacheTokens =
-      (Number(usage.cache_read_input_tokens) || 0) +
-      (Number(usage.cache_creation_input_tokens) || 0)
+      u.cache_read_input_tokens + u.cache_creation_input_tokens
     if (inTokens > 0) addXP('tokens.in', inTokens)
     if (outTokens > 0) addXP('tokens.out', outTokens)
     if (cacheTokens > 0) addXP('tokens.cache', cacheTokens)

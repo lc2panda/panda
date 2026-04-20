@@ -57,6 +57,8 @@ export type PandaLang = (typeof PANDA_LANG_WHITELIST)[number];
 // W14-T4 (2026-04-20 +08:00): 新增 firstRun 字段，默认 true；首次启动播放 demo-mode.ts 后置 false。
 // W21-T2 (2026-04-20 +08:00): 新增 demoSkipped 字段，默认 false；用户在 demo final card 点"不再显示" → true。
 //                              shouldRunDemo() 同时尊重此字段，永久跳过 demo（即便 reset firstRun 也不再播）。
+// W22-T1 (2026-04-20 +08:00): 新增 displayId 字段，默认 0（=主屏）；多屏用户可在 settings 选择副屏。
+//                              主屏哨位用 0/-1/缺省，避免与 Electron Display.id（正整数）冲突。
 export interface DeskPrefs {
   companionOnDesk: boolean;          // 启用桌面宠物总开关
   species: PandaSpecies;              // 物种（18 选 1）
@@ -67,6 +69,7 @@ export interface DeskPrefs {
   language: PandaLang;                // W5-T3 三语 UI 语言（默认按 detectInitialLang() 决定）
   firstRun: boolean;                  // W14-T4 首次启动 → runDemoSequence() → 自动 false
   demoSkipped: boolean;               // W21-T2 用户明确不想看 demo（永久跳过）
+  displayId: number;                  // W22-T1 多屏选择（0 = 主屏 / 自动；正整数 = Electron Display.id）
 }
 
 export const DEFAULT_DESK_PREFS: DeskPrefs = {
@@ -79,6 +82,7 @@ export const DEFAULT_DESK_PREFS: DeskPrefs = {
   language: "en",
   firstRun: true,
   demoSkipped: false,
+  displayId: 0, // W22-T1 主屏哨位
 };
 
 // ── ~/.pandacc/desk-prefs.json 路径 ──
@@ -103,6 +107,11 @@ function isValidVolume(n: unknown): boolean {
   return typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 100;
 }
 
+// W22-T1：displayId 可为 0/-1（主屏哨位）或非负整数（Electron Display.id 永远 ≥ 0）
+function isValidDisplayId(n: unknown): boolean {
+  return typeof n === "number" && Number.isFinite(n) && Math.floor(n) === n && n >= -1;
+}
+
 export function validateDeskPrefs(input: unknown): DeskPrefs {
   const inp = (input && typeof input === "object" ? input : {}) as Partial<DeskPrefs>;
   const species = (PANDA_SPECIES_WHITELIST as readonly string[]).includes(inp.species as string)
@@ -123,6 +132,8 @@ export function validateDeskPrefs(input: unknown): DeskPrefs {
     firstRun: typeof inp.firstRun === "boolean" ? inp.firstRun : DEFAULT_DESK_PREFS.firstRun,
     // W21-T2：demoSkipped 字段缺失/非 boolean → 默认 false（仅 user 明确放弃才 true）
     demoSkipped: typeof inp.demoSkipped === "boolean" ? inp.demoSkipped : DEFAULT_DESK_PREFS.demoSkipped,
+    // W22-T1：displayId 缺失/非数字 → 默认 0（=主屏 / 自动）
+    displayId: isValidDisplayId(inp.displayId) ? (inp.displayId as number) : DEFAULT_DESK_PREFS.displayId,
   };
 }
 

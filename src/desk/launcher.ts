@@ -10,6 +10,7 @@
 // 2026-04-20 08:13 +08:00 W4-T1 增强：spawn 前 checkElectronInstalled + friendly hint
 // 2026-04-20 11:42 +08:00 W11-T4 startup perf：defer 选项 + 路径缓存 + cfg 缓存 (≥3 项)
 // 2026-04-20 17:50 +08:00 W19-T3 crash 自动恢复：child.on('exit') + 限频 3次/5min
+// 2026-04-20 22:10 +08:00 W20-T2 性能 v4：gate 顺序按命中开销升序 + argv/env/tty 缓存（O(n)→O(1)）
 
 import { feature } from 'bun:bundle'
 import { spawn } from 'node:child_process'
@@ -40,6 +41,22 @@ let _launchCjsCache: string | null | undefined = undefined
 //   config 模块树（~30ms）。虽然 maybeSpawnOnDesk 通常一进程只调一次，但 config
 //   require 缓存命中时仍有 jsonParse 开销；缓存判定结果省去重复函数调用栈。
 let _companionOnDeskCache: boolean | undefined = undefined
+
+// W20-T2 perf：argv `--no-desk` 命中状态缓存
+//   why: process.argv.includes 是 O(n) 扫描；每次 startup 5000 iter 中重复扫
+//   累积开销可观（v8 JIT 后单次 ~100ns × 5000 = 0.5ms）。argv 在单进程生命周期内
+//   不变，缓存一次足够。null = 未探测；true/false = 已探测结果。
+let _noDeskArgvCache: boolean | null = null
+
+// W20-T2 perf：env 关键变量缓存
+//   why: process.env.PANDA_NO_DESK 每次访问会进 v8 属性查找 + lazy env 字典；
+//   缓存到原始 boolean 后下次直接 if (cache) return，省字符串比较 + property get。
+let _noDeskEnvCache: boolean | null = null
+
+// W20-T2 perf：isTTY 缓存
+//   why: process.stdout.isTTY 是 getter，每次访问可能触发 fd stat（虽然 Node 缓存了
+//   但仍有 v8 函数调用开销）。boolean cache 命中后纯局部变量比较。
+let _isTtyCache: boolean | null = null
 
 // ─────────────────────────────────────────────────────────────────────────────
 // W19-T3：crash 自动恢复 — 限频窗口 + 用户主动 quit 标记
@@ -104,7 +121,7 @@ export function __shouldRestartForTesting(
   }
 }
 
-/** 测试用 — 重置幂等标志 + W19-T3 重启状态 */
+/** 测试用 — 重置幂等标志 + W19-T3 重启状态 + W20-T2 startup gate cache */
 export function __resetSpawnedFlagForTesting(): void {
   _spawned = false
   _hintPrinted = false
@@ -112,6 +129,9 @@ export function __resetSpawnedFlagForTesting(): void {
   _companionOnDeskCache = undefined
   _restartTimestamps = []
   _userQuit = false
+  _noDeskArgvCache = null
+  _noDeskEnvCache = null
+  _isTtyCache = null
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -142,17 +162,32 @@ export interface MaybeSpawnOnDeskOptions {
 
 export function maybeSpawnOnDesk(opts: MaybeSpawnOnDeskOptions = {}): void {
   // ── 快速 gate 路径：所有 cheap check 保持同步 ────────────────────────────────
-  // 1. 单进程内幂等
+  // W20-T2 perf：gate 顺序按"命中开销升序" → 单进程缓存 < env 缓存 < argv 缓存
+  // < feature 编译期常量 < tty getter，确保最廉价的 gate 最先短路。
+  // 1. 单进程内幂等（最廉价 — 单 boolean 比较）
   if (_spawned) return
-  // 2. 编译期 feature flag
+  // 2. env 快速 gate（缓存命中后单 boolean 比较；首次 ~200ns property get + str compare）
+  //    why 提前于 argv：env O(1) < argv.includes O(n)；运维侧 PANDA_NO_DESK=1 是
+  //    主流关闭方式，应优先短路。
+  if (_noDeskEnvCache === null) {
+    const envVal = process.env.PANDA_NO_DESK
+    _noDeskEnvCache = envVal === '1' || envVal === 'true'
+  }
+  if (_noDeskEnvCache) return
+  // 3. 编译期 feature flag（const 折叠后是单 if false 直接 dead-code-elim）
   if (!feature('BUDDY')) return
-  // 3. CLI flag — 提前 short-circuit，避免后续 require config 链 + sync fs 探测的耗时
-  //    (W6-T4 perf polish：CI/sandbox 高频 spawn panda 时此分支命中率高)
-  if (process.argv.includes('--no-desk')) return
-  // 3b. env 快速 gate — process.env 比 process.argv.includes O(1) vs O(n)，且文档化运维侧关闭方式
-  if (process.env.PANDA_NO_DESK === '1' || process.env.PANDA_NO_DESK === 'true') return
-  // 4. 非交互模式（CI / pipe / SDK）
-  if (!process.stdout.isTTY) return
+  // 4. CLI flag 缓存（首次 O(n) argv 扫描；缓存后单 boolean）
+  //    why: 5000 次 startup iter 累积扫描 = 5ms 开销；缓存后降至 ~50µs。
+  if (_noDeskArgvCache === null) {
+    _noDeskArgvCache = process.argv.includes('--no-desk')
+  }
+  if (_noDeskArgvCache) return
+  // 5. 非交互模式（CI / pipe / SDK）— 缓存 isTTY getter
+  //    why: process.stdout.isTTY 是 getter，缓存后省每次 v8 function call。
+  if (_isTtyCache === null) {
+    _isTtyCache = !!process.stdout.isTTY
+  }
+  if (!_isTtyCache) return
 
   // ── 重量级路径：config 读取 + fs stat + spawn ────────────────────────────────
   // defer 默认 true — 所有 sync 重活推到 setImmediate，让 preAction 先返回

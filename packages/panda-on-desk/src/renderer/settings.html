@@ -319,6 +319,17 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
         <option value="ko">한국어</option>
       </select>
     </div>
+
+    <!-- 7. W22-T1 多屏选择（Main / External 1 / External 2 / ...） -->
+    <div class="row">
+      <div class="row-label">
+        <div class="title" data-i18n-key="settingsDisplay">显示器</div>
+        <div class="desc" data-i18n-key="settingsDisplayDesc">选择 panda 显示在哪个屏幕（Main = 主屏 · 外接屏即时跳转）</div>
+      </div>
+      <select id="sel-display" aria-label="Choose display for the pet" data-i18n-aria-key="a11yDisplaySelect">
+        <option value="0" data-i18n-key="settingsDisplayMain">主屏 (Main)</option>
+      </select>
+    </div>
   </form>
 
   <footer>
@@ -391,6 +402,7 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
     notificationVolume: 60,
     autoLaunch: false,
     language: 'en',
+    displayId: 0, // W22-T1
   };
 
   async function persist(patch) {
@@ -491,6 +503,35 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
       selLang.addEventListener('change', () => persist({ language: selLang.value }));
     }
 
+    // W22-T1：多屏下拉 — 拉取 displays / 渲染 options / 应用 prefs.displayId / change → persist
+    //   失败容错：listDisplays IPC 缺失 / 返回非数组 → 仅保留默认 "主屏 (Main)" option，不阻塞 init。
+    const selDisplay = $('sel-display');
+    if (selDisplay) {
+      try {
+        if (typeof api.listDisplays === 'function') {
+          const list = await api.listDisplays();
+          if (Array.isArray(list) && list.length > 0) {
+            // 第一项 "主屏 (Main)" 已在 HTML 静态写入；避免重复，按 id 跳过 primary
+            for (const d of list) {
+              if (!d || typeof d.id !== 'number') continue;
+              if (d.isPrimary) continue; // primary 由 value="0" 哨位代表
+              const opt = document.createElement('option');
+              opt.value = String(d.id);
+              opt.textContent = d.label || ('Display ' + d.id);
+              selDisplay.appendChild(opt);
+            }
+          }
+        }
+      } catch {}
+      const wantId = (typeof prefs.displayId === 'number') ? prefs.displayId : 0;
+      const hasOpt = Array.from(selDisplay.options).some(o => o.value === String(wantId));
+      selDisplay.value = hasOpt ? String(wantId) : '0';
+      selDisplay.addEventListener('change', () => {
+        const v = Number(selDisplay.value);
+        persist({ displayId: Number.isFinite(v) ? v : 0 });
+      });
+    }
+
     let timeDebounce;
     const onTimeChange = () => {
       clearTimeout(timeDebounce);
@@ -546,6 +587,7 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
         '#rng-notificationVolume',
         '#sw-autoLaunch',
         '#sel-language',
+        '#sel-display', // W22-T1
       ];
       const list = [];
       for (const q of sel) {

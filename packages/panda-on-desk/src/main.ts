@@ -49,6 +49,13 @@ import {
   getDisplayInsets,
   SYNTHETIC_WORK_AREA,
 } from './geometry/work-area'
+// W22-T1：多屏选择 — 纯函数 helper，便于 multi-display.test.ts mock displays 列表
+import {
+  selectDisplayForPanda,
+  buildDisplayOptions,
+  findDisplayForBounds,
+  computeDefaultBoundsOnDisplay,
+} from './geometry/display-select'
 import {
   getThemeMarginBox,
   computeStableVisibleContentMargins,
@@ -382,6 +389,32 @@ function getPrimaryWorkAreaSafe() {
 }
 function getNearestWorkArea(p: { x: number; y: number }) {
   return findNearestWorkArea(p, screen ? screen.getAllDisplays() : []) || SYNTHETIC_WORK_AREA
+}
+
+// W22-T1：根据 prefs.displayId 选择目标 Display，未选/失效 → primary 兜底。
+//   - 启动时（createWindow）影响初始 bounds；
+//   - settings 切换时（_saveDeskPrefsWithSideEffects）跳转 hitWin/win；
+//   - display-removed 时（screen.on）若选中 display 消失则回落到 primary。
+function _getTargetDisplay(displayId?: number | null) {
+  if (!screen) return null
+  let displays: any[] = []
+  let primaryId: number | null = null
+  try { displays = screen.getAllDisplays() } catch {}
+  try { primaryId = screen.getPrimaryDisplay().id } catch {}
+  return selectDisplayForPanda(displays, displayId, primaryId)
+}
+function _getTargetWorkArea(displayId?: number | null) {
+  const d = _getTargetDisplay(displayId)
+  if (d && d.workArea) return d.workArea
+  return getPrimaryWorkAreaSafe() || SYNTHETIC_WORK_AREA
+}
+function _getCurrentDisplayId(): number {
+  try {
+    const prefs = deskPrefsMod && typeof deskPrefsMod.loadDeskPrefs === 'function'
+      ? deskPrefsMod.loadDeskPrefs() : null
+    if (prefs && typeof prefs.displayId === 'number') return prefs.displayId
+  } catch {}
+  return 0
 }
 function getCurrentPixelSize(workArea?: any) {
   const prefs = _settingsController.getSnapshot()
@@ -924,13 +957,16 @@ function createWindow() {
   )
   const size = getCurrentPixelSize(launchSizingWorkArea)
 
+  // W22-T1：默认位置遵循 prefs.displayId（多屏）；positionSaved 与 miniMode 路径保持原有坐标。
+  //   why：用户明确指定副屏 → 即使首次启动也应在副屏右下角；displayId=0 时与原行为一致（primary）。
   let startBounds: { x: number; y: number; width: number; height: number }
   if (prefs.miniMode && _mini && typeof _mini.restoreFromPrefs === 'function') {
     startBounds = _mini.restoreFromPrefs(prefs, size)
   } else if (prefs.positionSaved) {
     startBounds = { x: prefs.x, y: prefs.y, width: size.width, height: size.height }
   } else {
-    const workArea = getPrimaryWorkAreaSafe() || SYNTHETIC_WORK_AREA
+    const targetDisplayId = _getCurrentDisplayId()
+    const workArea = _getTargetWorkArea(targetDisplayId)
     startBounds = {
       x: workArea.x + workArea.width - size.width - 20,
       y: workArea.y + workArea.height - size.height - 20,
@@ -1284,6 +1320,22 @@ function createWindow() {
       exitMiniMode()
       return
     }
+    // W22-T1：选中 displayId 被拔 → 回落到 primary；否则按原 clamp 路径
+    const wantId = _getCurrentDisplayId()
+    if (wantId !== 0) {
+      const stillThere = _getTargetDisplay(wantId)
+      let primaryId: number | null = null
+      try { primaryId = screen.getPrimaryDisplay().id } catch {}
+      if (!stillThere || (typeof primaryId === 'number' && stillThere.id !== wantId)) {
+        try {
+          if (deskPrefsMod && typeof deskPrefsMod.saveDeskPrefs === 'function') {
+            deskPrefsMod.saveDeskPrefs({ displayId: 0 })
+          }
+        } catch {}
+        _movePandaToDisplay(0)
+        return
+      }
+    }
     const size4 = getCurrentPixelSize()
     const { x, y } = getPetWindowBounds()
     const clamped = clampToScreenVisual(x, y, size4.width, size4.height)
@@ -1403,6 +1455,18 @@ function _saveDeskPrefsWithSideEffects(patch: any) {
         console.warn('[panda-on-desk] species webContents broadcast failed:', (err as Error).message)
       }
     }
+    // W22-T1：displayId 变更 → 把 hitWin/win 跳到目标屏右下角（与启动默认布局一致）。
+    //   仅在 patch 显式带 displayId 时触发（避免常规 save 误移宠物）。positionSaved 保留
+    //   先前坐标的逻辑由用户主动选屏覆盖：跳屏后重写 _petVirtualBounds，下次重启从新坐标读。
+    if (
+      res && res.status === 'ok' && res.data &&
+      typeof res.data.displayId === 'number' &&
+      patch && typeof patch === 'object' && typeof (patch as any).displayId === 'number'
+    ) {
+      try { _movePandaToDisplay(res.data.displayId) } catch (err) {
+        console.warn('[panda-on-desk] displayId move failed:', (err as Error).message)
+      }
+    }
     return res
   } catch (err) {
     return { status: 'error', message: (err as Error)?.message }
@@ -1412,6 +1476,32 @@ function _saveDeskPrefsWithSideEffects(patch: any) {
 // ─────────────────────────────────────────────────────────────────────────────
 // W5-T3：i18n 暴露给 renderer（settings.html / hit.html 通过 preload 调用）
 // ─────────────────────────────────────────────────────────────────────────────
+// W22-T1：把 panda（hitWin + mainWin 逻辑容器）跳转到指定 display 的右下角默认位。
+//   被 _saveDeskPrefsWithSideEffects 调用 / display-removed 兜底。
+//   失败容错：display 找不到 / size 计算失败 → swallow，原位不动。
+function _movePandaToDisplay(displayId: number): void {
+  if (!win || win.isDestroyed()) return
+  const target = _getTargetDisplay(displayId)
+  if (!target) return
+  const wa = target.workArea
+  const size = getCurrentPixelSize(wa)
+  const next = computeDefaultBoundsOnDisplay(target as any, size, 20)
+  if (!next) return
+  applyPetWindowBounds(next)
+  syncHitWin()
+  repositionFloatingBubbles()
+}
+
+// W22-T1：列举所有 displays（settings.html 下拉填充）
+ipcMain.handle('panda:displays:list', () => {
+  if (!screen) return []
+  let displays: any[] = []
+  let primaryId: number | null = null
+  try { displays = screen.getAllDisplays() } catch {}
+  try { primaryId = screen.getPrimaryDisplay().id } catch {}
+  return buildDisplayOptions(displays as any, primaryId)
+})
+
 ipcMain.handle('panda:i18n:get-lang', () => lang)
 ipcMain.handle('panda:i18n:get-dict', (_event: any, requestedLang?: string) => {
   try {
@@ -1527,6 +1617,23 @@ if (!gotTheLock) {
 
   app.whenReady().then(() => {
     hydrateSystemBackedSettings()
+    // W22-T1：启动时记录所有 displays（多屏诊断 + 帮 user 排查 displayId 失效）
+    try {
+      const ds = screen.getAllDisplays()
+      const pid = screen.getPrimaryDisplay().id
+      const summary = ds.map((d: any) => ({
+        id: d.id,
+        primary: d.id === pid,
+        bounds: d.bounds,
+        workArea: d.workArea,
+        scaleFactor: d.scaleFactor,
+        internal: d.internal,
+        label: d.label,
+      }))
+      console.log('[panda-on-desk] W22-T1 displays at startup:', JSON.stringify(summary))
+    } catch (err) {
+      console.warn('[panda-on-desk] W22-T1 enumerate displays failed:', (err as Error)?.message)
+    }
     createWindow()
     registerPersistentShortcutsFromSettings()
 

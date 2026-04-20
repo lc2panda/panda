@@ -35,6 +35,10 @@ contextBridge.exposeInMainWorld('pandaSettings', {
   /** 物种列表（白名单） */
   listSpecies: (): Promise<string[]> => ipcRenderer.invoke('panda:species:list'),
 
+  /** W22-T1：所有 displays（settings.html Display 下拉填充） */
+  listDisplays: (): Promise<Array<{ id: number; label: string; isPrimary: boolean }>> =>
+    ipcRenderer.invoke('panda:displays:list'),
+
   /** 打开外部链接（仅 https://） */
   openExternal: (url: string): Promise<{ status: 'ok' | 'error'; message?: string }> =>
     ipcRenderer.invoke('settings:open-external', url),
