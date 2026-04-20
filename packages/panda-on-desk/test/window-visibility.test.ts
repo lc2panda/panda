@@ -98,4 +98,103 @@ describe('panda-on-desk · W14-P0 窗口可见性 hotfix（防双 panda + 顶部
     const tagCount = (src.match(/\[W14-P0-FIX 20260420\]/g) || []).length
     expect(tagCount).toBeGreaterThanOrEqual(4)
   })
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // v2.25.21 hotfix — Mac 黑框 P0 加固（settings/bubble/contextMenuOwner 全 lazy）
+  // 现场：v2.25.20 已加 win.show:false，但用户仍报顶部黑条"点开是设置"。
+  // 根因分析：
+  //   ① settingsWindow —— 代码本身已 lazy（openSettingsWindow 内创建），
+  //      但需回归 test 保证未来不会在启动路径误加 eager 调用。
+  //   ② contextMenuOwner —— menu.ts:186 new BrowserWindow({parent:win, alwaysOnTop:true,
+  //      transparent:true, show:false, 1x1})，启动时 L899 eager ensureContextMenuOwner()
+  //      在 macOS panel 模式下偶发残影 → 本轮改 lazy（删启动时调用）。
+  //   ③ update-bubble —— 当前 stub (update-bubble.ts)，no-op / getBubbleWindow() 返回 null，
+  //      已是 lazy，本轮仅 test 锁定行为。
+  // 证据（≥3 来源）：
+  //   - Electron #10078：macOS transparent panel alwaysOnTop show:false 偶发黑矩形残影
+  //   - clawd-on-desk main.js L2318-2362：settings 仅 lazy 于 click handler
+  //   - clawd-on-desk main.js L2670 onwards：createContextMenuOwner 仅在 menu 首次 popup 调用
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('[v2.25.21] 启动序列（createWindow 函数体内）不含 openSettingsWindow() 调用（settings lazy）', () => {
+    // createWindow 函数从 "function createWindow()" 起到 "function " 下一个定义前
+    // createWindow 体到下一个 "function " 顶层定义前截止（容忍 Windows CRLF / 末尾 }\r?\n）
+    const createWinBlockMatch = src.match(/function createWindow\(\)[\s\S]*?\n\}\r?\n(?=[\s\S]*?\n(?:function |const |let |\/\/ ))/)
+    expect(createWinBlockMatch).not.toBeNull()
+    const block = createWinBlockMatch![0]
+    // 启动期间不得调用 openSettingsWindow
+    expect(block).not.toMatch(/\bopenSettingsWindow\s*\(\s*\)/)
+    // 启动期间不得直接 new 一个 settings BrowserWindow
+    expect(block).not.toMatch(/settingsWindow\s*=\s*new\s+BrowserWindow/)
+  })
+
+  it('[v2.25.21] app.whenReady 主路径无 openSettingsWindow() 调用（启动序列纯净）', () => {
+    // whenReady 回调 .then(() => { ... }) 截取第一级块
+    const readyBlock = src.match(/app\.whenReady\(\)\.then\([\s\S]*?^\s{2,4}\}\)/m)
+    // 若未匹配则降级搜全文 ready-callback 片段
+    const scope = readyBlock ? readyBlock[0] : src
+    // 不能出现启动即调 openSettingsWindow
+    const eagerSettingsCall = scope.match(/^\s*openSettingsWindow\(\)/m)
+    expect(eagerSettingsCall).toBeNull()
+  })
+
+  it('[v2.25.21] settingsWindow 仅由 openSettingsWindow() 函数创建（唯一 new 入口）', () => {
+    // 全文中 "settingsWindow = new BrowserWindow" 只能出现 1 次，且在 openSettingsWindow 函数体内
+    const allMatches = src.match(/settingsWindow\s*=\s*new\s+BrowserWindow/g) || []
+    expect(allMatches.length).toBe(1)
+    // 且定义位置在 openSettingsWindow 函数内
+    const openFnBlock = src.match(/function openSettingsWindow\(\)[\s\S]*?\n\}/)
+    expect(openFnBlock).not.toBeNull()
+    expect(openFnBlock![0]).toMatch(/settingsWindow\s*=\s*new\s+BrowserWindow/)
+  })
+
+  it('[v2.25.21] update-bubble 采用 lazy stub（update-bubble.ts no-op + getBubbleWindow:null）', () => {
+    const updateBubbleTs = path.join(PKG_ROOT, 'src', 'update-bubble.ts')
+    expect(fs.existsSync(updateBubbleTs)).toBe(true)
+    const source = fs.readFileSync(updateBubbleTs, 'utf8')
+    // getBubbleWindow 必须返回 null（不创建实际 BrowserWindow）
+    expect(source).toMatch(/getBubbleWindow\(\)\s*\{\s*return\s+null/)
+    // 不得 new BrowserWindow（stub 阶段不允许）
+    expect(source).not.toMatch(/new\s+BrowserWindow/)
+  })
+
+  it('[v2.25.21] contextMenuOwner 不在启动时 eager 创建（删除 createWindow 内 ensureContextMenuOwner() 调用）', () => {
+    // 保证 main.ts createWindow 末尾无 eager ensureContextMenuOwner() 非注释调用
+    // createWindow 体到下一个 "function " 顶层定义前截止（容忍 Windows CRLF / 末尾 }\r?\n）
+    const createWinBlockMatch = src.match(/function createWindow\(\)[\s\S]*?\n\}\r?\n(?=[\s\S]*?\n(?:function |const |let |\/\/ ))/)
+    expect(createWinBlockMatch).not.toBeNull()
+    const block = createWinBlockMatch![0]
+    // 仅允许注释行出现（以 // 开头），不允许裸调用
+    // 按行扫描：任一非注释行含 ensureContextMenuOwner() 即失败
+    const offending = block
+      .split(/\r?\n/)
+      .filter((line) => /ensureContextMenuOwner\s*\(/.test(line))
+      .filter((line) => !/^\s*\/\//.test(line))
+    expect(offending.length).toBe(0)
+  })
+
+  it('[v2.25.21] 启动序列唯一可见 panda = hitWin（mainWin / settings / contextMenuOwner / update-bubble 全 hidden 或 lazy）', () => {
+    // 本测试 grep 4 类窗的启动态：
+    //   1) mainWin(win)  —— show:false
+    //   2) hitWin        —— showInactive() (唯一启动可见)
+    //   3) settingsWindow—— 启动时不 new（lazy）
+    //   4) contextMenuOwner 启动时不 eager ensureContextMenuOwner()
+    // 任一违反 → fail
+    // createWindow 体到下一个 "function " 顶层定义前截止（容忍 Windows CRLF / 末尾 }\r?\n）
+    const createWinBlockMatch = src.match(/function createWindow\(\)[\s\S]*?\n\}\r?\n(?=[\s\S]*?\n(?:function |const |let |\/\/ ))/)
+    expect(createWinBlockMatch).not.toBeNull()
+    const createBody = createWinBlockMatch![0]
+    // 1) win opts show:false
+    expect(createBody).toMatch(/win\s*=\s*new\s+BrowserWindow\([\s\S]*?show:\s*false/)
+    // 2) hitWin showInactive
+    expect(createBody).toMatch(/hitWin\.showInactive\(\)/)
+    // 3) 无 new settings
+    expect(createBody).not.toMatch(/settingsWindow\s*=\s*new\s+BrowserWindow/)
+    // 4) 无裸 ensureContextMenuOwner() 调用
+    const offendingLines = createBody
+      .split(/\r?\n/)
+      .filter((line) => /ensureContextMenuOwner\s*\(/.test(line))
+      .filter((line) => !/^\s*\/\//.test(line))
+    expect(offendingLines.length).toBe(0)
+  })
 })

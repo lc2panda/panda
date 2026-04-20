@@ -896,7 +896,12 @@ function createWindow() {
 
   buildContextMenu()
   if (!isMac || showTray) createTray()
-  ensureContextMenuOwner()
+  // [W14-P0-FIX 20260420] contextMenuOwner 改为 lazy — 首次 popupMenuAt() 时才创建。
+  //   启动时预创建的 parent:win / alwaysOnTop / transparent BrowserWindow 即使 show:false
+  //   也会在 macOS panel 模式下偶发顶部黑框残影（用户现场报告"点开是设置"→ 实为残影）。
+  //   menu.ts:ensureContextMenuOwner 本身已 lazy（首次 popup 时 new BrowserWindow），
+  //   启动序列删除此处 eager 调用即可保证 0 额外启动窗。
+  // ensureContextMenuOwner()  // ← deliberately removed (lazy via popupMenuAt)
 
   // ── 窗 ② hitWin 输入窗（吞所有 pointer 事件） ──
   {
