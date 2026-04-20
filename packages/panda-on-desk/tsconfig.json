@@ -16,9 +16,12 @@
         "baseUrl": ".",
         "paths": {
             "@panda/buddy/*": ["../../src/buddy/*"],
-            "@panda/desk/*": ["./src/*"]
-        }
+            "@panda/desk/*": ["./src/*"],
+            "src/*": ["../../src/*"]
+        },
+        "jsx": "react-jsx",
+        "allowImportingTsExtensions": true
     },
     "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts"],
-    "exclude": ["node_modules", "dist"]
+    "exclude": ["node_modules", "dist", "test/e2e-real-process.test.ts", "test/benchmarks.ts"]
 }

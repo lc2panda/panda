@@ -141,7 +141,8 @@ export function getCompanion(): Companion | undefined {
   if (!stored) return undefined
   const { bones } = roll(companionUserId())
   // bones last so stale bones fields in old-format configs get overridden
-  const merged: Companion = { ...stored, ...bones }
+  // W10-T3: StoredCompanion.personality 已可选；Companion 仍要求 personality 字段，给空串默认。
+  const merged: Companion = { personality: '', ...stored, ...bones }
   // v2.21.30 方向 A：/buddy theme <species> 强制覆盖 species（18 物种全集）
   // why: bones.species 由 userId hash 决定不可控；forced 字段允许用户主动选任意 18 物种 +
   //   旧 panda/redPanda/kungFuPanda alias 在 commands/buddy/index.ts 已映射到替代物种

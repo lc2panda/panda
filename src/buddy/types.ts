@@ -162,10 +162,15 @@ export type Companion = CompanionBones &
     hatchedAt: number
   }
 
-// What actually persists in config. Bones are regenerated from hash(userId)
-// on every read so species renames don't break stored companions and users
-// can't edit their way to a legendary.
-export type StoredCompanion = CompanionSoul & { hatchedAt: number }
+// What actually persists in config. Historical comment said bones are
+// regenerated from hash(userId) on every read — but src/commands/buddy/index.ts
+// 默认 hatch 路径直接 spread 整个 bones 对象进 config (见 line 49)。
+// W10-T3: 把 bones 字段也加入（可选），personality 同样可选，避免 TS 报漏字段。
+export type StoredCompanion = Partial<CompanionBones> &
+  Partial<CompanionSoul> & {
+    hatchedAt: number
+    name: string
+  }
 
 export const RARITY_WEIGHTS = {
   common: 60,
