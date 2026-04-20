@@ -66,9 +66,45 @@ jobs:
         working-directory: packages/panda-on-desk
         run: bun install
 
+      # W6-T2 加固：把 packages/panda-on-desk/package.json 的 version 同步成 tag 里的 version
+      # 避免 electron-builder 用过期 version (e.g. 0.1.0-alpha) 命名 artifacts，与 publish job 的 ${RELEASE_VERSION} 错位
+      - name: Sync panda-on-desk version with tag
+        shell: bash
+        working-directory: packages/panda-on-desk
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#desk-v}"
+          echo "[W6-T2] Syncing package.json version → ${VERSION} (tag=${TAG_NAME})"
+          node -e "const fs=require('fs');const p='package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));const old=j.version;j.version='${VERSION}';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');console.log('[W6-T2] version: '+old+' → '+j.version);"
+
       - name: Compile TypeScript main entry (src/main.ts → src/main.js)
         working-directory: packages/panda-on-desk
         run: bun run build:dist
+
+      # W6-T2 加固：检测 panda.icns 是否文本占位（W3-T3 P3-T2 遗留）→ 用系统自带 sips+iconutil 从 panda.png 现场生成真实 .icns
+      - name: Ensure real panda.icns (regenerate if placeholder)
+        working-directory: packages/panda-on-desk/build/icons
+        run: |
+          if file panda.icns | grep -q 'ASCII\|text'; then
+            echo "[W6-T2] panda.icns is text placeholder — regenerating from panda.png via sips+iconutil"
+            ICONSET="panda.iconset"
+            rm -rf "$ICONSET" && mkdir "$ICONSET"
+            sips -z 16 16     panda.png --out "$ICONSET/icon_16x16.png"
+            sips -z 32 32     panda.png --out "$ICONSET/icon_16x16@2x.png"
+            sips -z 32 32     panda.png --out "$ICONSET/icon_32x32.png"
+            sips -z 64 64     panda.png --out "$ICONSET/icon_32x32@2x.png"
+            sips -z 128 128   panda.png --out "$ICONSET/icon_128x128.png"
+            sips -z 256 256   panda.png --out "$ICONSET/icon_128x128@2x.png"
+            sips -z 256 256   panda.png --out "$ICONSET/icon_256x256.png"
+            sips -z 512 512   panda.png --out "$ICONSET/icon_256x256@2x.png"
+            sips -z 512 512   panda.png --out "$ICONSET/icon_512x512.png"
+            cp panda.png "$ICONSET/icon_512x512@2x.png"
+            iconutil -c icns "$ICONSET" -o panda.icns
+            rm -rf "$ICONSET"
+            file panda.icns
+          else
+            echo "[W6-T2] panda.icns already real binary — skip regen"
+          fi
 
       - name: Build (electron-builder mac)
         working-directory: packages/panda-on-desk
@@ -115,9 +151,70 @@ jobs:
         working-directory: packages/panda-on-desk
         run: bun install
 
+      # W6-T2 加固：把 packages/panda-on-desk/package.json 的 version 同步成 tag 里的 version
+      # 避免 electron-builder 用过期 version (e.g. 0.1.0-alpha) 命名 artifacts，与 publish job 的 ${RELEASE_VERSION} 错位
+      - name: Sync panda-on-desk version with tag
+        shell: bash
+        working-directory: packages/panda-on-desk
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#desk-v}"
+          echo "[W6-T2] Syncing package.json version → ${VERSION} (tag=${TAG_NAME})"
+          node -e "const fs=require('fs');const p='package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));const old=j.version;j.version='${VERSION}';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');console.log('[W6-T2] version: '+old+' → '+j.version);"
+
       - name: Compile TypeScript main entry (src/main.ts → src/main.js)
         working-directory: packages/panda-on-desk
         run: bun run build:dist
+
+      # W6-T2 加固：检测 panda.ico 是否文本占位（W3-T3 P3-T2 遗留）→ 用 PowerShell+System.Drawing 从 panda.png 现场生成真实 .ico
+      - name: Ensure real panda.ico (regenerate if placeholder)
+        working-directory: packages/panda-on-desk/build/icons
+        shell: pwsh
+        run: |
+          $first = Get-Content -Path panda.ico -TotalCount 1 -ErrorAction SilentlyContinue
+          if ($first -match '^#' -or $first -match 'placeholder') {
+            Write-Host "[W6-T2] panda.ico is text placeholder — regenerating from panda.png via System.Drawing"
+            Add-Type -AssemblyName System.Drawing
+            $png = [System.Drawing.Image]::FromFile((Resolve-Path panda.png))
+            # ICO header + 单一 256x256 PNG-encoded entry（Vista+ 标准，Win 10/11 NSIS 接受）
+            $sizes = @(16, 32, 48, 64, 128, 256)
+            $streams = @()
+            foreach ($s in $sizes) {
+              $bmp = New-Object System.Drawing.Bitmap $s, $s
+              $g = [System.Drawing.Graphics]::FromImage($bmp)
+              $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+              $g.DrawImage($png, 0, 0, $s, $s)
+              $g.Dispose()
+              $ms = New-Object System.IO.MemoryStream
+              $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+              $streams += ,@{ size = $s; data = $ms.ToArray() }
+              $bmp.Dispose()
+            }
+            $png.Dispose()
+            $out = New-Object System.IO.MemoryStream
+            $bw = New-Object System.IO.BinaryWriter $out
+            # ICONDIR
+            $bw.Write([UInt16]0)            # reserved
+            $bw.Write([UInt16]1)            # type=icon
+            $bw.Write([UInt16]$streams.Count)
+            $offset = 6 + (16 * $streams.Count)
+            foreach ($e in $streams) {
+              $w = if ($e.size -ge 256) { 0 } else { $e.size }
+              $bw.Write([Byte]$w); $bw.Write([Byte]$w)
+              $bw.Write([Byte]0); $bw.Write([Byte]0)         # palette / reserved
+              $bw.Write([UInt16]1); $bw.Write([UInt16]32)    # planes / bpp
+              $bw.Write([UInt32]$e.data.Length)
+              $bw.Write([UInt32]$offset)
+              $offset += $e.data.Length
+            }
+            foreach ($e in $streams) { $bw.Write($e.data) }
+            $bw.Flush()
+            [System.IO.File]::WriteAllBytes((Join-Path (Get-Location) 'panda.ico'), $out.ToArray())
+            $bw.Dispose(); $out.Dispose()
+            Write-Host ("[W6-T2] panda.ico regenerated · {0} bytes" -f (Get-Item panda.ico).Length)
+          } else {
+            Write-Host "[W6-T2] panda.ico already real binary — skip regen"
+          }
 
       - name: Build (electron-builder win)
         working-directory: packages/panda-on-desk
@@ -171,6 +268,17 @@ jobs:
       - name: Install panda-on-desk deps
         working-directory: packages/panda-on-desk
         run: bun install
+
+      # W6-T2 加固：把 packages/panda-on-desk/package.json 的 version 同步成 tag 里的 version
+      # 避免 electron-builder 用过期 version (e.g. 0.1.0-alpha) 命名 artifacts，与 publish job 的 ${RELEASE_VERSION} 错位
+      - name: Sync panda-on-desk version with tag
+        shell: bash
+        working-directory: packages/panda-on-desk
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#desk-v}"
+          echo "[W6-T2] Syncing package.json version → ${VERSION} (tag=${TAG_NAME})"
+          node -e "const fs=require('fs');const p='package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));const old=j.version;j.version='${VERSION}';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n');console.log('[W6-T2] version: '+old+' → '+j.version);"
 
       - name: Compile TypeScript main entry (src/main.ts → src/main.js)
         working-directory: packages/panda-on-desk

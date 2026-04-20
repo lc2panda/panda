@@ -26,5 +26,10 @@ jobs:
       - name: Test
         run: bun test
 
+      - name: E2E real-process (panda CLI ↔ panda-on-desk bridge)
+        # W5-T1：真双进程 IPC 实测（无 GUI / 无 xvfb）
+        # 单测套件已包含此文件，但单独显式跑一次便于 CI 输出隔离审查
+        run: bun test packages/panda-on-desk/test/e2e-real-process.test.ts
+
       - name: Build
         run: bun run build

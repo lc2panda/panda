@@ -1,10 +1,28 @@
 # Changelog · panda-on-desk
 
-> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 14 版本演进（v2.22.0 → v2.25.2）。
+> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 17 版本演进（v2.22.0 → v2.25.5）。
 > panda CLI 主体的更早版本演进（v0.x → v2.21.x）见 git log 与 monitor/ 目录归档。
 > 时间锚点：2026-04-19 ~ 2026-04-20 (Asia/Singapore +08:00)
 
 ---
+
+## v2.25.5 — 2026-04-20 · W5-T2 GitHub Release 链接接入主 README
+- 主仓 `README.md` 新增 `desk-v1.0.0` GitHub Release 直链段（macOS arm64/x64 dmg、Windows NSIS、Linux AppImage/deb）。
+- 用户可绕过 `npm install` + `panda --install-desk` 80MB electron 下载流程，直接从 Release 页拉独立安装包。
+- W5-T2 触发 `desk-v1.0.0` tag → CI workflow `release-panda-on-desk.yml` 跨平台构建启动。
+- anthropic byte-equal 0 触碰；0 新依赖；`src/` 0 改动。
+
+## v2.25.4 — 2026-04-20 · 波 5 真 e2e + i18n 三语 + 性能 polish
+- W5-T1 真 e2e 双进程验证：`packages/panda-on-desk/test/e2e-real-process.test.ts` 13 用例（mock HTTP server + panda CLI pushNotification + 端口 1455→1456 fallback + runtime.json 字段校验 + secret mismatch 401 + on-desk 离线不阻塞 CLI）。
+- W5-T3 i18n 三语桌面端：`packages/panda-on-desk/src/i18n.ts` 扩展 61 新词条（zh/en/ko），覆盖 7 PetState + 18 物种 + 12 解锁阶梯 + 13 milestone + 5 settings + 6 tray；hit.html / overlay / settings / tray 四处接入；`LANG` / `app.getLocale()` 自动检测 + `~/.pandacc/desk-prefs.json` 持久化；缺 key fallback en。
+- W5-T4 性能优化 + 集成测试加固：5 项性能优化（hit.html SVG idle preload / bridge throttle 自适应 / dispatcher 5ms 批处理 / BadgeManager dedupe / IPC listener cleanup）；新增 `test/perf.test.ts` 12 用例。
+- 测试基线：bun test 全量 fail ≤ 4（MatrixTheme env / getFrozenStats 历史遗留）；anthropic byte-equal `claude.ts` / `oauth/*` / `providers.ts` 0 触碰；0 新依赖。
+
+## v2.25.3 — 2026-04-20 · W4-T3 用户文档完整（README + CHANGELOG + 故障排查）
+- 主仓 `README.md` 新增 `## panda-on-desk 桌面宠物（v2.25.0+）` 顶级章节（快速启用 3 行命令 + 8 项桌面能力 + `panda --no-desk` 单次关闭）。
+- 本 `CHANGELOG.md` 新建（v2.22.0 → v2.25.2 全 14 版本端到端演进）。
+- `packages/panda-on-desk/README.md` 扩 93 行（165 → 258）：18 物种 + 12 PetState 完整对照表 + IPC 通信架构拓扑图 + 7 项故障排查。
+- anthropic byte-equal 0 触碰；`src/` 0 改动；0 新依赖。
 
 ## v2.25.2 — 2026-04-20 · 波 4 自动启动稳定 + 14 物种 SVG + release 准备
 - W4-T1 `panda --install-desk` 引导 + maybeSpawnOnDesk 容错；首启不阻塞 CLI 主路径。
@@ -68,4 +86,4 @@
 ## 提交规范说明
 - 完整 commit 历史：`git log --oneline` 或 `monitor/20260419-on-desk-主方案.md` §10.14 / §11.3。
 - v2.25.0 GA 之前所有版本均为 panda CLI（@lc2panda/panda-code）主仓内提交，panda-on-desk 子包路径 `packages/panda-on-desk/`。
-- byte-equal 守护：14 版本 0 触碰 `src/services/api/claude.ts` / `src/services/oauth/*` / `src/services/api/providers.ts`。
+- byte-equal 守护：17 版本 0 触碰 `src/services/api/claude.ts` / `src/services/oauth/*` / `src/services/api/providers.ts`。

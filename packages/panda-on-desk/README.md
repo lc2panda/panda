@@ -4,6 +4,98 @@
 > Output：透明 overlay 浮窗 + 宠物养成可视化 + 通知聚合（Electron 41 GUI）
 > Pos：panda monorepo 子包 — 与 panda CLI（根目录）解耦，独立打包分发；与 panda CLI 的关系是「感知端 ↔ 信号源」，不替代 CLI
 
+## 架构总览（panda CLI ↔ HTTP IPC ↔ panda-on-desk）
+
+```
+   ┌─────────────────────────────┐                                      ┌──────────────────────────────┐
+   │      panda CLI (Ink TUI)    │                                      │   panda-on-desk (Electron)   │
+   │   @lc2panda/panda-code       │                                      │   @lc2panda/panda-on-desk    │
+   │                              │                                      │                              │
+   │  ┌────────────────────────┐ │                                      │  ┌────────────────────────┐ │
+   │  │  PetState 12 态状态机   │ │   HTTP POST 127.0.0.1:1455+/state    │  │ main.ts (god file)     │ │
+   │  │  103 主动场景调度       │ │ ───────────────────────────────────▶ │  │ 4 BrowserWindow        │ │
+   │  │  /buddy theme/state    │ │                                      │  │ tray (6 项菜单)        │ │
+   │  │  StatusLine mini-pet    │ │   SSE GET 127.0.0.1:1455+/events     │  │ dispatcher (103 场景)  │ │
+   │  │  XP 11 桶 + 60 级       │ │ ◀─────────────────────────────────── │  │ state.ts (12 态)       │ │
+   │  │  src/desk/bridge.ts    │ │                                      │  │ updater (auto-update)  │ │
+   │  └────────────────────────┘ │   runtime.json (secret + port + pid) │  └────────────────────────┘ │
+   │            ▲                │   ~/.pandacc/runtime.json            │            ▲                │
+   │            │ spawn          │                                      │            │ contextBridge  │
+   │  ┌────────────────────────┐ │   shared file:                       │  ┌────────────────────────┐ │
+   │  │ desk-spawn.ts          │ │   ~/.config/panda/desk-state.json    │  │ preload sandbox        │ │
+   │  │ (auto-launch on start) │ │   (XP / level / species 持久化)       │  │ panda:* IPC channels   │ │
+   │  └────────────────────────┘ │                                      │  └────────────────────────┘ │
+   │                              │                                      │            │                │
+   └─────────────────────────────┘                                      │            ▼                │
+                                                                        │  ┌────────────────────────┐ │
+        信号源（authoritative）                                          │  │ renderer (4 windows)   │ │
+        终端体验主体                                                     │  │ hit / bubble /         │ │
+                                                                        │  │ settings / update      │ │
+                                                                        │  └────────────────────────┘ │
+                                                                        │                              │
+                                                                        │   感知端（reactive）         │
+                                                                        │   桌面 GUI 增强              │
+                                                                        └──────────────────────────────┘
+
+   关键约束：
+   - byte-equal: panda-on-desk 0 触碰 src/services/api/{claude.ts,oauth/*,providers.ts}
+   - 解耦: panda CLI 不依赖 panda-on-desk 即可独立运行 (`bun panda` 仍是 TUI 主体验)
+   - HTTP local: 仅监听 127.0.0.1:1455+ (auto-fallback +1) — 无远程通信
+   - secret + nonce: runtime.json 内 secret 双向校验，mismatch 401
+```
+
+## 7 状态切换流程图（PetState 主线）
+
+```
+                            ┌────────────────┐
+                            │     idle       │  ◀──── 默认（无 active session）
+                            │ (优先级 1)     │       呼吸动画
+                            └───────┬────────┘
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              │                     │                     │
+              │ token 流式输出       │ 长任务 >5s           │ DEEP_SLEEP_TIMEOUT
+              ▼                     ▼                     ▼
+      ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+      │   thinking   │      │   working    │      │   sleeping   │
+      │ (优先级 2)   │      │ (优先级 3)   │      │ (优先级 0)   │
+      │ 思考气泡      │      │ 工具图标 +   │      │ 闭眼 + Z字    │
+      │              │      │ 进度脉冲      │      │              │
+      └──────┬───────┘      └──────┬───────┘      └──────┬───────┘
+             │                     │                     │ 鼠标移近
+             │ 多任务 ≥ 2 session   │ 文件传输/下载        │ ▼
+             ▼                     ▼              ┌──────────────┐
+      ┌──────────────┐      ┌──────────────┐     │    waking    │
+      │   juggling   │      │   carrying   │     │ 睁眼 + 伸展  │
+      │ (优先级 4)   │      │ (优先级 4)   │     └──────┬───────┘
+      │ 抛球动画      │      │ 抱箱 sprite  │            │
+      └──────┬───────┘      └──────┬───────┘            ▼
+             │                     │                ┌──────────────┐
+             └─────────┬───────────┘                │     idle     │ ◀── 唤醒回 idle
+                       │                            └──────────────┘
+                       │ 等待用户确认 / 权限气泡
+                       ▼
+              ┌──────────────┐
+              │  attention   │
+              │ (优先级 5)   │
+              │ 闪烁光圈      │
+              └──────┬───────┘
+                     │
+                     │ 工具调用失败 / API 异常 / 解锁里程碑
+                     ▼
+              ┌──────────────┐         ┌────────────────────┐
+              │    error     │ ──────▶ │   notification     │
+              │ (优先级 8)   │         │ (优先级 7)         │
+              │ 红色感叹号 + │         │ bubble 浮窗 +      │
+              │ 抖动        │         │ 提示音              │
+              └──────────────┘         └────────────────────┘
+
+         ↑ 高优先级抢占低优先级（如 error 抢占 working）
+         ↑ 抢占后按 MIN_DISPLAY_MS 节流回弹
+         ↑ 后台清理触发 sweeping (优先级 6)，独立于主线
+```
+
+
 > **当前版本：v1.0 GA（Phase 3 收尾）** · 100% 吸收 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) 81% (MIT 引用) 后改造 fork
 
 ## 安装方式（v1.0 GA）
