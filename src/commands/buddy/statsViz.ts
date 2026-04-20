@@ -246,6 +246,30 @@ export function buildLocalLeaderboard(
   return rows
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. W22-T2：mini-pet 状态可视化（接入 /buddy stats 输出）
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 渲染 mini-pet 一行状态（appended 到 /buddy stats 末尾）。
+ *
+ * why 单独一行：避免破坏既有 stats 块布局；mini-pet 当前 face 反映 PetState 派生状态，
+ *   是用户对"宠物在干什么"的最直观反馈，与 Level/XP 数据天然互补。
+ *
+ * @param face 5 字符 mini-pet 当前 face（pickAnimatedFace 输出）
+ * @param deskRunning desk 是否运行 — 提示用户 mini-pet 在 status line 的可见性
+ */
+export function renderMiniPetStatus(
+  face: string,
+  deskRunning: boolean,
+): string {
+  const visibility = deskRunning
+  // why 字面双语：on-desk visible 时，statusline mini-pet 隐藏，避免视觉重复
+    ? '(hidden in status line · panda-on-desk active)'
+    : '(visible in status line)'
+  return `Mini-Pet: ${face}  ${visibility}`
+}
+
 /**
  * 渲染 leaderboard 占位为纯文本。
  */

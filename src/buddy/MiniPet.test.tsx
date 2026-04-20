@@ -18,10 +18,16 @@
 import { describe, expect, test } from 'bun:test'
 import {
   getMiniFace,
+  IDLE_BREATHING_FRAMES,
+  isDeskRunningFor,
   MINI_FACE_LENGTH,
   MINI_FACES,
   MINI_PET_COLORS,
+  pickAnimatedFace,
   shouldRenderMiniPetFor,
+  SLEEPING_FRAMES,
+  THINKING_FRAMES,
+  WORKING_FRAMES,
 } from './MiniPet.js'
 import {
   duck,
@@ -216,6 +222,166 @@ describe('shouldRenderMiniPetFor — 隐藏条件（v2.21.30 方向 A）', () =>
           companionMiniPet: true,
         }),
       ).toBe(true)
+    }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. W22-T2：呼吸动画帧 — pickAnimatedFace + 帧表完整性
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W22-T2 动画帧表 — 长度恒等 5 字符', () => {
+  test('IDLE_BREATHING_FRAMES 4 帧 + 全 5 字符', () => {
+    expect(IDLE_BREATHING_FRAMES).toHaveLength(4)
+    for (const frame of IDLE_BREATHING_FRAMES) {
+      expect(frame).toHaveLength(MINI_FACE_LENGTH)
+      expect(frame.startsWith('(')).toBe(true)
+      expect(frame.endsWith(')')).toBe(true)
+    }
+  })
+
+  test('THINKING_FRAMES 2 帧 + 全 5 字符 + 含 (?.?) (新动画态)', () => {
+    expect(THINKING_FRAMES).toHaveLength(2)
+    for (const frame of THINKING_FRAMES) {
+      expect(frame).toHaveLength(MINI_FACE_LENGTH)
+    }
+    expect(THINKING_FRAMES).toContain('(?.?)')
+  })
+
+  test('WORKING_FRAMES 2 帧 + 含 (>w<) (task 指定动画)', () => {
+    expect(WORKING_FRAMES).toHaveLength(2)
+    for (const frame of WORKING_FRAMES) {
+      expect(frame).toHaveLength(MINI_FACE_LENGTH)
+    }
+    expect(WORKING_FRAMES).toContain('(>w<)')
+  })
+
+  test('SLEEPING_FRAMES 2 帧 + 全 5 字符', () => {
+    expect(SLEEPING_FRAMES).toHaveLength(2)
+    for (const frame of SLEEPING_FRAMES) {
+      expect(frame).toHaveLength(MINI_FACE_LENGTH)
+    }
+  })
+})
+
+describe('W22-T2 pickAnimatedFace — tick 切帧', () => {
+  test('idle tick=0 → IDLE_BREATHING_FRAMES[0]', () => {
+    expect(pickAnimatedFace('idle', 0)).toBe(IDLE_BREATHING_FRAMES[0])
+  })
+
+  test('idle tick 0..3 循环 IDLE_BREATHING_FRAMES', () => {
+    for (let i = 0; i < 4; i += 1) {
+      expect(pickAnimatedFace('idle', i)).toBe(IDLE_BREATHING_FRAMES[i])
+    }
+    // 周期回绕
+    expect(pickAnimatedFace('idle', 4)).toBe(IDLE_BREATHING_FRAMES[0])
+    expect(pickAnimatedFace('idle', 7)).toBe(IDLE_BREATHING_FRAMES[3])
+  })
+
+  test('thinking tick 0/1 切 THINKING_FRAMES', () => {
+    expect(pickAnimatedFace('thinking', 0)).toBe(THINKING_FRAMES[0])
+    expect(pickAnimatedFace('thinking', 1)).toBe(THINKING_FRAMES[1])
+    expect(pickAnimatedFace('thinking', 2)).toBe(THINKING_FRAMES[0])
+  })
+
+  test('working tick 0/1 切 WORKING_FRAMES', () => {
+    expect(pickAnimatedFace('working', 0)).toBe(WORKING_FRAMES[0])
+    expect(pickAnimatedFace('working', 1)).toBe(WORKING_FRAMES[1])
+  })
+
+  test('sleeping tick 0/1 切 SLEEPING_FRAMES', () => {
+    expect(pickAnimatedFace('sleeping', 0)).toBe(SLEEPING_FRAMES[0])
+    expect(pickAnimatedFace('sleeping', 1)).toBe(SLEEPING_FRAMES[1])
+  })
+
+  test('其他 8 态（非 idle/thinking/working/sleeping）回退静态 MINI_FACES', () => {
+    const animatedStates = new Set(['idle', 'thinking', 'working', 'sleeping'])
+    for (const state of PET_STATES) {
+      if (animatedStates.has(state)) continue
+      // tick 任意值，结果都应等于静态 MINI_FACES[state]
+      expect(pickAnimatedFace(state, 0)).toBe(MINI_FACES[state])
+      expect(pickAnimatedFace(state, 5)).toBe(MINI_FACES[state])
+      expect(pickAnimatedFace(state, 99)).toBe(MINI_FACES[state])
+    }
+  })
+
+  test('pickAnimatedFace 输出长度恒等 5 字符（任意 state × 任意 tick）', () => {
+    for (const state of PET_STATES) {
+      for (let tick = 0; tick < 10; tick += 1) {
+        expect(pickAnimatedFace(state, tick)).toHaveLength(MINI_FACE_LENGTH)
+      }
+    }
+  })
+
+  test('pickAnimatedFace 边界：负数 / NaN / Infinity → tick=0', () => {
+    expect(pickAnimatedFace('idle', -1)).toBe(IDLE_BREATHING_FRAMES[0])
+    expect(pickAnimatedFace('idle', Number.NaN)).toBe(IDLE_BREATHING_FRAMES[0])
+    expect(pickAnimatedFace('idle', Number.POSITIVE_INFINITY)).toBe(
+      IDLE_BREATHING_FRAMES[0],
+    )
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. W22-T2：desk 同步 — isDeskRunningFor 纯函数 + shouldRenderMiniPetFor deskRunning gate
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W22-T2 isDeskRunningFor — desk 检测纯函数', () => {
+  test('null runtime → 未运行', () => {
+    expect(isDeskRunningFor(null)).toBe(false)
+  })
+
+  test('合法 pid 正整数 → 已运行', () => {
+    expect(isDeskRunningFor({ pid: 12345 })).toBe(true)
+  })
+
+  test('pid=0 / 负数 / 非 number → 未运行（防 corrupted runtime）', () => {
+    expect(isDeskRunningFor({ pid: 0 })).toBe(false)
+    expect(isDeskRunningFor({ pid: -1 })).toBe(false)
+    // pid 字段类型异常的 corrupted runtime
+    expect(
+      isDeskRunningFor({ pid: 'bad' as unknown as number }),
+    ).toBe(false)
+  })
+})
+
+describe('W22-T2 shouldRenderMiniPetFor — deskRunning gate（第 4 隐藏条件）', () => {
+  const COMPANION = { species: duck } as { species: Species }
+  const FULL_OPEN = { companionMuted: false, companionMiniPet: true }
+
+  test('deskRunning=true → 不渲染（即便其他全通过）', () => {
+    expect(shouldRenderMiniPetFor(COMPANION, FULL_OPEN, true)).toBe(false)
+  })
+
+  test('deskRunning=false → 正常渲染', () => {
+    expect(shouldRenderMiniPetFor(COMPANION, FULL_OPEN, false)).toBe(true)
+  })
+
+  test('deskRunning 缺省（默认 false）→ 维持旧行为，正常渲染', () => {
+    expect(shouldRenderMiniPetFor(COMPANION, FULL_OPEN)).toBe(true)
+  })
+
+  test('deskRunning=true 优先级低于 companionMuted（任意 muted=true 都不渲染）', () => {
+    expect(
+      shouldRenderMiniPetFor(
+        COMPANION,
+        { companionMuted: true, companionMiniPet: true },
+        true,
+      ),
+    ).toBe(false)
+    expect(
+      shouldRenderMiniPetFor(
+        COMPANION,
+        { companionMuted: true, companionMiniPet: true },
+        false,
+      ),
+    ).toBe(false)
+  })
+
+  test('18 物种 + desk running → 全部不渲染（避免重复展示）', () => {
+    for (const s of SPECIES) {
+      const c = { species: s } as { species: Species }
+      expect(shouldRenderMiniPetFor(c, FULL_OPEN, true)).toBe(false)
     }
   })
 })

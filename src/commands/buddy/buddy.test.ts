@@ -736,6 +736,23 @@ describe('statsViz 纯函数（W18-T4）', () => {
     // 超窗事件不计入
     expect(out.reduce((a, b) => a + b, 0)).toBeLessThan(999)
   })
+
+  // W22-T2：renderMiniPetStatus — desk 状态指示
+  test('renderMiniPetStatus — desk running → 隐藏提示', async () => {
+    const { renderMiniPetStatus } = await import('./statsViz.js?viz=mini1')
+    const out = renderMiniPetStatus('(o.o)', true)
+    expect(out).toContain('(o.o)')
+    expect(out).toContain('hidden in status line')
+    expect(out).toContain('panda-on-desk active')
+  })
+
+  test('renderMiniPetStatus — desk not running → 可见提示', async () => {
+    const { renderMiniPetStatus } = await import('./statsViz.js?viz=mini2')
+    const out = renderMiniPetStatus('(>w<)', false)
+    expect(out).toContain('(>w<)')
+    expect(out).toContain('visible in status line')
+    expect(out).not.toContain('hidden')
+  })
 })
 
 // ─── W19-T3：/buddy desk logs --follow + markUserQuit 集成 ──────────────────

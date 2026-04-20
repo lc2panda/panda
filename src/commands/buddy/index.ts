@@ -218,6 +218,14 @@ const buddy = {
             ? 'Yes'
             : `No (${epicCount}/${SHINY_EPIC_MILESTONE_COUNT} epic milestones to unlock)`
 
+          // W22-T2：mini-pet 当前状态（idle 默认 face；desk 启动时提示已隐藏避免重复）
+          // why import here：避免顶部模块 cycle（MiniPet 反向依赖 desk/bridge）；
+          //   /buddy stats 是冷路径，dynamic import 无性能影响。
+          const miniPetMod = await import('../../buddy/MiniPet.js')
+          const miniPetFace = miniPetMod.pickAnimatedFace('idle', 0)
+          const deskRunning = miniPetMod.isDeskRunning()
+          const miniPetStatus = viz.renderMiniPetStatus(miniPetFace, deskRunning)
+
           // 里程碑摘要：完成数 + 前几条；详细列表交给 /buddy milestones
           const headerLines = [
             'Companion Progression',
@@ -230,6 +238,7 @@ const buddy = {
             `  Rarity:   ${eff}${nextRarityHint}`,
             `  Shiny:    ${shinyHint}`,
             `  Unlocked: ${states.join(', ')} (${states.length}/${totalStates} states)`,
+            `  ${miniPetStatus}`,
             '',
             `Milestones (${completed.length}/${MILESTONES.length} completed)`,
           ]

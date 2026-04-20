@@ -1,12 +1,16 @@
 // Input:  useCurrentPetState() 12 态信号 + getCompanion() 物种 + GlobalConfig 子开关
+//         + W22-T2: 700ms tick 动画帧 + getRuntimeSnapshot 检测 desk 是否运行
 // Output: StatusLine 左侧 1×5 字符 face（如 "(o.o)"），按 PetState 切表 + 按 species 上色
+//         W22-T2: idle/thinking/working/sleeping 走多帧动画；desk 启动时自动隐藏避免重复
 // Pos:    A+B 项目精华 — StatusLine mini-pet 嵌入组件（v2.21.30 方向 A 改造：18 物种通用）
 //         严守 anthropic byte-equal — 仅订阅 buddy 域 + GlobalConfig，不触 services/api 或 oauth
 // [NEW-FILE:#20260419-AB-06]
+// 2026-04-20 W22-T2 升级：呼吸动画 + desk 同步 + /buddy stats 状态展示
 
 import { feature } from 'bun:bundle'
 import * as React from 'react'
 import { Text } from '../ink.js'
+import { getRuntimeSnapshot } from '../desk/bridge.js'
 import { getGlobalConfig } from '../utils/config.js'
 import { getCompanion } from './companion.js'
 import { useCurrentPetState } from './petState.js'
@@ -55,6 +59,92 @@ export const MINI_FACES: Record<PetState, string> = {
 // 字符长度恒等校验常量（测试用）— 见 MiniPet.test.tsx
 export const MINI_FACE_LENGTH = 5 as const
 
+// ─────────────────────────────────────────────────────────────────────────────
+// W22-T2：呼吸动画帧 — 4 帧循环 idle / 2 帧 thinking-working-sleeping
+// why 多帧动画：StatusLine 1×5 字符不能写 CSS keyframes（terminal 无 CSS）；
+//   改为 React 700ms tick 切换帧 — 视觉上等同呼吸/眨眼，长度恒等 5 字符。
+// why 700ms：与 useCurrentPetState 内部 500ms tick 错开，避免渲染抖动同相位；
+//   呼吸节奏 ~1.4s/cycle 接近真实生理（人类静息 ~12-20 次/min）。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** idle 呼吸 4 帧循环 — 模拟眨眼+轻微动作（每帧严格 5 字符）
+ *  why 5 字符恒等：MINI_FACE_LENGTH=5，破坏会让 StatusLine 抖动；
+ *    故 task 中 `(-.- )` 6-char 改为 `(-.-)` 视觉等价（双闭眼）
+ */
+export const IDLE_BREATHING_FRAMES = [
+  '(o.o)', // 全开眼
+  '(-.o)', // 左眼眨
+  '(o.-)', // 右眼眨
+  '(-.-)', // 双眼半合
+] as const
+
+/** thinking 2 帧 — 圆眼/问号交替 */
+export const THINKING_FRAMES = ['(°.°)', '(?.?)'] as const
+
+/** working 2 帧 — 紧张/微笑交替 */
+export const WORKING_FRAMES = ['(>_<)', '(>w<)'] as const
+
+/** sleeping 2 帧 — Z 眼/Zzz 交替 */
+export const SLEEPING_FRAMES = ['(z.z)', '(-.-)'] as const
+
+/** 动画 tick 周期（ms）— 与 useCurrentPetState 500ms 错相，避免同步 jitter */
+export const MINI_PET_ANIM_TICK_MS = 700 as const
+
+/**
+ * 纯函数：根据 tick 计数 + state 选择当前动画帧。
+ * why 纯：bun test 下 React tick 不可控；纯函数可断言任意 tick 值的输出。
+ *
+ * @param state 当前 PetState（12 态之一）
+ * @param tick 单调递增 tick 计数（每 MINI_PET_ANIM_TICK_MS 毫秒 +1）
+ * @returns 5 字符 face 字符串
+ */
+export function pickAnimatedFace(state: PetState, tick: number): string {
+  const safeTick = Number.isFinite(tick) && tick >= 0 ? Math.floor(tick) : 0
+  if (state === 'idle') {
+    return IDLE_BREATHING_FRAMES[safeTick % IDLE_BREATHING_FRAMES.length]
+  }
+  if (state === 'thinking') {
+    return THINKING_FRAMES[safeTick % THINKING_FRAMES.length]
+  }
+  if (state === 'working') {
+    return WORKING_FRAMES[safeTick % WORKING_FRAMES.length]
+  }
+  if (state === 'sleeping') {
+    return SLEEPING_FRAMES[safeTick % SLEEPING_FRAMES.length]
+  }
+  // 其他 8 态保持静态 face — 高优先级态本就少出现，无动画即"庄严"
+  return MINI_FACES[state]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W22-T2：desk 同步 — desk 启动时 mini-pet 隐藏（避免桌面端 + status line 重复显示）
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 纯函数：基于 runtime snapshot 判定 desk 是否运行。
+ * why 纯：snapshot 是 fs 读取结果，注入式可单测；
+ *   不在此处直接 readRuntime —— 让调用方决定何时读盘（缓存 / TTL）。
+ *
+ * @param runtime null = 未运行；非 null = 已 spawn（runtime.json 存在 + 字段合法）
+ */
+export function isDeskRunningFor(runtime: { pid: number } | null): boolean {
+  if (!runtime) return false
+  if (typeof runtime.pid !== 'number' || runtime.pid <= 0) return false
+  return true
+}
+
+/**
+ * 默认入口：通过 getRuntimeSnapshot() 检测 desk 是否运行。
+ * 失败容错：snapshot 抛错（极端 fs 异常）→ 视作未运行，保 mini-pet 显示。
+ */
+export function isDeskRunning(): boolean {
+  try {
+    return isDeskRunningFor(getRuntimeSnapshot())
+  } catch {
+    return false
+  }
+}
+
 // why v2.21.30 方向 A：panda 系退役后 mini-pet 改"全 18 物种通用"——
 //   按物种简单分组上色，保留高对比可视；ESC 直 ANSI 名（与旧 panda 系做法一致）。
 //   分组依据：水鸟系蓝调 / 哺乳类暖调 / 爬虫两栖中性 / 怪奇/机械冷调 — 视觉上易区分。
@@ -95,24 +185,31 @@ export function getMiniFace(state: PetState): string {
  *   独立纯版本让测试能直接断言隐藏条件分支。
  *
  * 隐藏条件（v2.21.30 方向 A 调整）：1) 无 companion；2) companionMuted=true；
- *   3) companionMiniPet=false。物种 gate 移除——18 物种均可渲染。
+ *   3) companionMiniPet=false；4) W22-T2: deskRunning=true（避免桌面端 + status 重复）
  */
 export function shouldRenderMiniPetFor(
   companion: { species: Species } | undefined,
   config: { companionMuted?: boolean; companionMiniPet?: boolean },
+  deskRunning: boolean = false,
 ): boolean {
   if (!companion) return false
   if (config.companionMuted) return false
   // 子 feature flag — 默认 true（按计划决策点 #6 锁定，便于回滚）
   if (config.companionMiniPet === false) return false
+  // W22-T2：desk 启动时 mini-pet 隐藏 — 桌面端已显示同状态，避免视觉重复
+  if (deskRunning) return false
   return true
 }
 
 /**
- * 默认入口：从 GlobalConfig + getCompanion 读取实参后转交注入版。
+ * 默认入口：从 GlobalConfig + getCompanion + runtime.json 读取实参后转交注入版。
  */
 export function shouldRenderMiniPet(): boolean {
-  return shouldRenderMiniPetFor(getCompanion(), getGlobalConfig())
+  return shouldRenderMiniPetFor(
+    getCompanion(),
+    getGlobalConfig(),
+    isDeskRunning(),
+  )
 }
 
 /**
@@ -121,8 +218,8 @@ export function shouldRenderMiniPet(): boolean {
  * 渲染条件：feature('BUDDY') + shouldRenderMiniPet() 全通过。
  * 视觉占位：固定 5 字符宽，配色按物种映射，避免 Matrix 主题下与 statusline 字色撞车。
  *
- * why 不写 useEffect / 副作用：本组件纯订阅 useCurrentPetState（已自带 500ms tick），
- *   不引入二级 timer 避免 R4 风险（hook 多重 re-render 拖慢 sprite 节拍）。
+ * W22-T2：新增动画 tick — idle/thinking/working/sleeping 走多帧循环；
+ *   tick 周期 700ms 与 useCurrentPetState 500ms 错相，视觉无 jitter。
  */
 export function MiniPet(): React.ReactNode {
   // why 必须在所有 hook 调用之前判 feature gate 也不行：feature() 是 bun:bundle 编译宏，
@@ -141,12 +238,21 @@ function MiniPetInner(): React.ReactNode {
   // why bonesRarity fallback：getCompanion() 可能为空，hook 必须无条件调用 — fallback 只用于
   //   首启短瞬不渲染的场景，不影响视觉
   const progression = usePetProgression(getCompanion()?.rarity ?? 'common')
-  // why 渲染前再判隐藏条件：getCompanion() / getGlobalConfig() 是同步读取，
+  // W22-T2：动画 tick — 700ms 推进 setTick(t => t+1)，纯函数 pickAnimatedFace 取帧
+  // why useState + setInterval：与 useCurrentPetState 同模式（自带 500ms tick）；
+  //   清理 return 在 unmount 自动触发，无 leak。
+  const [tick, setTick] = React.useState(0)
+  React.useEffect(() => {
+    const t = setInterval(() => setTick(v => v + 1), MINI_PET_ANIM_TICK_MS)
+    return () => clearInterval(t)
+  }, [])
+  // why 渲染前再判隐藏条件：getCompanion() / getGlobalConfig() / isDeskRunning() 是同步读取，
   //   不会引发 hook 顺序漂移；放在 hook 调用之后确保 React 严格模式不报警
   if (!shouldRenderMiniPet()) return null
   const companion = getCompanion()!
   const color = MINI_PET_COLORS[companion.species] ?? 'white'
-  const face = getMiniFace(petState)
+  // W22-T2：用动画帧选择器替代静态 getMiniFace；其余 8 态保持静态
+  const face = pickAnimatedFace(petState, tick)
   const badge = miniPetLevelBadge(progression.level)
   return <Text color={color}>{badge ? `${face}${badge}` : face}</Text>
 }
