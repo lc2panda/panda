@@ -1,0 +1,14 @@
+panda-on-desk
+Copyright (c) 2026 lc2panda
+
+This product includes software developed by:
+- clawd-on-desk (https://github.com/rullerzhou-afk/clawd-on-desk) - MIT License
+  Forked at commit 4b07658, ~81% code reused (state machine / theme loader /
+  geometry / IPC server config / preload / i18n / updater / etc.)
+
+Third-party dependencies:
+- electron (^41.0.0) - MIT License
+- electron-updater (^6.8.3) - MIT License
+- electron-builder (^25.0.0) - MIT License
+- koffi (^2.15.2) - MIT License
+- htmlparser2 (^12.0.0) - MIT License

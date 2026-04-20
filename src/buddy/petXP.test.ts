@@ -76,7 +76,7 @@ describe('等级公式 xpRequiredForLevel / totalXpForLevel', () => {
 
   test('L=10 公式与手算 floor(80 × 10^1.55) 一致', () => {
     // 实测 80 × 10^1.55 ≈ 2838.86 → floor 2838（非 A2 §2 草表的 2949 — 已校正）
-    expect(xpRequiredForLevel(10)).toBe(Math.floor(80 * Math.pow(10, 1.55)))
+    expect(xpRequiredForLevel(10)).toBe(Math.floor(80 * 10 ** 1.55))
     expect(xpRequiredForLevel(10)).toBe(2838)
   })
 

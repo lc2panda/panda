@@ -566,12 +566,12 @@ describe('P3-T4-α / 16 新 scenarioId 全部在 packages/panda-on-desk SCENE_RE
     expect(newScenarios.length).toBe(15)
     for (const id of newScenarios) {
       expect(
-        Object.prototype.hasOwnProperty.call(SCENE_REGISTRY, id),
+        Object.hasOwn(SCENE_REGISTRY, id),
       ).toBe(true)
     }
     // 同步验证 midnight-care（personalLife 第 3 个接入）已在
     expect(
-      Object.prototype.hasOwnProperty.call(SCENE_REGISTRY, 'midnight-care'),
+      Object.hasOwn(SCENE_REGISTRY, 'midnight-care'),
     ).toBe(true)
   })
 

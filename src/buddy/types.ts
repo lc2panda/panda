@@ -239,7 +239,7 @@ export const TIME_XP_CAP_MIN = 480 // 8h / day
 // why pure: 纯数学便于测试 + 任何模块共享同一份单源真理
 export function xpRequiredForLevel(level: number): number {
   if (level < 1 || level >= MAX_LEVEL) return Infinity
-  return Math.floor(80 * Math.pow(level, 1.55))
+  return Math.floor(80 * level ** 1.55)
 }
 
 // 累计 XP（从 1 级到 N 级所需总和）— UI 进度条计算用

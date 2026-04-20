@@ -1906,6 +1906,13 @@ panda-on-desk 是 panda monorepo 的子包，欢迎贡献：
 
 贡献流程：fork → branch (`feat/desk-xxx`) → 改 `packages/panda-on-desk/` → `bun test` ≤ 4 fail 基线 → PR。详见子包 [README §贡献](packages/panda-on-desk/README.md)。
 
+### License & Acknowledgments
+panda-on-desk 基于 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) MIT License fork（~81% 代码复用）。详见 packages/panda-on-desk/LICENSE 和 NOTICE。
+
+### 隐私
+panda-on-desk 当前 0 telemetry。所有数据本地处理，不上传。详见
+packages/panda-on-desk/PRIVACY.md
+
 #### `/brief`
 - **用法**: `/brief [on|off]`
 - **说明**: 简报模式 — AI 只输出简洁摘要

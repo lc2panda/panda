@@ -190,6 +190,8 @@ class WechatLocalDBConnector implements IMConnector {
   ])
 
   private _status: ConnectorStatus = 'disconnected'
+  // TODO(W9-T1·v2.26): WechatLocalDBConnector.config 仅 initialize 写入 — 留作未来 capability 协商/重连
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: reserved for future capability negotiation
   private config: ConnectorConfig | null = null
   private dbStoragePath = ''                    // 源加密 DB 目录
   private decryptedDir = ''                     // 明文 DB 目录

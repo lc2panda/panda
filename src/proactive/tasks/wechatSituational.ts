@@ -1614,7 +1614,7 @@ const wechatYearlyDigest: SmartCronTask = {
       // 圈层演变（按季度）
       const quarterContacts = new Map<string, Set<string>>()
       for (const snap of snapshots) {
-        const month = parseInt(snap.date.slice(5, 7))
+        const month = parseInt(snap.date.slice(5, 7), 10)
         const q = `Q${Math.ceil(month / 3)}`
         if (!quarterContacts.has(q)) quarterContacts.set(q, new Set())
         for (const c of snap.topContacts) quarterContacts.get(q)!.add(c.name)

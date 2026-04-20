@@ -1,4 +1,4 @@
-"use strict";
+
 // Input:  panda CLI 内部事件（PetState 变化 / XP 增量 / 升级 / 权限请求 / 会话生命周期 /
 //         P2-T1 新增：notification / badge / drag-target / dnd 4 类）
 // Output: 跨进程 IPC 协议字段 — panda CLI ↔ panda-on-desk 共用 schema
