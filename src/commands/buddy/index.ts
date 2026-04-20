@@ -6,6 +6,7 @@
 //         W16-T2（agent-β）：新增 desk 子命令（status/start/stop/restart/logs）— CLI 可见桌面端连接状态
 //         W18-T4（agent-δ）：stats 升级（8 级精细进度条 + XP/min 速率 + 🔥 streak）
 //             + 新增 stats history（30 天 bar chart）+ leaderboard 占位（本地不联网）
+//         W19-T3（agent-γ）：desk logs 加 --follow/-f（tail -f 实时跟随）+ desk stop 触发 markUserQuit
 //         一旦本文件被修改，请同步更新头注释 + src/commands/buddy/README.md
 import { feature } from 'bun:bundle'
 import type { Command, LocalJSXCommandContext, LocalJSXCommandOnDone } from '../../types/command.js'
@@ -311,13 +312,14 @@ const buddy = {
         if (head === 'desk') {
           const sub = tail.toLowerCase()
           if (sub === '' || sub === 'status') {
-            const { getRuntimeSnapshot, fetchDetailedHealth } = await import(
+            // W19-T1：新增 getConnectionStatus — 暴露 ready/connecting/disconnected 三态
+            const { getRuntimeSnapshot, fetchDetailedHealth, getConnectionStatus } = await import(
               '../../desk/bridge.js'
             )
             const runtime = getRuntimeSnapshot()
             if (!runtime) {
               onDone(
-                'panda-on-desk · 桌面宠物\n  Status: ❌ Not Running\n  Hint:   跑 `panda --install-desk` 启用桌面宠物',
+                'panda-on-desk · 桌面宠物\n  Status: ❌ Not Running\n  Conn:   disconnected\n  Hint:   跑 `panda --install-desk` 启用桌面宠物',
                 { display: 'system' },
               )
               return null
@@ -326,15 +328,19 @@ const buddy = {
             if (!health) {
               // runtime.json 存在但 /health 不通 — 进程可能 stale
               onDone(
-                `panda-on-desk · 桌面宠物\n  Status: ⚠️  Stale (runtime.json 存在但 /health 不通 — PID ${runtime.pid} 可能已退出)\n  Port:   ${runtime.port}\n  Hint:   /buddy desk restart 清理并重启`,
+                `panda-on-desk · 桌面宠物\n  Status: ⚠️  Stale (runtime.json 存在但 /health 不通 — PID ${runtime.pid} 可能已退出)\n  Conn:   disconnected\n  Port:   ${runtime.port}\n  Hint:   /buddy desk restart 清理并重启`,
                 { display: 'system' },
               )
               return null
             }
+            // W19-T1：三态连接（ready/connecting/disconnected）— 自动重连期间会短暂 connecting → ready
+            const conn = getConnectionStatus()
+            const connIcon = conn === 'ready' ? '🟢' : conn === 'connecting' ? '🟡' : '🔴'
             const uptime = formatUptime(health.uptimeMs)
             const lines = [
               'panda-on-desk · 桌面宠物',
               `  Status:     ✅ Running (PID ${health.pid})`,
+              `  Conn:       ${connIcon} ${conn}`,
               `  Port:       ${runtime.port}`,
               `  Uptime:     ${uptime}`,
               `  Version:    ${health.appVersion ?? 'unknown'}`,
@@ -386,6 +392,13 @@ const buddy = {
               onDone('panda-on-desk 未在运行.', { display: 'system' })
               return null
             }
+            // W19-T3：标记用户主动 quit — launcher 的 child.on('exit') 监听器据此跳过自动重启
+            try {
+              const { markUserQuit } = await import('../../desk/launcher.js')
+              markUserQuit()
+            } catch {
+              /* 测试夹具未 mock markUserQuit 时静默 — 非阻塞 */
+            }
             const ok = await sendDeskQuit(1_500)
             onDone(
               ok
@@ -418,9 +431,12 @@ const buddy = {
             return null
           }
 
-          if (sub === 'logs') {
-            // 读 ~/.pandacc/panda-on-desk.log 最后 20 行；文件不存在提示
-            const { existsSync, readFileSync } = await import('node:fs')
+          // W16-T2 logs（默认 tail 20）+ W19-T3 logs --follow / -f（实时 tail）
+          if (sub === 'logs' || sub.startsWith('logs')) {
+            // tail 解析：'logs' / 'logs --follow' / 'logs -f'
+            const logsArgs = sub === 'logs' ? [] : sub.slice(4).trim().split(/\s+/).filter(Boolean)
+            const follow = logsArgs.includes('--follow') || logsArgs.includes('-f')
+            const { existsSync, readFileSync, statSync, watchFile, unwatchFile } = await import('node:fs')
             const { join } = await import('node:path')
             const { getClaudeConfigHomeDir } = await import(
               '../../utils/envUtils.js'
@@ -433,6 +449,66 @@ const buddy = {
               )
               return null
             }
+
+            // ── follow 模式：tail -f 风格实时输出 ────────────────────────────
+            // why fs.watchFile 而非 fs.watch：rotatedAppend 走 appendFileSync 写入，
+            //   watchFile 的 stat 轮询对追加最稳；watch (inotify) 在某些 fs（如 Docker）
+            //   不可靠。采样 250ms 平衡 CPU 与延迟。
+            if (follow) {
+              try {
+                let lastSize = 0
+                try {
+                  lastSize = statSync(logPath).size
+                } catch {
+                  lastSize = 0
+                }
+                // 先打印 header + 末尾 20 行作为上下文
+                const initialRaw = readFileSync(logPath, 'utf-8')
+                const initialLines = initialRaw.split(/\r?\n/).filter(l => l.length > 0)
+                const initialTail = initialLines.slice(-20).join('\n')
+                const followHeader = `panda-on-desk 日志（实时 tail · ${logPath}）:\n${initialTail}\n--- following (Ctrl+C 退出) ---`
+                onDone(followHeader, { display: 'system' })
+
+                // 注册 watcher — 每次 size 变大时读取增量并 process.stderr.write
+                // why: 命令式终端 follow 无法走 onDone 多次回调（display:system 只渲染一次）；
+                //   增量直写 stderr 是最稳的 tail -f 行为；用户 Ctrl+C 中断 panda 主进程时
+                //   bun runtime 会清理 watcher，无需手动 unwatch。
+                const onChange = (curr: { size: number }, _prev: { size: number }) => {
+                  try {
+                    if (curr.size > lastSize) {
+                      const fs = require('node:fs') as typeof import('node:fs')
+                      const fd = fs.openSync(logPath, 'r')
+                      try {
+                        const buf = Buffer.alloc(curr.size - lastSize)
+                        fs.readSync(fd, buf, 0, buf.length, lastSize)
+                        process.stderr.write(buf.toString('utf-8'))
+                      } finally {
+                        fs.closeSync(fd)
+                      }
+                      lastSize = curr.size
+                    } else if (curr.size < lastSize) {
+                      // log-rotate 触发文件被截断/轮换 — 重置 offset
+                      lastSize = curr.size
+                    }
+                  } catch {
+                    // 单次读取失败不停 watcher
+                  }
+                }
+                watchFile(logPath, { interval: 250 }, onChange)
+                // 注册 SIGINT 清理 — 防止 process 残留 watcher
+                const cleanup = () => {
+                  try { unwatchFile(logPath, onChange) } catch {}
+                }
+                process.once('SIGINT', cleanup)
+                process.once('exit', cleanup)
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e)
+                onDone(`panda-on-desk 日志 follow 失败: ${msg}`, { display: 'system' })
+              }
+              return null
+            }
+
+            // ── 非 follow 模式：tail -20（W16-T2 旧路径，byte-equal 守护） ──
             try {
               const raw = readFileSync(logPath, 'utf-8')
               // why -20: 日志按 rotatedAppend 追加，最后 20 行即最新事件
@@ -453,9 +529,9 @@ const buddy = {
             return null
           }
 
-          // 未知子命令 — Usage
+          // 未知子命令 — Usage（W19-T3 追加 logs --follow 用法）
           onDone(
-            'Usage: /buddy desk [status|start|stop|restart|logs]',
+            'Usage: /buddy desk [status|start|stop|restart|logs [--follow|-f]]',
             { display: 'system' },
           )
           return null

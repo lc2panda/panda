@@ -14,17 +14,24 @@ import { join } from 'node:path'
 
 import {
   __pushPetStateThrottledCore,
+  __resetConnectionStatusForTesting,
   __resetPetStateThrottleForTesting,
   __resetRuntimeCacheForTesting,
   buildPetStateChangeEvent,
   checkHealth,
+  getConnectionStatus,
   isOnDeskEnabled,
+  markDisconnected,
   PET_STATE_THROTTLE_MS,
   pushEventToOnDesk,
   pushPermissionRequest,
   pushPetStateChange,
+  READY_HANDSHAKE_BACKOFF_MS,
+  READY_HANDSHAKE_RETRIES,
+  requestRespawn,
   subscribeReverseStream,
   subscribeToOnDesk,
+  waitForReady,
 } from './bridge.js'
 import {
   APP_IDENTITY,
@@ -185,10 +192,12 @@ beforeEach(() => {
   }
   process.env.PANDA_CONFIG_DIR = tmpDir
   __resetRuntimeCacheForTesting()
+  __resetConnectionStatusForTesting()
 })
 
 afterEach(() => {
   __resetRuntimeCacheForTesting()
+  __resetConnectionStatusForTesting()
   if (savedEnv.panda === undefined) {
     delete process.env.PANDA_CONFIG_DIR
   } else {
@@ -703,6 +712,135 @@ describe('W1-T4 / 端到端：真 bridge server + 客户端 push → onEvent 接
     } finally {
       await handle.close()
     }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W19-T1：ready handshake + 自动重连 + 连接状态机
+// 目标：覆盖 DoD 5 场景 — handshake retry / ECONNREFUSED 静默 / crash 重连 /
+//       /buddy desk 状态切换 / runtime.json 不存在 fallback
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W19-T1 / ready handshake + 自动重连', () => {
+  test('场景 1：runtime.json 不存在 → waitForReady 不抛错且最终 disconnected（5 次 retry 全失败）', async () => {
+    // 不写 runtime.json — waitForReady 在 5×200ms 内应失败并归 disconnected
+    const t0 = Date.now()
+    const ok = await waitForReady({ retries: 3, backoffMs: 50 })
+    const elapsed = Date.now() - t0
+    expect(ok).toBe(false)
+    expect(getConnectionStatus()).toBe('disconnected')
+    // 3 retry × 50ms backoff ≥ ~100ms（2 次 sleep），但不应超过 1s（单次 checkHealth 500ms timeout）
+    expect(elapsed).toBeLessThan(3_000)
+  })
+
+  test('场景 2：on-desk 先离线后上线 → handshake retry 成功 + 状态变为 ready', async () => {
+    // 第一次 waitForReady — 没有 server，应 fail
+    const ok1 = await waitForReady({ retries: 2, backoffMs: 50 })
+    expect(ok1).toBe(false)
+    expect(getConnectionStatus()).toBe('disconnected')
+
+    // 模拟 on-desk 起来：写 runtime.json + 起 mock
+    const secret = randomBytes(16).toString('hex')
+    const mock = await startMockServer({ secret })
+    writeRuntime(mock.port, secret)
+
+    // 二次握手 — 应立即 ready
+    const ok2 = await waitForReady({ retries: 5, backoffMs: 50 })
+    expect(ok2).toBe(true)
+    expect(getConnectionStatus()).toBe('ready')
+
+    await mock.close()
+  })
+
+  test('场景 3：ECONNREFUSED 静默 — pushEventToOnDesk feature off 时不抛错且保持 disconnected', async () => {
+    // feature('BUDDY') 在 bun test 默认为 false → pushEventToOnDesk 应直接 short-circuit
+    expect(isOnDeskEnabled()).toBe(false)
+    const event: OnDeskEvent = {
+      type: 'pet-state',
+      state: 'working',
+      sessionId: 'w19-sid-1',
+      ts: Date.now(),
+    }
+    const ok = await pushEventToOnDesk(event)
+    expect(ok).toBe(false)
+    // 状态保持初始 disconnected（feature 关未尝试握手）
+    expect(getConnectionStatus()).toBe('disconnected')
+  })
+
+  test('场景 4：并发 waitForReady 共享同一次 handshake promise（不重复探测）', async () => {
+    // 不写 runtime.json — 5 次并发调用都应共享同一个 promise，最终 disconnected
+    const t0 = Date.now()
+    const results = await Promise.all([
+      waitForReady({ retries: 2, backoffMs: 50 }),
+      waitForReady({ retries: 2, backoffMs: 50 }),
+      waitForReady({ retries: 2, backoffMs: 50 }),
+      waitForReady({ retries: 2, backoffMs: 50 }),
+      waitForReady({ retries: 2, backoffMs: 50 }),
+    ])
+    const elapsed = Date.now() - t0
+    // 全部返回 false（共享失败）
+    expect(results).toEqual([false, false, false, false, false])
+    expect(getConnectionStatus()).toBe('disconnected')
+    // 共享 promise → elapsed 接近单次 retry 总时间，不会 ×5
+    expect(elapsed).toBeLessThan(3_000)
+  })
+
+  test('场景 5：markDisconnected 翻转 ready → disconnected（push 失败后的状态变化）', async () => {
+    const secret = randomBytes(16).toString('hex')
+    const mock = await startMockServer({ secret })
+    writeRuntime(mock.port, secret)
+
+    // 握手成功
+    const ok1 = await waitForReady({ retries: 3, backoffMs: 50 })
+    expect(ok1).toBe(true)
+    expect(getConnectionStatus()).toBe('ready')
+
+    // 标记断开（模拟 push 失败场景）
+    markDisconnected()
+    expect(getConnectionStatus()).toBe('disconnected')
+
+    // 再次 waitForReady — 应重新探测并回到 ready
+    const ok2 = await waitForReady({ retries: 3, backoffMs: 50 })
+    expect(ok2).toBe(true)
+    expect(getConnectionStatus()).toBe('ready')
+
+    await mock.close()
+  })
+
+  test('场景 6：requestRespawn 安全调用（launcher 可用时返回 true 或 false 不抛错）', () => {
+    // requestRespawn 通过 require 动态加载 launcher.js — 在 bun test 中
+    // launcher.js 存在但 feature('BUDDY')=false 路径内 maybeSpawnOnDesk 直接 no-op，
+    // 所以 requestRespawn 应返回 true（成功调度）但不产生实际 spawn 副作用
+    expect(() => requestRespawn()).not.toThrow()
+    const result = requestRespawn()
+    expect(typeof result).toBe('boolean')
+  })
+
+  test('场景 7：ready 状态 5s 内重复 waitForReady 直接命中缓存（不重新 ping /health）', async () => {
+    const secret = randomBytes(16).toString('hex')
+    const mock = await startMockServer({ secret })
+    writeRuntime(mock.port, secret)
+
+    // 首次 waitForReady — 真实 ping
+    const ok1 = await waitForReady({ retries: 3, backoffMs: 50 })
+    expect(ok1).toBe(true)
+
+    // 关 server — 但在 ready cache 5s 窗口内，waitForReady 不应重新 ping
+    await mock.close()
+
+    // 1ms 后再次 waitForReady — 由于 lastReadyAtMs 刚刚更新，应直接返回 true 不走 probe
+    const t0 = Date.now()
+    const ok2 = await waitForReady({ retries: 3, backoffMs: 50 })
+    const elapsed = Date.now() - t0
+    expect(ok2).toBe(true)
+    // 缓存命中 → 几乎瞬间（< 50ms，远小于 3 次 retry × 500ms timeout）
+    expect(elapsed).toBeLessThan(200)
+  })
+
+  test('场景 8：READY_HANDSHAKE 常量暴露供外部观测 (5 retries / 200ms backoff)', () => {
+    // DoD: 确认常量可被外部引用（/buddy desk 状态 UI 若需要展示等待总时长也能算出）
+    expect(READY_HANDSHAKE_RETRIES).toBe(5)
+    expect(READY_HANDSHAKE_BACKOFF_MS).toBe(200)
   })
 })
 

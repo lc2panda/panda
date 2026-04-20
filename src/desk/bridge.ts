@@ -11,6 +11,8 @@
 // 2026-04-19 +08:00 W2-T2 扩展：pushLevelUp / pushXpUpdate / pushLevelChange — 升级烟花动画 IPC
 // 2026-04-19 +08:00 W5-T4 扩展：pushNotification 同 (scenarioId,kind,level,title) 500ms 去重窗口
 //                    防 hook tick + bridge SSE 双触发刷屏 desk overlay（性能优化点 2）
+// 2026-04-20 +08:00 W19-T1 扩展：ready handshake (5×200ms backoff retry) + 连接状态机
+//                    (connecting/ready/disconnected) + 推送失败一次自动重试 + 重连请求
 
 import { feature } from 'bun:bundle'
 import { existsSync, readFileSync } from 'node:fs'
@@ -130,6 +132,112 @@ export function isOnDeskEnabled(): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// W19-T1：连接状态机 (connecting | ready | disconnected) + ready handshake
+//
+// 设计：
+//   1. 状态默认 'disconnected'；waitForReady 进入 → 'connecting'；探测成功 → 'ready'
+//   2. push 失败时（ECONNREFUSED / 401 / timeout）→ 'disconnected'（待下次 push 触发重连）
+//   3. /buddy desk status 通过 getConnectionStatus() 暴露给用户
+//
+// why 不引入 EventEmitter：bridge 是 fire-and-forget 单向客户端，状态变更回调由
+// /buddy desk 的 SubscribeToOnDesk 5s polling 间接刷新即可，避免引入额外回调表。
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ConnectionStatus = 'connecting' | 'ready' | 'disconnected'
+
+let _connectionStatus: ConnectionStatus = 'disconnected'
+/** 最近一次 ready 探测完成的 ts（用于 status getter 给 UI 算"刚刚 ready" 提示） */
+let _lastReadyAtMs = 0
+/** 进行中的 waitForReady promise — 多并发 push 共享同一次握手探测 */
+let _readyHandshake: Promise<boolean> | null = null
+
+export function getConnectionStatus(): ConnectionStatus {
+  return _connectionStatus
+}
+
+export function getLastReadyAtMs(): number {
+  return _lastReadyAtMs
+}
+
+export function __resetConnectionStatusForTesting(): void {
+  _connectionStatus = 'disconnected'
+  _lastReadyAtMs = 0
+  _readyHandshake = null
+}
+
+/** ready handshake 配置 — 5 次 × 200ms = 最多 ~1s 等待 desk bridge spawn 起来 */
+export const READY_HANDSHAKE_RETRIES = 5
+export const READY_HANDSHAKE_BACKOFF_MS = 200
+
+/**
+ * 等待 panda-on-desk bridge ready —— 通过 ping /health 验证 server alive。
+ *
+ * 行为：
+ *   1. 首次进入 → 状态 'connecting'，并发 push 共享同一次 handshake promise
+ *   2. /health 200 + APP_IDENTITY → 状态 'ready'，记录 lastReadyAt
+ *   3. 5 次重试全失败（ECONNREFUSED / runtime.json 缺失 / timeout）→ 状态 'disconnected'
+ *
+ * @param opts.retries 重试次数（默认 5）
+ * @param opts.backoffMs 退避间隔（默认 200ms）
+ * @returns Promise<boolean> — true 表示 ready；false 表示放弃
+ */
+export async function waitForReady(opts: {
+  retries?: number
+  backoffMs?: number
+} = {}): Promise<boolean> {
+  // 已 ready 且最近 < 5s — 直接返回（避免高频 push 反复 ping /health）
+  if (_connectionStatus === 'ready' && Date.now() - _lastReadyAtMs < 5_000) {
+    return true
+  }
+  // 已有进行中的 handshake — 复用
+  if (_readyHandshake) return _readyHandshake
+
+  _connectionStatus = 'connecting'
+  const retries = opts.retries ?? READY_HANDSHAKE_RETRIES
+  const backoff = opts.backoffMs ?? READY_HANDSHAKE_BACKOFF_MS
+
+  const probe = async (): Promise<boolean> => {
+    for (let i = 0; i < retries; i += 1) {
+      // why: 每次 retry 前失效 runtime cache — 刚 spawn 的 desk 落盘 runtime.json
+      //      但我们的 cache TTL=1s，若第一次 probe 读到 null 会被缓存。失效后下一轮
+      //      checkHealth 会真实重读 runtime.json，捕获新 port/secret。
+      runtimeCache = null
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await checkHealth(500)
+      if (ok) {
+        _connectionStatus = 'ready'
+        _lastReadyAtMs = Date.now()
+        return true
+      }
+      if (i < retries - 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise<void>(r => setTimeout(r, backoff))
+      }
+    }
+    _connectionStatus = 'disconnected'
+    return false
+  }
+
+  _readyHandshake = probe().finally(() => {
+    _readyHandshake = null
+  })
+  return _readyHandshake
+}
+
+/**
+ * 标记连接断开 — push 失败 / ECONNREFUSED / 401 调用，下次 push 会触发重连。
+ *
+ * why 不在 _readyHandshake 中标记：handshake 失败已经标过；本函数给 push 路径用，
+ * 让 push 路径与 handshake 路径都能从 'ready' 翻转回 'disconnected' 以触发自动重试。
+ */
+export function markDisconnected(): void {
+  _connectionStatus = 'disconnected'
+  _lastReadyAtMs = 0
+  // 同时失效 runtime cache — 下次 push 会重读 runtime.json（捕获新 spawn 的端口）
+  runtimeCache = null
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 内部：HTTP 请求（fire-and-forget；失败静默吞）
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -213,13 +321,78 @@ function postToOnDesk(
  *
  * 静默路径：feature 关 / config 关 / runtime.json 不存在 / on-desk 离线 / 鉴权失败。
  *
+ * W19-T1：
+ *   - 首次 push 前先调 waitForReady (5×200ms backoff) — 给 desk bridge spawn 时间
+ *   - push 失败 → markDisconnected()，再 retry 1 次（自动重连语义）
+ *   - opts.skipReadyCheck=true（默认 false）— pushPetStateChange 等节流路径用，
+ *     因为它们已经在 hot path 不希望被 handshake 阻塞；首发由后续 polling 触发 ready
+ *
  * @returns Promise<boolean> — 仅供测试观测 ack；调用方无需 await
  */
-export async function pushEventToOnDesk(event: OnDeskEvent): Promise<boolean> {
+export async function pushEventToOnDesk(
+  event: OnDeskEvent,
+  opts: { skipReadyCheck?: boolean; skipRetry?: boolean } = {},
+): Promise<boolean> {
   if (!isOnDeskEnabled()) return false
+  // W19-T1：首次 push 前 ready handshake；已 ready 且 cache 命中时几乎零开销
+  if (!opts.skipReadyCheck && _connectionStatus !== 'ready') {
+    const ready = await waitForReady()
+    if (!ready) return false
+  }
   try {
     const r = await postToOnDesk('/event', event)
-    return r.ok
+    if (r.ok) {
+      // 推送成功 — 维持 ready 状态
+      if (_connectionStatus !== 'ready') {
+        _connectionStatus = 'ready'
+        _lastReadyAtMs = Date.now()
+      }
+      return true
+    }
+    // 推送失败 — 标记断开
+    markDisconnected()
+    if (opts.skipRetry) return false
+    // W19-T1：自动重连一次 — 重新握手 + retry push
+    const reready = await waitForReady()
+    if (!reready) return false
+    const r2 = await postToOnDesk('/event', event)
+    if (r2.ok) {
+      _connectionStatus = 'ready'
+      _lastReadyAtMs = Date.now()
+      return true
+    }
+    markDisconnected()
+    return false
+  } catch {
+    markDisconnected()
+    return false
+  }
+}
+
+/**
+ * 请求 panda-on-desk 重新 spawn — push 多次失败后调用。
+ *
+ * why lazy import：launcher.js 触发 config 模块树初始化（~30ms），
+ * 而 bridge.ts 是 hot path（每次 pushPetStateChange 都 import），不应在模块顶部 import。
+ *
+ * @returns true 表示发起了 spawn 请求；false 表示 launcher 不可用
+ */
+export function requestRespawn(): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const launcher = require('./launcher.js') as {
+      __resetSpawnedFlagForTesting?: () => void
+      maybeSpawnOnDesk?: (opts?: { defer?: boolean }) => void
+    }
+    if (
+      typeof launcher.__resetSpawnedFlagForTesting !== 'function' ||
+      typeof launcher.maybeSpawnOnDesk !== 'function'
+    ) {
+      return false
+    }
+    launcher.__resetSpawnedFlagForTesting()
+    launcher.maybeSpawnOnDesk({ defer: false })
+    return true
   } catch {
     return false
   }
@@ -368,7 +541,8 @@ export function __pushNotificationDedupedCore(
 export function pushNotification(opts: Omit<NotificationEvent, 'type' | 'ts'>): void {
   if (!isOnDeskEnabled()) return
   __pushNotificationDedupedCore(opts, ev => {
-    void pushEventToOnDesk(ev)
+    // why W19-T1 skipReadyCheck: notification 已经被 dedupe，不需要再阻塞 handshake
+    void pushEventToOnDesk(ev, { skipReadyCheck: true })
   })
 }
 
@@ -376,22 +550,22 @@ export function pushNotification(opts: Omit<NotificationEvent, 'type' | 'ts'>): 
  * 角标累加 — A3 #5/#6/#7 场景"未读 +1"。delta 默认 +1，正负均可。
  */
 export function bumpBadge(scenarioId: string, delta = 1): void {
-  void pushEventToOnDesk(buildBadgeBumpEvent(scenarioId, delta))
+  void pushEventToOnDesk(buildBadgeBumpEvent(scenarioId, delta), { skipReadyCheck: true })
 }
 
 /** 角标清零 — overlay 已读 / 用户进入对应面板时调。 */
 export function resetBadge(scenarioId: string): void {
-  void pushEventToOnDesk(buildBadgeResetEvent(scenarioId))
+  void pushEventToOnDesk(buildBadgeResetEvent(scenarioId), { skipReadyCheck: true })
 }
 
 /** 进入拖拽接收模式 — A3 #6 file-organizer / screenshot-snippet。 */
 export function enableDragTarget(scenarioId: string, kinds: string[]): void {
-  void pushEventToOnDesk(buildDragTargetEnableEvent(scenarioId, kinds))
+  void pushEventToOnDesk(buildDragTargetEnableEvent(scenarioId, kinds), { skipReadyCheck: true })
 }
 
 /** 退出拖拽接收模式。 */
 export function disableDragTarget(scenarioId: string): void {
-  void pushEventToOnDesk(buildDragTargetDisableEvent(scenarioId))
+  void pushEventToOnDesk(buildDragTargetDisableEvent(scenarioId), { skipReadyCheck: true })
 }
 
 /**
@@ -405,7 +579,7 @@ export function setDnd(
   enabled: boolean,
   opts: { reason?: DndEvent['reason']; endsAt?: number } = {},
 ): void {
-  void pushEventToOnDesk(buildDndEvent(enabled, opts))
+  void pushEventToOnDesk(buildDndEvent(enabled, opts), { skipReadyCheck: true })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -549,7 +723,8 @@ export function pushPetStateChange(
   // why: feature gate 提前短路；isOnDeskEnabled 已含 feature('BUDDY')
   if (!isOnDeskEnabled()) return
   __pushPetStateThrottledCore(state, sessionId, forcedUntilMs, ev => {
-    void pushEventToOnDesk(ev)
+    // why W19-T1 skipReadyCheck: throttled 节流路径已合批，不能阻塞渲染节拍
+    void pushEventToOnDesk(ev, { skipReadyCheck: true })
   })
 }
 
@@ -620,7 +795,7 @@ export function pushSpeciesChange(species: Species, sessionId: string): void {
   if (!SPECIES_WHITELIST.includes(species)) return
   if (!isOnDeskEnabled()) return
   __pushSpeciesChangeCore(species, sessionId, ev => {
-    void pushEventToOnDesk(ev)
+    void pushEventToOnDesk(ev, { skipReadyCheck: true })
   })
 }
 
@@ -687,6 +862,7 @@ export function pushLevelUp(
   if (!isOnDeskEnabled()) return
   if (!Number.isFinite(fromLevel) || !Number.isFinite(toLevel)) return
   if (toLevel <= fromLevel) return // 防御：非升级不发
+  // why pushLevelUp 保留 ready check：升级是关键里程碑事件，宁可等 1s handshake 也不能丢
   void pushEventToOnDesk(buildLevelUpEvent(fromLevel, toLevel, unlocks))
 }
 
@@ -711,7 +887,8 @@ export function pushXpUpdate(opts: {
   rarity?: string
 }): void {
   if (!isOnDeskEnabled()) return
-  void pushEventToOnDesk(buildXpGainedEvent(opts))
+  // why skipReadyCheck: pushXpUpdate 30s 周期高频，不阻塞；首次 pushPermissionRequest 等关键路径已建立 ready
+  void pushEventToOnDesk(buildXpGainedEvent(opts), { skipReadyCheck: true })
 }
 
 /**
