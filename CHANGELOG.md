@@ -1,8 +1,21 @@
 # Changelog · panda-on-desk
 
-> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 42 版本演进（v2.22.0 → v2.25.30）。
+> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 42 版本演进（v2.22.0 → v2.25.31）。
 > panda CLI 主体的更早版本演进（v0.x → v2.21.x）见 git log 与 monitor/ 目录归档。
 > 时间锚点：2026-04-19 ~ 2026-04-20 (Asia/Singapore +08:00)
+
+---
+
+## panda-on-desk Release Tag 历史
+
+| Tag | 触发波次 | 日期 | 说明 |
+| --- | --- | --- | --- |
+| `desk-v1.0.0` | W5-T2 | 2026-04-20 | 首次 GitHub Release 触发；CI workflow `release-panda-on-desk.yml` 跨平台构建启动；assets 状态待 GitHub UI 验证。 |
+| `desk-v1.0.1` | W11-T1 | 2026-04-20 | W6-T2 / W7-T1 workflow 加固后重触发；`git ls-remote` 验证 tag 已到远端。 |
+| `desk-v1.0.2` | W19-T4 | 2026-04-20 | version sync + icns/ico 占位检测 + 真 NSIS 出包验证后由 W17 加固完成重触发。 |
+| `desk-v1.0.3` | W22-T4 | 2026-04-20 | v2.25.31/32 32 版本累计加固后最终触发：含 Mac 顶部黑框 5 重根因 nuclear fix + startup 性能 -67.3% + RSS 158MB + dist-electron -45MB + autoconnect handshake + crash 自动恢复。 |
+
+> 全部 tag 推送均使用 `http.proxy=http://127.0.0.1:7897` 走代理推达远端；anthropic byte-equal 0 触碰；0 新依赖。
 
 ---
 

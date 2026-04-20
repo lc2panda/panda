@@ -1818,14 +1818,20 @@ panda CLI 启动时（`panda` / `bun panda`）会通过 `src/buddy/desk-spawn.ts
 
 详见子包 [packages/panda-on-desk/README.md](./packages/panda-on-desk/README.md)。
 
-### 桌面端独立安装包（v1.0.2+）
-GitHub Release: https://github.com/lc2panda/panda/releases/tag/desk-v1.0.2
-- macOS Apple Silicon: panda-on-desk-1.0.2-arm64.dmg
-- macOS Intel: panda-on-desk-1.0.2-x64.dmg
-- Windows: panda-on-desk-Setup-1.0.2.exe
-- Linux: panda-on-desk-1.0.2.AppImage / .deb
+### 桌面端独立安装包（v1.0.3+）
+GitHub Release: https://github.com/lc2panda/panda/releases/tag/desk-v1.0.3
+- macOS Apple Silicon: panda-on-desk-1.0.3-arm64.dmg
+- macOS Intel: panda-on-desk-1.0.3-x64.dmg
+- Windows: panda-on-desk-Setup-1.0.3.exe
+- Linux: panda-on-desk-1.0.3.AppImage / .deb
 
-> v1.0.2 在 W6-T2 / W7-T1 / W17 workflow 多轮加固后由 W19-T4 重触发，修掉 v1.0.0/1 残余 0 assets 的根因（version sync + icns/ico 占位检测 + 真 NSIS 出包验证）。
+> v1.0.3 由 W22-T4 在 v2.25.31/32 32 版本累计加固后最终触发：含 Mac 顶部黑框 5 重根因 nuclear fix（v2.25.30）+ startup 性能 -67.3%（v2.25.29 W20-T2）+ RSS 158MB（v2.25.31 W21）+ dist-electron -45MB + autoconnect handshake + crash 自动恢复。
+
+历史 release tag：
+- desk-v1.0.0（W5-T2，2026-04-20）— 首次 GitHub Release 触发
+- desk-v1.0.1（W11-T1）— W6-T2 / W7-T1 workflow 加固后重触发
+- desk-v1.0.2（W19-T4）— version sync + icns/ico 占位检测 + 真 NSIS 出包验证后重触发
+- desk-v1.0.3（W22-T4）— v2.25.31/32 累计加固后最终触发
 
 ## panda-on-desk 桌面宠物（v2.25.0+）
 
