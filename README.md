@@ -1816,6 +1816,34 @@ panda CLI 启动时（`panda` / `bun panda`）会通过 `src/buddy/desk-spawn.ts
 
 详见子包 [packages/panda-on-desk/README.md](./packages/panda-on-desk/README.md)。
 
+## panda-on-desk 桌面宠物（v2.25.0+）
+
+panda 自带桌面宠物 — npm install 后自动启动，与 panda CLI 实时联动。
+
+### 快速启用
+```bash
+npm install -g @lc2panda/panda-code   # 安装 panda CLI（自带 panda-on-desk）
+panda --install-desk                  # 一次性下载 electron deps（首次 ~80MB）
+panda                                  # 启动 panda — 桌面宠物自动浮现
+```
+
+### 桌面宠物能力
+- 形象：圆头 + 黑耳 + 黑眼罩 + 鼻嘴的简笔 panda（可拖拽，呼吸动画）
+- 18 物种切换：/buddy theme robot|owl|chonk|... 实时切换桌面端形象
+- 状态联动：panda CLI 思考/工作/错误 → 桌面端 sprite 切换
+- 养成可见：等级 + XP 进度条 + 升级烟花动画
+- 103 场景通知：CI 失败 / 日历 / 晨间简报 等通过 overlay 弹出
+- 交互：双击 poke / 4击 flail / 长按 stats
+- 托盘：系统托盘菜单（Show/Hide/DND/Settings/Quit）
+- DND：勿扰时段 + 5min 通知聚合 + 离线累积
+
+### 关闭
+```bash
+panda --no-desk    # 单次不拉
+```
+
+详见 packages/panda-on-desk/README.md
+
 #### `/brief`
 - **用法**: `/brief [on|off]`
 - **说明**: 简报模式 — AI 只输出简洁摘要

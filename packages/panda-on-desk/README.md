@@ -156,6 +156,99 @@ panda 单 provider Tray，6 项菜单：
 > v1.0 GA 阶段：截图待美术与 PM 在真实环境抓取（macOS/Windows/Linux 三平台）后补 `docs/screenshots/`。
 > 当前以代码 + 5 选项 schema + 6 项菜单结构作为接口契约证据。
 
+## 18 物种 × 12 PetState 完整对照表（v2.25.2 基线）
+
+### 18 物种白名单（与 panda CLI `PANDA_SPECIES` / `/buddy theme <species>` 1:1 对齐）
+
+| # | 物种 ID | 中文名 | 简形描述 | 适用倾向 |
+|---|---------|--------|----------|----------|
+| 1 | `chonk` | 圆胖 panda | 圆头 + 黑耳 + 黑眼罩 + 鼻嘴（默认） | 治愈 / 默认 |
+| 2 | `cat` | 小猫 | 三角耳 + 尾巴 + 胡须 | 灵巧 / 节奏快 |
+| 3 | `robot` | 机器人 | 方头 + 天线 + 屏幕眼 | 工程 / 武术风 |
+| 4 | `owl` | 猫头鹰 | 圆眼盘 + 弯喙 | 夜猫子 / 学习 |
+| 5 | `dragon` | 小龙 | 双角 + 鳞片尾 | 勇者 / 任务流 |
+| 6 | `octopus` | 章鱼 | 圆头 + 8 触手 | 多线程 |
+| 7 | `penguin` | 企鹅 | 直立 + 双翼 | 系统通知 |
+| 8 | `turtle` | 乌龟 | 龟壳 + 短脚 | 长任务 / 等待 |
+| 9 | `snail` | 蜗牛 | 螺旋壳 + 触角 | DND / 慢节奏 |
+| 10 | `ghost` | 幽灵 | 半透明 + 飘尾 | 隐身 / 灰度 |
+| 11 | `axolotl` | 蝾螈 | 头侧 6 鳃羽 | 治愈 / 实验 |
+| 12 | `capybara` | 水豚 | 椭圆体 + 短耳 | 佛系 / 抗压 |
+| 13 | `cactus` | 仙人掌 | 柱状 + 刺点 | 极简 |
+| 14 | `rabbit` | 兔子 | 长耳 + 短尾 | 弹跳 / 通知 |
+| 15 | `mushroom` | 蘑菇 | 菌盖 + 茎柄 | 趣味 / 番茄 |
+| 16 | `duck` | 鸭子 | 扁喙 + 圆体 | 入门 / 童趣 |
+| 17 | `goose` | 鹅 | 长颈 + 扁喙 | 警戒 / 守护 |
+| 18 | `blob` | 史莱姆 | 不规则圆滴 | 自由 / 抽象 |
+
+> **退役 alias 向后兼容**：`panda` → `chonk`、`redPanda` → `cat`、`kungFuPanda` → `robot`（v2.21.27-29 panda 系实装因画布太小退役）。
+
+### 12 PetState 状态机（与 panda CLI `PetState` 1:1 对齐）
+
+| # | State | 优先级 | 触发条件 | 视觉表现 |
+|---|-------|--------|----------|----------|
+| 1 | `error` | 8 | 工具调用失败 / API 异常 | 红色感叹号 + 抖动 |
+| 2 | `notification` | 7 | 103 场景主动推送 / 解锁里程碑 | bubble 浮窗 + 提示音 |
+| 3 | `sweeping` | 6 | 后台清理 / 缓存刷新 / 更新检查 | 扫帚动画 |
+| 4 | `attention` | 5 | 等待用户确认 / 权限气泡 | 闪烁光圈 |
+| 5 | `carrying` | 4 | 文件传输 / 下载进行中 | 抱箱 sprite |
+| 6 | `juggling` | 4 | 多任务并行（≥2 session） | 抛球动画 |
+| 7 | `working` | 3 | 长任务执行中（>5s） | 工具图标 + 进度脉冲 |
+| 8 | `thinking` | 2 | 模型推理中 / token 流式输出 | 思考气泡 |
+| 9 | `idle` | 1 | 空闲（无 active session） | 默认呼吸动画 |
+| 10 | `sleeping` | 0 | 长时间无交互（DEEP_SLEEP_TIMEOUT 后） | 闭眼 + Z 字 |
+| 11 | `yawning` | — | sleeping 序列 — 入睡过渡 | 张嘴打哈欠 |
+| 12 | `dozing` | — | sleeping 序列 — 浅睡 | 半闭眼摇晃 |
+| 13 | `collapsing` | — | sleeping 序列 — 倒下 | 倒地动画 |
+| 14 | `waking` | — | sleeping 序列 — 唤醒（鼠标移近） | 睁眼伸展 |
+
+> 主线 12 态对应 `STATE_PRIORITY` 表（src/state.ts L73-84）；后 4 态（yawning/dozing/collapsing/waking）属 `SLEEP_SEQUENCE`，由 wake-poll 调度，不进入主优先级竞争。
+> 升序优先级：高优先级状态会抢占低优先级（如 `error` 抢占 `working`），抢占后按 `MIN_DISPLAY_MS` 节流回弹。
+
+## IPC 通信架构（main ↔ preload ↔ renderer ↔ panda CLI）
+
+panda-on-desk 采用 4 层 IPC 拓扑，所有跨 context 调用走 contextBridge 沙箱（contextIsolation:true / nodeIntegration:false）：
+
+```
+   panda CLI                     main (Electron)                preload                renderer
+  (authoritative)            ┌──────────────────┐         ┌───────────────┐      ┌───────────────┐
+   src/desk/bridge.ts        │ src/main.ts      │         │ src/preload/  │      │ src/renderer/ │
+   HTTP POST 1455+/state ───▶│ src/bridge/      │ ──IPC──▶│ contextBridge │ ───▶ │ hit / bubble  │
+   SSE GET 1455+/events  ◀── │ src/state.ts     │ ◀──IPC──│ pandaAPI/*    │ ◀─── │ settings      │
+   ~/.pandacc/runtime.json   │ src/tray/        │         │ panda:* 通道   │      │ update-bubble │
+                             │ src/dispatcher/  │         └───────────────┘      └───────────────┘
+                             └──────────────────┘
+   18 物种切换 / 103 场景      4 BrowserWindow + tray         contextBridge 沙箱     4 窗口 HTML+CSS
+   /buddy state / theme       单实例锁 + 生命周期             panda:desk-prefs:*     宠物 sprite + bubble
+                                                              panda:badge:*           设置面板 + 升级浮窗
+```
+
+主要 IPC 通道（命名规约：`panda:<domain>:<action>`）：
+- **状态推送**：`panda:state:set` / `panda:state:current`（main → renderer 单向广播）
+- **设置面板**：`panda:desk-prefs:get` / `panda:desk-prefs:save` / `panda:species:list` / `panda:app-version`
+- **托盘联动**：`panda:tray:show-hide` / `panda:dnd:toggle` / `panda:settings:open` / `panda:settings:close`
+- **交互事件**：`panda:badge:double-click` / `panda:badge:flail`（v2.25.1 W2-T4 补全）
+- **CLI 通信**：HTTP `127.0.0.1:1455+`（auto-fallback +1）+ SSE 订阅 `~/.pandacc/runtime.json` 信号
+
+byte-equal 守护：所有 IPC 仅在 panda-on-desk 子包内闭环，零触碰 `src/services/api/claude.ts` / `oauth/*` / `providers.ts`。
+
+## 故障排查
+
+| 症状 | 可能原因 | 排查与修复 |
+|------|----------|-----------|
+| `panda` 启动后撞 `main:785` / `Cannot find module 'electron'` | panda-on-desk 子包未安装 electron deps（npm 不会自动跨子包装） | 跑 `panda --install-desk` 一次性下载（首次 ~80MB）；或 `cd packages/panda-on-desk && bun install` |
+| 桌面宠物窗口未浮现，CLI 主体正常 | desk-spawn fallback 静默跳过（设计行为） | 检查 `~/.pandacc/desk-prefs.json` 中 `companionOnDesk:true`；查看 `~/.pandacc/desk-spawn.log` 启动错误 |
+| 启动时报 `EADDRINUSE 127.0.0.1:1455` | 1455 端口被其他进程占用（多次启动残留 / 其他 IDE） | 默认 auto-fallback +1（1456/1457/...）；或杀残留 `panda-on-desk` 进程：mac/linux `pkill -f panda-on-desk` / win 任务管理器结束 |
+| Windows `addWinAsarIntegrity` UNKNOWN/EBUSY 报错 | OneDrive / 杀软对 .exe 文件锁 | 关闭 OneDrive 同步该目录 / 暂停杀软实时扫描 / 退出 win-unpacked 目录后重试；CI runner 上无此问题 |
+| 托盘菜单图标缺失 | tray-{light,dark}.png 缺失 | 设计为静默降级 — 菜单文字仍可点击；如需补图标放至 `build/icons/tray-light.png` `tray-dark.png` |
+| settings.html 加载白屏 | 多候选路径未命中（v2.24.3 已修） | 升级到 ≥ v2.24.3；或检查 `packages/panda-on-desk/src/renderer/settings.html` 是否随 dist 打包 |
+| 18 物种切换无反应 | renderer SVG 资产未加载 / theme cache 未刷 | `/buddy theme chonk` 回到默认；重启 panda-on-desk；检查 `themes/panda/sprites/` 资产是否齐 |
+
+更多日志位置：
+- main 进程：终端 stdout（panda CLI spawn 子进程时透传）
+- renderer 控制台：托盘菜单 → Settings → DevTools（v2.25.0 GA 启用）
+- 持久化数据：`~/.pandacc/desk-prefs.json` `~/.pandacc/runtime.json` `~/.config/panda/desk-state.json`
+
 ## 上游致谢
 
 panda-on-desk 基于 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) (MIT) 81% 吸收 + 改造 fork。详见 `monitor/20260419-clawd-on-desk-调研报告.md` 与 `monitor/20260419-on-desk-A1-架构设计.md`。
