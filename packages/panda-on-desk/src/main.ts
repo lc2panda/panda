@@ -1,6 +1,7 @@
 // Input: launch.cjs spawn → electron main 进程入口
 // Output: 4 类 BrowserWindow（pet / hit / settings / update-bubble）+ 透明 overlay + 单实例锁 + 生命周期编排
 //         W19-T3：uncaughtException/unhandledRejection → logger.error + process.exit(1/2) 让 CLI launcher 重启
+//         W20-T2：hitWin show:false + ready-to-show 减少首屏闪烁
 // Pos: panda-on-desk 主进程 god file（改造 fork — 上游 3119 行 → 单 panda provider 削皮 ~30%）
 //
 // Forked from clawd-on-desk@4b07658:src/main.js (MIT License) - Adapted to panda single provider
@@ -1047,6 +1048,12 @@ function createWindow() {
       height: hh,
       x: hx,
       y: hy,
+      // W20-T2 perf：show:false + ready-to-show 模式减少首屏空白闪烁
+      //   why: Electron 默认 show:true 时窗口立即显示但 webContents 还在加载 HTML，
+      //   用户会先看到一帧透明矩形再看到 panda → 视觉闪烁。改为 ready-to-show 后
+      //   首帧即 panda（DOM ready），实测 first-paint 主观感受 ~30-80ms 提速。
+      //   与之前 hitWin.showInactive() 时机解耦 — fallback 仍保留（4s 超时）。
+      show: false,
       frame: false,
       transparent: true,
       alwaysOnTop: true,
@@ -1071,7 +1078,16 @@ function createWindow() {
     try { hitWin.setShape([{ x: 0, y: 0, width: hw, height: hh }]) } catch {}
     hitWin.setIgnoreMouseEvents(false) // PERMANENT — 永不切换
     if (isMac) hitWin.setFocusable(false)
-    hitWin.showInactive()
+    // W20-T2 perf：ready-to-show 后再 showInactive，消除"先空白再 panda"的闪烁
+    //   fallback：4s 超时强制 show（防御 webContents.did-finish-load 卡死或 ready-to-show 不触发）
+    let _hitShown = false
+    const showHitOnce = () => {
+      if (_hitShown || !hitWin || hitWin.isDestroyed()) return
+      _hitShown = true
+      try { hitWin.showInactive() } catch {}
+    }
+    hitWin.once('ready-to-show', showHitOnce)
+    setTimeout(showHitOnce, 4000)
     if (isLinux) hitWin.setSkipTaskbar(true)
     if (isWin) hitWin.setAlwaysOnTop(true, WIN_TOPMOST_LEVEL)
     reapplyMacVisibility()

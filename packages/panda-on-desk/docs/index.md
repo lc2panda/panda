@@ -3,6 +3,7 @@ Input:  panda-on-desk 全套用户/贡献者/架构/隐私文档分散在仓库�
 Output: GitHub Pages 单页索引（jekyll 默认主页 site root）
 Pos:    panda-on-desk 子包文档站根 — 仅供 GitHub Pages 渲染（Jekyll markdown）
         [NEW-FILE:#W10-04] · 2026-04-20 +08:00 W10-T4 docs 站点（agent-δ-W10-pages）
+        2026-04-20 +08:00 W20-T3 agent-γ-W20-pages 增补：Quick Nav + APNG demo + 18 物种锚点
         一旦上游任一文档新增 / 改名 / 下线，请同步更新本索引内的链接与摘要。
 -->
 
@@ -20,7 +21,17 @@ description: panda-on-desk 桌面宠物子产品 · 文档总入口（README · 
 [![release](https://img.shields.io/badge/release-desk--v1.0.0-brightgreen)](https://github.com/lc2panda/panda/releases)
 [![electron](https://img.shields.io/badge/electron-41.0-blue)](https://www.electronjs.org/)
 [![license](https://img.shields.io/badge/license-MIT-green)](https://github.com/lc2panda/panda/blob/main/packages/panda-on-desk/LICENSE)
-[![telemetry](https://img.shields.io/badge/telemetry-0-brightgreen)](#5-隐私声明privacymd)
+[![telemetry](https://img.shields.io/badge/telemetry-0-brightgreen)](#6-隐私声明-privacy)
+
+---
+
+## Quick Nav
+
+- [文档总览（8 段）](#文档总览)
+- [APNG 动效 demo（7 PetState）](#apng-动效-demo)
+- [18 物种 sprite 列表](#18-物种)
+- [FAQ Top 6](#faq常见问题速查)
+- [反馈与贡献](#反馈与贡献)
 
 ---
 
@@ -160,6 +171,56 @@ A: panda-on-desk 自动探测 1455-1465 段空闲端口，无需手动配置。�
 
 **Q6: panda-on-desk 会上传我的数据吗？**
 A: **不会**。当前 0 telemetry，所有数据本地化。详见 [PRIVACY.md](https://github.com/lc2panda/panda/blob/main/packages/panda-on-desk/PRIVACY.md)。
+
+---
+
+## APNG 动效 demo
+
+> 7 个 PetState 的 APNG 动效预览（仓库内 `packages/panda-on-desk/build/screenshots/apng/` · 200×200 · 透明背景）。
+> Pages baseurl `/panda` 下不直接托管 build 产物，故下列预览链接走 GitHub raw（直链 main 分支）。
+
+| PetState | 静态封面（200×200 PNG） | APNG 动效（直链） |
+|---|---|---|
+| idle       | [panda-200x200-idle.png](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/panda-200x200-idle.png)             | [panda-idle.apng](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/apng/panda-idle.apng) |
+| thinking   | [panda-200x200-thinking.png](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/panda-200x200-thinking.png)     | [panda-thinking.apng](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/apng/panda-thinking.apng) |
+| working    | [panda-200x200-working.png](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/panda-200x200-working.png)       | [panda-working.apng](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/apng/panda-working.apng) |
+| sleeping   | [panda-200x200-sleeping.png](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/panda-200x200-sleeping.png)     | [panda-sleeping.apng](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/apng/panda-sleeping.apng) |
+| error      | [panda-200x200-error.png](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/panda-200x200-error.png)           | [panda-error.apng](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/apng/panda-error.apng) |
+| attention  | [panda-200x200-attention.png](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/panda-200x200-attention.png)   | [panda-attention.apng](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/apng/panda-attention.apng) |
+| notification | [panda-200x200-notification.png](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/panda-200x200-notification.png) | [panda-notification.apng](https://github.com/lc2panda/panda/raw/main/packages/panda-on-desk/build/screenshots/apng/panda-notification.apng) |
+
+> 说明：GitHub Pages 站点（baseurl `/panda`）内不直接复制 ~MB 级二进制资产到 `_site/`，避免站点体积膨胀；改用 `raw.githubusercontent.com` 直链，与 README hero 图策略一致。
+
+---
+
+## 18 物种
+
+> sprite 字面量与 `src/bridge/types.ts` `Species` 类型严格 1:1（types.parity 守护）。
+> 主题资产位于 `packages/panda-on-desk/themes/<species>/sprites/`，缺省走 `template/`。
+> 18 物种 demo cycle 仅展示 `default + robot + owl + chonk + duck` 5 项（见 `src/demo-mode.ts` `DEMO_SPECIES_CYCLE`）。
+
+| # | sprite 名 | 类别 | 备注 |
+|---|---|---|---|
+|  1 | `duck`     | 鸟类 | demo cycle |
+|  2 | `goose`    | 鸟类 | |
+|  3 | `blob`     | 抽象 | |
+|  4 | `cat`      | 哺乳 | |
+|  5 | `dragon`   | 神话 | |
+|  6 | `octopus`  | 水生 | |
+|  7 | `owl`      | 鸟类 | demo cycle |
+|  8 | `penguin`  | 鸟类 | |
+|  9 | `turtle`   | 爬行 | |
+| 10 | `snail`    | 软体 | |
+| 11 | `ghost`    | 神话 | |
+| 12 | `axolotl`  | 两栖 | |
+| 13 | `capybara` | 哺乳 | |
+| 14 | `cactus`   | 植物 | |
+| 15 | `robot`    | 机械 | demo cycle |
+| 16 | `rabbit`   | 哺乳 | |
+| 17 | `mushroom` | 真菌 | |
+| 18 | `chonk`    | 抽象 | demo cycle |
+
+> 默认物种 `default` ≡ `panda`（不在 18 sprite 字面量内，单独作为 fallback）。完整规格见 [ARCHITECTURE.md](https://github.com/lc2panda/panda/blob/main/packages/panda-on-desk/ARCHITECTURE.md)。
 
 ---
 

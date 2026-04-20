@@ -33,15 +33,15 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 | 维度 | 值 | 来源 |
 |---|---|---|
-| panda CLI 版本 | **v2.25.25** | `package.json` L3 |
-| panda-on-desk 子包版本 | **v0.1.0-alpha** (内部) / 对外 desk-v1.0.1 GA | `packages/panda-on-desk/package.json` L3 |
-| 桌面端 GA 标签 | **desk-v1.0.1** (2026-04-20 推送) | `monitor/20260420-W11-T1-ci-retrigger.md` |
+| panda CLI 版本 | **v2.25.28** | `package.json` L3 |
+| panda-on-desk 子包版本 | **v0.1.0-alpha** (内部) / 对外 desk-v1.0.2 GA | `packages/panda-on-desk/package.json` L3 |
+| 桌面端 GA 标签 | **desk-v1.0.2** (2026-04-20 W19-T4 重触发) | `monitor/20260420-W19-T4-ci.md` |
 | Electron runtime | **41.2.1** | `packages/panda-on-desk/package.json` devDeps |
 | Node 兼容 | ≥ 18.0.0 | `package.json` engines |
 | Bun 兼容 | ≥ 1.2.0 | `package.json` engines |
 | 仓库 | `lc2panda/panda` (private) | git remote |
-| 最新发版日期 | **2026-04-20** (UTC+8) | git log HEAD `fddb1ac` |
-| 最新 commit | `fddb1ac` — `feat: 波 14 收尾 — tray 真实装 6 items + 首次启动 demo 模式 (v2.25.23)` | `git log -1` |
+| 最新发版日期 | **2026-04-20** (UTC+8) | git log HEAD `2286e8c` |
+| 最新 commit | `2286e8c` — `feat: 波 19 全 4/4 — autoconnect + 体积 -45MB + crash 恢复 + desk-v1.0.2 (v2.25.28)` | `git log -1` |
 
 ---
 
@@ -51,12 +51,12 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 | 维度 | 值 | 锚点 |
 |---|---|---|
-| 全量测试用例 | **1275+ pass / 2 fail** | v2.25.19 commit body（波 13 修 MatrixTheme 6 + frozen 1 后 4 fail → 2 fail） |
-| 预存基线 fail | **2** (原 4 基线 → v2.25.19 修 2 残留 2) | CHANGELOG v2.25.19 |
+| 全量测试用例 | **1560 pass / 1 skip / 0 fail** (W20-T4 实测 2026-04-20) | `bun test` 全量 |
+| 预存基线 fail | **0** (W15-T2 端口 race 修后达成里程碑 → W16-W19 持续守住) | CHANGELOG v2.25.24 / monitor `20260420-W20-T4-final.md` |
 | panda-on-desk 子包用例 | **226+ pass** + 后续波次新加（a11y 13 / logger 14 / telemetry 12 / window-lifecycle / petStats.migration / benchmarks 7 / perf 12 / perf-v2 10 / e2e-real-process 13 / screenshots 8 / a11y-headless / startup 5 / real-screenshots 4 + ...） | CHANGELOG v2.25.0–v2.25.15 / `packages/panda-on-desk/test/` |
 | 子包测试目录 | `packages/panda-on-desk/test/` | — |
 | 关键模块覆盖率 | **+74.32%** (W10-T1 retry 提升基线) | CHANGELOG v2.25.14 |
-| TypeScript typecheck | 125 errors → 修 105 → 留 20 TODO（17 test wildcard + 3 禁修区 anthropic byte-equal 守护） | CHANGELOG v2.25.14 |
+| TypeScript typecheck | 125 errors → 修 105 → 留 **2 TODO**（test/mac-bootstrap-e2e.test.ts L396/L446 mock 签名）；W20-T4 实测 ≤ 20 阈值 PASS | CHANGELOG v2.25.14 + W20-T4 实测 |
 | Lint (biome) | 8/8 自动 fix（unused imports / format） | CHANGELOG v2.25.11 |
 | build | `bun run build` 0 error | v2.25.10/14 实测 |
 | deps 安全审计 | `npm audit` 0 vulnerabilities | CHANGELOG v2.25.10 |

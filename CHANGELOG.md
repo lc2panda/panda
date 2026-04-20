@@ -1,10 +1,52 @@
 # Changelog · panda-on-desk
 
-> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 35 版本演进（v2.22.0 → v2.25.23）。
+> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 40 版本演进（v2.22.0 → v2.25.28）。
 > panda CLI 主体的更早版本演进（v0.x → v2.21.x）见 git log 与 monitor/ 目录归档。
 > 时间锚点：2026-04-19 ~ 2026-04-20 (Asia/Singapore +08:00)
 
 ---
+
+## v2.25.28 — 2026-04-20 · 波 19 全 4/4（autoconnect + 体积 -45MB + crash 恢复 + desk-v1.0.2）
+- W19-T1 autoconnect handshake：panda CLI 第一次 push 前 ping `/health` verify ready；ECONNREFUSED 时 retry 5 × 200ms backoff；panda-on-desk crash 后 `maybeSpawnOnDesk` 重启；`/buddy desk` 显示 ready/connecting/disconnected 状态；30 用例 pass。
+- W19-T2 dist-electron 体积优化：`packages/panda-on-desk/electron-builder.yml` +25 行（asar / compression maximum / electronLanguages 限 zh+en / files exclude test+docs+scripts）→ Linux unpacked **327MB → 282MB (-45MB / -14%)**；0 新依赖。
+- W19-T3 crash 自动恢复：`main.ts` uncaughtException + unhandledRejection 写 logger.error；`launcher.ts` `child.on('exit', code)` 自动重启 + 5min 限频 3 次防 crash loop；`/buddy desk logs --follow` 实时 tail；13 用例 pass。
+- W19-T4 desk-v1.0.2 重触发：加固后 `git tag desk-v1.0.2` + push；README link v1.0.1 → v1.0.2。
+- bun test 全量 1500+ pass / **0 fail** 持续守住；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `2286e8c` / `bf9e921` / `3205f15`。
+
+## v2.25.27 — 2026-04-20 · 波 18 全 4/4（键盘 a11y + 真 spawn 修 bug + stats 可视化）
+- W18-T1 AppImage：Win 主机 WSL/Docker/Podman 全缺 → 文档化 rootcause；`docs/linux-build.md` 新建用户 guide；CI build-linux job 已确认完整。
+- W18-T2 键盘 a11y v2：`hit.html` / `bubble.html` / `settings.html` / `preload/hit.ts` / `main.ts` +5 改动；Enter → `__pandaPoke` / Space 长按 → `__pandaShowStats` / Ctrl+Shift+P 切 species / Ctrl+Shift+M mute / ESC hide；overlay Tab 循环 + Enter/ESC + arrow keys；`packages/panda-on-desk/test/keyboard-a11y.test.ts` ([NEW-FILE:#W18-01]) 11 用例 + W8-T2 a11y 13 regression 全过。
+- W18-T3 真 spawn 端到端验证：真 spawn electron + main.js + 4 BrowserWindow + bridge listen 1455+ + demo sequence 触发；修 1 bug：`bridge/types.js` 跨包 ESM 解析 → 内联协议常量 + 子包 `type:commonjs`。
+- W18-T4 `/buddy stats` 可视化：进度条 unicode 8 级精细 + XP/min 速率 + 🔥 streak；`/buddy stats history` 30 天 XP bar chart（asciichart 已有依赖）；`/buddy leaderboard` 占位（不接网络）；51 buddy 测试 pass。
+- bun test 全量 1500+ pass / **0 fail**；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `3f9add2`。
+
+## v2.25.26 — 2026-04-20 · 波 17 全 4/4（Linux unpacked + APNG 嵌入 + demo 深化 + 基准 0 回归）
+- W17-T1 Linux build：`bunx electron-builder --linux AppImage` 部分成功；`linux-unpacked/` 327MB 出（含 electron 41 + panda-on-desk）；AppImage 封装阶段需 Linux runner（mksquashfs ELF）— 失败原因记录；待 GitHub Actions Linux job 完成。
+- W17-T2 README APNG 嵌入：主仓 README 7 状态对比表换 APNG（160px GitHub 自动播放）；副标题“实时 demo（APNG · GitHub 自动播放）”；hero PNG 保留（打印友好回退）；子包 README 加 APNG 章节 7 格 markdown table；STATUS.md §3.4 7 APNG 清单（总 508KB）。
+- W17-T3 demo 深化：demo 总时长压缩到 ~20s（从 30+s）；引导字幕（bottom overlay）+ progress bar（顶部细线 0% → 100%）+ skip 按钮 + fade in/out 0.3s；LevelUp 烟花更精彩 + 物种切换 fade；Welcome overlay 加 `/buddy desk` 跳转按钮；24 用例 pass。
+- W17-T4 性能基准重跑：7 旧 baseline + 3 新基准（demo / tray rebuild / APNG 加载）；10/10 全过 / 0 真实 regression（3 项 OS-noise 抖动在阈值内）；hot path 0 diff。
+- bun test 全量 0 fail；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `95564bf` / `4420499`。
+
+## v2.25.25 — 2026-04-20 · 波 16 全 4/4（APNG + /buddy desk + settings 真读写 + 真 Win NSIS .exe 100MB）
+- 重大里程碑：本地真 build 出 panda-on-desk Setup 0.1.0-alpha.exe (100.25MB)。
+- W16-T1 APNG 真动图：`packages/panda-on-desk/scripts/build-apng.cjs` ([NEW-FILE:#W16-01])；7 APNG 文件（48-95 KB / 总 500KB）：`panda-{idle,thinking,working,sleeping,error,attention,notification}.apng`；README 嵌入（GitHub markdown 渲染 PNG 自动播放）；29 用例 pass。
+- W16-T2 `/buddy desk` 子命令：显示桌面端状态（pid/port/uptime/version/electron/stats）；`start/stop/restart/logs` 5 子命令；`packages/panda-on-desk/src/bridge/server.ts` `/health` 端点详细化；14 用例 pass / 全量 buddy 37 pass。
+- W16-T3 settings 面板真读写：`settings.html` 简化为 5 控件（companionOnDesk / 物种 18 / DND 时段 / 通知音量 0-100 / 开机自启）；`preload/settings.ts` contextBridge `pandaSettings.load/save`；`main.ts` `ipcMain.handle settings:load/save`；物种改 → broadcast `hitWin __pandaSetSpecies`；DND 改 → 接 `dnd/state.ts`；12 用例 pass。
+- W16-T4 真 Win NSIS .exe 安装包：`bunx electron-builder --win nsis x64` 真出包 → `packages/panda-on-desk/dist-electron/panda-on-desk Setup 0.1.0-alpha.exe (100.25MB)`；含 electron 41 runtime + 真 panda-on-desk 主程序。
+- anthropic byte-equal 0 触碰；0 新依赖。
+- commit `834dd9c`。
+
+## v2.25.24 — 2026-04-20 · 🎉 波 15 全 4/4（全量 0 fail 里程碑 — 自 v2.18 以来首次）
+- 重大里程碑：全量 1473 pass / **0 fail**（本项目自 v2.18 以来首次）。
+- W15-T1 hit.html 鼠标交互真 hook：`-webkit-app-region drag` + SVG no-drag 嵌套解决拖拽/点击冲突；双击 poke (scale + 心形粒子)；4 击 flail (rotate ±15° × 3)；长按 1s showStats (卡片 1.5s 自动隐藏)；34 用例 pass。
+- W15-T2 预存 fail 扫尾：最后 2 fail 诊断为端口 race（e2e-real-process 固定 17_900 冲突）；改用 18_000 基础端口 + regression test；`packages/panda-on-desk/test/port-probe-regression.test.ts` ([NEW-FILE:#W15-T2-01]) 4 用例；全量 1473 pass / **0 fail** ✅。
+- W15-T3 CHANGELOG + badges：CHANGELOG.md +8 版本 (v2.25.16 → v2.25.23)；README 3 badges (release desk-v1.0.1 / version v2.25.23 / tests 2 fail → 0 fail)；STATUS.md 同步 35 版本 + 14 波交付列表。
+- W15-T4 Mac 启动 dry-run：`packages/panda-on-desk/test/mac-bootstrap-e2e.test.ts` ([NEW-FILE:#W15-01])；14 节点全链路 mock；18 用例 pass / 发现 0 新 bug；4 P0 反向锁死。
+- bun test 全量 1473 pass / **0 fail** / 6327 expect；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `febb4be`。
 
 ## v2.25.23 — 2026-04-20 · 波 14 收尾（tray 真实装 6 items + 首次启动 demo 模式）
 - W14-T3 tray 6 菜单真实装（companionOnDesk / species / dnd / volume / autoLaunch / quit）接入 settings.lazy + i18n 三语；W14-T4 首次启动 demo 模式（新用户引导 3 步，`~/.pandacc/desk-prefs.json` `demoSeen:false` → true 持久化），`trayShowDemo` i18n 三语（zh/en/ko）补齐。
