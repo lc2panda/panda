@@ -1,0 +1,66 @@
+# Input:  push to main on docs/* / *.md / packages/panda-on-desk/docs/**
+# Output: GitHub Pages 站点（panda-on-desk docs · Jekyll 渲染）部署到 https://lc2panda.github.io/panda/
+# Pos:    .github/workflows/ 第 4 个 workflow（与 ci.yml / ci-bench.yml / release-panda-on-desk.yml 平级）
+#         [NEW-FILE:#W10-04] · 2026-04-20 +08:00 W10-T4 docs 站点 GitHub Pages 自动部署
+#         站点内容源：packages/panda-on-desk/docs/（Jekyll source）
+#         一旦切换站点路径或 Jekyll → 静态切换，请同步本文件 + index.md + _config.yml
+
+name: docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/panda-on-desk/docs/**"
+      - "packages/panda-on-desk/README.md"
+      - "packages/panda-on-desk/ARCHITECTURE.md"
+      - "packages/panda-on-desk/CONTRIBUTING.md"
+      - "packages/panda-on-desk/PRIVACY.md"
+      - "README.md"
+      - "CHANGELOG.md"
+      - ".github/workflows/docs.yml"
+  # 允许在 GitHub Actions UI 手动触发
+  workflow_dispatch:
+
+# 仅授予 Pages 部署所需最小权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 串行队列：避免并发部署冲突
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./packages/panda-on-desk/docs
+          destination: ./_site
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

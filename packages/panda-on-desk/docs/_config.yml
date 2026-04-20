@@ -1,0 +1,33 @@
+# Input:  panda-on-desk docs site Jekyll 配置
+# Output: GitHub Pages（jekyll-build-pages）渲染站点元数据
+# Pos:    panda-on-desk docs/ 站根 — 仅 GitHub Pages CI 消费
+#         [NEW-FILE:#W10-04] · 2026-04-20 +08:00 W10-T4
+#         任何主题 / 站点元数据变更需同步 .github/workflows/docs.yml
+
+title: panda-on-desk · 文档站
+description: panda-on-desk 桌面宠物子产品 · 文档总入口（README · CHANGELOG · CONTRIBUTING · ARCHITECTURE · PRIVACY · FAQ）
+url: https://lc2panda.github.io
+baseurl: /panda
+theme: jekyll-theme-minimal
+lang: zh-CN
+
+# 安全：禁用 plugins / future / unpublished（与 GitHub Pages safe mode 一致）
+safe: true
+incremental: false
+
+# 排除非站点文件
+exclude:
+  - README.md
+  - INSTALL_TEST.md
+  - "*.gemspec"
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - node_modules
+
+# 默认 layout
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default

@@ -1,10 +1,12 @@
 // Input: bun test 触发；读取 build/screenshots/ 9 PNG + scripts/build-screenshots.cjs 模块
-// Output: 验证 W6-T1 程序化截图生成 — 9 PNG 就绪 + 文件尺寸合理 + 脚本可执行 + README 嵌入存在
-// Pos: panda-on-desk W6-T1 README 视觉化回归用例
+// Output: 验证 W6-T1 / W10-T2 程序化截图生成 — 9 PNG 就绪 + 文件尺寸合理 + 脚本可执行 + README 嵌入存在
+//          + W10-T2 视觉升级特征（状态文字标注 / hero state strip / demo Lv 角标）
+// Pos: panda-on-desk W6-T1 README 视觉化回归用例 + W10-T2 视觉升级回归
 //
 // [NEW-FILE:#W6-03]
 // 触发原因：W6-T1 用 sharp 程序化生成 panda 桌面宠物截图（7 状态 + hero + demo），
 //   嵌入主仓 README 与子包 README。需自动化用例锁定生成契约 + README 链接，防回归。
+// W10-T2 升级：加 SVG 视觉特征断言（THINKING 文字标注 / 状态 accent / Lv banner）
 // 不可在 art-quality.test.ts 扩展：那里只验 hit.html 源 + sprite SVG；本套验"截图工件 + 脚本契约"。
 // 证据：
 //   - sharp PNG 输出规范：https://sharp.pixelplumbing.com/api-output#png
@@ -85,6 +87,45 @@ describe('panda-on-desk · W6-T1 截图工件 screenshots', () => {
       // watermark
       expect(demo).toContain('github.com/lc2panda/panda-code')
     })
+
+    // W10-T2 视觉升级专项：状态文字标注 + Lv banner + state strip
+    it('W10-T2 视觉升级：每状态 SVG 含大写状态名标注（如 THINKING / WORKING）', () => {
+      const mod = require(SCRIPT_PATH)
+      // STATE_DECO 表导出的 display 字段必须出现在对应 SVG 中
+      for (const st of STATES_7) {
+        const svg = mod.buildStateSvg(st)
+        const display = (mod.STATE_DECO[st] && mod.STATE_DECO[st].display) || st.toUpperCase()
+        expect(svg).toContain(display)
+      }
+    })
+
+    it('W10-T2 视觉升级：hero SVG 含 7 状态条带 + Lv banner + 双窗口', () => {
+      const mod = require(SCRIPT_PATH)
+      const hero = mod.buildHeroSvg()
+      // 状态条带：所有 7 状态 display 名都出现
+      for (const st of STATES_7) {
+        const display = (mod.STATE_DECO[st] && mod.STATE_DECO[st].display) || st.toUpperCase()
+        expect(hero).toContain(display)
+      }
+      // Lv 12 等级 banner（与终端文本同步）
+      expect(hero).toContain('Lv 12')
+      // 双窗口：终端 (zsh) + editor (auth.ts)
+      expect(hero).toContain('zsh')
+      expect(hero).toContain('auth.ts')
+      // 桌面背景层（点阵 pattern）
+      expect(hero).toContain('bgDots')
+    })
+
+    it('W10-T2 视觉升级：demo SVG 含 panda + 状态 badge (THINKING) + Lv 角标', () => {
+      const mod = require(SCRIPT_PATH)
+      const demo = mod.buildDemoSvg()
+      // panda 形象 fragment（白头核心圆）
+      expect(demo).toContain('cx="100" cy="105"')
+      // 状态 badge 文字
+      expect(demo).toContain('THINKING')
+      // Lv 12 角标
+      expect(demo).toContain('Lv 12')
+    })
   })
 
   describe('9 PNG 工件就绪 + PNG 签名合法 + 尺寸合理', () => {
@@ -111,7 +152,7 @@ describe('panda-on-desk · W6-T1 截图工件 screenshots', () => {
       expect(badSig).toEqual([])
     })
 
-    it('7 状态 PNG 单张 5–50 KB；hero/demo 单张 5–100 KB（避免空文件 / 仓库膨胀）', () => {
+    it('7 状态 PNG 单张 5–50 KB；hero ≤ 160 KB；demo ≤ 80 KB（避免空文件 / 仓库膨胀）', () => {
       const oversized: string[] = []
       const undersized: string[] = []
       // 7 状态 sprite — 严格 5–50 KB
@@ -121,13 +162,16 @@ describe('panda-on-desk · W6-T1 截图工件 screenshots', () => {
         if (sz < 5 * 1024) undersized.push(`${st}: ${sz}B`)
         if (sz > 50 * 1024) oversized.push(`${st}: ${sz}B`)
       }
-      // hero / demo — 容差到 100 KB（hero 1200×600 含较多文本与图层）
-      for (const big of ['panda-hero-1200x600.png', 'panda-demo-600x400.png']) {
-        const p = path.join(SCREENSHOTS_DIR, big)
-        const sz = fs.statSync(p).size
-        if (sz < 5 * 1024) undersized.push(`${big}: ${sz}B`)
-        if (sz > 100 * 1024) oversized.push(`${big}: ${sz}B`)
-      }
+      // W10-T2 视觉升级后：hero 1200×600 含双窗口 / 状态条带 / 语法高亮，扩到 160 KB
+      const heroPath = path.join(SCREENSHOTS_DIR, 'panda-hero-1200x600.png')
+      const heroSz = fs.statSync(heroPath).size
+      if (heroSz < 5 * 1024) undersized.push(`hero: ${heroSz}B`)
+      if (heroSz > 160 * 1024) oversized.push(`hero: ${heroSz}B`)
+      // demo 600×400 含 panda + Lv 角标 + state badge，扩到 80 KB
+      const demoPath = path.join(SCREENSHOTS_DIR, 'panda-demo-600x400.png')
+      const demoSz = fs.statSync(demoPath).size
+      if (demoSz < 5 * 1024) undersized.push(`demo: ${demoSz}B`)
+      if (demoSz > 80 * 1024) oversized.push(`demo: ${demoSz}B`)
       expect(undersized).toEqual([])
       expect(oversized).toEqual([])
     })

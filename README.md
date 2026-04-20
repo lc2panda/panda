@@ -2,6 +2,8 @@
 
 > 懂你所有数据的 AI 伙伴 | 编码 · 助理 · 感知 · 生活
 
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![release](https://img.shields.io/badge/release-desk--v1.0.0-brightgreen)](https://github.com/lc2panda/panda/releases) [![telemetry](https://img.shields.io/badge/telemetry-0-brightgreen)](./packages/panda-on-desk/PRIVACY.md)
+
 ```
  ██████╗   █████╗  ███╗   ██╗ ██████╗   █████╗
  ██╔══██╗ ██╔══██╗ ████╗  ██║ ██╔══██╗ ██╔══██╗
