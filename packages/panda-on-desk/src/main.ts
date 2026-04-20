@@ -1392,6 +1392,57 @@ ipcMain.on('panda:settings:close', () => {
   if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.close()
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// W18-T2（2026-04-20 +08:00）：键盘 a11y 深化 — hit.html 全局热键后端
+//   · panda:kb:cycle-species → 按 species 白名单顺序切换下一个（循环）
+//   · panda:kb:toggle-mute  → notificationVolume 0 ↔ 上次非 0 值（默认回 60）
+//   · panda:kb:hide-hit     → 隐藏 hitWin（WCAG 2.1.2 No Keyboard Trap）
+// 复用 _saveDeskPrefsWithSideEffects，避免逻辑漂移。
+// ─────────────────────────────────────────────────────────────────────────────
+let _lastNonZeroVolume = 60
+ipcMain.handle('panda:kb:cycle-species', () => {
+  try {
+    if (!deskPrefsMod || typeof deskPrefsMod.loadDeskPrefs !== 'function') {
+      return { status: 'error', message: 'desk-prefs module not loaded' }
+    }
+    const cur = deskPrefsMod.loadDeskPrefs()
+    const list = Array.isArray(deskPrefsMod.PANDA_SPECIES_WHITELIST)
+      ? [...deskPrefsMod.PANDA_SPECIES_WHITELIST]
+      : ['default']
+    const curSpecies = (cur && typeof cur.species === 'string') ? cur.species : 'default'
+    const idx = list.indexOf(curSpecies)
+    const nextIdx = (idx === -1) ? 0 : (idx + 1) % list.length
+    const next = list[nextIdx] || 'default'
+    return _saveDeskPrefsWithSideEffects({ species: next })
+  } catch (err) {
+    return { status: 'error', message: (err as Error)?.message }
+  }
+})
+ipcMain.handle('panda:kb:toggle-mute', () => {
+  try {
+    if (!deskPrefsMod || typeof deskPrefsMod.loadDeskPrefs !== 'function') {
+      return { status: 'error', message: 'desk-prefs module not loaded' }
+    }
+    const cur = deskPrefsMod.loadDeskPrefs()
+    const curVol = (cur && typeof cur.notificationVolume === 'number') ? cur.notificationVolume : 60
+    if (curVol > 0) {
+      _lastNonZeroVolume = curVol
+      return _saveDeskPrefsWithSideEffects({ notificationVolume: 0 })
+    }
+    const restore = _lastNonZeroVolume > 0 ? _lastNonZeroVolume : 60
+    return _saveDeskPrefsWithSideEffects({ notificationVolume: restore })
+  } catch (err) {
+    return { status: 'error', message: (err as Error)?.message }
+  }
+})
+ipcMain.on('panda:kb:hide-hit', () => {
+  try {
+    if (hitWin && !hitWin.isDestroyed() && hitWin.isVisible()) hitWin.hide()
+  } catch (err) {
+    console.warn('[panda-on-desk] panda:kb:hide-hit failed:', (err as Error).message)
+  }
+})
+
 // ── First-run hydrate openAtLogin from system → prefs ──
 function hydrateSystemBackedSettings() {
   if (_settingsController.get('openAtLoginHydrated')) return

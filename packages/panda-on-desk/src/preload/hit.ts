@@ -145,3 +145,17 @@ contextBridge.exposeInMainWorld('pandaXP', {
 contextBridge.exposeInMainWorld('pandaLevelUp', {
   onTrigger: makeChannelSubscriber('panda:level-up', 'pandaLevelUp.onTrigger'),
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W18-T2（2026-04-20 +08:00）：键盘 a11y 桥接 — 3 invoke + 1 send
+//   · cycleSpecies() → 'panda:kb:cycle-species' (按 WHITELIST 循环切)
+//   · toggleMute()   → 'panda:kb:toggle-mute'  (notificationVolume 0 ↔ last)
+//   · hideHit()      → 'panda:kb:hide-hit'     (hitWin.hide)
+// Ctrl+Shift+P / Ctrl+Shift+M / ESC 全由 hit.html inline keydown 监听触发。
+// 严守 byte-equal — 不动 src/services/*；零新依赖。
+// ─────────────────────────────────────────────────────────────────────────────
+contextBridge.exposeInMainWorld('pandaKb', {
+  cycleSpecies: (): Promise<any> => ipcRenderer.invoke('panda:kb:cycle-species'),
+  toggleMute: (): Promise<any> => ipcRenderer.invoke('panda:kb:toggle-mute'),
+  hideHit: (): void => ipcRenderer.send('panda:kb:hide-hit'),
+})

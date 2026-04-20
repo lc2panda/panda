@@ -532,6 +532,46 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
         } catch {}
       }
     });
+
+    // W18-T2 a11y：Arrow Up/Down 在控件间切焦点 + Enter 触发主交互（按钮/switch）
+    // why：WCAG 2.1.1 Keyboard — 所有功能键盘可达；同类 switch/input 方向键快速切换。
+    //      Tab 原生顺序仍保留（form 内 tabIndex=0 的 switch + 原生 select/input/range 全参与）。
+    //      Enter 在 switch/button 上触发（Space 由 existing bindSwitch 处理）；Form 无 submit。
+    function _collectFocusableW18Settings() {
+      const sel = [
+        '#sw-companionOnDesk',
+        '#sel-species',
+        '#time-dndStart',
+        '#time-dndEnd',
+        '#rng-notificationVolume',
+        '#sw-autoLaunch',
+        '#sel-language',
+      ];
+      const list = [];
+      for (const q of sel) {
+        const el = document.querySelector(q);
+        if (el) list.push(el);
+      }
+      return list;
+    }
+    document.addEventListener('keydown', (e) => {
+      // Tab 原生行为交给浏览器（WCAG 2.4.3 Focus Order — 让浏览器按 DOM 序）
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      const active = document.activeElement;
+      // select/time/range 原生方向键是值变更 — 不拦截
+      if (active && (active.tagName === 'SELECT' || active.tagName === 'INPUT')) return;
+      const focusable = _collectFocusableW18Settings();
+      if (focusable.length === 0) return;
+      const idx = focusable.indexOf(active);
+      e.preventDefault();
+      let next;
+      if (e.key === 'ArrowDown') {
+        next = (idx === -1) ? 0 : (idx + 1) % focusable.length;
+      } else {
+        next = (idx === -1) ? focusable.length - 1 : (idx - 1 + focusable.length) % focusable.length;
+      }
+      try { focusable[next].focus(); } catch {}
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);

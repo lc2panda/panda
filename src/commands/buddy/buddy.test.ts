@@ -90,13 +90,14 @@ async function runBuddy(args: string): Promise<{
 
 // ─── argumentHint 守护 ───────────────────────────────────────────────────────
 
-describe('argumentHint 同步 12 子命令（D4 9 + Phase 0 P0-T5 +2 + W16-T2 +1）', () => {
-  test('argumentHint 含全部 12 子命令', async () => {
+describe('argumentHint 同步 13 子命令（D4 9 + Phase 0 P0-T5 +2 + W16-T2 +1 + W18-T4 +1）', () => {
+  test('argumentHint 含全部 13 子命令（W18-T4 追加 leaderboard）', async () => {
     const mod = await import('./index.js?hint=1')
     const cmd = mod.default
-    // why D4 9 + Phase 0 P0-T5 + W16-T2：旧 9 byte-equal 在前；stats / milestones / desk 追加在末尾
+    // why D4 9 + Phase 0 P0-T5 + W16-T2 + W18-T4：旧 9 byte-equal 在前；
+    //   stats / milestones / desk / leaderboard 追加在末尾
     expect(cmd.argumentHint).toBe(
-      '[show|hide|mute|unmute|info|state|wake|sleep|theme|stats|milestones|desk]',
+      '[show|hide|mute|unmute|info|state|wake|sleep|theme|stats|milestones|desk|leaderboard]',
     )
   })
 })
@@ -510,6 +511,226 @@ describe('formatUptime（W16-T2 纯函数）', () => {
     expect(mod.formatUptime(2 * 3_600_000 + 14 * 60_000 + 6_000)).toBe(
       '2h 14m 06s',
     )
+  })
+})
+
+// ─── W18-T4：stats 可视化升级 + history + leaderboard ───────────────────────
+
+describe('/buddy stats 可视化升级（W18-T4）', () => {
+  beforeEach(() => {
+    // mock petXP / petStats 纯函数 — 不走真实磁盘
+    mock.module('../../buddy/petXP.js', () => ({
+      getCurrentLevel: () => 13,
+      getCurrentXP: () => ({
+        total: 4800,
+        today: 320,
+        toNextLevel: 200,
+        pctToNext: 69,
+      }),
+      getEffectiveRarity: () => 'rare',
+      getUnlockedStates: () => ['idle', 'sleeping', 'dozing'],
+      getCompletedMilestones: () => ['streak_7', 'first_fix_bug'],
+      getShinyEarned: () => false,
+    }))
+    mock.module('../../buddy/petStats.js', () => ({
+      loadStats: () => ({
+        version: 1,
+        createdAt: Date.now() - 15 * 86_400_000,
+        lastUpdatedAt: Date.now(),
+        xp: {
+          total: 4800,
+          today: 320,
+          todayResetAt: Date.now(),
+          overflow: 0,
+          byBucket: {},
+        },
+        level: 13,
+        unlocks: { states: [], hats: [], eyes: [] },
+        stats: {},
+        milestones: {},
+        streak: { current: 7, lastSeenDay: '2026-04-20' },
+        // 构造 15 天历史 XP events — 让 renderDailyBars 有数据
+        history: Array.from({ length: 15 }, (_, i) => ({
+          ts: Date.now() - i * 86_400_000,
+          event: 'level_up' as const,
+          from: 12,
+          to: 13,
+          xp: 100 + i * 20,
+        })),
+        hmac: 'fake',
+      }),
+    }))
+  })
+
+  test('/buddy stats 含 8 级 unicode 精细进度条字符（█ 或 ▏..▉）', async () => {
+    configState.companion = { species: 'panda', rarity: 'rare' }
+    const { result, display } = await runBuddy('stats')
+    expect(display).toBe('system')
+    // why: 精细进度条用 U+2588 █（全块）或 U+258F..U+2589（1/8..7/8 块）
+    //   pct=69 → 10 格 × 80 eighths × 0.69 ≈ 55 eighths → 6 full + 7/8 remainder
+    //   确保出现 █ 且不再出现旧 ▓ 字符
+    expect(result).toContain('█')
+    expect(result).not.toContain('▓')
+  })
+
+  test('/buddy stats 含 XP/min 速率（"XP/min last 24h"）', async () => {
+    configState.companion = { species: 'panda', rarity: 'rare' }
+    const { result } = await runBuddy('stats')
+    expect(result).toContain('XP/min last 24h')
+    // 数值行格式：Today:    320 XP  (~N.N XP/min last 24h)
+    expect(result).toMatch(/~\d+(\.\d+)? XP\/min last 24h/)
+  })
+
+  test('/buddy stats 含 streak 🔥 可视化（7 days）', async () => {
+    configState.companion = { species: 'panda', rarity: 'rare' }
+    const { result } = await runBuddy('stats')
+    // 7 streak → 7 个 🔥
+    expect(result).toContain('🔥🔥🔥🔥🔥🔥🔥')
+    expect(result).toContain('7 days')
+    expect(result).toContain('Streak:')
+  })
+
+  test('/buddy stats history — 输出 30 天 bar chart', async () => {
+    configState.companion = { species: 'panda', rarity: 'rare' }
+    const { result, display } = await runBuddy('stats history')
+    expect(display).toBe('system')
+    expect(result).toContain('Companion XP · 最近 30 天')
+    // bar chart 至少有一个纵向块字符（▁..█）
+    expect(result).toMatch(/[▁▂▃▄▅▆▇█]/)
+    expect(result).toContain('total XP')
+    // 含"今日 Lv/XP"总结行
+    expect(result).toContain('Today:')
+  })
+
+  test('/buddy stats history — 含 upgrade 时间线（Recent level-ups）', async () => {
+    configState.companion = { species: 'panda', rarity: 'rare' }
+    const { result } = await runBuddy('stats history')
+    // history mock 含 level_up events → 应渲染 "Recent level-ups:" + "← upgrade"
+    expect(result).toContain('Recent level-ups:')
+    expect(result).toContain('← upgrade')
+  })
+
+  test('/buddy stats <unknown> → Usage 提示', async () => {
+    const { result, display } = await runBuddy('stats nonsense')
+    expect(display).toBe('system')
+    expect(result).toContain('Usage: /buddy stats')
+    expect(result).toContain('history')
+  })
+})
+
+describe('/buddy leaderboard（W18-T4 占位）', () => {
+  beforeEach(() => {
+    mock.module('../../buddy/petXP.js', () => ({
+      getCurrentLevel: () => 13,
+      getCurrentXP: () => ({
+        total: 4800,
+        today: 320,
+        toNextLevel: 200,
+        pctToNext: 69,
+      }),
+    }))
+  })
+
+  test('/buddy leaderboard — 本地输出 You + 建议目标 + 不联网提示', async () => {
+    const { result, display } = await runBuddy('leaderboard')
+    expect(display).toBe('system')
+    // 占位标题
+    expect(result).toContain('Leaderboard')
+    // 自己位置标记
+    expect(result).toContain('→')
+    expect(result).toContain('You')
+    // 建议目标至少含 Suggested / Monthly / Yearly 之一
+    expect(
+      (result ?? '').includes('Suggested next milestone') ||
+        (result ?? '').includes('Monthly goal') ||
+        (result ?? '').includes('Yearly goal'),
+    ).toBe(true)
+    // 强调不联网
+    expect(result).toContain('no network')
+  })
+
+  test('/buddy leaderboard — 不触及 network / config 字段', async () => {
+    const before = JSON.stringify(configState)
+    await runBuddy('leaderboard')
+    // leaderboard 是只读占位；不应写 companionForcedXxx 或任何 config 字段
+    expect(JSON.stringify(configState)).toBe(before)
+  })
+})
+
+// ─── W18-T4：statsViz 纯函数守护 ─────────────────────────────────────────────
+
+describe('statsViz 纯函数（W18-T4）', () => {
+  test('renderFineBar — 0% / 50% / 100% 边界', async () => {
+    const { renderFineBar } = await import('./statsViz.js?viz=1')
+    // 0% → 全 ░
+    expect(renderFineBar(0, 10)).toBe('░░░░░░░░░░')
+    // 100% → 全 █
+    expect(renderFineBar(100, 10)).toBe('██████████')
+    // 50% → 半块精度（5 × 8 = 40 eighths = 5 full blocks）
+    const half = renderFineBar(50, 10)
+    expect(half.length).toBe(10)
+    expect(half).toContain('█')
+  })
+
+  test('renderFineBar — 1/8 精度（精细 block）', async () => {
+    const { renderFineBar } = await import('./statsViz.js?viz=2')
+    // pct=65 width=10 → 65% × 80 eighths = 52 → 6 full + 4/8 = ▌
+    const bar = renderFineBar(65, 10)
+    // 必出现 1 个中间 1/8 块字符（▏▎▍▌▋▊▉ 之一）
+    expect(bar).toMatch(/[▏▎▍▌▋▊▉]/)
+  })
+
+  test('renderStreakFire — 边界行为', async () => {
+    const { renderStreakFire } = await import('./statsViz.js?viz=3')
+    expect(renderStreakFire(0)).toBe('(no streak yet)')
+    expect(renderStreakFire(1)).toBe('🔥 1 day')
+    expect(renderStreakFire(7)).toContain('🔥🔥🔥🔥🔥🔥🔥')
+    expect(renderStreakFire(7)).toContain('7 days')
+    // > 7 → 截断 + "+N"
+    const long = renderStreakFire(12)
+    expect(long).toContain('+5')
+    expect(long).toContain('12 days')
+  })
+
+  test('renderDailyBars — 全 0 → 全最低块；混合 → 归一化', async () => {
+    const { renderDailyBars } = await import('./statsViz.js?viz=4')
+    expect(renderDailyBars([0, 0, 0])).toBe('▁▁▁')
+    // max=100 → 100 映射到 █；0 映射到 ▁；中间 50 映射到中部
+    const bars = renderDailyBars([0, 50, 100])
+    expect(bars.length).toBe(3)
+    expect(bars[bars.length - 1]).toBe('█')
+    expect(bars[0]).toBe('▁')
+  })
+
+  test('buildLocalLeaderboard — 包含 You + 递进目标', async () => {
+    const { buildLocalLeaderboard } = await import('./statsViz.js?viz=5')
+    const rows = buildLocalLeaderboard(13, 4800, lv => lv * 1000, 60)
+    expect(rows.length).toBeGreaterThanOrEqual(2)
+    expect(rows.find(r => r.you)?.level).toBe(13)
+    // 含"Monthly goal"或更高目标
+    expect(rows.some(r => r.label === 'Monthly goal')).toBe(true)
+    expect(rows.some(r => r.label === 'Yearly goal (max level)')).toBe(true)
+  })
+
+  test('aggregateDailyXp — history 事件按 +08:00 日历桶归集', async () => {
+    const { aggregateDailyXp } = await import('./statsViz.js?viz=6')
+    // 固定 now 为 SG 时区 2026-04-20 12:00:00 +08:00 = UTC 2026-04-20 04:00:00
+    // why 固定：避免 CI 跑在 UTC 时 "now=凌晨5点 UTC" 恰好在 SG 日历日边界左右
+    const now = Date.UTC(2026, 3, 20, 4, 0, 0) // Apr 20 04:00 UTC = Apr 20 12:00 +08:00
+    const hist = [
+      { ts: now, event: 'milestone' as const, xp: 100 },
+      { ts: now - 86_400_000, event: 'milestone' as const, xp: 50 },
+      { ts: now - 29 * 86_400_000, event: 'milestone' as const, xp: 10 },
+      { ts: now - 99 * 86_400_000, event: 'milestone' as const, xp: 999 }, // 超窗丢弃
+    ]
+    const out = aggregateDailyXp(hist, 30, now)
+    expect(out.length).toBe(30)
+    // 最后一个桶 = 今天 = 100（now 在 SG 中午）
+    expect(out[29]).toBe(100)
+    // 倒数第二桶 = 昨天 = 50
+    expect(out[28]).toBe(50)
+    // 超窗事件不计入
+    expect(out.reduce((a, b) => a + b, 0)).toBeLessThan(999)
   })
 })
 

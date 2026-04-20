@@ -820,6 +820,55 @@
         console.warn('[panda-on-desk:hit] a11y keyboard listeners failed:', e && e.message);
       }
 
+      // ── W18-T2 a11y：全局热键 — Ctrl+Shift+P 切 species / Ctrl+Shift+M toggle mute / ESC 隐藏 hit 窗 ──
+      // why：WCAG 2.1.1 Keyboard + 2.1.2 No Keyboard Trap — 不用鼠标的用户完整可达。
+      //      Ctrl+Shift+P / M 与浏览器默认快捷键无冲突（Electron 透明窗无 menu bar）。
+      //      ESC 走 pandaKb.hideHit 委托 main 进程调 hitWin.hide()，比 window.close() 更安全
+      //      （避免销毁窗口引起 preload 重建成本）。
+      function onGlobalHotkeyW18(e) {
+        // ESC — 隐藏 hit 窗（与 bubble.html ESC 等价 Deny 对齐：ESC = 退出动作）
+        if (e.key === 'Escape' && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+          e.preventDefault();
+          try {
+            if (window.pandaKb && typeof window.pandaKb.hideHit === 'function') {
+              window.pandaKb.hideHit();
+            }
+          } catch (err) {
+            console.warn('[panda-on-desk:hit] hideHit failed:', err && err.message);
+          }
+          return;
+        }
+        // Ctrl+Shift+P — 循环切下一个 species（desk-prefs.species + typed channel 广播回本窗）
+        if (e.ctrlKey && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+          e.preventDefault();
+          try {
+            if (window.pandaKb && typeof window.pandaKb.cycleSpecies === 'function') {
+              window.pandaKb.cycleSpecies();
+            }
+          } catch (err) {
+            console.warn('[panda-on-desk:hit] cycleSpecies failed:', err && err.message);
+          }
+          return;
+        }
+        // Ctrl+Shift+M — toggle mute（notificationVolume 0 ↔ 上次非 0 值）
+        if (e.ctrlKey && e.shiftKey && (e.key === 'M' || e.key === 'm')) {
+          e.preventDefault();
+          try {
+            if (window.pandaKb && typeof window.pandaKb.toggleMute === 'function') {
+              window.pandaKb.toggleMute();
+            }
+          } catch (err) {
+            console.warn('[panda-on-desk:hit] toggleMute failed:', err && err.message);
+          }
+          return;
+        }
+      }
+      try {
+        window.addEventListener('keydown', onGlobalHotkeyW18);
+      } catch (e) {
+        console.warn('[panda-on-desk:hit] W18 hotkey listener failed:', e && e.message);
+      }
+
       // badge:update IPC 订阅（preload 注入 window.pandaBadge.onUpdate）
       try {
         if (window.pandaBadge && typeof window.pandaBadge.onUpdate === 'function') {

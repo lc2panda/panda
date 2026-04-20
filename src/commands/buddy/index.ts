@@ -1,9 +1,11 @@
-// Input:  /buddy 子命令字符串（show/hide/mute/unmute/info/state/wake/sleep/theme/stats/milestones/desk）+ globalConfig + AppState
+// Input:  /buddy 子命令字符串（show/hide/mute/unmute/info/state/wake/sleep/theme/stats/milestones/desk/leaderboard）+ globalConfig + AppState
 // Output: 单一 LocalJSXCommand — display:'system' 文案；落盘 globalConfig.companion* 字段
-// Pos:    A+B 项目精华 — 12 子命令实装；旧 9 文案 byte-equal 守护见 buddy.test.ts
+// Pos:    A+B 项目精华 — 13 子命令实装；旧 9 文案 byte-equal 守护见 buddy.test.ts
 //         v2.21.30 方向 A：theme 接 18 物种全集 + 旧 panda/redPanda/kungFuPanda alias
 //         Phase 0 P0-T5（agent-γ）：新增 stats / milestones 子命令；info 兼容追加 Level/XP/Unlocks
 //         W16-T2（agent-β）：新增 desk 子命令（status/start/stop/restart/logs）— CLI 可见桌面端连接状态
+//         W18-T4（agent-δ）：stats 升级（8 级精细进度条 + XP/min 速率 + 🔥 streak）
+//             + 新增 stats history（30 天 bar chart）+ leaderboard 占位（本地不联网）
 //         一旦本文件被修改，请同步更新头注释 + src/commands/buddy/README.md
 import { feature } from 'bun:bundle'
 import type { Command, LocalJSXCommandContext, LocalJSXCommandOnDone } from '../../types/command.js'
@@ -33,7 +35,7 @@ const buddy = {
     if (feature('BUDDY')) { return false }
     return true
   },
-  argumentHint: '[show|hide|mute|unmute|info|state|wake|sleep|theme|stats|milestones|desk]',
+  argumentHint: '[show|hide|mute|unmute|info|state|wake|sleep|theme|stats|milestones|desk|leaderboard]',
   immediate: true,
   load: () =>
     Promise.resolve({
@@ -107,7 +109,9 @@ const buddy = {
         // Phase 0 P0-T5：/buddy stats — 全量养成进度面板
         // why 单独子命令：info 保 byte-equal 旧 3 行 + 4 新行；stats 是"展开"视图含进度条 + 里程碑摘要
         // why 不查 feature gate：仅调用 petXP 纯函数，无 React hook；与 info 同源策略
-        if (subcommand === 'stats') {
+        // W18-T4：head=stats 支持带参（stats history）走 statsViz renderDailyBars
+        if (head === 'stats') {
+          const sub = tail.toLowerCase()
           const {
             getCurrentLevel,
             getCurrentXP,
@@ -116,6 +120,7 @@ const buddy = {
             getCompletedMilestones,
             getShinyEarned,
           } = await import('../../buddy/petXP.js')
+          const { loadStats } = await import('../../buddy/petStats.js')
           const {
             MAX_LEVEL,
             MILESTONES,
@@ -126,6 +131,52 @@ const buddy = {
             SHINY_EPIC_MILESTONE_COUNT,
             xpRequiredForLevel,
           } = await import('../../buddy/types.js')
+          const viz = await import('./statsViz.js')
+
+          // ─── /buddy stats history — 30 天 bar chart + 升级点标记 ───────────
+          if (sub === 'history') {
+            const statsRaw = loadStats()
+            const bars = viz.renderDailyBars(
+              viz.aggregateDailyXp(statsRaw.history, 30),
+            )
+            // 提取升级事件 — 附在 bar chart 下方作为时间线
+            const levelUps = statsRaw.history
+              .filter(ev => ev.event === 'level_up')
+              .slice(-5) // 最近 5 次升级
+            const now = Date.now()
+            const xpInfo = getCurrentXP()
+            const lv = getCurrentLevel()
+            const lines = [
+              'Companion XP · 最近 30 天',
+              `  ${bars}  (${statsRaw.xp.total} total XP)`,
+              '',
+            ]
+            if (levelUps.length > 0) {
+              lines.push('Recent level-ups:')
+              for (const ev of levelUps) {
+                const daysAgo = Math.max(
+                  0,
+                  Math.floor((now - ev.ts) / 86_400_000),
+                )
+                const when = daysAgo === 0 ? 'today' : `${daysAgo}d ago`
+                lines.push(`  Lv ${ev.to}  ${when.padStart(8)}  ← upgrade`)
+              }
+              lines.push('')
+            }
+            lines.push(
+              `Today:   Lv ${lv} → ${xpInfo.pctToNext}% to next (${xpInfo.today} XP today)`,
+            )
+            onDone(lines.join('\n'), { display: 'system' })
+            return null
+          }
+
+          // ─── /buddy stats（默认）— 进度面板 ───────────────────────────────
+          if (sub !== '' && sub !== 'stats') {
+            // stats 下未知子命令 — 给 Usage 不阻塞
+            onDone('Usage: /buddy stats [history]', { display: 'system' })
+            return null
+          }
+
           const lv = getCurrentLevel()
           const xpInfo = getCurrentXP()
           const companion = config.companion
@@ -135,16 +186,18 @@ const buddy = {
           const totalStates = Object.keys(PETSTATE_UNLOCK_LEVEL).length
           const completed = getCompletedMilestones()
           const shiny = getShinyEarned()
+          const statsRaw = loadStats()
 
-          // 进度条（10 格 ▓░）
+          // 进度条（W18-T4 升级：8 级精细 unicode block ▏▎▍▌▋▊▉█）
           const required = xpRequiredForLevel(lv)
           const intoLevel = required === Infinity ? 0 : required - xpInfo.toNextLevel
-          const barWidth = 10
-          const filled = Math.max(
-            0,
-            Math.min(barWidth, Math.round((xpInfo.pctToNext / 100) * barWidth)),
-          )
-          const bar = '▓'.repeat(filled) + '░'.repeat(barWidth - filled)
+          const bar = viz.renderFineBar(xpInfo.pctToNext, 10)
+
+          // W18-T4：XP/min 速率（最近 24h 平均）
+          const xpPerMin = viz.computeXpPerMin(statsRaw)
+
+          // W18-T4：streak 🔥 可视化
+          const streakFire = viz.renderStreakFire(statsRaw.streak.current)
 
           // 下一档稀有度跃迁提示
           // why scan thresholds: LEVEL_RARITY_THRESHOLDS 已 frozen，按顺序找首个 lv < threshold
@@ -171,7 +224,8 @@ const buddy = {
             `  XP:       ${intoLevel} / ${required === Infinity ? '∞' : required}  (${xpInfo.pctToNext}%)`,
             `  [${bar}] ${xpInfo.pctToNext}%`,
             `  Total XP: ${xpInfo.total}`,
-            `  Today:    ${xpInfo.today} XP`,
+            `  Today:    ${xpInfo.today} XP  (~${xpPerMin} XP/min last 24h)`,
+            `  Streak:   ${streakFire}`,
             `  Rarity:   ${eff}${nextRarityHint}`,
             `  Shiny:    ${shinyHint}`,
             `  Unlocked: ${states.join(', ')} (${states.length}/${totalStates} states)`,
@@ -226,6 +280,28 @@ const buddy = {
             lines.push(`  ${mark} ${id}  [+${xp} XP]  — ${hint}`)
           }
           onDone(lines.join('\n'), { display: 'system' })
+          return null
+        }
+
+        // W18-T4：/buddy leaderboard — 本地占位（绝不联网/上传）
+        // why local-only：task 明确"不接网络 / 不上传"；展示"You vs 建议目标"定位是激励而非竞争
+        if (subcommand === 'leaderboard') {
+          const { getCurrentLevel, getCurrentXP } = await import(
+            '../../buddy/petXP.js'
+          )
+          const { MAX_LEVEL, totalXpForLevel } = await import(
+            '../../buddy/types.js'
+          )
+          const viz = await import('./statsViz.js')
+          const lv = getCurrentLevel()
+          const xp = getCurrentXP()
+          const rows = viz.buildLocalLeaderboard(
+            lv,
+            xp.total,
+            totalXpForLevel,
+            MAX_LEVEL,
+          )
+          onDone(viz.renderLeaderboard(rows), { display: 'system' })
           return null
         }
 

@@ -988,6 +988,58 @@ document.addEventListener("keydown", (e) => {
     }
   }
 });
+
+// ── W18-T2 a11y：Tab 焦点循环（focus trap）+ Arrow 切换 action ──
+// why: WCAG 2.1.2 No Keyboard Trap — 焦点必须能在 alertdialog 内循环不逸出。
+//      WCAG 2.4.3 Focus Order — 方向键遍历同语义按钮组（Allow/Deny/Suggestions）。
+// 仅在 alertdialog 可见时生效；隐藏后 noop（观测 card.classList.visible 判定）。
+function _collectFocusableW18() {
+  const pool = [];
+  if (btnAllow && !btnAllow.disabled && btnAllow.style.display !== "none") pool.push(btnAllow);
+  if (btnDeny && !btnDeny.disabled && btnDeny.style.display !== "none") pool.push(btnDeny);
+  for (const btn of suggestionsContainer.children) {
+    if (btn && !btn.disabled) pool.push(btn);
+  }
+  // elicitation inputs（radio/checkbox）也参与 Tab 循环
+  for (const input of elicitationForm.querySelectorAll("input")) {
+    if (input && !input.disabled) pool.push(input);
+  }
+  return pool;
+}
+document.addEventListener("keydown", (e) => {
+  // 仅在 card 可见时处理焦点陷阱
+  if (!card.classList.contains("visible") || card.classList.contains("hiding")) return;
+  const focusable = _collectFocusableW18();
+  if (focusable.length === 0) return;
+  const active = document.activeElement;
+  let idx = focusable.indexOf(active);
+
+  if (e.key === "Tab") {
+    e.preventDefault();
+    if (idx === -1) { focusable[0].focus(); return; }
+    const nextIdx = e.shiftKey
+      ? (idx - 1 + focusable.length) % focusable.length
+      : (idx + 1) % focusable.length;
+    focusable[nextIdx].focus();
+    return;
+  }
+  // Arrow 左右 / 上下 — 等价于 Tab / Shift+Tab（WAI-ARIA 对话框内按钮组模式）
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+    // elicitation 内的 radio/checkbox 走浏览器默认（方向键切同组 radio），不拦截
+    if (active && active.tagName === "INPUT") return;
+    e.preventDefault();
+    if (idx === -1) { focusable[0].focus(); return; }
+    focusable[(idx + 1) % focusable.length].focus();
+    return;
+  }
+  if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+    if (active && active.tagName === "INPUT") return;
+    e.preventDefault();
+    if (idx === -1) { focusable[focusable.length - 1].focus(); return; }
+    focusable[(idx - 1 + focusable.length) % focusable.length].focus();
+    return;
+  }
+});
 </script>
 </body>
 </html>

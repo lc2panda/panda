@@ -4,6 +4,7 @@
   "private": true,
   "description": "panda desktop companion - CLI status perception + pet visualization",
   "author": "lc2panda <imladrisel@gmail.com>",
+  "type": "commonjs",
   "main": "src/main.js",
   "scripts": {
     "start": "node launch.cjs",
