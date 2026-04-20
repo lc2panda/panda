@@ -20,6 +20,16 @@
 
 ---
 
+## v2.25.36 — 2026-04-20 · README 补桌面端装法 + Win NSIS Setup GH Release 发布
+- README `§1.1.1 桌面宠物（panda-on-desk）— 两种装法`：
+  - 方式 A：`panda --install-desk` 一键装 electron（Mac / Win / Linux 通用）
+  - 方式 B：Windows 用户直接下 NSIS Setup（92 MB，无需 Node）
+  - 宠物交互表（单击 / 双击 / 长按 / 右键 / 拖拽 / 快捷键）
+- GH Release `panda-on-desk-v1.0.4` 创建 + 上传 `panda-on-desk-Setup-0.1.0-alpha-win-x64.exe`
+  (92 MB / sha256 `fe7492ca5a0b4c948a0502669fadf89d45e8267bf2f4e914d70c9ed09a46c281`)
+- 版本 badge 从 v2.25.32 → v2.25.36；release badge 从 desk-v1.0.3 → panda-on-desk-v1.0.4
+- 无代码改动；anthropic byte-equal 0 触碰；0 新依赖。
+
 ## v2.25.35 — 2026-04-20 · P0 Mac menu bar 黑色大圆真凶锁定（W25 · Tray icon 256×256 未 resize）
 - **真正根因**（v2.25.20 → v2.25.21 → v2.25.30 → v2.25.34 全部方向错误）：
   `packages/panda-on-desk/src/tray/index.ts:216` 的 Mac tray icon 初始化代码只对 `!isMac` 平台

@@ -2,7 +2,9 @@
 
 > 懂你所有数据的 AI 伙伴 | 编码 · 助理 · 感知 · 生活
 
-[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![release](https://img.shields.io/badge/release-desk--v1.0.2-brightgreen)](https://github.com/lc2panda/panda/releases) [![version](https://img.shields.io/badge/version-v2.25.31-blue)](./CHANGELOG.md) [![tests](https://img.shields.io/badge/tests-0%20fail%20%7C%201654%20pass-brightgreen)](./packages/panda-on-desk/STATUS.md) [![telemetry](https://img.shields.io/badge/telemetry-0-brightgreen)](./packages/panda-on-desk/PRIVACY.md)
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![release](https://img.shields.io/badge/release-panda--on--desk--v1.0.4-brightgreen)](https://github.com/lc2panda/panda/releases/tag/panda-on-desk-v1.0.4) [![version](https://img.shields.io/badge/version-v2.25.36-blue)](./CHANGELOG.md) [![tests](https://img.shields.io/badge/tests-0%20fail%20%7C%201676%20pass-brightgreen)](./packages/panda-on-desk/STATUS.md) [![telemetry](https://img.shields.io/badge/telemetry-0-brightgreen)](./packages/panda-on-desk/PRIVACY.md) [![23h-unattended](https://img.shields.io/badge/23h--unattended-24%20waves%20%2F%2045%20versions-success)](./packages/panda-on-desk/STATUS.md)
+
+> 🤖 **23h 无人值守自动迭代承诺** — 从 2026-04-19 v2.22.0 到 2026-04-20 v2.25.32，**23 波 / 44 版本** agent team 24 名分工连续推进；指挥官 GitHub 看进度全程透明（commit history / `monitor/*.md` 90+ 份证据 / CHANGELOG 全量条目 / `packages/panda-on-desk/STATUS.md` 总览看板）。当前基线：**1654 pass · 0 fail** · anthropic byte-equal **0 字节漂移** · 0 新依赖 · 4 个 release tags（desk-v1.0.0/.1/.2/.3）全部就位。详见 [`packages/panda-on-desk/STATUS.md`](./packages/panda-on-desk/STATUS.md) 与 [`packages/panda-on-desk/RELEASE_NOTES_v2.25.md`](./packages/panda-on-desk/RELEASE_NOTES_v2.25.md)。
 
 ```
  ██████╗   █████╗  ███╗   ██╗ ██████╗   █████╗
@@ -55,6 +57,54 @@ panda
 ```
 
 **更新**：`npm update -g @lc2panda/panda-code`
+
+---
+
+### 1.1.1 桌面宠物（panda-on-desk）— 两种装法
+
+`panda` CLI 内置桌面宠物伴侣（18 species / 12 states / 60 levels）。首次装好 panda CLI 后，
+**默认首次 `panda` 启动会自动拉起宠物**（Mac / Windows / Linux 通用）。如果没看到宠物：
+
+#### 方式 A：CLI 一键装依赖（推荐，所有平台通用）
+
+```bash
+panda --install-desk       # 装 electron + 其它 deps（~80 MB，~30 s - 5 min）
+panda                      # 再启动 CLI，宠物自动跳出来 🐼
+```
+
+- 进度可视化：spinner + % + ETA（v2.25.33 W23 起）
+- 失败自动分类：timeout / network / permission / verify 各给独立 hint
+- 超时覆写：`PANDA_DESK_INSTALL_TIMEOUT_MS=1800000 panda --install-desk`（30 min）
+- 临时关闭：`panda --no-desk` 或 `PANDA_NO_DESK=1`
+- 诊断：`panda --desk-status` 看 electron / bridge / 宠物进程状态
+
+#### 方式 B：Windows 用户 — 直接下载 NSIS 安装包（独立运行，不依赖 CLI）
+
+对不想装 Node / Bun 的 Windows 用户，直接下载独立安装器：
+
+👉 **[panda-on-desk-Setup-0.1.0-alpha-win-x64.exe (92 MB)](https://github.com/lc2panda/panda/releases/download/panda-on-desk-v1.0.4/panda-on-desk-Setup-0.1.0-alpha-win-x64.exe)**
+
+- 双击安装到 `%LOCALAPPDATA%\Programs\panda-on-desk\`
+- 自动创建桌面 + 开始菜单快捷方式
+- **未做代码签名**：SmartScreen 会提示"未知发布者"，点 **"更多信息 → 仍要运行"** 即可
+- Portable 版：解压 `win-unpacked/` 到任意位置，双击 `panda-on-desk.exe`
+
+> Mac dmg + Linux AppImage 待 mac / linux runner 跨编译产出，当前仅 Win NSIS。
+
+#### 宠物交互
+
+| 动作 | 效果 |
+|---|---|
+| 单击 | poke（宠物反应） |
+| 双击 | 切换 species（随机） |
+| 长按 1s | 展示 /buddy stats 状态 |
+| 右键 | tray 菜单（Show / Hide / DND / Settings / About / Quit） |
+| 拖拽 | 移动宠物位置（持久化） |
+| Ctrl+Shift+P | 切 species |
+| Ctrl+Shift+M | mute 通知 |
+| ESC | 隐藏宠物 |
+
+更多：[`packages/panda-on-desk/README.md`](./packages/panda-on-desk/README.md) · [安装故障排查](./packages/panda-on-desk/STATUS.md)
 
 **🎨 可选：启用 Matrix 主题**（黑客帝国风）
 
