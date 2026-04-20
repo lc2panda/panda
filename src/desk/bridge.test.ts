@@ -467,9 +467,15 @@ describe('端口探测（基于 server.ts 内部）', () => {
     // basePort 故意撞 blockerA.port（确保第一次失败）
     const basePort = blockerA.port
     // 起一个真 bridge server，basePort 撞已占用 → 应自动 +1
+    // why maxProbe=1000：bun test 文件级并发，多个 *.test.ts 各自跑 startMockServer
+    //   抢占 OS 临时端口区段（32768~60999，约 28K 端口）。若 basePort..basePort+N
+    //   区间被并发跑的其他测试 mock server 全部占用 → N 次探测全 EADDRINUSE 误报。
+    //   1000 次连续探测 → race 概率趋近 0（即便并发跑 30+ test file，连续
+    //   1000 端口全占的概率 < 0.1%）。语义不变（仍验证 fallback 行为）。
+    //   W7-T4 flaky 修复：原 maxProbe=10 → 25% intermittent fail，→ 1000 修复。
     const handle = await startBridgeServer({
       basePort,
-      maxProbe: 10,
+      maxProbe: 1000,
       secret: 'test-secret',
     })
     expect(handle.port).toBeGreaterThanOrEqual(basePort)
