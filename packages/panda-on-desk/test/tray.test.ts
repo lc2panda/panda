@@ -384,4 +384,157 @@ describe('panda-on-desk W12-T2 Tray (systray 实测)', () => {
     expect(items[4].label).toBe('退出 panda-on-desk')
     handle.destroy()
   })
+
+  // ─── W14-T2 retry · 真实装加固 (≥ 5 新用例) ────────────────────────────────
+  it('W14-T2 retry · setToolTip 调用值为 "panda-on-desk" (托盘悬浮提示真实装)', () => {
+    const ctx = makeFakeCtx()
+    const handle = trayMod.initPandaTray(ctx)
+    expect(lastTrayInstance).not.toBeNull()
+    expect(lastTrayInstance!._toolTip).toBe('panda-on-desk')
+    handle.destroy()
+  })
+
+  it('W14-T2 retry · build/icons/tray-light.png 真存在 + tray-dark.png 真存在 (打包资源校验)', () => {
+    const fs = require('node:fs') as typeof import('node:fs')
+    const iconsDir = path.join(__dirname, '..', 'build', 'icons')
+    expect(fs.existsSync(path.join(iconsDir, 'tray-light.png'))).toBe(true)
+    expect(fs.existsSync(path.join(iconsDir, 'tray-dark.png'))).toBe(true)
+    expect(fs.existsSync(path.join(iconsDir, 'tray-light.svg'))).toBe(true)
+    expect(fs.existsSync(path.join(iconsDir, 'tray-dark.svg'))).toBe(true)
+  })
+
+  it('W14-T2 retry · DND submenu type=radio 互斥；checked 状态由 dnd 决定', () => {
+    const ctx = makeFakeCtx()
+    ctx.getDoNotDisturb = () => false
+    const handle = trayMod.initPandaTray(ctx)
+    const items = lastMenuTemplate!.filter(t => t.type !== 'separator')
+    const submenu = (items[1] as any).submenu as MenuItemTemplate[]
+    const dndItems = submenu.filter(s => s.type !== 'separator')
+    // 全部 5 项都是 radio
+    for (const it of dndItems) expect(it.type).toBe('radio')
+    // dnd=false → Off radio 选中，其余 4 项不选
+    expect(dndItems[0].checked).toBe(true)  // Off
+    expect(dndItems[1].checked).toBe(false) // 15m
+    expect(dndItems[2].checked).toBe(false) // 1h
+    expect(dndItems[3].checked).toBe(false) // 2h
+    expect(dndItems[4].checked).toBe(false) // Forever
+    handle.destroy()
+  })
+
+  it('W14-T2 retry · About 对话框 "Open repo" 按钮 (response=1) 调 shell.openExternal 到 repo 根', async () => {
+    const openCalls: string[] = []
+    let lastButtons: string[] | null = null
+    mock.module('electron', () => {
+      const base = buildElectronMock()
+      base.dialog = {
+        showMessageBox: (opts: any) => {
+          lastButtons = opts.buttons || []
+          return Promise.resolve({ response: 1 })
+        },
+      } as any
+      base.shell = {
+        openExternal: (url: string) => { openCalls.push(url) },
+      } as any
+      return base
+    })
+    const trayModFresh = await import('../src/tray/index.js?w14_repo=' + Date.now())
+    const ctx = makeFakeCtx()
+    const handle = trayModFresh.initPandaTray(ctx)
+    const items = lastMenuTemplate!.filter(t => t.type !== 'separator')
+    items[3].click!()
+    await new Promise(r => setTimeout(r, 5))
+    expect(lastButtons).toEqual(['OK', 'Open repo', 'View LICENSE'])
+    expect(openCalls.length).toBe(1)
+    expect(openCalls[0]).toMatch(/github\.com\/lc2panda\/panda$/)
+    handle.destroy()
+    mock.module('electron', () => buildElectronMock())
+  })
+
+  it('W14-T2 retry · About 对话框 "OK" 按钮 (response=0) 不触发任何 shell.openExternal', async () => {
+    const openCalls: string[] = []
+    mock.module('electron', () => {
+      const base = buildElectronMock()
+      base.dialog = {
+        showMessageBox: (_opts: any) => Promise.resolve({ response: 0 }),
+      } as any
+      base.shell = {
+        openExternal: (url: string) => { openCalls.push(url) },
+      } as any
+      return base
+    })
+    const trayModFresh = await import('../src/tray/index.js?w14_ok=' + Date.now())
+    const ctx = makeFakeCtx()
+    const handle = trayModFresh.initPandaTray(ctx)
+    const items = lastMenuTemplate!.filter(t => t.type !== 'separator')
+    items[3].click!()
+    await new Promise(r => setTimeout(r, 5))
+    expect(openCalls.length).toBe(0)
+    handle.destroy()
+    mock.module('electron', () => buildElectronMock())
+  })
+
+  it('W14-T2 retry · 主题切换为 dark menubar 时 createFromPath 路径切到 tray-light 变体', async () => {
+    const createFromPathCalls: string[] = []
+    mock.module('electron', () => {
+      const base = buildElectronMock()
+      base.nativeImage = {
+        createFromPath: (p: string) => {
+          createFromPathCalls.push(p)
+          return {
+            isEmpty: () => false,
+            resize: (_o: any) => ({
+              isEmpty: () => false,
+              resize: (_x: any) => ({} as any),
+              setTemplateImage: (_v: boolean) => {},
+            }),
+            setTemplateImage: (_v: boolean) => {},
+          } as any
+        },
+        createEmpty: () => ({
+          isEmpty: () => true,
+          resize: (_o: any) => ({} as any),
+          setTemplateImage: (_v: boolean) => {},
+        }),
+      } as any
+      return base
+    })
+    const trayModFresh = await import('../src/tray/index.js?w14_theme=' + Date.now())
+    const ctx = makeFakeCtx()
+    mockIsDark = false
+    const handle = trayModFresh.initPandaTray(ctx)
+    // 初始 light menubar → dark icon 变体
+    const initial = createFromPathCalls.join('|')
+    expect(initial).toMatch(/tray-dark\.(png|svg)/)
+    // 切到 dark menubar
+    mockIsDark = true
+    for (const fn of themeListeners) fn()
+    const after = createFromPathCalls.slice(initial.split('|').length).join('|')
+    expect(after).toMatch(/tray-light\.(png|svg)/)
+    handle.destroy()
+    mock.module('electron', () => buildElectronMock())
+  })
+
+  it('W14-T2 retry · rebuild() 在 dnd 状态变化后同步更新 checkbox/submenu radio', () => {
+    const state = { dnd: false }
+    const ctx = makeFakeCtx({
+      getDoNotDisturb: () => state.dnd,
+    })
+    const handle = trayMod.initPandaTray(ctx)
+    let items = lastMenuTemplate!.filter(t => t.type !== 'separator')
+    expect(items[1].checked).toBe(false)
+    let sub = (items[1] as any).submenu as MenuItemTemplate[]
+    let dndItems = sub.filter(s => s.type !== 'separator')
+    expect(dndItems[0].checked).toBe(true)   // Off radio 初始选中
+    expect(dndItems[4].checked).toBe(false)  // Forever 未选
+    // 模拟 DND 永久开启
+    state.dnd = true
+    handle.rebuild()
+    items = lastMenuTemplate!.filter(t => t.type !== 'separator')
+    expect(items[1].checked).toBe(true)
+    sub = (items[1] as any).submenu as MenuItemTemplate[]
+    dndItems = sub.filter(s => s.type !== 'separator')
+    expect(dndItems[0].checked).toBe(false)  // Off 取消
+    expect(dndItems[4].checked).toBe(true)   // Forever 选中
+    handle.destroy()
+  })
 })
