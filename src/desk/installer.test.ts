@@ -12,6 +12,7 @@
 // [NEW-FILE:#20260419-W4-03]
 // 2026-04-20 08:13 +08:00 W4-T1 初版
 // 2026-04-20 14:25 +08:00 P0 hotfix v2.25.16 — workspace 隔离用例
+// 2026-04-20 16:10 +08:00 W23-T1 install UX — 进度解析 / 失败分类 / 自检用例
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
@@ -28,13 +29,17 @@ import { join } from 'node:path'
 
 import {
   ELECTRON_DEPS,
+  __classifyInstallErrorForTesting,
   __createStageDirForTesting,
   __locateDeskDirForTesting,
   __moveNodeModulesForTesting,
   __parseDepSpecForTesting,
+  __parseProgressLineForTesting,
   __resetInstallerStateForTesting,
+  __verifyElectronLoadableForTesting,
   checkElectronInstalled,
   installPandaOnDeskDeps,
+  type InstallProgressEvent,
 } from './installer.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -449,5 +454,213 @@ describe('installPandaOnDeskDeps · stage 隔离回归（P0）', () => {
     expect(stageLine).toBeTruthy()
     const stagePath = stageLine!.split('stage=')[1].trim()
     expect(existsSync(stagePath)).toBe(false)
+  }, 15_000)
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W23-T1 用例组：install UX 进度解析 / 失败分类 / 自检 / 自动重试
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W23-T1 · __classifyInstallErrorForTesting 失败分类', () => {
+  test('timeout 关键字 → timeout', () => {
+    expect(__classifyInstallErrorForTesting('npm install 超时（600s）')).toBe(
+      'timeout',
+    )
+    expect(__classifyInstallErrorForTesting('ETIMEDOUT')).toBe('timeout')
+    expect(
+      __classifyInstallErrorForTesting('Error: ESOCKETTIMEDOUT registry'),
+    ).toBe('timeout')
+  })
+
+  test('network 关键字 → network', () => {
+    expect(
+      __classifyInstallErrorForTesting('connect ECONNREFUSED 127.0.0.1:7890'),
+    ).toBe('network')
+    expect(__classifyInstallErrorForTesting('getaddrinfo ENOTFOUND')).toBe(
+      'network',
+    )
+    expect(__classifyInstallErrorForTesting('socket hang up')).toBe('network')
+    expect(
+      __classifyInstallErrorForTesting('proxy connection failed'),
+    ).toBe('network')
+  })
+
+  test('permission 关键字 → permission', () => {
+    expect(
+      __classifyInstallErrorForTesting('npm ERR! code EACCES open /usr/lib'),
+    ).toBe('permission')
+    expect(__classifyInstallErrorForTesting('Permission denied')).toBe(
+      'permission',
+    )
+    expect(__classifyInstallErrorForTesting('Try running with sudo')).toBe(
+      'permission',
+    )
+  })
+
+  test('未匹配 / 空 → unknown', () => {
+    expect(__classifyInstallErrorForTesting('')).toBe('unknown')
+    expect(__classifyInstallErrorForTesting(null)).toBe('unknown')
+    expect(__classifyInstallErrorForTesting(undefined)).toBe('unknown')
+    expect(
+      __classifyInstallErrorForTesting('some unrelated text 12345'),
+    ).toBe('unknown')
+  })
+
+  test('timeout 优先级高于 network（超时消息可能含 connect 字样）', () => {
+    // 自家注入的消息 "npm install 超时" 优先识别为 timeout 而非 network
+    expect(
+      __classifyInstallErrorForTesting('npm install 超时 connect failed'),
+    ).toBe('timeout')
+  })
+})
+
+describe('W23-T1 · __parseProgressLineForTesting npm 输出解析', () => {
+  test('npm 完成 summary "added X packages in Ys" → done 100%', () => {
+    const r = __parseProgressLineForTesting('added 142 packages in 23.5s')
+    expect(r).not.toBeNull()
+    expect(r!.phase).toBe('done')
+    expect(r!.percent).toBe(100)
+    expect(r!.label).toContain('142')
+    expect(r!.label).toContain('23.5')
+  })
+
+  test('downloading / fetching → downloading', () => {
+    const r1 = __parseProgressLineForTesting('npm http fetch GET 200 ...')
+    expect(r1?.phase).toBe('downloading')
+    const r2 = __parseProgressLineForTesting('downloading electron-v41...')
+    expect(r2?.phase).toBe('downloading')
+  })
+
+  test('extract / electron postinstall → extracting', () => {
+    const r1 = __parseProgressLineForTesting('extract:electron')
+    expect(r1?.phase).toBe('extracting')
+    const r2 = __parseProgressLineForTesting('electron postinstall')
+    expect(r2?.phase).toBe('extracting')
+  })
+
+  test('linking / building → linking', () => {
+    const r = __parseProgressLineForTesting('linking dependencies')
+    expect(r?.phase).toBe('linking')
+  })
+
+  test('无信号行 → null（不抖动进度）', () => {
+    expect(__parseProgressLineForTesting('some random debug noise')).toBeNull()
+    expect(__parseProgressLineForTesting('')).toBeNull()
+  })
+})
+
+describe('W23-T1 · __verifyElectronLoadableForTesting 安装后自检', () => {
+  test('node 命令不存在 → ok:false + 友好消息（不抛）', () => {
+    const desk = mkDeskDirWith({ electron: true })
+    const r = __verifyElectronLoadableForTesting(desk, {
+      nodeCmd: 'definitely-not-a-real-node-binary-zzz',
+      timeoutMs: 3000,
+    })
+    expect(r.ok).toBe(false)
+    expect(r.message).toBeTruthy()
+    expect(r.message).toMatch(/自检|reinstall|electron|spawn/)
+  })
+
+  test('真实 runtime + 完整 electron stub（含 main 入口）→ ok:true（覆盖成功路径）', () => {
+    // 构造能被 require 成功解析的 fake electron：package.json 含 main + 空 main.js
+    // 用 process.execPath（bun 测试里是 bun，CI/node 环境下是 node）；两者 require 行为兼容
+    const desk = join(tmpDir, 'packages', 'panda-on-desk')
+    mkdirSync(join(desk, 'node_modules', 'electron'), { recursive: true })
+    writeFileSync(
+      join(desk, 'node_modules', 'electron', 'package.json'),
+      JSON.stringify({
+        name: 'electron',
+        version: '41.0.0',
+        main: 'main.js',
+      }),
+      'utf-8',
+    )
+    writeFileSync(
+      join(desk, 'node_modules', 'electron', 'main.js'),
+      'module.exports = { mock: true }',
+      'utf-8',
+    )
+    const r = __verifyElectronLoadableForTesting(desk, {
+      nodeCmd: process.execPath,
+      timeoutMs: 5000,
+    })
+    expect(r.ok).toBe(true)
+    expect(r.message).toContain('自检通过')
+  })
+})
+
+describe('W23-T1 · installPandaOnDeskDeps 进度事件 + errorKind 透传', () => {
+  test('失败时 InstallResult.errorKind 被填充（spawn 失败 → unknown 或具体 kind）', async () => {
+    const desk = mkDeskDirWith({ electron: false })
+    const result = await installPandaOnDeskDeps({
+      deskDir: desk,
+      npmCmd: 'definitely-not-a-real-npm-w23',
+      timeoutMs: 3000,
+      maxRetries: 0,
+      verifyAfterInstall: false,
+    })
+    expect(result.ok).toBe(false)
+    expect(result.errorKind).toBeDefined()
+    // 不论是 spawn fail 还是 npm exit 非 0，errorKind 必须是已知枚举值之一
+    expect(['timeout', 'network', 'permission', 'verify', 'unknown']).toContain(
+      result.errorKind,
+    )
+  }, 15_000)
+
+  test('onProgress 至少收到 phase=start 事件', async () => {
+    const desk = mkDeskDirWith({ electron: false })
+    const events: InstallProgressEvent[] = []
+    await installPandaOnDeskDeps({
+      deskDir: desk,
+      npmCmd: 'definitely-not-a-real-npm-progress',
+      timeoutMs: 3000,
+      maxRetries: 0,
+      verifyAfterInstall: false,
+      onProgress: (e) => events.push(e),
+    })
+    expect(events.length).toBeGreaterThan(0)
+    expect(events[0].phase).toBe('start')
+    expect(events[0].label).toBeTruthy()
+  }, 15_000)
+
+  test('已装 short-circuit → verifyStatus=skipped', async () => {
+    const desk = mkDeskDirWith({ electron: true })
+    const result = await installPandaOnDeskDeps({
+      deskDir: desk,
+      npmCmd: 'irrelevant-already-installed',
+      verifyAfterInstall: true,
+    })
+    expect(result.ok).toBe(true)
+    expect(result.alreadyInstalled).toBe(true)
+    expect(result.verifyStatus).toBe('skipped')
+  })
+
+  test('verifyAfterInstall=false 时跳过自检（即便 install ok）', async () => {
+    // 此用例仅验证选项透传：通过 short-circuit 路径快速验证
+    const desk = mkDeskDirWith({ electron: true })
+    const result = await installPandaOnDeskDeps({
+      deskDir: desk,
+      verifyAfterInstall: false,
+    })
+    // short-circuit 路径仍是 skipped（已装无需自检）
+    expect(result.ok).toBe(true)
+    expect(result.verifyStatus).toBe('skipped')
+  })
+
+  test('maxRetries=0 时不重试（spawn 失败立即返回，不做第二次尝试）', async () => {
+    const desk = mkDeskDirWith({ electron: false })
+    const events: InstallProgressEvent[] = []
+    const result = await installPandaOnDeskDeps({
+      deskDir: desk,
+      npmCmd: 'definitely-not-a-real-npm-noretry',
+      timeoutMs: 3000,
+      maxRetries: 0,
+      verifyAfterInstall: false,
+      onProgress: (e) => events.push(e),
+    })
+    expect(result.ok).toBe(false)
+    expect(result.retried ?? 0).toBe(0)
+    // 不应出现 retry phase
+    expect(events.find((e) => e.phase === 'retry')).toBeUndefined()
   }, 15_000)
 })

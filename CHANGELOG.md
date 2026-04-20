@@ -1,6 +1,6 @@
 # Changelog · panda-on-desk
 
-> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 42 版本演进（v2.22.0 → v2.25.31）。
+> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 45 版本演进（v2.22.0 → v2.25.33 · 23 波 23h 无人值守 · 终版）。
 > panda CLI 主体的更早版本演进（v0.x → v2.21.x）见 git log 与 monitor/ 目录归档。
 > 时间锚点：2026-04-19 ~ 2026-04-20 (Asia/Singapore +08:00)
 
@@ -14,10 +14,26 @@
 | `desk-v1.0.1` | W11-T1 | 2026-04-20 | W6-T2 / W7-T1 workflow 加固后重触发；`git ls-remote` 验证 tag 已到远端。 |
 | `desk-v1.0.2` | W19-T4 | 2026-04-20 | version sync + icns/ico 占位检测 + 真 NSIS 出包验证后由 W17 加固完成重触发。 |
 | `desk-v1.0.3` | W22-T4 | 2026-04-20 | v2.25.31/32 32 版本累计加固后最终触发：含 Mac 顶部黑框 5 重根因 nuclear fix + startup 性能 -67.3% + RSS 158MB + dist-electron -45MB + autoconnect handshake + crash 自动恢复。 |
+| `desk-v1.0.4` | W23-T4 | 2026-04-20 | 23h 无人值守终版触发：W23-T1 install UX 进度可视化 + 失败分类 + 自检；W23-T2 STATUS 收官；W23-T3 全量 1651/0 验证；W23-T4 23h 总结落盘。 |
 
 > 全部 tag 推送均使用 `http.proxy=http://127.0.0.1:7897` 走代理推达远端；anthropic byte-equal 0 触碰；0 新依赖。
 
 ---
+
+## v2.25.33 — 2026-04-20 · 波 23 全 4/4（install UX + STATUS 收官 + 最终 1651/0 + 23h 总结 · 终版）
+- W23-T1 install UX：`src/desk/installer.ts` 加 `InstallErrorKind` / `InstallProgressEvent` 类型 + `__classifyInstallErrorForTesting` / `__parseProgressLineForTesting` / `__verifyElectronLoadableForTesting` 三个 helper；外层加自动重试（仅 timeout/network）+ 安装后 `require('electron')` 自检。`src/cli/handlers/desk-install.ts` +spinner（10 帧）+ % + ETA 渲染 + 失败按 errorKind 给 4 类 hint。`installer.test.ts` 41 pass / 0 fail / 116 expect。
+- W23-T2 STATUS 收官：`packages/panda-on-desk/STATUS.md` 收尾 23h 进展（120 行新增）。
+- W23-T3 最终全量验证：`bun test` 1651 pass / 4 skip / 0 fail / 7867 expect / 1655 tests across 99 files / 38.81s；`bun run build` exit 0；`tsc` 主仓 + 子包 exit 0；`npm pack` 6.6 MB / 31.4 MB unpacked / 748 files；anthropic byte-equal 守护通过；0 新依赖。
+- W23-T4 23h 总结：`monitor/20260420-23h-summary.md` 17929 字节 / 10 节落盘。
+- 红线：`git diff main -- src/services/api/claude.ts src/services/oauth src/services/api/providers.ts` → 0 行；anthropic byte-equal 完整守护。
+
+## v2.25.32 — 2026-04-20 · 波 22 全 4/4（多屏 + mini-pet + 最终验证 1654/0 + desk-v1.0.3）
+- W22-T1 多屏支持：新建 `packages/panda-on-desk/src/geometry/display-select.ts`（134 行，物理多屏选择器）；`main.ts` +109 行接入；新增 `test/multi-display.test.ts` 267 行用例。
+- W22-T2 mini-pet 升级：呼吸动画 + desk 同步 + `/buddy stats` 状态可视化（`MiniPet.tsx` +120 / `MiniPet.test.tsx` +166 / `commands/buddy/statsViz.ts` +24）。
+- W22-T3 最终综合验证：bun test 全量 1654 pass / 0 fail；新建 `RELEASE_NOTES_v2.25.md` 194 行覆盖 v2.25.0 → v2.25.31。
+- W22-T4 desk-v1.0.3 最终触发：32 版本累计加固后跨平台真实出包；README/CHANGELOG 全量收尾。
+- W23-T3 最终全量验证（本条目）：bun test 1651 pass / 0 fail / 4 skip；bun run build exit 0；主仓 tsc exit 0（5 测试动态 import sentinel TS2307 已知）；子包 tsc exit 0（mac-bootstrap-e2e mock 签名 3 处 TODO）；npm pack tarball 6.6 MB / unpacked 31.4 MB / 748 files；anthropic byte-equal 守护通过；0 新依赖；22 波 / 87 task evidence 完整（W3 单 agent 合并 T1+T2+T3）。
+- commit `c3b81a1`。
 
 ## v2.25.31 — 2026-04-20 · 波 21 全 4/4（Mac e2e + demo polish + README v4 + 性能 v5 RSS 158MB）
 - W21-T1 Mac e2e mock 测试加固：覆盖 v2.25.30 nuclear fix 全 5 重根因 regression（21 pass 全过）。

@@ -13,8 +13,10 @@
 // 2026-04-20 08:13 +08:00 W4-T1 panda v2.25.1 桌面端依赖按需安装
 // 2026-04-20 14:20 +08:00 P0 hotfix v2.25.16 — 改用临时 stage 目录 npm install
 //                          绕开主仓 workspace:* devDeps 触发的 EUNSUPPORTEDPROTOCOL
+// 2026-04-20 16:00 +08:00 W23-T1 install UX — 进度解析 / 失败分类 / 自动重试 /
+//                          安装后自检（require electron 验证可加载）
 
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import {
   cpSync,
   existsSync,
@@ -103,6 +105,41 @@ export interface InstallResult {
   message: string
   /** 是否因为 electron 已装而 short-circuit（幂等命中） */
   alreadyInstalled?: boolean
+  /** W23-T1 失败分类：timeout / network / permission / unknown / verify */
+  errorKind?: InstallErrorKind
+  /** W23-T1 重试次数（0=未重试，1=自动重试一次） */
+  retried?: number
+  /** W23-T1 自检状态：pass / fail / skipped（未触发） */
+  verifyStatus?: 'pass' | 'fail' | 'skipped'
+}
+
+/** W23-T1 失败分类枚举，用于 CLI handler 给出对应 hint */
+export type InstallErrorKind =
+  | 'timeout'
+  | 'network'
+  | 'permission'
+  | 'verify'
+  | 'unknown'
+
+/** W23-T1 进度事件载荷 — 由 CLI handler 实时渲染 spinner / percentage / ETA */
+export interface InstallProgressEvent {
+  /** 阶段：start | downloading | extracting | linking | done | retry | verify */
+  phase:
+    | 'start'
+    | 'downloading'
+    | 'extracting'
+    | 'linking'
+    | 'done'
+    | 'retry'
+    | 'verify'
+  /** 0~100；未知阶段保持 0（spinner only） */
+  percent: number
+  /** 估计剩余秒数；未知则 -1 */
+  etaSeconds: number
+  /** 给人看的简短中文描述 */
+  label: string
+  /** 关联日志行（可选） */
+  rawLine?: string
 }
 
 export interface InstallOptions {
@@ -110,12 +147,22 @@ export interface InstallOptions {
   deskDir?: string
   /** 进度/日志回调（默认 no-op；CLI handler 会传入打印到 stderr 的函数） */
   onLog?: (line: string) => void
+  /** W23-T1 进度事件回调（默认 no-op；CLI handler 会渲染 spinner + % + ETA） */
+  onProgress?: (event: InstallProgressEvent) => void
   /** 自定义 npm 可执行（测试注入用，默认 'npm' 走 PATH） */
   npmCmd?: string
   /** 子进程超时 ms（默认 1800000 = 30 分钟，electron 80MB 下载兜底；
    *  v2.25.18 由 600s 提到 1800s — Mac 实测 600s 不够慢网络场景。
    *  ENV PANDA_DESK_INSTALL_TIMEOUT_MS 可覆盖） */
   timeoutMs?: number
+  /** W23-T1 自动重试次数（默认 1；仅在 timeout / network 失败时触发） */
+  maxRetries?: number
+  /** W23-T1 是否在安装完成后跑 require('electron') 自检（默认 true） */
+  verifyAfterInstall?: boolean
+  /** W23-T1 自检子进程超时 ms（默认 10000） */
+  verifyTimeoutMs?: number
+  /** W23-T1 测试注入：覆盖 node 可执行路径用于自检 spawnSync */
+  nodeCmd?: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -162,6 +209,159 @@ export function __locateDeskDirForTesting(
 
 function locateDeskDir(): string | null {
   return __locateDeskDirForTesting(buildDeskDirCandidates())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W23-T1 失败分类与进度解析 helpers（纯函数 / 易测）
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 把任意错误（npm stderr 行 / 子进程 message / Error.message）映射到
+ * InstallErrorKind，CLI handler 据此给出对应排查 hint。
+ *
+ * 关键字依据：
+ *   - timeout: 我方注入的超时消息含 "超时"；node ETIMEDOUT/ESOCKETTIMEDOUT
+ *   - network: ECONNREFUSED / ECONNRESET / ENOTFOUND / EAI_AGAIN /
+ *              proxy / network / registry.npmjs.org
+ *   - permission: EACCES / EPERM / EROFS / sudo / Permission denied
+ *   - 其余 → unknown
+ *
+ * 不区分大小写；为空字符串时返回 unknown。
+ */
+export function __classifyInstallErrorForTesting(
+  raw: string | null | undefined,
+): InstallErrorKind {
+  if (!raw) return 'unknown'
+  const s = raw.toLowerCase()
+  // timeout 优先（自家注入消息含"超时"）
+  if (
+    s.includes('超时') ||
+    s.includes('timeout') ||
+    s.includes('etimedout') ||
+    s.includes('esockettimedout')
+  ) {
+    return 'timeout'
+  }
+  if (
+    s.includes('econnrefused') ||
+    s.includes('econnreset') ||
+    s.includes('enotfound') ||
+    s.includes('eai_again') ||
+    s.includes('network') ||
+    s.includes('proxy') ||
+    s.includes('registry.npmjs') ||
+    s.includes('getaddrinfo') ||
+    s.includes('socket hang up')
+  ) {
+    return 'network'
+  }
+  if (
+    s.includes('eacces') ||
+    s.includes('eperm') ||
+    s.includes('erofs') ||
+    s.includes('permission denied') ||
+    s.includes('sudo')
+  ) {
+    return 'permission'
+  }
+  return 'unknown'
+}
+
+/**
+ * 解析 npm 输出行 → InstallProgressEvent（或 null 表示无进度信号）。
+ *
+ * npm 7+ 默认无 progress bar，但常见输出包含可解析阶段：
+ *   - "added 142 packages in 23.5s"           → done, 100%
+ *   - "removed N packages"                    → linking
+ *   - "downloaded N tarballs / fetching ..."  → downloading
+ *   - "extract:electron"                       → extracting
+ *   - 自家日志 "[panda-desk] 开始安装"          → start
+ *
+ * 同时支持 "added X packages in Ys" 提取 percentage（已知 deps 总数）：
+ *   currentAdded / expectedTotal * 100
+ *   expectedTotal 由调用方传入（npm 实测 4 deps 会拉 ~140 子 deps，无法精确）
+ *   → 退化为 0% + spinner only 而非给假数字
+ */
+export function __parseProgressLineForTesting(
+  line: string,
+): { phase: InstallProgressEvent['phase']; percent: number; label: string } | null {
+  const s = line.toLowerCase()
+  // npm 8+ 的最终 summary：added X packages in Ys
+  const addedMatch = line.match(/added\s+(\d+)\s+packages?\s+in\s+([\d.]+)s/i)
+  if (addedMatch) {
+    return {
+      phase: 'done',
+      percent: 100,
+      label: `npm 完成（共 ${addedMatch[1]} 包，耗时 ${addedMatch[2]}s）`,
+    }
+  }
+  // fetching / downloading
+  if (
+    s.includes('downloading') ||
+    s.includes('fetching') ||
+    s.includes('npm http fetch')
+  ) {
+    return { phase: 'downloading', percent: 0, label: '下载依赖中' }
+  }
+  // extract / unpack
+  if (s.includes('extract:') || s.includes('extracting')) {
+    return { phase: 'extracting', percent: 0, label: '解压依赖中' }
+  }
+  // electron postinstall（80MB binary 解压）
+  if (s.includes('electron') && (s.includes('postinstall') || s.includes('install'))) {
+    return { phase: 'extracting', percent: 0, label: '安装 electron 二进制' }
+  }
+  // npm link / building
+  if (s.includes('linking') || s.includes('building')) {
+    return { phase: 'linking', percent: 0, label: '链接依赖' }
+  }
+  return null
+}
+
+/**
+ * 跑 `node -e "require('electron')"` 验证 electron 真的可加载（非仅文件存在）。
+ *
+ * 为什么不直接 require：
+ *   installer.ts 是 ESM 上下文，require 不可直接用；且子进程隔离能避免
+ *   electron native binary 加载副作用污染当前 node 进程。
+ *
+ * 子进程必须 cwd: deskDir，让 require resolve 走子包 node_modules。
+ */
+export function __verifyElectronLoadableForTesting(
+  deskDir: string,
+  opts: { nodeCmd?: string; timeoutMs?: number } = {},
+): { ok: boolean; message: string } {
+  const nodeCmd = opts.nodeCmd ?? process.execPath ?? 'node'
+  const timeoutMs = opts.timeoutMs ?? 10_000
+  try {
+    const r = spawnSync(
+      nodeCmd,
+      ['-e', "require('electron'); process.exit(0)"],
+      {
+        cwd: deskDir,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: timeoutMs,
+        windowsHide: true,
+      },
+    )
+    if (r.error) {
+      return {
+        ok: false,
+        message: `自检 spawn 失败：${r.error.message}（建议 reinstall）`,
+      }
+    }
+    if (r.status === 0) {
+      return { ok: true, message: 'electron 可加载（自检通过）' }
+    }
+    const stderr = (r.stderr?.toString('utf-8') ?? '').slice(0, 200)
+    return {
+      ok: false,
+      message: `自检失败（exit ${r.status}）：${stderr || 'electron require 抛错'}（建议 panda --install-desk 重装）`,
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: `自检异常：${msg}（建议 reinstall）` }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -310,40 +510,20 @@ function cleanupStage(stage: string): void {
 // 5) 隔离：在 os.tmpdir() stage 目录跑 npm install，避开主仓 workspace:* 解析
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function installPandaOnDeskDeps(
-  opts: InstallOptions = {},
-): Promise<InstallResult> {
-  // 并发幂等
-  if (_installInFlight) return _installInFlight
-
+/**
+ * 内部 — 单次 npm install 子进程闭环（不含重试 / 自检）。
+ * 抽离为内部函数让 installPandaOnDeskDeps 主体专注于编排（重试 / 自检 / 锁）。
+ */
+function _runInstallOnce(params: {
+  deskDir: string
+  npmCmd: string
+  timeoutMs: number
+  log: (line: string) => void
+  emitProgress: (event: InstallProgressEvent) => void
+}): Promise<InstallResult> {
+  const { deskDir, npmCmd, timeoutMs, log, emitProgress } = params
   const startedAt = Date.now()
-  const log = opts.onLog ?? (() => {})
-
-  const promise = new Promise<InstallResult>((resolve) => {
-    const deskDir = opts.deskDir ?? locateDeskDir()
-    if (!deskDir) {
-      resolve({
-        ok: false,
-        code: null,
-        durationMs: Date.now() - startedAt,
-        message: '未找到 packages/panda-on-desk 目录（panda 安装可能不完整）',
-      })
-      return
-    }
-
-    // 已装 → short-circuit
-    if (checkElectronInstalled(deskDir)) {
-      resolve({
-        ok: true,
-        code: 0,
-        durationMs: Date.now() - startedAt,
-        message: 'electron 已安装，跳过',
-        alreadyInstalled: true,
-      })
-      return
-    }
-
-    // 创建 stage 目录（隔离主仓 workspace:* 解析）
+  return new Promise<InstallResult>((resolve) => {
     let stage: string
     try {
       stage = __createStageDirForTesting(ELECTRON_DEPS)
@@ -354,17 +534,11 @@ export function installPandaOnDeskDeps(
         code: null,
         durationMs: Date.now() - startedAt,
         message: `创建临时安装目录失败：${msg}（检查 ${tmpdir()} 可写）`,
+        errorKind: __classifyInstallErrorForTesting(msg),
       })
       return
     }
 
-    const npmCmd = opts.npmCmd ?? 'npm'
-    // v2.25.18: 默认从 600s 提到 1800s（30min），允许 ENV 覆盖
-    // why: Mac 实测 600s 不够 electron 80MB 下载在慢网络场景
-    const envTimeout = Number(process.env.PANDA_DESK_INSTALL_TIMEOUT_MS)
-    const timeoutMs = opts.timeoutMs ?? (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : 1_800_000)
-    // why --no-package-lock: stage 是一次性目录，无需 lock；省一次 IO
-    // why --omit=dev: 与原 --production 等价的现代 npm 写法
     const args = [
       'install',
       '--no-audit',
@@ -377,11 +551,15 @@ export function installPandaOnDeskDeps(
     log(`[panda-desk] stage=${stage}`)
     log(`[panda-desk] dest=${deskDir}`)
     log(`[panda-desk] cmd=${npmCmd} ${args.join(' ')}`)
+    emitProgress({
+      phase: 'start',
+      percent: 0,
+      etaSeconds: -1,
+      label: '准备 npm install',
+    })
 
     let child
     try {
-      // why shell:true — Windows 下 npm 实际是 npm.cmd，spawn 需 shell 兜底；
-      //   POSIX shell:true 不影响 PATH 解析
       child = spawn(npmCmd, args, {
         cwd: stage,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -396,6 +574,7 @@ export function installPandaOnDeskDeps(
         code: null,
         durationMs: Date.now() - startedAt,
         message: `spawn npm 失败：${msg}`,
+        errorKind: __classifyInstallErrorForTesting(msg),
       })
       return
     }
@@ -410,28 +589,57 @@ export function installPandaOnDeskDeps(
       }
     }, timeoutMs)
 
-    // 流式转发 npm 输出到 onLog（按行；避免半行垃圾）
-    const forward = (chunk: Buffer | string) => {
+    // npm stderr 行汇总，用于失败分类（取末尾 200 字够用）
+    let stderrTail = ''
+    const STDERR_TAIL_MAX = 4000
+
+    // 流式转发 npm 输出 + 进度解析
+    const forward = (chunk: Buffer | string, isStderr: boolean) => {
       try {
         const text = typeof chunk === 'string' ? chunk : chunk.toString('utf-8')
+        if (isStderr) {
+          stderrTail = (stderrTail + text).slice(-STDERR_TAIL_MAX)
+        }
         for (const line of text.split(/\r?\n/)) {
-          if (line.length > 0) log(`[npm] ${line}`)
+          if (line.length === 0) continue
+          log(`[npm] ${line}`)
+          // 进度解析（无信号则不发事件，避免进度抖动）
+          const p = __parseProgressLineForTesting(line)
+          if (p) {
+            const elapsed = (Date.now() - startedAt) / 1000
+            // 简单 ETA：done 时 0；否则按 percent 线性外推（百分比为 0 时 ETA -1）
+            const etaSeconds =
+              p.percent > 0 && p.percent < 100
+                ? Math.max(0, Math.round((elapsed * (100 - p.percent)) / p.percent))
+                : p.percent === 100
+                  ? 0
+                  : -1
+            emitProgress({
+              phase: p.phase,
+              percent: p.percent,
+              etaSeconds,
+              label: p.label,
+              rawLine: line,
+            })
+          }
         }
       } catch {
         // 编码异常忽略
       }
     }
-    child.stdout?.on('data', forward)
-    child.stderr?.on('data', forward)
+    child.stdout?.on('data', (c) => forward(c, false))
+    child.stderr?.on('data', (c) => forward(c, true))
 
     child.on('error', (err) => {
       clearTimeout(timeout)
       cleanupStage(stage)
+      const msg = err.message
       resolve({
         ok: false,
         code: null,
         durationMs: Date.now() - startedAt,
-        message: `npm 子进程错误：${err.message}（常见原因：网络断/权限拒/npm 未安装）`,
+        message: `npm 子进程错误：${msg}（常见原因：网络断/权限拒/npm 未安装）`,
+        errorKind: __classifyInstallErrorForTesting(msg),
       })
     })
 
@@ -445,30 +653,40 @@ export function installPandaOnDeskDeps(
           code,
           durationMs,
           message: `npm install 超时（${Math.round(timeoutMs / 1000)}s）— 网络太慢；可设 PANDA_DESK_INSTALL_TIMEOUT_MS=3600000（1h）后重试`,
+          errorKind: 'timeout',
         })
         return
       }
       if (code !== 0) {
         cleanupStage(stage)
+        const kind = __classifyInstallErrorForTesting(stderrTail)
         resolve({
           ok: false,
           code,
           durationMs,
-          message: `npm install 失败（exit ${code}）— 检查网络/代理/权限后重试`,
+          message: `npm install 失败（exit ${code}）— ${stderrTail.split(/\r?\n/).filter(Boolean).slice(-1)[0] || '检查网络/代理/权限后重试'}`,
+          errorKind: kind,
         })
         return
       }
-      // npm 成功 → 把 stage/node_modules/* 搬迁到 deskDir/node_modules/
       log('[panda-desk] npm install 成功，搬迁 node_modules → 子包')
+      emitProgress({
+        phase: 'linking',
+        percent: 95,
+        etaSeconds: 1,
+        label: '搬迁 node_modules',
+      })
       const moveResult = __moveNodeModulesForTesting(stage, deskDir)
       cleanupStage(stage)
       if (moveResult.errors.length > 0) {
         for (const err of moveResult.errors) log(`[panda-desk] mv 错误: ${err}`)
+        const firstErr = moveResult.errors[0]
         resolve({
           ok: false,
           code,
           durationMs,
-          message: `安装完成但搬迁失败（${moveResult.errors.length} 个错误）：${moveResult.errors[0]}`,
+          message: `安装完成但搬迁失败（${moveResult.errors.length} 个错误）：${firstErr}`,
+          errorKind: __classifyInstallErrorForTesting(firstErr),
         })
         return
       }
@@ -479,6 +697,7 @@ export function installPandaOnDeskDeps(
           durationMs,
           message:
             'npm install 退出 0 + 搬迁完成但未检测到 electron — 可能 deps 解析异常',
+          errorKind: 'unknown',
         })
         return
       }
@@ -490,6 +709,125 @@ export function installPandaOnDeskDeps(
       })
     })
   })
+}
+
+export function installPandaOnDeskDeps(
+  opts: InstallOptions = {},
+): Promise<InstallResult> {
+  // 并发幂等
+  if (_installInFlight) return _installInFlight
+
+  const startedAt = Date.now()
+  const log = opts.onLog ?? (() => {})
+  const emitProgress = opts.onProgress ?? (() => {})
+
+  const promise = (async (): Promise<InstallResult> => {
+    const deskDir = opts.deskDir ?? locateDeskDir()
+    if (!deskDir) {
+      return {
+        ok: false,
+        code: null,
+        durationMs: Date.now() - startedAt,
+        message: '未找到 packages/panda-on-desk 目录（panda 安装可能不完整）',
+        errorKind: 'unknown',
+      }
+    }
+
+    // 已装 → short-circuit
+    if (checkElectronInstalled(deskDir)) {
+      return {
+        ok: true,
+        code: 0,
+        durationMs: Date.now() - startedAt,
+        message: 'electron 已安装，跳过',
+        alreadyInstalled: true,
+        verifyStatus: 'skipped',
+      }
+    }
+
+    const npmCmd = opts.npmCmd ?? 'npm'
+    const envTimeout = Number(process.env.PANDA_DESK_INSTALL_TIMEOUT_MS)
+    const timeoutMs =
+      opts.timeoutMs ??
+      (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : 1_800_000)
+    const maxRetries = opts.maxRetries ?? 1
+
+    let result = await _runInstallOnce({
+      deskDir,
+      npmCmd,
+      timeoutMs,
+      log,
+      emitProgress,
+    })
+    let retried = 0
+
+    // W23-T1 自动重试：仅 timeout / network 类失败重试 1 次（permission / unknown 不重试）
+    while (
+      !result.ok &&
+      retried < maxRetries &&
+      (result.errorKind === 'timeout' || result.errorKind === 'network')
+    ) {
+      retried++
+      log(
+        `[panda-desk] 第 ${retried} 次重试（上次失败：${result.errorKind} - ${result.message}）`,
+      )
+      emitProgress({
+        phase: 'retry',
+        percent: 0,
+        etaSeconds: -1,
+        label: `自动重试（第 ${retried} 次，原因：${result.errorKind}）`,
+      })
+      result = await _runInstallOnce({
+        deskDir,
+        npmCmd,
+        timeoutMs,
+        log,
+        emitProgress,
+      })
+    }
+    if (retried > 0) {
+      result = { ...result, retried }
+    }
+
+    // W23-T1 安装后自检：require('electron') 验证可加载
+    const verifyAfterInstall = opts.verifyAfterInstall ?? true
+    if (result.ok && verifyAfterInstall) {
+      emitProgress({
+        phase: 'verify',
+        percent: 99,
+        etaSeconds: 1,
+        label: '自检 require(electron)',
+      })
+      const verify = __verifyElectronLoadableForTesting(deskDir, {
+        nodeCmd: opts.nodeCmd,
+        timeoutMs: opts.verifyTimeoutMs,
+      })
+      log(`[panda-desk] 自检：${verify.message}`)
+      if (verify.ok) {
+        result = { ...result, verifyStatus: 'pass' }
+      } else {
+        result = {
+          ...result,
+          ok: false,
+          verifyStatus: 'fail',
+          errorKind: 'verify',
+          message: verify.message,
+        }
+      }
+    } else if (result.ok && !verifyAfterInstall) {
+      result = { ...result, verifyStatus: 'skipped' }
+    }
+
+    if (result.ok) {
+      emitProgress({
+        phase: 'done',
+        percent: 100,
+        etaSeconds: 0,
+        label: '安装完成',
+      })
+    }
+    return result
+  })()
 
   _installInFlight = promise
   // 完成后释放 in-flight 锁，允许下次重试

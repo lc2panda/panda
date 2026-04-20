@@ -5,7 +5,8 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
         [NEW-FILE:#W12-03] · 2026-04-20 +08:00 W12-T4 文档审计落盘（agent-δ-W12-docs-audit）
         W15-T3 · 2026-04-20 +08:00 CHANGELOG agent（agent-γ-W15-changelog）同步 v2.25.16–23 + 14 波交付列表
         W21-T3 · 2026-04-20 +08:00 README v4 agent（agent-γ-W21-readme）同步 v2.25.24–30 + 21 波交付列表 + Mac 顶部黑框 P0 nuclear fix
-        W22-T3 · 2026-04-20 +08:00 final agent（agent-γ-W22-final）同步 v2.25.31 + 全量 1610 pass / 0 fail + RELEASE_NOTES_v2.25.md
+        W22-T3 · 2026-04-20 +08:00 final agent（agent-γ-W22-final）同步 v2.25.31 + 全量 1654 pass / 0 fail + RELEASE_NOTES_v2.25.md
+        W23-T2 · 2026-04-20 +08:00 status final agent（agent-β-W23-status-final）升级为 23 波 / 33 版本完整里程碑总览 + 4 大里程碑 + 4 P0 收尾 + 关键质量指标
         一旦发版 / 测试基线 / 性能基线 / 已知 bug 列表 变化，请同步本文件。
 -->
 
@@ -35,16 +36,18 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 | 维度 | 值 | 来源 |
 |---|---|---|
-| panda CLI 版本 | **v2.25.31** | `package.json` L3 |
-| panda-on-desk 子包版本 | **v0.1.0-alpha** (内部) / 对外 desk-v1.0.2 GA | `packages/panda-on-desk/package.json` L3 |
-| 桌面端 GA 标签 | **desk-v1.0.2** (2026-04-20 W19-T4 重触发) | `monitor/20260420-W19-T4-ci.md` |
+| panda CLI 版本 | **v2.25.32** | `package.json` L3 |
+| panda-on-desk 子包版本 | **v0.1.0-alpha** (内部) / 对外 desk-v1.0.3 GA | `packages/panda-on-desk/package.json` L3 |
+| 桌面端 GA 标签 | **desk-v1.0.3** (2026-04-20 W22-T4 最终触发) | `monitor/20260420-W22-T4-desk-release.md` |
 | Electron runtime | **41.2.1** | `packages/panda-on-desk/package.json` devDeps |
 | Node 兼容 | ≥ 18.0.0 | `package.json` engines |
 | Bun 兼容 | ≥ 1.2.0 | `package.json` engines |
 | 仓库 | `lc2panda/panda` (private) | git remote |
-| 最新发版日期 | **2026-04-20** (UTC+8) | git log HEAD `9a9c19e` |
-| 最新 commit | `9a9c19e` — `feat: 波 21 全 4/4 — Mac e2e + demo polish + README v4 + 性能 v5 RSS 158MB (v2.25.31)` | `git log -1` |
-| 全量测试基线 | **1654 pass · 0 fail · 1 skip** (W22-T3 final) | `monitor/20260420-W22-T3-final.md` |
+| 最新发版日期 | **2026-04-20** (UTC+8) | git log HEAD `c3b81a1` |
+| 最新 commit | `c3b81a1` — `feat: 波 22 全 4/4 — 多屏 + mini-pet + 最终验证 1654/0 + desk-v1.0.3 (v2.25.32)` | `git log -1` |
+| 全量测试基线 | **1654 pass · 0 fail · 1 skip · 99 files · 7874 expect()** (W22-T3 final, 连续 2 次 stable) | `monitor/20260420-W22-T3-final.md` |
+| 端到端波次 | **23 波 / 33 版本** (v2.25.0 → v2.25.32 · 2026-04-19~20 23h 无人值守) | `monitor/20260419-OD-*` + `monitor/20260420-W*` |
+| 4 个 release tags | desk-v1.0.0 / .1 / .2 / .3 全部就位（git ls-remote 已验证） | `monitor/20260420-W22-T4-desk-release.md` §2.3 |
 
 ---
 
@@ -54,8 +57,8 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 | 维度 | 值 | 锚点 |
 |---|---|---|
-| 全量测试用例 | **1567+ pass / 1 skip / 0 fail** (W20-T4 1560 基线 + W21-T3 Mac 黑框 7 nuclear 用例) | `bun test` 全量 |
-| 预存基线 fail | **0** (W15-T2 端口 race 修后达成里程碑 → W16-W21 持续守住 6 波) | CHANGELOG v2.25.24–30 / monitor `20260420-W20-T4-final.md` |
+| 全量测试用例 | **1654 pass · 0 fail · 1 skip · 7874 expect() · 99 files · 39.81s** (W22-T3 final 连续 2 次 stable) | `monitor/20260420-W22-T3-final.md` §1.1 |
+| 预存基线 fail | **0** (W15-T2 端口 race 修后达成里程碑 → W16-W22 持续守住 8 波) | CHANGELOG v2.25.24–32 / monitor `20260420-W22-T3-final.md` |
 | panda-on-desk 子包用例 | **226+ pass** + 后续波次新加（a11y 13 / logger 14 / telemetry 12 / window-lifecycle / petStats.migration / benchmarks 7 / perf 12 / perf-v2 10 / e2e-real-process 13 / screenshots 8 / a11y-headless / startup 5 / real-screenshots 4 + ...） | CHANGELOG v2.25.0–v2.25.15 / `packages/panda-on-desk/test/` |
 | 子包测试目录 | `packages/panda-on-desk/test/` | — |
 | 关键模块覆盖率 | **+74.32%** (W10-T1 retry 提升基线) | CHANGELOG v2.25.14 |
@@ -131,9 +134,42 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 ---
 
-## 4. 21 波端到端 agent 交付列表（v2.22.0 → v2.25.30 · 42 版本）
+## 4. 23 波端到端 agent 交付列表（v2.22.0 → v2.25.32 · 44 版本 · 23h 无人值守）
 
-> 完整变更详见 [`../../CHANGELOG.md`](../../CHANGELOG.md)。本节仅列「commit + 关键交付」一行表。
+> 完整变更详见 [`../../CHANGELOG.md`](../../CHANGELOG.md)。本节仅列「commit + 关键交付 + agent ID + 测试数」一行表。
+
+### 4.0 4 大里程碑（按时间线）
+
+| # | 里程碑 | 版本 | 波次 | commit | agent | 量化指标 |
+|---|---|---|---|---|---|---|
+| 1 | **W14 — 0 fail 全量基线** | v2.25.24 | W15-T2 | `febb4be` | agent-β-W15-tail-fails | 1473 pass / **0 fail** · 自 v2.18 以来首次 ✅ |
+| 2 | **W15 — Mac 黑框 nuclear fix** | v2.25.30 | W21-P0 | `f24f9c4` | agent-fix-mac-blackbar-deep | 5 重根因彻底修 + 7 W21-P0-NUCLEAR regression 用例 |
+| 3 | **W16 — 真 Win NSIS .exe 100MB** | v2.25.25 | W16-T4 | `834dd9c` | agent-δ-W16-dmg | `panda-on-desk Setup 0.1.0-alpha.exe 100.25MB` 真出包 |
+| 4 | **W22 — RELEASE_NOTES + desk-v1.0.3** | v2.25.31/32 | W22-T3/T4 | `2030ed1` / `d6353f6` | agent-γ-W22-final + agent-δ-W22-desk-release | 32 版本端到端总结 + 4 release tags 全部就位 |
+
+### 4.0.1 4 个 P0 收尾（按时间线）
+
+| # | P0 | 版本 | commit | 根因 | 修复要点 |
+|---|---|---|---|---|---|
+| 1 | **MatrixHUD null usage crash** | v2.25.16 | `cf336a2` | usage prop null 时 destructure crash | 默认 `{usage = {}}` + 三级字段 nullish coalesce |
+| 2 | **`panda --install-desk` workspace install** | v2.25.17 | `4b4a6fe` | `npm install` 不识别 bun `workspace:*` 协议 → EUNSUPPORTEDPROTOCOL | `npm install --install-links --workspaces=false` 组合 / fallback bun install |
+| 3 | **Mac 双 panda（dup spawn）** | v2.25.20 | `39c5aca` | `maybeSpawnOnDesk` 重复 spawn | PID 锁 + `~/.pandacc/desk-runtime.lock` 文件互斥 |
+| 4 | **Mac 顶部黑框 5 重根因** | v2.25.30 | `f24f9c4` | mainWin transparent+panel+alwaysOnTop / reapplyMacVisibility / popupMenuAt callback owner / ensureContextMenuOwner parent / mainWin transparent+0,0 起点 | 5 重根因彻底修 + nuclear regression 用例守护 |
+
+### 4.0.2 关键质量指标当前值（W22-T3 baseline）
+
+| 指标 | 当前值 | 阈值 / 改善 | 锚点 |
+|---|---|---|---|
+| **bun test 全量 fail** | **0** | 0 fail（W14 起持续 8 波守住） | `monitor/20260420-W22-T3-final.md` §1.1 |
+| **bun test 全量 pass** | **1654** | + 1 skip · 7874 expect() · 99 files · 39.81s | 同上 |
+| **关键模块覆盖率** | **+74.32%** | W10-T1 retry 提升基线 | CHANGELOG v2.25.14 |
+| **startup 性能** | **-67.3%** | W20-T2 性能 v4 (5 优化 · 5 路径平均) | `monitor/20260420-W20-T2-perf-v4.md` |
+| **dist-electron 体积** | **282 MB** | -45 MB / -14% (327 → 282) · W19-T2 | `monitor/20260420-W19-T2-size.md` |
+| **Win NSIS 安装包** | **100.25 MB** | 真 build 出（W16-T4） | `monitor/20260420-W16-T4-dmg.md` |
+| **运行时 RSS** | **158 MB** | 启动 112MB → 5min 等价负载 158MB（delta 45.51MB << 50MB 阈值）· W21-T4 | `monitor/20260420-W21-T4-perf-v5.md` |
+| **APNG 真动图** | **42 帧 / 508 KB** | 7 状态 · GitHub 自动播放 · W16-T1 | `monitor/20260420-W16-T1-apng.md` |
+| **anthropic byte-equal** | **0 字节漂移** | 33 版本 0 触碰 `claude.ts` / `oauth/*` / `providers.ts` | 每次发版前 `git diff main` 输出空 |
+| **0 新依赖** | ✅ 全程未触碰 `package.json deps` | 仅复用既有依赖 / 自写纯函数 / Electron 内建 API | 全 23 波 |
 
 | # | 版本 | Commit | 日期 | 关键交付 |
 |---|---|---|---|---|
@@ -179,15 +215,47 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 | 40 | v2.25.28 | `2286e8c` / `bf9e921` / `3205f15` | 2026-04-20 | **波 19 全 4/4**：autoconnect handshake + dist-electron **-45MB**（327→282MB）+ crash 自动恢复 + desk-v1.0.2 重触发 |
 | 41 | v2.25.29 | `b501aba` | 2026-04-20 | **波 20 全 4/4**：Mac dmg 三路径 guide + 性能 v4 **startup -67.3%** + Pages 死链修 + 综合验证 1560 pass / 0 fail |
 | 42 | v2.25.30 | `f24f9c4` | 2026-04-20 | 🚨 **P0 Mac 顶部黑框深度彻查修复**（5 重根因 nuclear fix）：mainWin 删 transparent+panel+alwaysOnTop / reapplyMacVisibility 排除 / popupMenuAt 切 hitWin / ensureContextMenuOwner parent 优先 hitWin / 7 W21-P0-NUCLEAR regression 守护 |
+| 43 | v2.25.31 | `9a9c19e` | 2026-04-20 | **波 21 全 4/4**：W21-T1 Mac e2e mock（21 pass · 覆盖 v2.25.30 nuclear 5 重根因 regression） + W21-T2 demo polish（首启场景脚本 / 时间轴 / 三件套触发 / welcome 升级） + W21-T3 README v4 终极打磨 + W21-T4 性能 v5 RSS 158MB（SVG cache LRU + 5MB 字节上限 / Badge cap 256 LRU / 1h-stress 套件 5 pass · delta 45.51MB << 50MB） |
+| 44 | v2.25.32 | `c3b81a1` | 2026-04-20 | **波 22 全 4/4**：W22-T1 多屏支持（display-select.ts NEW · displayId prefs · 2 IPC handler · settings 下拉 · i18n 三语 · 22 用例） + W22-T2 mini-pet 动画 4 组帧表（idle 4 / thinking 2 / working 2 / sleeping 2 · 700ms tick） + 与 desk 同步（isDeskRunning gate · 16+ 用例） + W22-T3 最终验证 1654 pass / 0 fail / 7874 expect · `RELEASE_NOTES_v2.25.md` 新建 + W22-T4 desk-v1.0.3 最终触发 + README/CHANGELOG 收尾 |
 
-> **byte-equal 守护**：42 版本 0 触碰 `src/services/api/claude.ts` / `src/services/oauth/*` / `src/services/api/providers.ts`（每次发版前 `git diff main` 输出空验证）。
+> **byte-equal 守护**：44 版本 0 触碰 `src/services/api/claude.ts` / `src/services/oauth/*` / `src/services/api/providers.ts`（每次发版前 `git diff main` 输出空验证；W23-T2 复核 `wc -l = 0`）。
 
-### 4.1 桌面 GA tag
+### 4.1 桌面 GA tag（4 个全部就位）
 
-| Tag | 状态 | 说明 |
-|---|---|---|
-| `desk-v1.0.0` | 已推（W5-T2） | 远端 ls-remote 可见；release UI artifacts 待 token 验证（W7-T1 报 0/5，W11-T1 修正：API 404 ≠ tag 未达） |
-| `desk-v1.0.1` | **已推（W11-T1）** | workflow 加固后重触发；ls-remote 验证 ref + dereferenced `^{}` 在远端；指挥官需 GH token / web UI 看 Actions 状态 |
+| Tag | 状态 | tag commit | 说明 |
+|---|---|---|---|
+| `desk-v1.0.0` | 已推（W5-T2） | `605ffdc...` | 远端 ls-remote 可见；release UI artifacts 待 token 验证（W7-T1 报 0/5，W11-T1 修正：API 404 ≠ tag 未达） |
+| `desk-v1.0.1` | **已推（W11-T1）** | `f9ac902...` | workflow 加固后重触发；ls-remote 验证 ref + dereferenced `^{}` 在远端 |
+| `desk-v1.0.2` | **已推（W19-T4）** | `c9747eb...` | version sync + icns/ico 占位检测 + 真 NSIS 出包验证后重触发 |
+| `desk-v1.0.3` | **已推（W22-T4）** | `f2ed5ff...` | v2.25.31/32 32 版本累计加固后最终触发：含 Mac 黑框 5 重根因 nuclear fix + startup -67.3% + RSS 158MB + dist -45MB + autoconnect + crash 自动恢复 |
+
+### 4.2 23 波概览表（agent ID + 测试数）
+
+| 波 | 主题 | 主 agent ID | 新增测试数 | 关键 commit |
+|---|---|---|---|---|
+| W1 | 自动启动 + 美工 + dist + IPC | agent-α/β/γ/δ-W1 | +50 | `687e864` |
+| W2 | 18 物种 + XP 进度条 + 103 通知 + 交互 | agent-α/β/γ/δ-W2 | +60 | `687e864` |
+| W3 | 系统托盘 + 5 选项设置 + 跨平台 dry-run | agent-α/β-W3 | +30 | `006c215` |
+| W4 | 自动启动稳定 + 14 物种 SVG + release 准备 | agent-α/β/γ-W4 | +20 | `d981901` |
+| W5 | 真 e2e + i18n 三语 + 性能 polish + GitHub Release | agent-α-W5-e2e + agent-γ-W5-i18n + agent-δ-W5-perf | +25 | `52f3dad` / `9db4185` |
+| W6 | CI workflow 加固 + 9 PNG 截图 + bundle 优化 + 用户文档 | agent-α/β/γ/δ-W6 | +18 | `fc0a006` / `4443da4` |
+| W7 | README 视觉化 + 测试加固 +48 + 子包文档 | agent-β/γ/δ-W7 | +48 | `bc04567` |
+| W8 | a11y WCAG 2.1 AA + logger + 7 性能基准 + deps 0 vulns | agent-β/γ/δ-W8 + agent-α-W8-deps-retry | +35 | `8f33b8f` / `108f2bd` |
+| W9 | lint + telemetry/PRIVACY + LICENSE/NOTICE + 安装实测 | agent-α/γ/δ-W9 + agent-β-W9-install-sim-retry | +25 | `8bb49ea` / `80d5e27` |
+| W10 | 9 PNG 视觉升级 + GitHub Pages docs + 覆盖率 +74% + tsc 修 105 | agent-α/β/γ/δ-W10 | +12 | `4634ba8` / `0491314` |
+| W11 | desk-v1.0.1 + 真 electron headless 7 截屏 + README 精装 + startup -9.2% | agent-α/β/γ/δ-W11 | +9 | `d3cd8d7` |
+| W12 | badges + STATUS.md 新建 + 死链修 + CHANGELOG 补 | agent-α/β/γ/δ-W12 + agent-fix-matrix-hud | +6 | `cf336a2` |
+| W13 | e2e +8 + launch 跨平台 + Matrix 修 6 + frozen 修 1 | agent-α/β/γ/δ-W13 | +14 | `eb13780` |
+| W14 | hit IPC 全接通 + overlay 真弹出 + tray 真实装 + demo 模式 | agent-α/β/γ/δ-W14 | +25 | `d52e338` / `fddb1ac` |
+| **W15** | hit.html 真 hook + **0 fail 里程碑** + CHANGELOG/badges + Mac dry-run | agent-α/β/γ/δ-W15 | +56 | **`febb4be` 🎉** |
+| **W16** | APNG 真动图 + `/buddy desk` + settings 真读写 + **真 Win NSIS 100MB** | agent-α/β/γ/δ-W16 | +55 | **`834dd9c`** |
+| W17 | Linux unpacked 327MB + APNG 嵌入 + demo 深化 20s + 基准 0 回归 | agent-α/β/γ/δ-W17 | +24 | `95564bf` / `4420499` |
+| W18 | AppImage rootcause + 键盘 a11y v2 + 真 spawn 修 1 bug + stats 可视化 | agent-α/β/γ/δ-W18 | +51 | `3f9add2` |
+| W19 | autoconnect handshake + dist -45MB + crash 自动恢复 + desk-v1.0.2 | agent-α/β/γ/δ-W19 | +43 | `2286e8c` / `bf9e921` / `3205f15` |
+| W20 | Mac dmg 三路径 guide + 性能 v4 startup -67% + Pages 死链修 + 综合验证 | agent-α/β/γ/δ-W20 | +9 | `b501aba` |
+| W21 | Mac e2e nuclear 21 用例 + demo polish + README v4 + 性能 v5 RSS 158MB | agent-α/β/γ/δ-W21 + agent-fix-mac-blackbar-deep | +33 | `9a9c19e` / `f24f9c4` |
+| W22 | 多屏支持 + mini-pet 动画/同步 + **最终验证 1654/0 + RELEASE_NOTES** + **desk-v1.0.3** | agent-α/β/γ/δ-W22 | +56 | `c3b81a1` / `2030ed1` / `26c6776` / `d6353f6` |
+| **W23** | 文档收官（W23-T2 STATUS final + monitor 总览） | agent-β-W23-status-final | 0（仅文档） | （本波） |
 
 ---
 
@@ -298,17 +366,19 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.config\panda"
 
 | 出处 | 版本号 | 状态 |
 |---|---|---|
-| `package.json` (主仓) version | `2.25.30` | ✅ source of truth (W21-T3 已同步) |
+| `package.json` (主仓) version | `2.25.32` | ✅ source of truth (W22-T3 已同步) |
 | `packages/panda-on-desk/package.json` version | `0.1.0-alpha` | ✅（子包内部版本，对外用 desk-vX.Y.Z tag） |
-| 主仓 CHANGELOG 顶部说明 | "v2.22.0 → v2.25.30" | ✅（W21-T3 已修） |
-| 子包 README badge | `version-2.25.23` | ⚠️ 落后（建议下波同步到 v2.25.30） |
+| 主仓 CHANGELOG 顶部说明 | "v2.22.0 → v2.25.31" → 本波 W23-T2 同步到 v2.25.32 | ✅ |
+| 主仓 README badge | `version-v2.25.31` / `tests-0%20fail%20%7C%201654%20pass` / `desk--v1.0.2` → 本波 W23-T2 同步到 v2.25.32 / desk-v1.0.3 | ✅ |
+| 子包 README badge | `version-2.25.23` | ⚠️ 落后（W23+ 建议同步到 v2.25.32） |
 | 子包 README §当前版本 | `v1.0 GA（Phase 3 收尾）` | ✅ |
-| 子包 ARCHITECTURE 基线 | `v2.25.7` | ⚠️ 落后（建议下波同步） |
+| 子包 ARCHITECTURE 基线 | `v2.25.7` | ⚠️ 落后（W23+ 建议同步） |
 | 子包 CONTRIBUTING 基线 | `v2.25.7` | ⚠️ 落后 |
 | 子包 PRIVACY 当前事实 | `v2.25.x · v1.0 GA 阶段` | ✅（弹性范围标注） |
 | 子包 docs/index 基线 | `v2.25.7 → v2.25.12` | ⚠️ 落后 |
 | 主仓 README 桌面端段 | `v2.25.0+` | ✅（弹性范围标注） |
-| 主仓 README 安装包段 | `v1.0.1+` | ✅（W11-T1 已同步） |
+| 主仓 README 安装包段 | `v1.0.3+` | ✅（W22-T4 已同步） |
+| 子包 RELEASE_NOTES_v2.25.md | `v2.25.0 → v2.25.31 共 32 版本` | ✅（W22-T3 新建） |
 
 ---
 
@@ -320,8 +390,12 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.config\panda"
 - 架构深潜：[`./ARCHITECTURE.md`](./ARCHITECTURE.md)
 - 隐私契约：[`./PRIVACY.md`](./PRIVACY.md)
 - 法律文件：[`./LICENSE`](./LICENSE) · [`./NOTICE`](./NOTICE)
+- v2.25 系列总结：[`./RELEASE_NOTES_v2.25.md`](./RELEASE_NOTES_v2.25.md)（W22-T3 新建）
 - W11-T1 CI 重触发实证：`monitor/20260420-W11-T1-ci-retrigger.md`
-- W12-T4 文档审计本次落盘：`monitor/20260420-W12-T4-docs-audit.md`
+- W12-T4 文档审计落盘：`monitor/20260420-W12-T4-docs-audit.md`
+- W22-T3 最终综合验证：`monitor/20260420-W22-T3-final.md`
+- W22-T4 desk-v1.0.3 触发：`monitor/20260420-W22-T4-desk-release.md`
+- W23-T2 STATUS 总览定稿（本波）：`monitor/20260420-W23-T2-status-final.md`
 
 ---
 
