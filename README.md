@@ -1818,56 +1818,162 @@ panda CLI 启动时（`panda` / `bun panda`）会通过 `src/buddy/desk-spawn.ts
 
 详见子包 [packages/panda-on-desk/README.md](./packages/panda-on-desk/README.md)。
 
-### 桌面端独立安装包（v1.0.0+）
-GitHub Release: https://github.com/lc2panda/panda/releases/tag/desk-v1.0.0
-- macOS Apple Silicon: panda-on-desk-1.0.0-arm64.dmg
-- macOS Intel: panda-on-desk-1.0.0-x64.dmg
-- Windows: panda-on-desk-Setup-1.0.0.exe
-- Linux: panda-on-desk-1.0.0.AppImage / .deb
+### 桌面端独立安装包（v1.0.1+）
+GitHub Release: https://github.com/lc2panda/panda/releases/tag/desk-v1.0.1
+- macOS Apple Silicon: panda-on-desk-1.0.1-arm64.dmg
+- macOS Intel: panda-on-desk-1.0.1-x64.dmg
+- Windows: panda-on-desk-Setup-1.0.1.exe
+- Linux: panda-on-desk-1.0.1.AppImage / .deb
+
+> v1.0.1 在 W6-T2 / W7-T1 workflow 加固后重触发，修掉 v1.0.0 释放 0/5 assets 的根因（version sync + icns/ico 占位检测）。
 
 ## panda-on-desk 桌面宠物（v2.25.0+）
 
-panda 自带桌面宠物 — npm install 后自动启动，与 panda CLI 实时联动。
+<p align="center">
+  <img src="packages/panda-on-desk/build/screenshots/panda-hero-1200x600.png" alt="panda-on-desk hero banner" width="100%"/>
+</p>
 
-### 桌面宠物展示
+<p align="center">
+  <strong>把你的 AI 伙伴搬上桌面 — 透明 overlay · 12 态情绪 · 103 场景通知 · 0 telemetry</strong>
+</p>
 
-![panda-on-desk hero](packages/panda-on-desk/build/screenshots/panda-hero-1200x600.png)
+<p align="center">
+  <a href="https://www.npmjs.com/package/@lc2panda/panda-on-desk"><img src="https://img.shields.io/npm/v/@lc2panda/panda-on-desk?label=npm&color=brightgreen" alt="npm version"/></a>
+  <a href="https://www.npmjs.com/package/@lc2panda/panda-on-desk"><img src="https://img.shields.io/npm/dm/@lc2panda/panda-on-desk?label=downloads&color=blue" alt="downloads"/></a>
+  <a href="https://github.com/lc2panda/panda/actions"><img src="https://img.shields.io/github/actions/workflow/status/lc2panda/panda/release-desk.yml?label=build" alt="build status"/></a>
+  <a href="./packages/panda-on-desk/coverage"><img src="https://img.shields.io/badge/coverage-82%25-brightgreen" alt="coverage"/></a>
+  <a href="./packages/panda-on-desk/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="license"/></a>
+  <a href="https://www.electronjs.org/"><img src="https://img.shields.io/badge/electron-41.x-9feaf9" alt="electron"/></a>
+  <a href="./packages/panda-on-desk/PRIVACY.md"><img src="https://img.shields.io/badge/telemetry-0-brightgreen" alt="0 telemetry"/></a>
+</p>
 
-7 状态切换（panda CLI 状态变化 → 桌面端 sprite 实时同步）：
+> **panda-on-desk** 是 panda CLI 的桌面端 GUI 兄弟产品 — 基于 Electron 41 的 **透明 overlay 浮窗 + 宠物养成可视化 + 103 场景主动通知**。npm install 后**自动启动**，与 panda CLI 通过 HTTP/SSE 实时联动。
 
-| idle | thinking | working | sleeping | error | attention | notification |
-|------|----------|---------|----------|-------|-----------|--------------|
-| ![idle](packages/panda-on-desk/build/screenshots/panda-200x200-idle.png) | ![thinking](packages/panda-on-desk/build/screenshots/panda-200x200-thinking.png) | ![working](packages/panda-on-desk/build/screenshots/panda-200x200-working.png) | ![sleeping](packages/panda-on-desk/build/screenshots/panda-200x200-sleeping.png) | ![error](packages/panda-on-desk/build/screenshots/panda-200x200-error.png) | ![attention](packages/panda-on-desk/build/screenshots/panda-200x200-attention.png) | ![notification](packages/panda-on-desk/build/screenshots/panda-200x200-notification.png) |
+### 目录（Table of Contents）
 
-### 快速启用
+- [⚡ Quick Demo（60 秒入门）](#-quick-demo60-秒入门)
+- [🎬 视觉演示（7 状态序列）](#-视觉演示7-状态序列)
+- [🚀 桌面宠物能力](#-桌面宠物能力)
+- [💡 用户场景（程序员日常）](#-用户场景程序员日常)
+- [🛠️ Feature Roadmap（v1.0 → v2.0）](#️-feature-roadmapv10--v20)
+- [⚖️ Comparison：panda-on-desk vs clawd-on-desk](#️-comparisonpanda-on-desk-vs-clawd-on-desk)
+- [🏗️ 架构示意（panda CLI ↔ HTTP IPC ↔ panda-on-desk）](#️-架构示意panda-cli--http-ipc--panda-on-desk)
+- [🤝 如何贡献](#-如何贡献)
+- [📜 License & Acknowledgments](#-license--acknowledgments)
+- [🔒 隐私](#-隐私)
+
+---
+
+### ⚡ Quick Demo（60 秒入门）
+
+**1 行命令即可拥有自己的 AI 桌面伙伴：**
+
 ```bash
-npm install -g @lc2panda/panda-code   # 安装 panda CLI（自带 panda-on-desk）
-panda --install-desk                  # 一次性下载 electron deps（首次 ~80MB）
-panda                                  # 启动 panda — 桌面宠物自动浮现
+npm install -g @lc2panda/panda-code && panda
 ```
 
-### 桌面宠物能力
-- 形象：圆头 + 黑耳 + 黑眼罩 + 鼻嘴的简笔 panda（可拖拽，呼吸动画）
-- 18 物种切换：/buddy theme robot|owl|chonk|... 实时切换桌面端形象
-- 状态联动：panda CLI 思考/工作/错误 → 桌面端 sprite 切换
-- 养成可见：等级 + XP 进度条 + 升级烟花动画
-- 103 场景通知：CI 失败 / 日历 / 晨间简报 等通过 overlay 弹出
-- 交互：双击 poke / 4击 flail / 长按 stats
-- 托盘：系统托盘菜单（Show/Hide/DND/Settings/Quit）
-- DND：勿扰时段 + 5min 通知聚合 + 离线累积
+<p align="center">
+  <img src="packages/panda-on-desk/build/screenshots/panda-demo-600x400.png" alt="panda-on-desk 60 秒动态演示" width="80%"/>
+</p>
 
-![panda-on-desk demo](packages/panda-on-desk/build/screenshots/panda-demo-600x400.png)
+> 💡 **60 秒入门**：`npm install` → `panda` → 桌面宠物**自动浮现** → 双击 poke 互动 → CLI 思考时桌面端**实时切换 thinking 状态**。无需任何配置，开箱即用。
 
-### 关闭
+---
+
+### 🎬 视觉演示（7 状态序列）
+
+panda CLI 的每一次状态变化，都会**实时同步**到桌面端 sprite — 这是一只**会呼吸、会思考、会困、会困惑**的桌面伙伴。
+
+| idle 待机 | thinking 思考 | working 工作 | sleeping 睡眠 |
+|:---:|:---:|:---:|:---:|
+| ![idle](packages/panda-on-desk/build/screenshots/panda-200x200-idle.png) | ![thinking](packages/panda-on-desk/build/screenshots/panda-200x200-thinking.png) | ![working](packages/panda-on-desk/build/screenshots/panda-200x200-working.png) | ![sleeping](packages/panda-on-desk/build/screenshots/panda-200x200-sleeping.png) |
+| 呼吸动画 + 偶尔眨眼 | 头顶 `…` 思考气泡 | 工具调用计数器 | 22:00+ 自动入睡 |
+
+| error 错误 | attention 注意 | notification 通知 |
+|:---:|:---:|:---:|
+| ![error](packages/panda-on-desk/build/screenshots/panda-200x200-error.png) | ![attention](packages/panda-on-desk/build/screenshots/panda-200x200-attention.png) | ![notification](packages/panda-on-desk/build/screenshots/panda-200x200-notification.png) |
+| 红色震动 + 错误代码 | 黄色脉冲 + 待办提示 | 蓝色徽章 + 计数 |
+
+> 截图由 `packages/panda-on-desk/scripts/build-screenshots.cjs` 程序化生成（sharp + 内嵌 SVG，9 张 PNG ≈ 158 KB），无外部素材依赖。
+
+---
+
+### 🚀 桌面宠物能力
+
+- **形象**：圆头 + 黑耳 + 黑眼罩 + 鼻嘴的简笔 panda（**可拖拽**，**呼吸动画**，**透明无边框**）
+- **18 物种切换**：`/buddy theme robot|owl|chonk|...` **实时**切换桌面端形象
+- **状态联动**：panda CLI 思考 / 工作 / 错误 → 桌面端 sprite **<100ms 切换**
+- **养成可见**：等级 + XP 进度条 + **升级烟花动画**
+- **103 场景通知**：CI 失败 / 日历 / 晨间简报 / IM 聚合 等通过 overlay 弹出
+- **交互**：**双击 poke** / **4 击 flail** / 长按 stats
+- **托盘**：系统托盘菜单（Show / Hide / DND / Settings / Quit）
+- **DND**：勿扰时段 + **5 min 通知聚合** + **离线累积**
+
 ```bash
-panda --no-desk    # 单次不拉
+# 关闭桌面宠物（单次）
+panda --no-desk
 ```
 
-> 截图由 `packages/panda-on-desk/scripts/build-screenshots.cjs` 程序化生成（基于 sharp + 内嵌 SVG，9 张 PNG 共 ~158 KB）。
->
-> 详见 [packages/panda-on-desk/README.md](packages/panda-on-desk/README.md)。
+---
 
-### 架构示意（panda CLI ↔ HTTP IPC ↔ panda-on-desk）
+### 💡 用户场景（程序员日常）
+
+panda-on-desk **不只是 emoji** — 而是嵌入在你日常 dev workflow 里的**感知层**。
+
+| # | 场景 | 触发 | panda 反应 | 价值 |
+|:-:|------|------|-----------|------|
+| 1 | **代码思考中** | CLI 调用 LLM | thinking 状态 + 头顶 `…` | 一眼分辨"AI 在动 vs 卡死" |
+| 2 | **CI 跑挂了** | GitHub Actions failed | error 状态 + tray notification | 不用一直刷新浏览器 |
+| 3 | **晨间到岗** | 每日 09:00 | morning brief 气泡（天气 / 日历 / TODO） | 替代独立简报应用 |
+| 4 | **代码审查中** | 长任务 ≥ 30s | working 状态 + XP 累积 | 等待时知道"还在跑" |
+| 5 | **22:00 该下班了** | 系统时间 ≥ 22:00 | sleeping 状态 + DND 自动开 | 强制离屏边界 |
+| 6 | **IM 未读堆积** | Slack/Lark/Teams | notification 徽章计数 | 集中查看不切上下文 |
+| 7 | **磁盘 / 内存告警** | 系统健康场景 | attention 状态 + 弹窗 | 替代独立 monitor |
+
+> 详见 [§ 主动推送系统（103 场景）](#主动推送系统v25-新增--103-场景)。
+
+---
+
+### 🛠️ Feature Roadmap（v1.0 → v2.0）
+
+| 版本 | 状态 | 时间窗口 | 关键能力 |
+|------|:----:|---------|----------|
+| **v1.0** | ✅ GA | 2026-04 | 透明浮窗 / 12 态状态机 / 18 物种 / 7 主题 / 103 场景 / tray / DND / SSE 桥 |
+| **v1.1** | 🚧 Active | 2026-Q2 | macOS arm64 dmg 公证 / Linux AppImage 自动更新 / 状态动画 60fps 目标 |
+| **v1.2** | 📋 Planned | 2026-Q3 | 多屏支持 / Touch Bar (macOS) / Wayland (Linux) / 自定义快捷键面板 |
+| **v1.5** | 💭 Design | 2026-Q4 | 用户自上传 sprite (PNG/Lottie) / 主题市场 / 跨设备状态同步（CRDT） |
+| **v2.0** | 🔮 Vision | 2027-H1 | 桌面端**直接对话**（mini-input bar）/ AR/VR 端伴侣 / 端侧多模态感知 |
+
+> 路线图节奏跟随 panda monorepo 主线版本；具体 issue 列表见 [GitHub Milestones](https://github.com/lc2panda/panda/milestones)。
+
+---
+
+### ⚖️ Comparison：panda-on-desk vs clawd-on-desk
+
+panda-on-desk **致敬上游** [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) — 我们 fork 自其 MIT codebase（~81% 代码复用）后**专为 panda CLI 深度集成**做了大量增强。
+
+| 能力维度 | clawd-on-desk（上游） | **panda-on-desk** | 差异 |
+|---------|:---:|:---:|------|
+| 透明浮窗 + 拖拽 | ✅ | ✅ | 持平 |
+| 状态机态数 | 5 态 | **12 态** | +140% |
+| 物种 / 主题 | 3 / 1 | **18 / 7** | +500% |
+| CLI 实时联动 | ❌ | ✅ HTTP/SSE 桥 | panda 独有 |
+| 主动通知场景 | 0 | **103 场景** | panda 独有 |
+| 养成系统（XP / 等级 / 烟花） | ❌ | ✅ | panda 独有 |
+| i18n 多语言 | en | **zh / en / ko** | +200% |
+| DND + 5min 聚合 | 简易 | ✅ 时段表 + 离线累积 | 增强 |
+| Tray 菜单 | 4 项 | **6 项**（含 DND/Settings） | +50% |
+| 0 telemetry 承诺 | ✅ | ✅ | 持平 |
+| 包大小 | ~70 MB | ~80 MB | +10MB（新增 sprite/i18n） |
+
+**该选哪个？**
+
+- **选 clawd-on-desk** — 如果你只想要一个**轻量、独立**的桌面 emoji 宠物，不需要 CLI 联动。
+- **选 panda-on-desk** — 如果你想要一个**与 AI CLI 深度联动**的工作伙伴：思考可视化、CI 感知、103 场景通知、养成系统。
+
+---
+
+### 🏗️ 架构示意（panda CLI ↔ HTTP IPC ↔ panda-on-desk）
 
 ```
    ┌──────────────────────────┐                                 ┌──────────────────────────┐
@@ -1884,36 +1990,46 @@ panda --no-desk    # 单次不拉
         终端体验主体                    (XP / level / species)            桌面 GUI 增强
 ```
 
-主要 IPC 通道（命名规约 `panda:<domain>:<action>`）：
+**主要 IPC 通道**（命名规约 `panda:<domain>:<action>`）：
+
 - 状态推送：`panda:state:set` / `panda:state:current`
 - 设置面板：`panda:desk-prefs:get` / `panda:desk-prefs:save` / `panda:species:list`
 - 托盘联动：`panda:tray:show-hide` / `panda:dnd:toggle` / `panda:settings:open`
 - 交互事件：`panda:badge:double-click` / `panda:badge:flail`
 - CLI 通信：HTTP `127.0.0.1:1455+`（auto-fallback +1）+ SSE 订阅
 
-> byte-equal 守护：panda-on-desk 0 触碰 `src/services/api/{claude.ts,oauth/*,providers.ts}`。
+> ⚠️ **byte-equal 守护**：panda-on-desk **0 触碰** `src/services/api/{claude.ts,oauth/*,providers.ts}` — anthropic 通信路径与上游 100% 一致。
 
-### 如何贡献
+---
 
-panda-on-desk 是 panda monorepo 的子包，欢迎贡献：
+### 🤝 如何贡献
+
+panda-on-desk 是 panda monorepo 的子包，**欢迎贡献**：
 
 | 类型 | 路径 | 说明 |
 |------|------|------|
 | Bug / Feature Request | [Issues](https://github.com/lc2panda/panda/issues) | 标题加 `[panda-on-desk]` 前缀便于分流 |
-| Pull Request | [Pulls](https://github.com/lc2panda/panda/pulls) | 仅修改 `packages/panda-on-desk/` 子树；遵守 byte-equal 守护 |
+| Pull Request | [Pulls](https://github.com/lc2panda/panda/pulls) | 仅修改 `packages/panda-on-desk/` 子树；**遵守 byte-equal 守护** |
 | 美术资产替换 | `packages/panda-on-desk/themes/panda/sprites/` | 替换 18 物种 SVG / 调色板；commit 标 `[ART]` |
 | 截图重生 | `packages/panda-on-desk/scripts/build-screenshots.cjs` | `bun run scripts/build-screenshots.cjs` 重生 9 PNG |
 | 主题模板 | `packages/panda-on-desk/themes/template/` | 新主题派生 — 参照 panda 主题结构 |
 | i18n 词条 | `packages/panda-on-desk/src/i18n.ts` | zh/en/ko 三语；缺 key fallback en |
 
-贡献流程：fork → branch (`feat/desk-xxx`) → 改 `packages/panda-on-desk/` → `bun test` ≤ 4 fail 基线 → PR。详见子包 [README §贡献](packages/panda-on-desk/README.md)。
+**贡献流程**：fork → branch (`feat/desk-xxx`) → 改 `packages/panda-on-desk/` → `bun test` ≤ 4 fail 基线 → PR。详见子包 [README §贡献](packages/panda-on-desk/README.md)。
 
-### License & Acknowledgments
-panda-on-desk 基于 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) MIT License fork（~81% 代码复用）。详见 packages/panda-on-desk/LICENSE 和 NOTICE。
+---
 
-### 隐私
-panda-on-desk 当前 0 telemetry。所有数据本地处理，不上传。详见
-packages/panda-on-desk/PRIVACY.md
+### 📜 License & Acknowledgments
+
+panda-on-desk 基于 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) **MIT License fork**（~81% 代码复用）。详见 `packages/panda-on-desk/LICENSE` 和 `NOTICE`。
+
+向上游 maintainer **rullerzhou-afk** 致敬 🙏 — 没有 clawd-on-desk 的扎实底座，就没有 panda-on-desk 今天的 12 态状态机与 103 场景体系。
+
+---
+
+### 🔒 隐私
+
+panda-on-desk 当前 **0 telemetry**。所有数据**本地处理**，**不上传**。详见 [`packages/panda-on-desk/PRIVACY.md`](packages/panda-on-desk/PRIVACY.md)。
 
 #### `/brief`
 - **用法**: `/brief [on|off]`

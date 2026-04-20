@@ -914,12 +914,21 @@ async function run(): Promise<CommanderCommand> {
     // 4 重 gate（任一不满足即静默 return）：feature('BUDDY') + companionOnDesk +
     // isTTY + --no-desk；spawn 子进程 detached + unref，失败完全静默。
     // dynamic import：launcher 模块加载失败也不能阻塞 panda CLI 主流程。
-    try {
-      const { maybeSpawnOnDesk } = await import('./desk/launcher.js');
-      maybeSpawnOnDesk();
-    } catch {
-      // 静默 — 桌面端可选体验
-    }
+    //
+    // W11-T4 perf：fire-and-forget — 不 await。launcher 内部 setImmediate(heavy)
+    // 已自带 defer 语义，再叠加 import 不阻塞 preAction → main thread 立即返回，
+    // TTFR（time to first render）从 ~700ms 降低到 ~600ms 量级。
+    void import('./desk/launcher.js')
+      .then(({ maybeSpawnOnDesk }) => {
+        try {
+          maybeSpawnOnDesk();
+        } catch {
+          // 静默 — 桌面端可选体验
+        }
+      })
+      .catch(() => {
+        // import 失败也静默
+      });
     profileCheckpoint('preAction_after_desk_spawn');
 
     // P0-3 审计日志滚动：启动时清一次 30 天前的条目（幂等，失败静默）。

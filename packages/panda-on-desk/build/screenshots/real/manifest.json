@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-04-20T03:50:39.904Z",
+  "pid": 19352,
+  "electron": "41.2.1",
+  "chrome": "146.0.7680.188",
+  "states": {
+    "idle": {
+      "file": "panda-real-200x200-idle.png",
+      "bytes": 18334,
+      "capturedAt": "2026-04-20T03:50:41.183Z"
+    },
+    "thinking": {
+      "file": "panda-real-200x200-thinking.png",
+      "bytes": 19172,
+      "capturedAt": "2026-04-20T03:50:41.708Z"
+    },
+    "working": {
+      "file": "panda-real-200x200-working.png",
+      "bytes": 19068,
+      "capturedAt": "2026-04-20T03:50:42.142Z"
+    },
+    "sleeping": {
+      "file": "panda-real-200x200-sleeping.png",
+      "bytes": 17649,
+      "capturedAt": "2026-04-20T03:50:42.963Z"
+    },
+    "error": {
+      "file": "panda-real-200x200-error.png",
+      "bytes": 18956,
+      "capturedAt": "2026-04-20T03:50:43.695Z"
+    },
+    "attention": {
+      "file": "panda-real-200x200-attention.png",
+      "bytes": 17619,
+      "capturedAt": "2026-04-20T03:50:43.973Z"
+    },
+    "notification": {
+      "file": "panda-real-200x200-notification.png",
+      "bytes": 17585,
+      "capturedAt": "2026-04-20T03:50:44.193Z"
+    }
+  }
+}
