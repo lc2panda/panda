@@ -1,17 +1,25 @@
 // Input:  src/desk/installer.ts 公共 API checkElectronInstalled / installPandaOnDeskDeps
 //         + 内部 helpers __locateDeskDirForTesting / __resetInstallerStateForTesting
-// Output: 8 测试用例 — 路径定位 / electron 检测三态 / 已装 short-circuit /
-//         npm 失败 / spawn 抛错 / 并发幂等 / 超时 / 常量对齐
+//         + P0 hotfix helpers __parseDepSpecForTesting / __createStageDirForTesting
+//         / __moveNodeModulesForTesting
+// Output: 11+ 测试用例 — 路径定位 / electron 检测三态 / 已装 short-circuit /
+//         npm 失败 / spawn 抛错 / 并发幂等 / 超时 / 常量对齐 /
+//         + P0 hotfix：dep spec 解析 / stage 目录隔离主仓 workspace:* /
+//                       node_modules 搬迁 + 冲突覆盖 / mv 失败回滚
 // Pos:    W4-T1 panda CLI 启动稳定性验证 — 桌面宠物 deps 按需安装闭环
 //         严守 anthropic byte-equal — 仅 node 内置 + 自家模块
 //
 // [NEW-FILE:#20260419-W4-03]
-// 2026-04-20 08:13 +08:00
+// 2026-04-20 08:13 +08:00 W4-T1 初版
+// 2026-04-20 14:25 +08:00 P0 hotfix v2.25.16 — workspace 隔离用例
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -20,7 +28,10 @@ import { join } from 'node:path'
 
 import {
   ELECTRON_DEPS,
+  __createStageDirForTesting,
   __locateDeskDirForTesting,
+  __moveNodeModulesForTesting,
+  __parseDepSpecForTesting,
   __resetInstallerStateForTesting,
   checkElectronInstalled,
   installPandaOnDeskDeps,
@@ -175,17 +186,18 @@ describe('installPandaOnDeskDeps · 幂等', () => {
     expect(result.code).toBe(0)
   })
 
-  test('deskDir 定位失败 → ok:false + 友好错误（不抛）', async () => {
+  test('deskDir 定位失败（npm 不存在）→ ok:false + 友好错误（不抛）', async () => {
+    // P0 hotfix 后 cwd 已切到 tmp stage，所以这里改用不存在的 npm 触发失败路径
+    // 验证仍能优雅返回 ok:false 而非抛出
     const result = await installPandaOnDeskDeps({
       deskDir: join(tmpDir, 'ghost', 'panda-on-desk'),
+      npmCmd: 'definitely-not-a-real-npm-zzz-locate-fail',
+      timeoutMs: 5000,
     })
-    // ghost 目录不存在 package.json → 走 short-circuit "未找到目录" 分支前
-    // 还是会先经过 checkElectronInstalled false → 进入 spawn 路径。
-    // 但因为 deskDir 显式给了一个不存在的目录，spawn cwd 会失败 → ok:false
     expect(result.ok).toBe(false)
     expect(typeof result.message).toBe('string')
     expect(result.message.length).toBeGreaterThan(0)
-  })
+  }, 15_000)
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -225,5 +237,217 @@ describe('installPandaOnDeskDeps · 进度日志', () => {
     // 至少有"开始安装"或"cwd"或"cmd"行
     const joined = lines.join('\n')
     expect(joined).toContain('panda-desk')
+  }, 15_000)
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P0 hotfix v2.25.16 用例组
+// 修复：v2.25.16 panda --install-desk 在 Mac 实测 EUNSUPPORTEDPROTOCOL
+//   "workspace:*" 报错。根因：原实现 cwd: deskDir 跑 npm install，npm 沿
+//   cwd 向上扫到主仓 package.json，撞上 9 个 workspace:* devDeps。
+// 修复策略：在 os.tmpdir() stage 目录隔离 npm install，完成后搬迁
+//   node_modules → deskDir。
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('__parseDepSpecForTesting · dep 规范解析', () => {
+  test('electron@41 → name=electron version=^41', () => {
+    const r = __parseDepSpecForTesting('electron@41')
+    expect(r.name).toBe('electron')
+    expect(r.version).toBe('^41')
+  })
+
+  test('electron-updater@6.8.3 → name=electron-updater version=^6.8.3', () => {
+    const r = __parseDepSpecForTesting('electron-updater@6.8.3')
+    expect(r.name).toBe('electron-updater')
+    expect(r.version).toBe('^6.8.3')
+  })
+
+  test('裸名（无版本）→ version=*', () => {
+    const r = __parseDepSpecForTesting('htmlparser2')
+    expect(r.name).toBe('htmlparser2')
+    expect(r.version).toBe('*')
+  })
+
+  test('已含 ^ 的版本 → 原样保留', () => {
+    const r = __parseDepSpecForTesting('koffi@^2.15.2')
+    expect(r.name).toBe('koffi')
+    expect(r.version).toBe('^2.15.2')
+  })
+
+  test('@scoped/pkg@1.0.0 取最后一个 @ → 名空间不丢失', () => {
+    const r = __parseDepSpecForTesting('@anthropic-ai/sdk@0.80.0')
+    expect(r.name).toBe('@anthropic-ai/sdk')
+    expect(r.version).toBe('^0.80.0')
+  })
+})
+
+describe('__createStageDirForTesting · stage 目录隔离', () => {
+  test('生成 tmp stage 目录 + 最小 package.json（无 workspace:*）', () => {
+    const stage = __createStageDirForTesting(ELECTRON_DEPS)
+    try {
+      // 1. 目录存在且在 os.tmpdir() 之下
+      expect(existsSync(stage)).toBe(true)
+      expect(stage.startsWith(tmpdir())).toBe(true)
+
+      // 2. package.json 存在 + 仅含 4 个核心 deps
+      const pkgRaw = readFileSync(join(stage, 'package.json'), 'utf-8')
+      const pkg = JSON.parse(pkgRaw)
+      expect(pkg.name).toBe('pandacc-desk-deps-stage')
+      expect(pkg.private).toBe(true)
+      expect(Object.keys(pkg.dependencies)).toHaveLength(4)
+      expect(pkg.dependencies['electron']).toBe('^41')
+      expect(pkg.dependencies['electron-updater']).toBe('^6.8.3')
+      expect(pkg.dependencies['koffi']).toBe('^2.15.2')
+      expect(pkg.dependencies['htmlparser2']).toBe('^12')
+
+      // 3. P0 关键断言：JSON 不含任何 workspace 协议字符串
+      //    （主仓 workspace:* devDeps 是本 bug 根因）
+      expect(pkgRaw).not.toContain('workspace:')
+
+      // 4. .npmrc 存在且为空（屏蔽继承）
+      expect(existsSync(join(stage, '.npmrc'))).toBe(true)
+      expect(readFileSync(join(stage, '.npmrc'), 'utf-8')).toBe('')
+    } finally {
+      rmSync(stage, { recursive: true, force: true })
+    }
+  })
+
+  test('多次调用 stage 目录互不冲突（mkdtemp 唯一性）', () => {
+    const a = __createStageDirForTesting(ELECTRON_DEPS)
+    const b = __createStageDirForTesting(ELECTRON_DEPS)
+    try {
+      expect(a).not.toBe(b)
+      expect(existsSync(a)).toBe(true)
+      expect(existsSync(b)).toBe(true)
+    } finally {
+      rmSync(a, { recursive: true, force: true })
+      rmSync(b, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('__moveNodeModulesForTesting · 搬迁与回滚', () => {
+  function mkStageWithNodeModules(entries: Array<{
+    name: string
+    files?: Record<string, string>
+  }>): string {
+    const stage = mkdtempSync(join(tmpdir(), 'panda-mv-stage-'))
+    const nm = join(stage, 'node_modules')
+    mkdirSync(nm, { recursive: true })
+    for (const e of entries) {
+      const dir = join(nm, e.name)
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(
+        join(dir, 'package.json'),
+        JSON.stringify({ name: e.name, version: '1.0.0' }),
+        'utf-8',
+      )
+      for (const [fname, fcontent] of Object.entries(e.files ?? {})) {
+        writeFileSync(join(dir, fname), fcontent, 'utf-8')
+      }
+    }
+    return stage
+  }
+
+  test('搬迁多个 entry → dest/node_modules/ 全部命中 + 计数正确', () => {
+    const stage = mkStageWithNodeModules([
+      { name: 'electron' },
+      { name: 'electron-updater' },
+      { name: 'koffi' },
+      { name: 'htmlparser2' },
+    ])
+    const dest = mkdtempSync(join(tmpdir(), 'panda-mv-dest-'))
+    try {
+      const result = __moveNodeModulesForTesting(stage, dest)
+      expect(result.errors).toEqual([])
+      expect(result.moved).toBe(4)
+      const movedEntries = readdirSync(join(dest, 'node_modules')).sort()
+      expect(movedEntries).toEqual(
+        ['electron', 'electron-updater', 'htmlparser2', 'koffi'].sort(),
+      )
+      // stage/node_modules 应已搬空
+      const remaining = readdirSync(join(stage, 'node_modules'))
+      expect(remaining).toEqual([])
+    } finally {
+      rmSync(stage, { recursive: true, force: true })
+      rmSync(dest, { recursive: true, force: true })
+    }
+  })
+
+  test('dest 已存在同名 entry → 覆盖（搬迁后内容来自 stage）', () => {
+    const stage = mkStageWithNodeModules([
+      { name: 'electron', files: { 'marker.txt': 'from-stage' } },
+    ])
+    const dest = mkdtempSync(join(tmpdir(), 'panda-mv-dest-'))
+    // 预先在 dest 放一个旧 electron
+    const existingDir = join(dest, 'node_modules', 'electron')
+    mkdirSync(existingDir, { recursive: true })
+    writeFileSync(join(existingDir, 'marker.txt'), 'from-old-dest', 'utf-8')
+    try {
+      const result = __moveNodeModulesForTesting(stage, dest)
+      expect(result.errors).toEqual([])
+      expect(result.moved).toBe(1)
+      const marker = readFileSync(
+        join(dest, 'node_modules', 'electron', 'marker.txt'),
+        'utf-8',
+      )
+      expect(marker).toBe('from-stage')
+    } finally {
+      rmSync(stage, { recursive: true, force: true })
+      rmSync(dest, { recursive: true, force: true })
+    }
+  })
+
+  test('stage/node_modules 不存在 → 返回 error 且 moved=0（不抛）', () => {
+    const stage = mkdtempSync(join(tmpdir(), 'panda-mv-stage-empty-'))
+    const dest = mkdtempSync(join(tmpdir(), 'panda-mv-dest-'))
+    try {
+      const result = __moveNodeModulesForTesting(stage, dest)
+      expect(result.moved).toBe(0)
+      expect(result.errors.length).toBeGreaterThan(0)
+      expect(result.errors[0]).toContain('node_modules')
+    } finally {
+      rmSync(stage, { recursive: true, force: true })
+      rmSync(dest, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('installPandaOnDeskDeps · stage 隔离回归（P0）', () => {
+  test('npm 子进程 cwd 必须是 tmp stage 而非 deskDir（避免 workspace 解析）', async () => {
+    // 通过 onLog 观察 [panda-desk] stage=... 与 dest=... 行
+    const desk = mkDeskDirWith({ electron: false })
+    const lines: string[] = []
+    await installPandaOnDeskDeps({
+      deskDir: desk,
+      npmCmd: 'definitely-not-a-real-command-stage-check',
+      timeoutMs: 5000,
+      onLog: (l) => lines.push(l),
+    })
+    const joined = lines.join('\n')
+    // 应同时出现 stage= 与 dest= 标志（证明走的是新隔离路径）
+    expect(joined).toMatch(/stage=/)
+    expect(joined).toMatch(/dest=/)
+    // stage 路径必须以 tmpdir() 开头
+    const stageLine = lines.find((l) => l.includes('stage='))
+    expect(stageLine).toBeTruthy()
+    const stagePath = stageLine!.split('stage=')[1]
+    expect(stagePath.startsWith(tmpdir())).toBe(true)
+  }, 15_000)
+
+  test('install 失败后 stage 目录应被清理（不留垃圾）', async () => {
+    const desk = mkDeskDirWith({ electron: false })
+    const lines: string[] = []
+    await installPandaOnDeskDeps({
+      deskDir: desk,
+      npmCmd: 'definitely-not-a-real-command-cleanup-check',
+      timeoutMs: 5000,
+      onLog: (l) => lines.push(l),
+    })
+    // 从日志取出 stage 路径，断言它已被删除
+    const stageLine = lines.find((l) => l.includes('stage='))
+    expect(stageLine).toBeTruthy()
+    const stagePath = stageLine!.split('stage=')[1].trim()
+    expect(existsSync(stagePath)).toBe(false)
   }, 15_000)
 })
