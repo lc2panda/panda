@@ -1,6 +1,7 @@
 # Input: bunx electron-builder 读取此 YAML 决定 mac/win/linux 三平台打包目标 + 签名 + 通道
 # Output: dist-electron/{Setup-x.x.x.exe, .dmg, .zip, .AppImage, .deb} 制品 + GitHub release 通道（如配 token）
 # Pos: panda-on-desk 跨平台分发配置 god-file — 与 packages/panda-on-desk/package.json 的 build:electron 脚本配套
+# W19-T2 体积优化（2026-04-20）：asar + compression: maximum + electronLanguages（3 locale） + files exclude docs/scripts/test/md/map/tsconfig — Linux unpacked 327MB → 待 build 验证
 #
 # [NEW-FILE:#20260419-P1-16]
 # v0.1-alpha 仅验证 YAML 语法 + 字段结构 — 不实际打包（不安装 electron@41 等子包 deps）
@@ -21,13 +22,37 @@ directories:
   output: dist-electron
   buildResources: build
 
+# W19-T2 体积优化：开启 asar + 最大压缩 + 精简 locales
+# — asar: true → 把 src/themes 打包成单个 app.asar 减少 IO + 启用压缩
+# — compression: maximum → installer/AppImage 内部用 maximum xz 压缩
+# — electronLanguages → 只保留 en-US + zh-CN + zh-TW（其余 52 个 .pak 删除，省 ~44MB）
+asar: true
+compression: maximum
+electronLanguages:
+  - en-US
+  - zh-CN
+  - zh-TW
+
 # 包含文件清单 — 排除测试文件 / test 目录避免污染发布包
+# W19-T2 加固：显式排除 docs/ scripts/ test/ + 各种开发期产物
 files:
   - "src/**/*"
   - "themes/**/*"
   - "package.json"
   - "!**/*.test.{ts,tsx,js}"
+  - "!**/*.spec.{ts,tsx,js}"
   - "!test/**"
+  - "!tests/**"
+  - "!docs/**"
+  - "!scripts/**"
+  - "!**/*.md"
+  - "!**/*.map"
+  - "!**/tsconfig*.json"
+  - "!**/.eslintrc*"
+  - "!**/.prettierrc*"
+  - "!**/CHANGELOG*"
+  - "!**/LICENSE*"
+  - "!**/NOTICE*"
 
 # macOS：dmg + zip 双格式 / x64 + arm64 双架构 / 启用 hardened runtime（公证前置）
 # 注意：electron-builder 25 schema — arch 必须嵌入 target 对象内，不允许顶层 mac.arch

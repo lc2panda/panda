@@ -1818,14 +1818,14 @@ panda CLI 启动时（`panda` / `bun panda`）会通过 `src/buddy/desk-spawn.ts
 
 详见子包 [packages/panda-on-desk/README.md](./packages/panda-on-desk/README.md)。
 
-### 桌面端独立安装包（v1.0.1+）
-GitHub Release: https://github.com/lc2panda/panda/releases/tag/desk-v1.0.1
-- macOS Apple Silicon: panda-on-desk-1.0.1-arm64.dmg
-- macOS Intel: panda-on-desk-1.0.1-x64.dmg
-- Windows: panda-on-desk-Setup-1.0.1.exe
-- Linux: panda-on-desk-1.0.1.AppImage / .deb
+### 桌面端独立安装包（v1.0.2+）
+GitHub Release: https://github.com/lc2panda/panda/releases/tag/desk-v1.0.2
+- macOS Apple Silicon: panda-on-desk-1.0.2-arm64.dmg
+- macOS Intel: panda-on-desk-1.0.2-x64.dmg
+- Windows: panda-on-desk-Setup-1.0.2.exe
+- Linux: panda-on-desk-1.0.2.AppImage / .deb
 
-> v1.0.1 在 W6-T2 / W7-T1 workflow 加固后重触发，修掉 v1.0.0 释放 0/5 assets 的根因（version sync + icns/ico 占位检测）。
+> v1.0.2 在 W6-T2 / W7-T1 / W17 workflow 多轮加固后由 W19-T4 重触发，修掉 v1.0.0/1 残余 0 assets 的根因（version sync + icns/ico 占位检测 + 真 NSIS 出包验证）。
 
 ## panda-on-desk 桌面宠物（v2.25.0+）
 
