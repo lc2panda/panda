@@ -195,6 +195,8 @@ export const i18n: Record<LangCode, Dict> = {
     trayHidePanda: 'Hide panda',
     trayDndMode: 'DND mode',
     traySettings: 'Settings…',
+    // W14-T4: manual replay of first-run demo sequence
+    trayShowDemo: 'Show Demo',
     trayAbout: 'About panda-on-desk',
     trayQuit: 'Quit panda-on-desk',
     trayAboutTitle: 'About panda-on-desk',
@@ -412,6 +414,8 @@ export const i18n: Record<LangCode, Dict> = {
     trayHidePanda: '隐藏 panda',
     trayDndMode: '免打扰模式',
     traySettings: '设置…',
+    // W14-T4：手动重放首次启动演示序列
+    trayShowDemo: '观看演示',
     trayAbout: '关于 panda-on-desk',
     trayQuit: '退出 panda-on-desk',
     trayAboutTitle: '关于 panda-on-desk',
@@ -627,6 +631,8 @@ export const i18n: Record<LangCode, Dict> = {
     trayHidePanda: 'panda 숨기기',
     trayDndMode: 'DND 모드',
     traySettings: '설정…',
+    // W14-T4: 첫 실행 데모 시퀀스 수동 재생
+    trayShowDemo: '데모 보기',
     trayAbout: 'panda-on-desk 정보',
     trayQuit: 'panda-on-desk 종료',
     trayAboutTitle: 'panda-on-desk 정보',
