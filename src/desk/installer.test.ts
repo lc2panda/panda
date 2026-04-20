@@ -81,6 +81,37 @@ describe('ELECTRON_DEPS · 常量', () => {
     expect(joined).toContain('koffi@2.15.2')
     expect(joined).toContain('htmlparser2@12')
   })
+
+  // W9-T2 regression：实测发现 ELECTRON_DEPS 注释 "与 dependencies 对齐" 不准确，
+  // electron 实际在 devDependencies。本测试守护：每个 dep 必须出现在子包
+  // package.json 的 dependencies 或 devDependencies，否则 npm install 出错或漂移。
+  test('regression W9-T2：每个 dep 必须存在于 panda-on-desk/package.json (deps/devDeps)', () => {
+    // 读取真子包 package.json — 用 require 以触发 bun resolve（避免 fs 路径耦合）
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pkg = require('../../packages/panda-on-desk/package.json') as {
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
+    const all = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) }
+    for (const dep of ELECTRON_DEPS) {
+      // dep 形如 'electron@41' → name='electron', version='41'
+      const atIdx = dep.lastIndexOf('@')
+      const name = atIdx > 0 ? dep.slice(0, atIdx) : dep
+      const version = atIdx > 0 ? dep.slice(atIdx + 1) : ''
+      expect(
+        Object.keys(all),
+        `dep "${name}" 必须存在于 packages/panda-on-desk/package.json (deps 或 devDeps)`,
+      ).toContain(name)
+      // 版本前缀校验：package.json 通常是 "^41.0.0" 或 "^6.8.3"
+      // 我们只校验 major（避免 patch 漂移误报）
+      const majorInPkg = (all[name] ?? '').replace(/^[~^]/, '').split('.')[0]
+      const majorInDeps = version.split('.')[0]
+      expect(
+        majorInPkg,
+        `dep "${name}" major 版本应一致：ELECTRON_DEPS=${majorInDeps} pkg=${majorInPkg}`,
+      ).toBe(majorInDeps)
+    }
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

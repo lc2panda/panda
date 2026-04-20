@@ -18,11 +18,22 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 常量 — electron deps 与 panda-on-desk/package.json 的 dependencies 严格对齐
-// 修改此列表必须同步 packages/panda-on-desk/package.json，否则版本漂移
+// 常量 — electron + 其余 panda-on-desk 必装运行依赖
+//
+// 版本对齐策略（与 packages/panda-on-desk/package.json）：
+//   - electron@41          ← 子包 devDependencies（开发期 electron-builder 需要）
+//                            生产期通过本列表显式 install 到 node_modules，让 launch.cjs
+//                            require('electron') 解析成功；不在 dependencies 是为了
+//                            避免 npm install 主仓库时连带拉 electron ~80MB
+//   - electron-updater@6.8.3 ← 子包 dependencies
+//   - koffi@2.15.2          ← 子包 dependencies
+//   - htmlparser2@12        ← 子包 dependencies
+//
+// 修改此列表必须同步 packages/panda-on-desk/package.json 与 CONTRIBUTING.md §1.2，
+// 否则版本漂移导致桌面端启动失败。W9-T2 add regression test 守护版本一致性。
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** electron + 其余 panda-on-desk 必装运行依赖（与子包 package.json 对齐） */
+/** electron + 其余 panda-on-desk 必装运行依赖（按上方注释策略） */
 export const ELECTRON_DEPS: ReadonlyArray<string> = [
   'electron@41',
   'electron-updater@6.8.3',
