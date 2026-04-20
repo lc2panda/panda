@@ -565,14 +565,15 @@ function repositionFloatingBubbles() {
 }
 
 // pet 显隐
+// [W14-P0-FIX 20260420] mainWin (win) 永远 hidden（show:false），可见性仅看 hitWin。
+//   旧实现切换 win.isVisible() 会与 W14 修复冲突；改判 hitWin 状态。
 function togglePetVisibility() {
-  if (!win || win.isDestroyed()) return
-  if (win.isVisible()) {
-    win.hide()
-    if (hitWin && !hitWin.isDestroyed()) hitWin.hide()
+  if (!hitWin || hitWin.isDestroyed()) return
+  if (hitWin.isVisible()) {
+    hitWin.hide()
+    // mainWin 已永久隐藏，无须 hide
   } else {
-    win.showInactive()
-    if (hitWin && !hitWin.isDestroyed()) hitWin.showInactive()
+    hitWin.showInactive()
     reapplyMacVisibility()
   }
 }
@@ -797,11 +798,16 @@ function createWindow() {
     (prefs.positionSaved || prefs.miniMode) && hasStoredPositionThemeMismatch(prefs)
 
   // ── 窗 ① pet 透明 overlay ──
+  // [W14-P0-FIX 20260420] mainWin (pet) 是逻辑容器（位置/状态机/IPC owner），
+  //   不再渲染 panda 视觉（v2.24.3 误将 win.loadFile 改为 hit.html 致 mac 双 panda）；
+  //   hitWin 才是唯一可见 panda（loadFile hit.html）。show: false 确保启动即隐藏，
+  //   防止 panel 类型透明窗在 macOS 残留黑色矩形（"顶部黑横条" 现场）。
   win = new BrowserWindow({
     width: size.width,
     height: size.height,
     x: startBounds.x,
     y: startBounds.y,
+    show: false, // [W14-P0-FIX] 永不显示 mainWin —— hitWin 是唯一可见 panda
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -826,7 +832,8 @@ function createWindow() {
     win.on('close', (event: any) => {
       if (!isQuitting) {
         event.preventDefault()
-        if (!win.isVisible()) win.showInactive()
+        // [W14-P0-FIX 20260420] mainWin 永久 hidden；保险起见恢复 hitWin 可见性
+        if (hitWin && !hitWin.isDestroyed() && !hitWin.isVisible()) hitWin.showInactive()
       }
     })
     win.on('unresponsive', () => {
@@ -876,7 +883,8 @@ function createWindow() {
     const clamped = computeFinalDragBounds(getPetWindowBounds(), size, clampToScreenVisual)
     if (clamped) applyPetWindowBounds(clamped)
   }
-  win.showInactive()
+  // [W14-P0-FIX 20260420] 不再 win.showInactive() —— mainWin 永远隐藏（show: false 已保障）
+  //   hitWin 是唯一可见 panda；mainWin 仅作为逻辑容器（位置/状态/IPC）
   if (isLinux) win.setSkipTaskbar(true)
   reapplyMacVisibility()
   if (isMac) {
@@ -1235,10 +1243,8 @@ if (!gotTheLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    if (win) {
-      win.showInactive()
-      if (isLinux) win.setSkipTaskbar(true)
-    }
+    // [W14-P0-FIX 20260420] mainWin 永久隐藏（show:false），仅恢复 hitWin 可见性
+    if (win && isLinux) win.setSkipTaskbar(true)
     if (hitWin && !hitWin.isDestroyed()) {
       hitWin.showInactive()
       if (isLinux) hitWin.setSkipTaskbar(true)
@@ -1438,12 +1444,12 @@ if (!gotTheLock) {
   })
 
   app.on('activate', () => {
-    // macOS: dock 重新激活时恢复 4 窗
+    // macOS: dock 重新激活时恢复可见 panda（hitWin），mainWin 保持永久隐藏
+    // [W14-P0-FIX 20260420] mainWin 永远不 show；仅 hitWin 是用户可见 panda
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow()
-    } else if (win && !win.isDestroyed() && !win.isVisible()) {
-      win.showInactive()
-      if (hitWin && !hitWin.isDestroyed()) hitWin.showInactive()
+    } else if (hitWin && !hitWin.isDestroyed() && !hitWin.isVisible()) {
+      hitWin.showInactive()
       reapplyMacVisibility()
     }
   })
