@@ -158,6 +158,25 @@ const deskPrefsMod = _safeRequire<{
   PANDA_SPECIES_WHITELIST?: readonly string[]
 }>('./prefs', {})
 
+// W14-T4：演示模式（首次启动 + Tray "Show Demo" 触发 10 步骤序列）
+// 失败容错：demo-mode 缺失仅退化为"用户看不到首次引导"，主路径 4 BrowserWindow 不受影响。
+const demoModeMod = _safeRequire<{
+  runDemoSequence?: (hitWin: any, opts?: any) => Promise<any>
+  shouldRunDemo?: (prefs: any) => boolean
+  markDemoComplete?: (deps?: any) => any
+}>('./demo-mode', {})
+
+// W14-T3：overlay bubble-window 真运行时弹出 — main 进程注入 BrowserWindow factory
+// + workArea provider，否则 showOverlayBubble 静默 noop（即用户 Mac 实测看不到弹卡的根因）。
+// 失败容错：模块缺失时仅 overlay 通道无效，hit/pet 主路径不影响。
+const bubbleWindowMod = _safeRequire<{
+  setBubbleWindowFactory?: (fn: any) => void
+  setOverlayWorkAreaProvider?: (fn: () => { x: number; y: number; width: number; height: number }) => void
+}>('./overlay/bubble-window', {})
+const permissionBubbleMod = _safeRequire<{
+  setPermissionResponseSink?: (fn: any) => void
+}>('./overlay/permission-bubble', {})
+
 // platform/win-window：Windows koffi user32 FFI 提权（P1-T7 fork）
 // 上游 main.js L37-46 的 AllowSetForegroundWindow 直接 inline；此处提取到 platform/win-window.ts。
 // TODO[P1-T7]: 替换为 import { allowSetForegroundWindow } from './platform/win-window'
@@ -448,12 +467,22 @@ let _trayHandle: { tray: any; rebuild: () => void; destroy: () => void } | null 
 let _dndEnabled: boolean = false
 function getDoNotDisturb(): boolean { return _dndEnabled }
 function setDoNotDisturb(enabled: boolean): void {
+  setDoNotDisturbWithEndsAt(enabled)
+}
+// W14-T2：DND 子菜单（Off/15m/1h/2h/Forever）入口 — endsAtMs 透传到 dnd/state.ts setDnd
+//   tray 子菜单 click → ctx.setDoNotDisturbWithEndsAt(enabled, endsAt)
+//   why: 单一状态源 + endsAt 自动恢复（dnd/state scheduleRecovery）
+function setDoNotDisturbWithEndsAt(enabled: boolean, endsAtMs?: number): void {
   _dndEnabled = !!enabled
   // W12-T2：写穿 dnd/state.ts —— 单一状态源，dispatcher / bridge gate 共用同一开关
   // why: tray 之前只更新 main.ts 内存镜像 + 广播 IPC，dispatcher.isInDnd() 读不到，导致 DND 视觉切换但通知未抑制
   try {
     if (typeof dndStateMod.setDnd === 'function') {
-      dndStateMod.setDnd({ enabled: _dndEnabled, reason: 'manual' })
+      dndStateMod.setDnd({
+        enabled: _dndEnabled,
+        reason: 'manual',
+        endsAt: _dndEnabled && typeof endsAtMs === 'number' ? endsAtMs : undefined,
+      })
     }
   } catch (err) {
     console.warn('[panda-on-desk] dnd/state.setDnd failed:', (err as Error)?.message)
@@ -532,10 +561,55 @@ function sendToHitWin(channel: string, ...args: any[]) {
 }
 // W1-T4：bridge POST /event → 转发给 hitWin renderer（preload 暴露 panda.onEvent，
 // hit.html 内 handler 调 window.__pandaSetState 切 UI）。同时也广播给主 win 以兼容未来扩展。
+// W14-T1：除原 'panda-event' 通道外，按 event.type 分发到 5 typed channels —
+//         hit.html inline script 通过 window.pandaState/pandaSpecies/pandaLevel/pandaXP/pandaLevelUp
+//         对应 onChange/onUpdate/onTrigger 订阅；与 panda-event 并存（双订阅幂等，
+//         hit.html __panda* setters 自身有去抖/正确性保护）。
 function forwardBridgeEventToRenderer(event: any) {
   try {
     sendToHitWin('panda-event', event)
     sendToRenderer('panda-event', event)
+    // ── W14-T1 typed channel 分发 ───────────────────────────────────────────
+    if (event && typeof event === 'object' && typeof event.type === 'string') {
+      switch (event.type) {
+        case 'pet-state':
+          // PetStateChangeEvent: { type:'pet-state', state, sessionId, ts, ... }
+          if (typeof event.state === 'string') sendToHitWin('panda:state', event.state)
+          break
+        case 'species':
+          // SpeciesChangeEvent: { type:'species', species, sessionId, ts }
+          if (typeof event.species === 'string') sendToHitWin('panda:species', event.species)
+          break
+        case 'level-up':
+          // LevelUpEvent: { type:'level-up', fromLevel, toLevel, unlocks?, ts }
+          if (typeof event.fromLevel === 'number' && typeof event.toLevel === 'number') {
+            sendToHitWin('panda:level-up', { from: event.fromLevel, to: event.toLevel })
+            // 升级后等级也变化 — 同步推 panda:level（rarity 取 unlocks.rarity 或 fallback）
+            const rarity = (event.unlocks && typeof event.unlocks.rarity === 'string')
+              ? event.unlocks.rarity : 'common'
+            sendToHitWin('panda:level', { level: event.toLevel, rarity })
+          }
+          break
+        case 'xp-gained':
+          // XPGainedEvent: { type:'xp-gained', delta, bucket, totalXp, level, ts, ... }
+          // 推 'panda:xp'（current/total/pct 由 hit.html __pandaSetXP 内部容错 0）
+          // pctToNext 由 panda CLI 注入（如有），desk 不再算
+          {
+            const current = (typeof event.totalXp === 'number') ? event.totalXp : 0
+            const total = (typeof event.nextLevelXp === 'number') ? event.nextLevelXp : 0
+            const pct = (typeof event.pctToNext === 'number') ? event.pctToNext : 0
+            sendToHitWin('panda:xp', { current, total, pct })
+            // level 字段也变化时同步 panda:level
+            if (typeof event.level === 'number' && typeof event.rarity === 'string') {
+              sendToHitWin('panda:level', { level: event.level, rarity: event.rarity })
+            }
+          }
+          break
+        // notification / badge / dnd / drag-target / permission / session / scene / milestone
+        // 不在此处分发 typed channel — 由 P2-T4 badge manager / scene registry / overlay 等
+        // 既有通路负责（避免双推冲突）。
+      }
+    }
   } catch (err) {
     // renderer 未就绪不阻塞 bridge ack；warn 级别（非致命，但需诊断）
     deskLog.warn('forwardBridgeEventToRenderer failed', err)
@@ -576,6 +650,50 @@ function togglePetVisibility() {
     hitWin.showInactive()
     reapplyMacVisibility()
   }
+}
+
+// ── W14-T4：演示模式触发辅助 ────────────────────────────────────────────────────
+// 状态机：_demoRunning 防止 firstRun 自动 + tray 手动 双触发并发；
+// _firstRunDemoFired 防止 did-finish-load 多次触发（reload / theme 切换会重发）。
+let _demoRunning = false
+let _firstRunDemoFired = false
+
+function _maybeRunFirstRunDemo(): void {
+  if (_firstRunDemoFired) return
+  if (_demoRunning) return
+  if (!demoModeMod || typeof demoModeMod.runDemoSequence !== 'function') return
+  if (!hitWin || hitWin.isDestroyed()) return
+  let prefs: any = null
+  try {
+    if (deskPrefsMod && typeof deskPrefsMod.loadDeskPrefs === 'function') {
+      prefs = deskPrefsMod.loadDeskPrefs()
+    }
+  } catch {}
+  const should = typeof demoModeMod.shouldRunDemo === 'function'
+    ? demoModeMod.shouldRunDemo(prefs)
+    : (prefs ? prefs.firstRun !== false : true)
+  if (!should) return
+  _firstRunDemoFired = true
+  _demoRunning = true
+  Promise.resolve(demoModeMod.runDemoSequence(hitWin, { markComplete: true }))
+    .then(() => { console.log('[panda-on-desk] W14-T4 first-run demo sequence complete') })
+    .catch((err: Error) => { console.warn('[panda-on-desk] W14-T4 first-run demo failed:', err?.message) })
+    .finally(() => { _demoRunning = false })
+}
+
+function triggerDemoSequenceManual(): void {
+  if (_demoRunning) {
+    console.log('[panda-on-desk] W14-T4 demo already running; skip manual trigger')
+    return
+  }
+  if (!demoModeMod || typeof demoModeMod.runDemoSequence !== 'function') return
+  if (!hitWin || hitWin.isDestroyed()) return
+  // 手动触发不写 firstRun=false（用户随时可重看）
+  _demoRunning = true
+  Promise.resolve(demoModeMod.runDemoSequence(hitWin, { markComplete: false }))
+    .then(() => { console.log('[panda-on-desk] W14-T4 manual demo sequence complete') })
+    .catch((err: Error) => { console.warn('[panda-on-desk] W14-T4 manual demo failed:', err?.message) })
+    .finally(() => { _demoRunning = false })
 }
 
 // ── 拖拽快照辅助 ───────────────────────────────────────────────────────────────
@@ -974,6 +1092,9 @@ function createWindow() {
       sendToHitWin('theme-config', themeLoader.getHitRendererConfig())
       if (themeReloadInProgress) return
       syncHitStateAfterLoad()
+      // W14-T4：首次启动 → 自动播放 demo 序列（一次性；演示完后 firstRun=false）
+      // 失败容错：demo-mode 缺失 / prefs 读失败 / hitWin 销毁 → 全 swallow，主路径不受影响。
+      _maybeRunFirstRunDemo()
     })
     hitWin.webContents.on('render-process-gone', (_event: any, details: any) => {
       deskLog.error('hitWin renderer crashed', details && details.reason, details)
@@ -1338,10 +1459,14 @@ if (!gotTheLock) {
           },
           getDoNotDisturb,
           setDoNotDisturb,
+          // W14-T2：DND 子菜单 endsAt 通道 — Off/15m/1h/2h/Forever 透传到 dnd/state.setDnd
+          setDoNotDisturbWithEndsAt,
           requestQuit: requestPandaQuit,
           appVersion: (() => { try { return app.getVersion() } catch { return undefined } })(),
           // W5-T3：tray menu 三语 — 每次 buildMenu 都问 getLang，保证 saveDeskPrefs 后 rebuild 即生效
           getLang: () => lang,
+          // W14-T4：tray "Show Demo" 手动触发演示序列（不写 firstRun=false，用户可重复观看）
+          runDemo: () => triggerDemoSequenceManual(),
         })
         console.log('[panda-on-desk] panda tray initialized (W3-T1)')
       } catch (err) {
@@ -1365,6 +1490,51 @@ if (!gotTheLock) {
         console.warn('[panda-on-desk] desk-prefs hydrate failed:', (err as Error).message)
       }
     }
+
+    // ── W14-T3：注入 overlay BrowserWindow factory + workArea provider ──
+    // why: 上游 P2-T3 + W2-T3 写好了 showOverlayBubble 但 main 从未注入工厂 →
+    //   showOverlayBubble 永远返回 null → Mac 用户实测 calendar/morning-brief/CI-fail
+    //   通知都看不到任何 overlay。修复后真创建 BrowserWindow loadFile bubble.html。
+    // 失败容错：模块未 require 成功不阻挡主路径，仅 overlay 通道继续失效。
+    if (bubbleWindowMod && typeof bubbleWindowMod.setBubbleWindowFactory === 'function') {
+      try {
+        bubbleWindowMod.setBubbleWindowFactory((opts: any) => {
+          const w = new BrowserWindow(opts)
+          // overlay 是无边框透明窗，不要进 dock/taskbar；isMac 下 panel 已设
+          if (isMac && w && typeof (w as any).setVisibleOnAllWorkspaces === 'function') {
+            try {
+              ;(w as any).setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+            } catch { /* mac 旧版 API 容错 */ }
+          }
+          return w as any
+        })
+        console.log('[panda-on-desk] overlay BrowserWindow factory wired (W14-T3)')
+      } catch (err) {
+        console.warn('[panda-on-desk] setBubbleWindowFactory failed:', (err as Error)?.message)
+      }
+    }
+    if (bubbleWindowMod && typeof bubbleWindowMod.setOverlayWorkAreaProvider === 'function') {
+      try {
+        bubbleWindowMod.setOverlayWorkAreaProvider(() => {
+          // why: 多屏 — 用 primaryDisplay.workArea（去掉 dock/taskbar）
+          const wa = screen.getPrimaryDisplay().workArea
+          return { x: wa.x, y: wa.y, width: wa.width, height: wa.height }
+        })
+      } catch (err) {
+        console.warn('[panda-on-desk] setOverlayWorkAreaProvider failed:', (err as Error)?.message)
+      }
+    }
+
+    // ── W14-T3：overlay/permission 双 IPC 收口 — bubble.html overlayAction → main → SSE 推回 ──
+    // 仅注册一次（whenReady 只跑一次）；不影响 permission-decide 既有处理（在下方）。
+    try {
+      ipcMain.on('overlay-action', (_event: any, payload: any) => {
+        // 简单 ack — 让 bubble 主动关闭由 ttl 处理；后续如需触发 SSE 反向 action 可在此扩展
+        if (payload && typeof payload === 'object') {
+          deskLog.info(`overlay-action: ${payload.overlayId} → ${payload.actionId}`)
+        }
+      })
+    } catch { /* duplicate handler 容错 */ }
 
     // ── W2-T4：注入 badge renderer notifier — manager 内 publishSnapshot 时推 'badge:update' 给 hitWin ──
     // 失败容错：缺失 manager 不阻挡主路径，仅退化为无 badge 显示。
@@ -1394,6 +1564,15 @@ if (!gotTheLock) {
           startPromise.then(handle => {
             _bridgeHandle = handle
             deskLog.info(`bridge IPC server listening on 127.0.0.1:${handle.port}`)
+            // W14-T3：bridge 起来后注入 permission-response sink — 用户点 overlay
+            // 权限按钮 → 走 SSE 反向通道推回 panda CLI（ReversePermissionResponse）
+            if (permissionBubbleMod && typeof permissionBubbleMod.setPermissionResponseSink === 'function') {
+              try {
+                permissionBubbleMod.setPermissionResponseSink((msg: any) => handle.broadcast(msg))
+              } catch (err) {
+                deskLog.warn('setPermissionResponseSink failed', err)
+              }
+            }
           }).catch((err: Error) => {
             deskLog.error(`bridge IPC server start failed (attempt ${attempt})`, err)
             if (attempt < 2) {

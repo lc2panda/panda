@@ -1,5 +1,5 @@
-// Input: { app, nativeTheme } + ctx.{getWin, getHitWin, openSettingsWindow, togglePetVisibility, getDoNotDisturb, setDoNotDisturb, requestQuit}
-// Output: 系统托盘 Tray 实例（Show / Hide / DND / Settings / About / Quit 6 项菜单 + 主题感知图标）
+// Input: { app, nativeTheme } + ctx.{getWin, getHitWin, openSettingsWindow, togglePetVisibility, getDoNotDisturb, setDoNotDisturb, requestQuit, setDoNotDisturbWithEndsAt?}
+// Output: 系统托盘 Tray 实例（Show / Hide / DND[Off/15m/1h/2h/Forever 子菜单] / Settings / About / Quit 6 项菜单 + 主题感知图标）
 // Pos: panda-on-desk W3 收尾交付 — 真正的 panda 单 provider Tray（替代上游 menu.js 中走错路径的 createTray）
 //
 // [NEW-FILE:#20260419-W3-01]
@@ -9,8 +9,10 @@
 //   1. Electron Tray 官方 API — https://www.electronjs.org/docs/latest/api/tray (检索 2026-04-20 +08:00)
 //   2. clawd-on-desk@4b07658:src/menu.js#createTray 上游参考（路径 + 模板图机制）
 //   3. nativeTheme.shouldUseDarkColors — Electron 41 LTS 文档
-// 最小化方案：单文件 ~140 行；零新依赖；失败容错（图标缺失静默降级）。
+// 最小化方案：单文件 ~180 行；零新依赖；失败容错（图标缺失静默降级）。
 // 回滚：删除 tray/index.ts + main.ts 中 _initPandaTray() 调用 + import 即可。
+// 2026-04-20 +08:00 W14-T2 真实装：DND 升级为 submenu (Off/15m/1h/2h/Forever 含 endsAt 自动恢复)；
+//   About 对话框新增 "View LICENSE" 第三按钮；ctx.setDoNotDisturbWithEndsAt 可选回调（main.ts 注入）。
 
 import { app, Menu, Tray, nativeImage, nativeTheme, dialog, shell } from 'electron'
 import * as path from 'node:path'
@@ -26,10 +28,14 @@ export type TrayCtx = {
   togglePetVisibility: () => void
   getDoNotDisturb: () => boolean
   setDoNotDisturb: (enabled: boolean) => void
+  /** W14-T2：DND 子菜单 endsAt 通道；main.ts 注入。缺失则降级为 setDoNotDisturb(enabled) 不带时长。 */
+  setDoNotDisturbWithEndsAt?: (enabled: boolean, endsAtMs?: number) => void
   requestQuit: () => void
   appVersion?: string
   /** W5-T3 三语：getLang 回调由 main 注入；缺失则 fallback 'en' */
   getLang?: () => LangCode | string
+  /** W14-T4：Show Demo 手动触发 10 步骤演示序列；缺失时菜单项隐藏 */
+  runDemo?: () => void
 }
 
 export type TrayHandle = {
@@ -72,6 +78,55 @@ function resolveTrayIconPath(appDir: string, isPackaged: boolean): { iconPath: s
   return { iconPath: null, isTemplate: false }
 }
 
+/**
+ * W14-T2：DND 子菜单 click 委派
+ * - 优先调 ctx.setDoNotDisturbWithEndsAt(enabled, endsAtMs)（main.ts 注入新签名）
+ * - 缺失则 fallback 调 ctx.setDoNotDisturb(enabled)（向后兼容旧 W12-T2 签名）
+ */
+function applyDndChoice(ctx: TrayCtx, enabled: boolean, endsAtMs?: number): void {
+  if (typeof ctx.setDoNotDisturbWithEndsAt === 'function') {
+    try { ctx.setDoNotDisturbWithEndsAt(enabled, endsAtMs); return } catch {}
+  }
+  try { ctx.setDoNotDisturb(enabled) } catch {}
+}
+
+function buildDndSubmenu(ctx: TrayCtx, t: (k: string) => string, dnd: boolean): Electron.MenuItemConstructorOptions[] {
+  // why: type:'radio' 让 Electron 自动维护互斥；dnd=false → Off radio 选中
+  return [
+    {
+      label: t('trayDndOff'),
+      type: 'radio',
+      checked: !dnd,
+      click: () => applyDndChoice(ctx, false),
+    },
+    { type: 'separator' },
+    {
+      label: t('trayDnd15m'),
+      type: 'radio',
+      checked: false,
+      click: () => applyDndChoice(ctx, true, Date.now() + 15 * 60 * 1000),
+    },
+    {
+      label: t('trayDnd1h'),
+      type: 'radio',
+      checked: false,
+      click: () => applyDndChoice(ctx, true, Date.now() + 60 * 60 * 1000),
+    },
+    {
+      label: t('trayDnd2h'),
+      type: 'radio',
+      checked: false,
+      click: () => applyDndChoice(ctx, true, Date.now() + 2 * 60 * 60 * 1000),
+    },
+    {
+      label: t('trayDndForever'),
+      type: 'radio',
+      checked: dnd,
+      click: () => applyDndChoice(ctx, true),
+    },
+  ]
+}
+
 function buildTrayMenuTemplate(ctx: TrayCtx): Electron.MenuItemConstructorOptions[] {
   const win = ctx.getWin()
   const isVisible = !!(win && !win.isDestroyed() && win.isVisible())
@@ -86,16 +141,26 @@ function buildTrayMenuTemplate(ctx: TrayCtx): Electron.MenuItemConstructorOption
     },
     { type: 'separator' },
     {
+      // W14-T2：DND 升级为 submenu（Off / 15m / 1h / 2h / Forever）
+      // why: 任务要求"DND mode → 切换 dnd/state.ts setDnd (含子菜单：Off/15m/1h/2h/Forever)"
+      // 兼容：父项 label 仍为 trayDndMode；checkbox 状态由 getDoNotDisturb() 反映
       label: t('trayDndMode'),
       type: 'checkbox',
       checked: dnd,
-      click: (menuItem) => ctx.setDoNotDisturb(menuItem.checked),
+      submenu: buildDndSubmenu(ctx, t, dnd),
     },
     { type: 'separator' },
     {
       label: t('traySettings'),
       click: () => ctx.openSettingsWindow(),
     },
+    // W14-T4：Show Demo 手动触发演示序列（仅当 ctx.runDemo 注入时显示）
+    ...(typeof ctx.runDemo === 'function'
+      ? [{
+          label: t('trayShowDemo'),
+          click: () => { try { ctx.runDemo!() } catch {} },
+        } as Electron.MenuItemConstructorOptions]
+      : []),
     {
       label: t('trayAbout'),
       click: () => {
@@ -107,12 +172,15 @@ function buildTrayMenuTemplate(ctx: TrayCtx): Electron.MenuItemConstructorOption
           title: t('trayAboutTitle'),
           message: `panda-on-desk v${ver}`,
           detail: t('trayAboutDetail'),
-          buttons: [t('trayAboutOk'), t('trayAboutOpenRepo')],
+          // W14-T2：3 按钮 — OK / Open repo / View LICENSE
+          buttons: [t('trayAboutOk'), t('trayAboutOpenRepo'), t('trayAboutOpenLicense')],
           defaultId: 0,
           cancelId: 0,
         }).then(res => {
           if (res.response === 1) {
             try { shell.openExternal('https://github.com/lc2panda/panda') } catch {}
+          } else if (res.response === 2) {
+            try { shell.openExternal('https://github.com/lc2panda/panda/blob/main/LICENSE') } catch {}
           }
         }).catch(() => {})
       },

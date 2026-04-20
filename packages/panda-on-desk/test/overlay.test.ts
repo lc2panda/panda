@@ -501,3 +501,244 @@ describe('overlay — entry 引用辅助', () => {
     expect(entry?.id).toBe(handle!.id)
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group F：W14-T3 真弹出验证 — IPC 通道契约 / preload 对齐 / 实际 send overlay-show
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 背景：P2-T3 + W2-T3 写了 showOverlayBubble 但 Mac 用户实测 overlay 不可见。
+// 根因：
+//   ① main.ts 从未注入 setBubbleWindowFactory → showOverlayBubble 永远 noop
+//   ② preload/bubble.ts 只暴露 onPermissionShow，bubble-window.ts send('overlay:show')
+//      通道名不匹配 → 即便创建了窗也收不到 payload
+//   ③ bubble.html 没有 overlay 渲染分支 → 即便收到 payload 也无法显示
+//
+// 本组用例验证：
+//   - 通道名修正为 'overlay-show'（与 preload onOverlayShow 对齐）
+//   - did-finish-load 后 send + show 真触发
+//   - actions[] / level / title / body 完整透传给 renderer
+//   - bubble.html / preload/bubble.ts 物理存在 + 暴露 onOverlayShow API
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+describe('W14-T3 — overlay 真运行时弹出验证', () => {
+  test('did-finish-load 触发 → webContents.send 真调，通道名 = overlay-show', () => {
+    const event: NotificationEvent = {
+      type: 'notification',
+      kind: 'overlay',
+      level: 'warning',
+      scenarioId: 'ci-failed',
+      title: 'CI failed on main',
+      body: 'pipeline #4521 broken',
+      actions: [
+        { id: 'open', label: 'Open PR', primary: true },
+        { id: 'dismiss', label: 'Dismiss' },
+      ],
+      ts: Date.now(),
+    }
+    showOverlayBubble(event)
+    expect(createdWindows.length).toBe(1)
+    const w = createdWindows[0]
+
+    // 模拟 renderer ready — 触发 did-finish-load 监听器
+    const onceListeners = w.__webContentsListeners.get('did-finish-load') ?? []
+    expect(onceListeners.length).toBeGreaterThan(0)
+    for (const fn of onceListeners) fn()
+
+    // 应 send 一次 overlay-show（通道名修正后才会到 preload onOverlayShow）
+    const sent = w.__sentChannels.filter(s => s.channel === 'overlay-show')
+    expect(sent.length).toBe(1)
+    const payload = sent[0].args[0] as {
+      id: string
+      title: string
+      body: string
+      level: string
+      actions: Array<{ id: string; label: string }>
+    }
+    expect(payload.title).toBe('CI failed on main')
+    expect(payload.body).toBe('pipeline #4521 broken')
+    expect(payload.level).toBe('warning')
+    expect(payload.actions.length).toBe(2)
+    expect(payload.actions[0].id).toBe('open')
+
+    // 不应 send 旧通道 'overlay:show'（链路断点的根因之一）
+    const stale = w.__sentChannels.filter(s => s.channel === 'overlay:show')
+    expect(stale.length).toBe(0)
+  })
+
+  test('payload.body 缺失 → 默认 ""（renderer 不会 undefined 渲染）', () => {
+    showOverlayBubble({
+      type: 'notification',
+      kind: 'overlay',
+      level: 'info',
+      scenarioId: 'morning-brief',
+      title: 'Good morning, commander',
+      ts: Date.now(),
+    })
+    const w = createdWindows[0]
+    const onceListeners = w.__webContentsListeners.get('did-finish-load') ?? []
+    for (const fn of onceListeners) fn()
+    const sent = w.__sentChannels.find(s => s.channel === 'overlay-show')
+    expect(sent).toBeDefined()
+    const payload = sent!.args[0] as { body: string; actions: unknown[] }
+    expect(payload.body).toBe('')
+    expect(payload.actions).toEqual([])
+  })
+
+  test('preload/bubble.js 真存在 + 暴露 onOverlayShow / onOverlayHide / overlayAction', () => {
+    // why W14-T3: bubble-window.ts webPreferences.preload 指向 preload/bubble.js
+    //   该 preload 必须暴露 onOverlayShow 才能让 bubble.html 收到 overlay 数据
+    const preloadPath = join(__dirname, '..', 'src', 'preload', 'bubble.js')
+    expect(existsSync(preloadPath)).toBe(true)
+    const src = readFileSync(preloadPath, 'utf-8')
+    expect(src.includes('onOverlayShow')).toBe(true)
+    expect(src.includes('onOverlayHide')).toBe(true)
+    expect(src.includes('overlayAction')).toBe(true)
+    // 通道名物理对齐 — 'overlay-show' / 'overlay-hide' / 'overlay-action'
+    expect(src.includes("'overlay-show'")).toBe(true)
+    expect(src.includes("'overlay-hide'")).toBe(true)
+    expect(src.includes("'overlay-action'")).toBe(true)
+  })
+
+  test('bubble.html 真存在 + 含 overlay 渲染分支（onOverlayShow 监听 + 动态 actions）', () => {
+    const htmlPath = join(__dirname, '..', 'src', 'renderer', 'bubble.html')
+    expect(existsSync(htmlPath)).toBe(true)
+    const html = readFileSync(htmlPath, 'utf-8')
+    // 必须订阅 onOverlayShow（W14-T3 核心修复）
+    expect(html.includes('onOverlayShow')).toBe(true)
+    // 必须有动态 actions 渲染（forEach + createElement button）
+    expect(html.includes('actions') && html.includes('createElement')).toBe(true)
+    // 必须用 textContent 防 XSS（不用 innerHTML 注入用户 title/body）
+    expect(html.includes('textContent')).toBe(true)
+    // 必须有 overlayAction IPC 推回 — 让按钮点击有去处
+    expect(html.includes('overlayAction')).toBe(true)
+    // 自包含 — 不引用外部 .js / .css 资源
+    expect(html.includes('<script src=')).toBe(false)
+    expect(html.includes('<link rel="stylesheet"')).toBe(false)
+  })
+
+  test('did-finish-load 后 win.show() 真调（防止透明窗存在但未显示）', () => {
+    let showCalls = 0
+    setBubbleWindowFactory(opts => {
+      const w = makeMockWindow(opts)
+      const origShow = w.show
+      w.show = () => { showCalls += 1; origShow.call(w) }
+      createdWindows.push(w)
+      return w
+    })
+    showOverlayBubble({
+      type: 'notification',
+      kind: 'overlay',
+      level: 'success',
+      scenarioId: 'task-done',
+      title: 'Task complete',
+      ts: Date.now(),
+    })
+    const w = createdWindows[0]
+    const onceListeners = w.__webContentsListeners.get('did-finish-load') ?? []
+    for (const fn of onceListeners) fn()
+    expect(showCalls).toBe(1)
+  })
+
+  test('options.show=false 防失焦闪烁；renderer ready 后才 show（契约）', () => {
+    showOverlayBubble({
+      type: 'notification',
+      kind: 'overlay',
+      level: 'info',
+      scenarioId: 's',
+      title: 't',
+      ts: Date.now(),
+    })
+    expect(createdWindows[0].__opts.show).toBe(false)
+    // 同时校验 transparent / frame:false / alwaysOnTop / focusable —
+    // 这些是 overlay 真弹出 + 真可点击的硬约束
+    expect(createdWindows[0].__opts.transparent).toBe(true)
+    expect(createdWindows[0].__opts.frame).toBe(false)
+    expect(createdWindows[0].__opts.alwaysOnTop).toBe(true)
+    expect(createdWindows[0].__opts.focusable).toBe(true)
+    expect(createdWindows[0].__opts.skipTaskbar).toBe(true)
+  })
+
+  test('多 actions 全字段透传（id/label/primary/shortcut）— renderer 渲染需要', () => {
+    const event: NotificationEvent = {
+      type: 'notification',
+      kind: 'overlay',
+      level: 'warning',
+      scenarioId: 'pr-review',
+      title: 'PR #42 ready for review',
+      body: 'feat(panda): add overlay真弹出',
+      actions: [
+        { id: 'review', label: 'Review now', primary: true, shortcut: 'Cmd+Shift+R' },
+        { id: 'snooze', label: 'Snooze 1h' },
+        { id: 'open-pr', label: 'Open in browser', shortcut: 'Cmd+Shift+O' },
+      ],
+      ts: Date.now(),
+    }
+    showOverlayBubble(event)
+    const w = createdWindows[0]
+    const onceListeners = w.__webContentsListeners.get('did-finish-load') ?? []
+    for (const fn of onceListeners) fn()
+    const sent = w.__sentChannels.find(s => s.channel === 'overlay-show')
+    const payload = sent!.args[0] as {
+      actions: Array<{ id: string; label: string; primary?: boolean; shortcut?: string }>
+    }
+    expect(payload.actions.length).toBe(3)
+    expect(payload.actions[0].primary).toBe(true)
+    expect(payload.actions[0].shortcut).toBe('Cmd+Shift+R')
+    expect(payload.actions[1].primary).toBeUndefined()
+    expect(payload.actions[2].shortcut).toBe('Cmd+Shift+O')
+  })
+
+  test('did-finish-load 抛错时 silent — 不阻断后续 overlay；窗口仍在栈中', () => {
+    showOverlayBubble({
+      type: 'notification',
+      kind: 'overlay',
+      level: 'error',
+      scenarioId: 'crash',
+      title: 'Module crash',
+      ts: Date.now(),
+    })
+    const w = createdWindows[0]
+    // 模拟 webContents.send 抛错（renderer 已销毁等极端情况）
+    const origSend = w.webContents.send
+    w.webContents.send = () => { throw new Error('renderer destroyed') }
+    const onceListeners = w.__webContentsListeners.get('did-finish-load') ?? []
+    expect(() => { for (const fn of onceListeners) fn() }).not.toThrow()
+    w.webContents.send = origSend
+    // 栈仍稳定
+    expect(__getOverlayStackSizeForTesting()).toBe(1)
+  })
+
+  test('端到端：dispatchNotification(overlay) → factory 调 → did-finish-load → overlay-show payload 完整', () => {
+    dispatchNotification({
+      type: 'notification',
+      kind: 'overlay',
+      level: 'info',
+      scenarioId: 'morning-brief',
+      title: 'Good morning, commander',
+      body: '4 PRs need review · 2 calendar events',
+      actions: [
+        { id: 'open-brief', label: 'Open brief', primary: true },
+      ],
+      ts: Date.now(),
+    })
+    expect(createdWindows.length).toBe(1)
+    const w = createdWindows[0]
+    const onceListeners = w.__webContentsListeners.get('did-finish-load') ?? []
+    for (const fn of onceListeners) fn()
+    const sent = w.__sentChannels.find(s => s.channel === 'overlay-show')
+    expect(sent).toBeDefined()
+    const payload = sent!.args[0] as {
+      title: string
+      body: string
+      scenarioId: string
+      actions: Array<{ id: string; label: string }>
+    }
+    expect(payload.title).toBe('Good morning, commander')
+    expect(payload.body).toBe('4 PRs need review · 2 calendar events')
+    expect(payload.scenarioId).toBe('morning-brief')
+    expect(payload.actions[0].id).toBe('open-brief')
+  })
+})

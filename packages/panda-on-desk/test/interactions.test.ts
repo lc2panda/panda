@@ -1,17 +1,21 @@
 // Input:  bun test 触发
 // Output: ≥ 5 用例 — W2-T4 双击 / 4 击 / 长按 + window 三接口 + badge 显示 + drag 不冲突
+//         + W14-T1 ≥ 6 新用例（5 typed channel preload + main 分发 round-trip）
 // Pos:    Phase 2 W2-T4 交互回归用例 [NEW-FILE:#20260419-W2-05]
 //         严守 byte-equal — 不引用 src/services/api/{claude,oauth,providers}
 // 证据：
 //   - hit.html 双击/4击/长按 + 5 个 window.__panda* 接口 + .badge / .stats-card / .reaction-heart DOM
 //   - preload/hit.ts 暴露 window.pandaBadge.onUpdate（'badge:update' channel）
+//   - preload/hit.ts 暴露 W14-T1 5 typed channel：pandaState/pandaSpecies/pandaLevel/pandaXP/pandaLevelUp
 //   - main.ts setBadgeRendererNotifier 接 sendToHitWin
+//   - main.ts forwardBridgeEventToRenderer W14-T1 typed channel 分发
 //   - W3C UI Events pointer + dblclick 规范
 //
 // 2026-04-19 +08:00 agent-δ-W2-interact · W2-T4 交付
 // 2026-04-19 +08:00 agent-α-W2T4-complete · v2 补全 — 追加 Group E badge 行为型用例（manager → notifier 端到端）
+// 2026-04-20 +08:00 agent-α-W14-hit-ipc · W14-T1 hit IPC 全接通 — 追加 Group F (preload 5 typed channel)
 
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
@@ -253,5 +257,277 @@ describe('W2-T4 v2 · badge manager → notifier 端到端', () => {
     expect(() => resetBadge('s1')).not.toThrow()
     // state 仍按预期演进
     expect(getTotalCount()).toBe(0)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group F · W14-T1 hit IPC 深度集成 — 5 typed channel preload + main 分发
+//   1. preload/hit.ts 暴露 5 typed API（contextBridge.exposeInMainWorld）
+//   2. preload 每个 onChange/onUpdate/onTrigger 用 ipcRenderer.on + 返回 removeListener
+//   3. hit.html inline script 订阅 5 typed channel → 调对应 __panda* setter
+//   4. main.ts forwardBridgeEventToRenderer 在 'panda-event' 之外按 type 分发到 typed channel
+//   5. round-trip 模拟：mock ipcRenderer + contextBridge 验 preload 注册 5 listener
+//   6. removeListener fn 真清理（mock 验 removeListener 调用）
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W14-T1 · hit IPC 深度集成（preload 5 typed channel）', () => {
+  it('preload/hit.ts 暴露 5 typed API: pandaState/pandaSpecies/pandaLevel/pandaXP/pandaLevelUp', () => {
+    expect(fs.existsSync(PRELOAD_HIT_TS)).toBe(true)
+    const ts = fs.readFileSync(PRELOAD_HIT_TS, 'utf8')
+    // 5 contextBridge.exposeInMainWorld 调用（含已有 hitAPI/panda/pandaI18n/pandaBadge → 共 9）
+    expect(ts).toContain("exposeInMainWorld('pandaState'")
+    expect(ts).toContain("exposeInMainWorld('pandaSpecies'")
+    expect(ts).toContain("exposeInMainWorld('pandaLevel'")
+    expect(ts).toContain("exposeInMainWorld('pandaXP'")
+    expect(ts).toContain("exposeInMainWorld('pandaLevelUp'")
+    // 5 channel 名（与 main.ts sendToHitWin 字符串字面量匹配）
+    expect(ts).toContain("'panda:state'")
+    expect(ts).toContain("'panda:species'")
+    expect(ts).toContain("'panda:level'")
+    expect(ts).toContain("'panda:xp'")
+    expect(ts).toContain("'panda:level-up'")
+    // onChange / onUpdate / onTrigger 三种语义命名
+    expect(ts).toMatch(/pandaState'[\s\S]{0,200}onChange/)
+    expect(ts).toMatch(/pandaSpecies'[\s\S]{0,200}onChange/)
+    expect(ts).toMatch(/pandaLevel'[\s\S]{0,200}onChange/)
+    expect(ts).toMatch(/pandaXP'[\s\S]{0,200}onUpdate/)
+    expect(ts).toMatch(/pandaLevelUp'[\s\S]{0,200}onTrigger/)
+  })
+
+  it('preload 每个订阅 fn 返回 removeListener 卸载器（防 hit 窗销毁/重建泄漏）', () => {
+    const ts = fs.readFileSync(PRELOAD_HIT_TS, 'utf8')
+    // makeChannelSubscriber 工厂 + return () => ipcRenderer.removeListener
+    expect(ts).toContain('makeChannelSubscriber')
+    expect(ts).toMatch(/return\s+\(\)\s*=>\s*ipcRenderer\.removeListener/)
+    // ipcRenderer.on 用法（注册 listener）
+    expect(ts).toMatch(/ipcRenderer\.on\(channel,\s*handler\)/)
+  })
+
+  it('main.ts forwardBridgeEventToRenderer 按 event.type 分发到 5 typed channel', () => {
+    expect(fs.existsSync(MAIN_TS)).toBe(true)
+    const ts = fs.readFileSync(MAIN_TS, 'utf8')
+    // 必须保留原 'panda-event' 通道（兼容 W1-T4 + 未类型化事件）
+    expect(ts).toContain("sendToHitWin('panda-event'")
+    // 5 typed channel 分发字符串字面量（在 forwardBridgeEventToRenderer 函数内）
+    expect(ts).toContain("sendToHitWin('panda:state'")
+    expect(ts).toContain("sendToHitWin('panda:species'")
+    expect(ts).toContain("sendToHitWin('panda:level'")
+    expect(ts).toContain("sendToHitWin('panda:xp'")
+    expect(ts).toContain("sendToHitWin('panda:level-up'")
+    // switch event.type 路由（discriminated union 5 case）
+    const dispatchIdx = ts.indexOf('forwardBridgeEventToRenderer')
+    expect(dispatchIdx).toBeGreaterThan(0)
+    const dispatchBlock = ts.slice(dispatchIdx, dispatchIdx + 3000)
+    expect(dispatchBlock).toMatch(/case\s+['"]pet-state['"]/)
+    expect(dispatchBlock).toMatch(/case\s+['"]species['"]/)
+    expect(dispatchBlock).toMatch(/case\s+['"]level-up['"]/)
+    expect(dispatchBlock).toMatch(/case\s+['"]xp-gained['"]/)
+  })
+
+  it('hit.html inline script 订阅所有 5 typed channel → 调对应 __panda* setter', () => {
+    const html = fs.readFileSync(HIT_HTML, 'utf8')
+    // 5 全局对象 typeof 检查 + onXxx 调用
+    expect(html).toMatch(/window\.pandaState[\s\S]{0,80}onChange/)
+    expect(html).toMatch(/window\.pandaSpecies[\s\S]{0,80}onChange/)
+    expect(html).toMatch(/window\.pandaLevel[\s\S]{0,80}onChange/)
+    expect(html).toMatch(/window\.pandaXP[\s\S]{0,80}onUpdate/)
+    expect(html).toMatch(/window\.pandaLevelUp[\s\S]{0,80}onTrigger/)
+    // 各订阅 handler 内调对应 setter
+    expect(html).toMatch(/pandaState\.onChange\([\s\S]{0,300}__pandaSetState/)
+    expect(html).toMatch(/pandaSpecies\.onChange\([\s\S]{0,300}__pandaSetSpecies/)
+    expect(html).toMatch(/pandaLevel\.onChange\([\s\S]{0,400}__pandaSetLevel/)
+    expect(html).toMatch(/pandaXP\.onUpdate\([\s\S]{0,500}__pandaSetXP/)
+    expect(html).toMatch(/pandaLevelUp\.onTrigger\([\s\S]{0,400}__pandaTriggerLevelUp/)
+  })
+
+  it('preload 编译产物 hit.js 存在且含 5 typed channel 字符串（build:dist 验证）', () => {
+    const PRELOAD_HIT_JS = path.join(PKG_ROOT, 'src', 'preload', 'hit.js')
+    expect(fs.existsSync(PRELOAD_HIT_JS)).toBe(true)
+    const js = fs.readFileSync(PRELOAD_HIT_JS, 'utf8')
+    // 编译产物必须含 5 channel + 5 exposeInMainWorld 调用
+    expect(js).toContain("'panda:state'")
+    expect(js).toContain("'panda:species'")
+    expect(js).toContain("'panda:level'")
+    expect(js).toContain("'panda:xp'")
+    expect(js).toContain("'panda:level-up'")
+    expect(js).toContain('pandaState')
+    expect(js).toContain('pandaSpecies')
+    expect(js).toContain('pandaLevel')
+    expect(js).toContain('pandaXP')
+    expect(js).toContain('pandaLevelUp')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group G · W14-T1 round-trip — 模拟 ipcRenderer mock 验证 preload 注册 + removeListener
+//   方式：用 require.cache 注入 mock electron 模块，再 require preload/hit.js（CommonJS 输出），
+//   验 contextBridge.exposeInMainWorld 被调用 9 次（含已有 4 + 5 新）+ 注册 5 typed channel
+//   listener；调返回的卸载 fn → 验 removeListener 被调用对应 channel。
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W14-T1 round-trip · preload mock 注册 + removeListener 卸载', () => {
+  const PRELOAD_HIT_JS = path.join(PKG_ROOT, 'src', 'preload', 'hit.js')
+
+  type ExposedAPI = { name: string; api: any }
+  type RegisteredListener = { channel: string; handler: (e: unknown, payload: unknown) => void }
+
+  // 共享 capture buckets — bun:test mock.module 是全局 hook（不能 per-call swap），
+  // 用闭包指针 _current 让每次 loadPreloadWithMock 切换目标 bucket。
+  const _current: {
+    exposed: ExposedAPI[]
+    registered: RegisteredListener[]
+    removed: Array<{ channel: string; handler: any }>
+  } = { exposed: [], registered: [], removed: [] }
+
+  // 一次性注册 electron mock — bun:test mock.module 全局生效
+  mock.module('electron', () => ({
+    contextBridge: {
+      exposeInMainWorld: (name: string, api: any) => {
+        _current.exposed.push({ name, api })
+      },
+    },
+    ipcRenderer: {
+      on: (channel: string, handler: any) => {
+        _current.registered.push({ channel, handler })
+      },
+      removeListener: (channel: string, handler: any) => {
+        _current.removed.push({ channel, handler })
+      },
+      send: () => { /* noop */ },
+      invoke: () => Promise.resolve(),
+    },
+  }))
+
+  function loadPreloadWithMock() {
+    _current.exposed = []
+    _current.registered = []
+    _current.removed = []
+    try {
+      delete require.cache[require.resolve(PRELOAD_HIT_JS)]
+    } catch { /* first load — no cache entry */ }
+    require(PRELOAD_HIT_JS)
+    return {
+      exposed: _current.exposed,
+      registered: _current.registered,
+      removed: _current.removed,
+    }
+  }
+
+  it('preload 加载后 contextBridge 暴露 ≥ 9 个全局 API（含 W14-T1 5 typed）', () => {
+    if (!fs.existsSync(PRELOAD_HIT_JS)) {
+      // build:dist 未跑或环境异常 — 跳过（不阻塞）
+      return
+    }
+    const { exposed } = loadPreloadWithMock()
+    const names = exposed.map((e) => e.name)
+    // 已有：hitThemeConfig, hitAPI, panda, pandaI18n, pandaBadge（5）
+    // W14-T1 新增：pandaState, pandaSpecies, pandaLevel, pandaXP, pandaLevelUp（5）
+    expect(names).toContain('pandaState')
+    expect(names).toContain('pandaSpecies')
+    expect(names).toContain('pandaLevel')
+    expect(names).toContain('pandaXP')
+    expect(names).toContain('pandaLevelUp')
+    // 已有也保留
+    expect(names).toContain('hitAPI')
+    expect(names).toContain('panda')
+    expect(names).toContain('pandaBadge')
+  })
+
+  it('调 5 typed API 的 onXxx 注册 5 listener；返回的卸载 fn 调 removeListener', () => {
+    if (!fs.existsSync(PRELOAD_HIT_JS)) return
+    const { exposed, registered, removed } = loadPreloadWithMock()
+
+    // 找 5 typed API
+    const apiByName = Object.fromEntries(exposed.map((e) => [e.name, e.api]))
+    expect(typeof apiByName.pandaState.onChange).toBe('function')
+    expect(typeof apiByName.pandaSpecies.onChange).toBe('function')
+    expect(typeof apiByName.pandaLevel.onChange).toBe('function')
+    expect(typeof apiByName.pandaXP.onUpdate).toBe('function')
+    expect(typeof apiByName.pandaLevelUp.onTrigger).toBe('function')
+
+    // 调 5 onXxx 注册
+    const beforeRegCount = registered.length
+    const cb = () => { /* noop */ }
+    const off1 = apiByName.pandaState.onChange(cb)
+    const off2 = apiByName.pandaSpecies.onChange(cb)
+    const off3 = apiByName.pandaLevel.onChange(cb)
+    const off4 = apiByName.pandaXP.onUpdate(cb)
+    const off5 = apiByName.pandaLevelUp.onTrigger(cb)
+
+    const newRegs = registered.slice(beforeRegCount)
+    const channels = newRegs.map((r) => r.channel)
+    expect(channels).toEqual([
+      'panda:state', 'panda:species', 'panda:level', 'panda:xp', 'panda:level-up',
+    ])
+    // 卸载 fn 必须返回函数
+    ;[off1, off2, off3, off4, off5].forEach((off) => expect(typeof off).toBe('function'))
+
+    // 调卸载 → removeListener 被调对应 channel
+    off1(); off2(); off3(); off4(); off5()
+    const removedChannels = removed.slice(-5).map((r) => r.channel)
+    expect(removedChannels).toEqual([
+      'panda:state', 'panda:species', 'panda:level', 'panda:xp', 'panda:level-up',
+    ])
+  })
+
+  it('typed channel handler payload 透传 — main webContents.send 模拟 round-trip', () => {
+    if (!fs.existsSync(PRELOAD_HIT_JS)) return
+    const { exposed, registered } = loadPreloadWithMock()
+    const apiByName = Object.fromEntries(exposed.map((e) => [e.name, e.api]))
+
+    // 5 channel 各注册一个 capture cb
+    const captures: Record<string, unknown[]> = {
+      'panda:state': [], 'panda:species': [], 'panda:level': [], 'panda:xp': [], 'panda:level-up': [],
+    }
+    apiByName.pandaState.onChange((p: unknown) => captures['panda:state'].push(p))
+    apiByName.pandaSpecies.onChange((p: unknown) => captures['panda:species'].push(p))
+    apiByName.pandaLevel.onChange((p: unknown) => captures['panda:level'].push(p))
+    apiByName.pandaXP.onUpdate((p: unknown) => captures['panda:xp'].push(p))
+    apiByName.pandaLevelUp.onTrigger((p: unknown) => captures['panda:level-up'].push(p))
+
+    // 找新注册的 5 listener（最后 5 个）
+    const last5 = registered.slice(-5)
+    // 模拟 main.ts webContents.send → ipcRenderer 收到事件
+    last5.forEach((r) => {
+      // payload 形态对齐 main.ts forwardBridgeEventToRenderer 推送格式
+      const payloadByChannel: Record<string, unknown> = {
+        'panda:state': 'thinking',
+        'panda:species': 'duck',
+        'panda:level': { level: 7, rarity: 'rare' },
+        'panda:xp': { current: 120, total: 200, pct: 60 },
+        'panda:level-up': { from: 6, to: 7 },
+      }
+      r.handler({} as any, payloadByChannel[r.channel])
+    })
+
+    expect(captures['panda:state']).toEqual(['thinking'])
+    expect(captures['panda:species']).toEqual(['duck'])
+    expect(captures['panda:level']).toEqual([{ level: 7, rarity: 'rare' }])
+    expect(captures['panda:xp']).toEqual([{ current: 120, total: 200, pct: 60 }])
+    expect(captures['panda:level-up']).toEqual([{ from: 6, to: 7 }])
+  })
+
+  it('handler 抛错不污染 ipc 通道 — try/catch 吞错（warn 级别）', () => {
+    if (!fs.existsSync(PRELOAD_HIT_JS)) return
+    const { exposed, registered } = loadPreloadWithMock()
+    const apiByName = Object.fromEntries(exposed.map((e) => [e.name, e.api]))
+
+    const beforeRegLen = registered.length
+    apiByName.pandaState.onChange(() => {
+      throw new Error('intentional handler bomb')
+    })
+    const reg = registered[beforeRegLen]
+    expect(reg.channel).toBe('panda:state')
+
+    // 调 handler 不应抛出（preload 内部 try/catch 吞）
+    const origWarn = console.warn
+    let warned = false
+    console.warn = () => { warned = true }
+    try {
+      expect(() => reg.handler({} as any, 'idle')).not.toThrow()
+    } finally {
+      console.warn = origWarn
+    }
+    expect(warned).toBe(true)
   })
 })

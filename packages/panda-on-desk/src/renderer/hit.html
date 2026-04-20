@@ -6,6 +6,8 @@
   <!--
     Input: hitWin loadFile(hit.html) + bridge 'panda-event' 通过 preload 注入 window.panda.onEvent
            + W2-T4: preload 'badge:update' channel 通过 window.pandaBadge.onUpdate 订阅
+           + W14-T1: preload 5 typed channels — pandaState/pandaSpecies/pandaLevel/pandaXP/pandaLevelUp
+                     onChange/onUpdate/onTrigger 订阅，main.ts 在 forwardBridgeEventToRenderer 内分发
     Output: 透明窗内可见精美 panda 形象 + 7 状态切换 (idle/thinking/working/sleeping/error/attention/notification) + 整窗 CSS drag
             + W2-T4: 双击/4击/长按交互反应 + 右上角红圆 badge + 长按显示 stats 卡片
     Pos: panda-on-desk hit window 渲染入口 — W1-T2 美工升级（多帧动画 + 渐变 + 阴影 + 高光 + 状态机 UI）
@@ -1089,6 +1091,98 @@
         }
       } catch (e) {
         console.warn('[panda-on-desk:hit] pandaI18n apply failed:', e && e.message);
+      }
+    })();
+
+    // ── W14-T1：5 typed IPC channels 订阅（preload 暴露 pandaState/pandaSpecies/
+    //                                      pandaLevel/pandaXP/pandaLevelUp）──────
+    // 来源：main.ts forwardBridgeEventToRenderer 在原 'panda-event' 之外，按 event.type
+    //       分发到 5 typed channel；preload/hit.ts 经 contextBridge 暴露 5 个全局对象。
+    // 与 W1-T4 的 window.panda.onEvent 双订阅幂等：
+    //   - typed channel：精准、解耦、payload 已被 main.ts 提取（不带 sessionId/ts 噪音）；
+    //   - panda-event：保留以兼容老路径 + 未类型化事件（notification / dnd / permission ...）。
+    //   双订阅同帧到达时，__pandaSetState/__pandaSetSpecies 等 setter 是幂等 DOM 操作（赋值 dataset）；
+    //   __pandaSetXP/__pandaSetLevel/__pandaTriggerLevelUp 内有 _state 缓存 + repaintLevel 整体重渲，
+    //   多次调用最多多刷一帧 — 无副作用。
+    // 失败容错：preload 未生效（开发态 file:// 直开）→ 5 全局都 undefined → 静默退出。
+    (function () {
+      try {
+        if (typeof window === 'undefined') return;
+        // 1. panda:state → __pandaSetState
+        if (window.pandaState && typeof window.pandaState.onChange === 'function') {
+          window.pandaState.onChange(function (state) {
+            try {
+              if (typeof window.__pandaSetState === 'function') {
+                window.__pandaSetState(state);
+              } else {
+                if (!window.__pandaPendingState) window.__pandaPendingState = state;
+              }
+            } catch (e) {
+              console.warn('[panda-on-desk:hit] pandaState.onChange handler threw:', e && e.message);
+            }
+          });
+        }
+        // 2. panda:species → __pandaSetSpecies
+        if (window.pandaSpecies && typeof window.pandaSpecies.onChange === 'function') {
+          window.pandaSpecies.onChange(function (species) {
+            try {
+              if (typeof window.__pandaSetSpecies === 'function') {
+                window.__pandaSetSpecies(species);
+              } else {
+                if (!window.__pandaPendingSpecies) window.__pandaPendingSpecies = species;
+              }
+            } catch (e) {
+              console.warn('[panda-on-desk:hit] pandaSpecies.onChange handler threw:', e && e.message);
+            }
+          });
+        }
+        // 3. panda:level → __pandaSetLevel(level, rarity)
+        if (window.pandaLevel && typeof window.pandaLevel.onChange === 'function') {
+          window.pandaLevel.onChange(function (payload) {
+            try {
+              if (!payload || typeof payload !== 'object') return;
+              if (typeof window.__pandaSetLevel === 'function' &&
+                  typeof payload.level === 'number') {
+                window.__pandaSetLevel(payload.level, payload.rarity);
+              }
+            } catch (e) {
+              console.warn('[panda-on-desk:hit] pandaLevel.onChange handler threw:', e && e.message);
+            }
+          });
+        }
+        // 4. panda:xp → __pandaSetXP(current, total, pct)
+        if (window.pandaXP && typeof window.pandaXP.onUpdate === 'function') {
+          window.pandaXP.onUpdate(function (payload) {
+            try {
+              if (!payload || typeof payload !== 'object') return;
+              if (typeof window.__pandaSetXP === 'function') {
+                window.__pandaSetXP(
+                  typeof payload.current === 'number' ? payload.current : 0,
+                  typeof payload.total === 'number' ? payload.total : 0,
+                  typeof payload.pct === 'number' ? payload.pct : 0
+                );
+              }
+            } catch (e) {
+              console.warn('[panda-on-desk:hit] pandaXP.onUpdate handler threw:', e && e.message);
+            }
+          });
+        }
+        // 5. panda:level-up → __pandaTriggerLevelUp(from, to)
+        if (window.pandaLevelUp && typeof window.pandaLevelUp.onTrigger === 'function') {
+          window.pandaLevelUp.onTrigger(function (payload) {
+            try {
+              if (!payload || typeof payload !== 'object') return;
+              if (typeof window.__pandaTriggerLevelUp === 'function' &&
+                  typeof payload.from === 'number' && typeof payload.to === 'number') {
+                window.__pandaTriggerLevelUp(payload.from, payload.to);
+              }
+            } catch (e) {
+              console.warn('[panda-on-desk:hit] pandaLevelUp.onTrigger handler threw:', e && e.message);
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('[panda-on-desk:hit] W14-T1 typed channel subscribe failed:', e && e.message);
       }
     })();
 

@@ -274,9 +274,12 @@ export function showOverlayBubble(event: NotificationEvent): OverlayHandle | nul
   }
 
   // renderer ready 后推送 payload（mock 中不会触发 — 测试直接验栈状态即可）
+  // why: 通道名 'overlay-show' 与 preload/bubble.ts onOverlayShow 对齐（W14-T3）
+  //      不能用 'overlay:show' — preload 没有监听该通道，导致 Mac 实测 overlay 窗口
+  //      创建后 renderer 收不到数据，永远空白不显示。
   win.webContents.once('did-finish-load', () => {
     try {
-      win.webContents.send('overlay:show', {
+      win.webContents.send('overlay-show', {
         id,
         title: event.title,
         body: event.body ?? '',
@@ -290,8 +293,9 @@ export function showOverlayBubble(event: NotificationEvent): OverlayHandle | nul
     }
   })
 
-  // renderer 上报真实高度后回写栈
-  win.webContents.on('overlay:height', (...args: unknown[]) => {
+  // renderer 上报真实高度后回写栈（preload reportHeight → 'bubble-height' channel；
+  // main.ts 的 ipcMain.on('bubble-height') 会回灌到此 entry 通道）
+  win.webContents.on('overlay-height', (...args: unknown[]) => {
     const h = Number(args[0])
     if (Number.isFinite(h) && h > 0) {
       entry.height = h

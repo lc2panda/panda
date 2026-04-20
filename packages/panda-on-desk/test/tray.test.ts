@@ -119,7 +119,13 @@ beforeAll(async () => {
 
 function makeFakeCtx(over: any = {}): any {
   const state = { winVisible: true, dnd: false }
-  const calls = { togglePetVisibility: 0, openSettingsWindow: 0, setDnd: [] as boolean[], requestQuit: 0 }
+  const calls = {
+    togglePetVisibility: 0,
+    openSettingsWindow: 0,
+    setDnd: [] as boolean[],
+    setDndWithEndsAt: [] as Array<{ enabled: boolean; endsAt?: number }>,
+    requestQuit: 0,
+  }
   const ctx: any = {
     getWin: () => ({
       isDestroyed: () => false,
@@ -135,6 +141,11 @@ function makeFakeCtx(over: any = {}): any {
     togglePetVisibility: () => { state.winVisible = !state.winVisible; calls.togglePetVisibility++ },
     getDoNotDisturb: () => state.dnd,
     setDoNotDisturb: (v: boolean) => { state.dnd = !!v; calls.setDnd.push(!!v) },
+    // W14-T2：新签名 — DND 子菜单 click 走这里，endsAt 透传
+    setDoNotDisturbWithEndsAt: (v: boolean, endsAt?: number) => {
+      state.dnd = !!v
+      calls.setDndWithEndsAt.push({ enabled: !!v, endsAt })
+    },
     requestQuit: () => { calls.requestQuit++ },
     appVersion: '1.2.3-test',
     getLang: () => 'en',
@@ -184,25 +195,35 @@ describe('panda-on-desk W12-T2 Tray (systray 实测)', () => {
     expect(items[0].label).toBe('Hide panda')
     expect(items[1].label).toBe('DND mode')
     expect(items[1].type).toBe('checkbox')
+    // W14-T2：DND 改 submenu，items[1] 不再有 click；其余 4 项仍 click
+    expect(typeof items[0].click).toBe('function')
+    expect(typeof items[2].click).toBe('function')
+    expect(typeof items[3].click).toBe('function')
+    expect(typeof items[4].click).toBe('function')
     expect(items[2].label).toBe('Settings…')
     expect(items[3].label).toBe('About panda-on-desk')
     expect(items[4].label).toBe('Quit panda-on-desk')
-    for (const it of items) {
-      expect(typeof it.click).toBe('function')
-    }
     handle.destroy()
   })
 
-  it('click handlers 正确调用 ctx.{togglePetVisibility,setDoNotDisturb,openSettingsWindow,requestQuit}', () => {
+  it('click handlers 正确调用 ctx.{togglePetVisibility,openSettingsWindow,requestQuit} + DND 子菜单走 setDoNotDisturbWithEndsAt', () => {
     const ctx = makeFakeCtx()
     const handle = trayMod.initPandaTray(ctx)
     const items = lastMenuTemplate!.filter(t => t.type !== 'separator')
     items[0].click!()
     expect(ctx.calls.togglePetVisibility).toBe(1)
-    items[1].click!({ checked: true })
-    expect(ctx.calls.setDnd).toEqual([true])
-    items[1].click!({ checked: false })
-    expect(ctx.calls.setDnd).toEqual([true, false])
+    // W14-T2：DND 是 submenu — 父项无 click，子项才有
+    const submenu = (items[1] as any).submenu as MenuItemTemplate[]
+    expect(Array.isArray(submenu)).toBe(true)
+    const dndItems = submenu.filter(s => s.type !== 'separator')
+    expect(dndItems.length).toBe(5)
+    // 选 "On for 15 minutes" → enabled=true, endsAt 约 +15min
+    const before = Date.now()
+    dndItems[1].click!()
+    expect(ctx.calls.setDndWithEndsAt.length).toBe(1)
+    expect(ctx.calls.setDndWithEndsAt[0].enabled).toBe(true)
+    expect(ctx.calls.setDndWithEndsAt[0].endsAt).toBeGreaterThanOrEqual(before + 15 * 60 * 1000 - 1000)
+    expect(ctx.calls.setDndWithEndsAt[0].endsAt).toBeLessThanOrEqual(Date.now() + 15 * 60 * 1000 + 1000)
     items[2].click!()
     expect(ctx.calls.openSettingsWindow).toBe(1)
     expect(() => items[3].click!()).not.toThrow()
@@ -223,7 +244,7 @@ describe('panda-on-desk W12-T2 Tray (systray 实测)', () => {
     handle.destroy()
   })
 
-  it('getDoNotDisturb=true 时 DND 菜单项 checked=true', () => {
+  it('getDoNotDisturb=true 时 DND 菜单项 checked=true + Forever 子项 radio 选中', () => {
     const ctx = makeFakeCtx()
     ctx.getDoNotDisturb = () => true
     const handle = trayMod.initPandaTray(ctx)
@@ -231,7 +252,103 @@ describe('panda-on-desk W12-T2 Tray (systray 实测)', () => {
     expect(items[1].label).toBe('DND mode')
     expect(items[1].type).toBe('checkbox')
     expect(items[1].checked).toBe(true)
+    const submenu = (items[1] as any).submenu as MenuItemTemplate[]
+    const dndItems = submenu.filter(s => s.type !== 'separator')
+    // dnd=true → Off radio 不选；Forever radio 选中
+    expect(dndItems[0].label).toBe('Off')
+    expect(dndItems[0].checked).toBe(false)
+    expect(dndItems[4].label).toBe('On until I turn it off')
+    expect(dndItems[4].checked).toBe(true)
     handle.destroy()
+  })
+
+  it('W14-T2 DND submenu 5 项 (Off/15m/1h/2h/Forever) — endsAt 时长精确', () => {
+    const ctx = makeFakeCtx()
+    const handle = trayMod.initPandaTray(ctx)
+    const items = lastMenuTemplate!.filter(t => t.type !== 'separator')
+    const submenu = (items[1] as any).submenu as MenuItemTemplate[]
+    const dndItems = submenu.filter(s => s.type !== 'separator')
+    expect(dndItems.length).toBe(5)
+    expect(dndItems.map(i => i.label)).toEqual([
+      'Off',
+      'On for 15 minutes',
+      'On for 1 hour',
+      'On for 2 hours',
+      'On until I turn it off',
+    ])
+    // Off → enabled=false, endsAt undefined
+    dndItems[0].click!()
+    const last0 = ctx.calls.setDndWithEndsAt[ctx.calls.setDndWithEndsAt.length - 1]
+    expect(last0.enabled).toBe(false)
+    expect(last0.endsAt).toBeUndefined()
+    // 1h → enabled=true, endsAt ≈ +1h
+    const t1 = Date.now()
+    dndItems[2].click!()
+    const last1 = ctx.calls.setDndWithEndsAt[ctx.calls.setDndWithEndsAt.length - 1]
+    expect(last1.enabled).toBe(true)
+    expect(last1.endsAt).toBeGreaterThanOrEqual(t1 + 60 * 60 * 1000 - 1000)
+    // 2h
+    const t2 = Date.now()
+    dndItems[3].click!()
+    const last2 = ctx.calls.setDndWithEndsAt[ctx.calls.setDndWithEndsAt.length - 1]
+    expect(last2.endsAt).toBeGreaterThanOrEqual(t2 + 2 * 60 * 60 * 1000 - 1000)
+    // Forever → endsAt undefined
+    dndItems[4].click!()
+    const last3 = ctx.calls.setDndWithEndsAt[ctx.calls.setDndWithEndsAt.length - 1]
+    expect(last3.enabled).toBe(true)
+    expect(last3.endsAt).toBeUndefined()
+    handle.destroy()
+  })
+
+  it('W14-T2 DND submenu fallback — 无 setDoNotDisturbWithEndsAt 时降级到 setDoNotDisturb', () => {
+    const ctx = makeFakeCtx()
+    // 删掉新签名 — 验证向后兼容（旧 main.ts 不会注入新方法）
+    delete ctx.setDoNotDisturbWithEndsAt
+    const handle = trayMod.initPandaTray(ctx)
+    const items = lastMenuTemplate!.filter(t => t.type !== 'separator')
+    const submenu = (items[1] as any).submenu as MenuItemTemplate[]
+    const dndItems = submenu.filter(s => s.type !== 'separator')
+    dndItems[1].click!() // 15m
+    expect(ctx.calls.setDnd).toEqual([true])
+    dndItems[0].click!() // Off
+    expect(ctx.calls.setDnd).toEqual([true, false])
+    handle.destroy()
+  })
+
+  it('W14-T2 About 对话框含 3 按钮 (OK / Open repo / View LICENSE) + LICENSE click 调 shell.openExternal', async () => {
+    // 重新 mock electron — 让 dialog.showMessageBox 返回 LICENSE 按钮 (response=2)
+    const openCalls: string[] = []
+    let lastButtons: string[] | null = null
+    let lastTitle: string | null = null
+    mock.module('electron', () => {
+      const base = buildElectronMock()
+      base.dialog = {
+        showMessageBox: (opts: any) => {
+          lastButtons = opts.buttons || []
+          lastTitle = opts.title || ''
+          return Promise.resolve({ response: 2 })
+        },
+      } as any
+      base.shell = {
+        openExternal: (url: string) => { openCalls.push(url) },
+      } as any
+      return base
+    })
+    const trayModFresh = await import('../src/tray/index.js?w14_about=' + Date.now())
+    const ctx = makeFakeCtx()
+    const handle = trayModFresh.initPandaTray(ctx)
+    const items = lastMenuTemplate!.filter(t => t.type !== 'separator')
+    expect(items[3].label).toBe('About panda-on-desk')
+    items[3].click!()
+    // 等 microtask 完成 dialog promise
+    await new Promise(r => setTimeout(r, 5))
+    expect(lastButtons).toEqual(['OK', 'Open repo', 'View LICENSE'])
+    expect(lastTitle).toBe('About panda-on-desk')
+    expect(openCalls.length).toBe(1)
+    expect(openCalls[0]).toContain('LICENSE')
+    handle.destroy()
+    // 还原 mock 给后续测试
+    mock.module('electron', () => buildElectronMock())
   })
 
   it('rebuild() 反映 win 可见状态切换 (Hide panda ⇄ Show panda)', () => {

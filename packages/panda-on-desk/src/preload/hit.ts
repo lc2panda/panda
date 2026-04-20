@@ -1,11 +1,14 @@
 // Input: Electron preload context（hit 透明窗口）
 // Output: window.hitAPI / window.hitThemeConfig / window.panda — drag/click/menu 通道 + W1-T4 bridge event subscribe
+//         + W14-T1：5 typed channels（pandaState/pandaSpecies/pandaLevel/pandaXP/pandaLevelUp）
 // Pos: panda-on-desk hit 窗口 preload
 //
 // Forked from clawd-on-desk@4b07658:src/preload-hit.js (MIT License)
 // JS → TS 直接转。
 // 2026-04-19 +08:00 W1-T4: 新增 window.panda.onEvent —— hit.html 接收 bridge 事件（pet-state / notification 等）
 // 2026-04-19 +08:00 W2-T4: 新增 window.pandaBadge.onUpdate —— 'badge:update' IPC 通道订阅（P2-T4 manager → hit 红圆 badge）
+// 2026-04-20 +08:00 W14-T1: 新增 5 typed channels：pandaState/pandaSpecies/pandaLevel/pandaXP/pandaLevelUp
+//                            （main.ts 在 forwardBridgeEventToRenderer 内分发；与 panda-event 通道并存）
 
 import { contextBridge, ipcRenderer } from 'electron'
 
@@ -89,4 +92,56 @@ contextBridge.exposeInMainWorld('pandaBadge', {
     ipcRenderer.on('badge:update', handler)
     return () => ipcRenderer.removeListener('badge:update', handler)
   },
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W14-T1：5 typed IPC channels — main.ts 在 forwardBridgeEventToRenderer 内
+//         按 event.type 分发到对应 typed channel；preload 透传给 inline script
+//         调对应 window.__panda* 接口。设计：
+//           1. 'panda:state'   → __pandaSetState(state)
+//           2. 'panda:species' → __pandaSetSpecies(species)
+//           3. 'panda:level'   → __pandaSetLevel(level, rarity)
+//           4. 'panda:xp'      → __pandaSetXP(current, total, pct)
+//           5. 'panda:level-up'→ __pandaTriggerLevelUp(from, to)
+//         preload 不做业务校验（hit.html 内 inline script 已有白名单）；
+//         每个 onXxx 返回 removeListener fn，便于 hit 窗销毁/重建时清理。
+// 2026-04-20 +08:00 W14-T1 agent-α-W14-hit-ipc
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 通用工厂：创建一个 ipcRenderer.on 订阅 + removeListener 卸载器 */
+function makeChannelSubscriber(channel: string, label: string) {
+  return (cb: (payload: unknown) => void): (() => void) => {
+    const handler = (_e: unknown, payload: unknown) => {
+      try { cb(payload) } catch (err) {
+        console.warn(`[panda-on-desk:hit-preload] ${label} handler threw:`, (err as Error)?.message)
+      }
+    }
+    ipcRenderer.on(channel, handler)
+    return () => ipcRenderer.removeListener(channel, handler)
+  }
+}
+
+/** PetState 推送（'panda:state'）— payload: PetState 字符串字面量 */
+contextBridge.exposeInMainWorld('pandaState', {
+  onChange: makeChannelSubscriber('panda:state', 'pandaState.onChange'),
+})
+
+/** Species 推送（'panda:species'）— payload: Species 18 物种字面量 */
+contextBridge.exposeInMainWorld('pandaSpecies', {
+  onChange: makeChannelSubscriber('panda:species', 'pandaSpecies.onChange'),
+})
+
+/** Level 推送（'panda:level'）— payload: { level: number, rarity: string } */
+contextBridge.exposeInMainWorld('pandaLevel', {
+  onChange: makeChannelSubscriber('panda:level', 'pandaLevel.onChange'),
+})
+
+/** XP 推送（'panda:xp'）— payload: { current: number, total: number, pct: number } */
+contextBridge.exposeInMainWorld('pandaXP', {
+  onUpdate: makeChannelSubscriber('panda:xp', 'pandaXP.onUpdate'),
+})
+
+/** LevelUp 触发（'panda:level-up'）— payload: { from: number, to: number } */
+contextBridge.exposeInMainWorld('pandaLevelUp', {
+  onTrigger: makeChannelSubscriber('panda:level-up', 'pandaLevelUp.onTrigger'),
 })

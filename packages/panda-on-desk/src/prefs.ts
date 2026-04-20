@@ -53,7 +53,8 @@ export type PandaSpecies = (typeof PANDA_SPECIES_WHITELIST)[number];
 export const PANDA_LANG_WHITELIST = ["en", "zh", "ko"] as const;
 export type PandaLang = (typeof PANDA_LANG_WHITELIST)[number];
 
-// ── 5 选项 panda 偏好 schema ──
+// ── 6 选项 panda 偏好 schema ──
+// W14-T4 (2026-04-20 +08:00): 新增 firstRun 字段，默认 true；首次启动播放 demo-mode.ts 后置 false。
 export interface DeskPrefs {
   companionOnDesk: boolean;          // 启用桌面宠物总开关
   species: PandaSpecies;              // 物种（18 选 1）
@@ -62,6 +63,7 @@ export interface DeskPrefs {
   notificationVolume: number;         // 通知音量 0~100
   autoLaunch: boolean;                // 开机自启
   language: PandaLang;                // W5-T3 三语 UI 语言（默认按 detectInitialLang() 决定）
+  firstRun: boolean;                  // W14-T4 首次启动 → runDemoSequence() → 自动 false
 }
 
 export const DEFAULT_DESK_PREFS: DeskPrefs = {
@@ -72,6 +74,7 @@ export const DEFAULT_DESK_PREFS: DeskPrefs = {
   notificationVolume: 60,
   autoLaunch: false,
   language: "en",
+  firstRun: true,
 };
 
 // ── ~/.pandacc/desk-prefs.json 路径 ──
@@ -112,6 +115,8 @@ export function validateDeskPrefs(input: unknown): DeskPrefs {
     notificationVolume: isValidVolume(inp.notificationVolume) ? (inp.notificationVolume as number) : DEFAULT_DESK_PREFS.notificationVolume,
     autoLaunch: typeof inp.autoLaunch === "boolean" ? inp.autoLaunch : DEFAULT_DESK_PREFS.autoLaunch,
     language,
+    // W14-T4：firstRun 字段缺失/非 boolean → 默认 true（保持"老用户首次升级也会看一次 demo"的体验合理）
+    firstRun: typeof inp.firstRun === "boolean" ? inp.firstRun : DEFAULT_DESK_PREFS.firstRun,
   };
 }
 

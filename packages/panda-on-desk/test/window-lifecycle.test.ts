@@ -210,11 +210,14 @@ describe('W7-T3 · panda-on-desk window lifecycle · 单窗', () => {
     expect(loadEv).toBeDefined()
     expect(String(loadEv?.payload)).toContain('bubble.html')
 
-    // 3. did-finish-load 触发 → renderer 收 overlay:show payload + win.show()
+    // 3. did-finish-load 触发 → renderer 收 overlay-show payload + win.show()
+    // why W14-T3：通道名从 'overlay:show' 改为 'overlay-show'，与 preload/bubble.ts
+    //   的 onOverlayShow → ipcRenderer.on('overlay-show') 对齐。旧通道名导致 mac
+    //   用户实测 overlay 创建后 renderer 收不到 payload，永远空白。
     win.__triggerWebContents('did-finish-load')
     const sendEvents = win.__lifecycle.filter(e => e.kind === 'webContents.send')
     expect(sendEvents.length).toBeGreaterThanOrEqual(1)
-    expect((sendEvents[0].payload as { channel: string }).channel).toBe('overlay:show')
+    expect((sendEvents[0].payload as { channel: string }).channel).toBe('overlay-show')
     expect(win.__visible).toBe(true)
     expect(win.__lifecycle.find(e => e.kind === 'show')).toBeDefined()
 

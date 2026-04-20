@@ -842,6 +842,119 @@ btnDeny.addEventListener("click", () => {
 window.bubbleAPI.onPermissionShow(show);
 window.bubbleAPI.onPermissionHide(hide);
 
+// ── W14-T3 overlay-show / overlay-hide 通用通知分支 ───────────────────────────
+// why: 非 permission overlay（CI 失败 / morning-brief / calendar 等）需要真渲染
+//      title + body + actions。permission 路径继续走 onPermissionShow（不动）。
+//      bubble.html 单文件双模板：marker actions 含 'permission_request' → 走
+//      permission 路径；否则进入 overlay 路径（自包含 title/body/动态按钮）。
+const OVERLAY_LEVEL_COLOR = {
+  info:    "#5b8dd9",
+  warning: "#d97757",
+  error:   "#dc2626",
+  success: "#5a9e6f",
+};
+
+function showOverlay(data) {
+  if (!data || typeof data !== "object") return;
+  resetBubbleContent();
+
+  // 头部 — title 直显（来自 NotificationEvent.title），不再硬编码 "Permission Request"
+  const title = (typeof data.title === "string" && data.title.length > 0)
+    ? data.title
+    : "Notification";
+  headerTitle.textContent = title;
+
+  // tool-pill 复用为 level pill（INFO / WARN / ERROR / OK）— 颜色按 level 染色
+  const level = (typeof data.level === "string") ? data.level : "info";
+  const levelLabel = level === "warning" ? "WARN"
+    : level === "error" ? "ERROR"
+    : level === "success" ? "OK"
+    : "INFO";
+  toolPill.textContent = levelLabel;
+  toolPill.removeAttribute("data-tool"); // 清掉 permission 路径的 data-tool 染色
+  toolPill.style.background = OVERLAY_LEVEL_COLOR[level] || OVERLAY_LEVEL_COLOR.info;
+  toolPill.style.display = "";
+
+  // body 注入到 commandBlock（textContent 防 XSS）
+  const body = (typeof data.body === "string") ? data.body : "";
+  if (body.length > 0) {
+    commandBlock.textContent = body;
+    commandBlock.style.display = "";
+    commandBlock.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    commandBlock.style.fontSize = "13px";
+    commandBlock.style.maxHeight = "200px";
+    commandBlock.style.whiteSpace = "pre-wrap";
+    commandBlock.style.wordBreak = "break-word";
+  } else {
+    commandBlock.style.display = "none";
+  }
+
+  // 隐藏 permission 双按钮，全用 actions[] 渲染到 suggestions 区
+  btnAllow.style.display = "none";
+  btnDeny.style.display = "none";
+  suggestionsContainer.innerHTML = "";
+
+  const actions = Array.isArray(data.actions) ? data.actions : [];
+  let renderedAction = false;
+  actions.forEach((action, idx) => {
+    if (!action || typeof action !== "object") return;
+    if (typeof action.id !== "string" || typeof action.label !== "string") return;
+    // 跳过 permission_request marker（仅 dispatcher 用于路由升级）
+    if (action.id === "permission_request") return;
+    const btn = document.createElement("button");
+    btn.className = action.primary ? "btn btn-allow" : "btn-suggestion";
+    btn.textContent = action.label;
+    btn.setAttribute("data-action-id", action.id);
+    if (typeof action.shortcut === "string" && action.shortcut.length > 0) {
+      btn.title = action.shortcut;
+    }
+    btn.addEventListener("click", () => {
+      // 全部按钮 disable + 通过 overlay-action IPC 推回
+      for (const b of suggestionsContainer.children) b.disabled = true;
+      window.bubbleAPI.overlayAction(data.id || "", action.id);
+    });
+    suggestionsContainer.appendChild(btn);
+    renderedAction = true;
+  });
+
+  // 无 actions → 自动追加一个 Dismiss 按钮（保证 ESC/Enter 有目标）
+  if (!renderedAction) {
+    const btn = document.createElement("button");
+    btn.className = "btn-suggestion";
+    btn.textContent = "Dismiss";
+    btn.setAttribute("data-action-id", "dismiss");
+    btn.addEventListener("click", () => {
+      window.bubbleAPI.overlayAction(data.id || "", "dismiss");
+    });
+    suggestionsContainer.appendChild(btn);
+  }
+
+  // a11y — card label 用 title
+  card.setAttribute("aria-label", title);
+
+  revealCard();
+}
+
+function hideOverlay() {
+  hide();
+}
+
+if (window.bubbleAPI && typeof window.bubbleAPI.onOverlayShow === "function") {
+  window.bubbleAPI.onOverlayShow(showOverlay);
+}
+if (window.bubbleAPI && typeof window.bubbleAPI.onOverlayHide === "function") {
+  window.bubbleAPI.onOverlayHide(hideOverlay);
+}
+
+// Enter — 触发第一个 action（overlay 模式下 ESC 已由 permission keydown 兜底）
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && btnAllow.style.display === "none") {
+    e.preventDefault();
+    const firstBtn = suggestionsContainer.querySelector("button:not([disabled])");
+    if (firstBtn) firstBtn.click();
+  }
+});
+
 // ── W8-T2 a11y：ESC 关闭气泡 + Tab focus 起点 + bubble 显示后聚焦 Allow ──
 // why: WCAG 2.1.2 No Keyboard Trap — ESC 必须能离开 alertdialog
 //      WCAG 2.4.3 Focus Order — 显示后焦点落到主操作（Allow）

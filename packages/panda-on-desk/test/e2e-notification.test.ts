@@ -500,3 +500,134 @@ describe('W2-T3 / dispatchEvent 兼容旧入口', () => {
     expect(__getOverlayStackSizeForTesting()).toBe(1)
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group H：W14-T3 端到端 — HTTP /event → bridge → dispatcher → overlay-show IPC payload
+//   验证 mac 用户场景下整条链 — 通道名 'overlay-show' 与 preload onOverlayShow 对齐，
+//   payload 含完整 title/body/level/actions 让 bubble.html 真渲染。
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W14-T3 端到端 — overlay 真弹出 IPC payload 完整透传', () => {
+  test('CI failed overlay → POST /event → window 创建 + did-finish-load 后 send overlay-show', async () => {
+    // 自定义 factory 拿到 webContents.send 调用记录
+    const sentByWindow: Array<{ channel: string; args: unknown[] }> = []
+    const finishLoadFns: Array<() => void> = []
+    setBubbleWindowFactory(opts => {
+      const closeListeners: Array<() => void> = []
+      const w = {
+        __closed: false,
+        loadFile: () => {},
+        setBounds: () => {},
+        setAlwaysOnTop: () => {},
+        setIgnoreMouseEvents: () => {},
+        show: () => {},
+        hide: () => {},
+        close: () => { w.__closed = true; for (const fn of closeListeners) fn() },
+        isDestroyed: () => w.__closed,
+        on: (event: string, listener: any) => {
+          if (event === 'closed') closeListeners.push(listener)
+        },
+        webContents: {
+          send: (channel: string, ...args: unknown[]) => {
+            sentByWindow.push({ channel, args })
+          },
+          on: () => {},
+          once: (event: string, listener: any) => {
+            if (event === 'did-finish-load') finishLoadFns.push(listener)
+          },
+        },
+      }
+      return w as any
+    })
+
+    const handle = await startBridgeServer({
+      basePort: 16_500,
+      maxProbe: 50,
+      secret: 'w14t3-overlay-1',
+      onEvent: () => {},
+    })
+    try {
+      const event: NotificationEvent = {
+        type: 'notification',
+        kind: 'overlay',
+        level: 'error',
+        scenarioId: 'ci-failed',
+        title: 'CI failed on main',
+        body: 'pipeline #4521 broken — 3 tests red',
+        actions: [
+          { id: 'open-pipeline', label: 'Open pipeline', primary: true },
+          { id: 'dismiss', label: 'Dismiss' },
+        ],
+        ts: Date.now(),
+      }
+      const resp = await rawRequest({
+        port: handle.port,
+        path: '/event',
+        method: 'POST',
+        headers: { [SECRET_HEADER]: 'w14t3-overlay-1' },
+        body: JSON.stringify(event),
+      })
+      expect(resp.status).toBe(200)
+      expect(__getOverlayStackSizeForTesting()).toBe(1)
+
+      // 模拟 renderer ready
+      for (const fn of finishLoadFns) fn()
+      const overlayShow = sentByWindow.filter(s => s.channel === 'overlay-show')
+      expect(overlayShow.length).toBe(1)
+      const payload = overlayShow[0].args[0] as {
+        title: string
+        body: string
+        level: string
+        actions: Array<{ id: string; primary?: boolean }>
+      }
+      expect(payload.title).toBe('CI failed on main')
+      expect(payload.body).toBe('pipeline #4521 broken — 3 tests red')
+      expect(payload.level).toBe('error')
+      expect(payload.actions[0].primary).toBe(true)
+    } finally {
+      await handle.close()
+    }
+  })
+
+  test('calendar 提醒 overlay → ttlMs 默认 5s，栈中至少 1（不立即消失）', () => {
+    const finishLoadFns: Array<() => void> = []
+    setBubbleWindowFactory(opts => {
+      const w = {
+        __closed: false,
+        loadFile: () => {},
+        setBounds: () => {},
+        setAlwaysOnTop: () => {},
+        setIgnoreMouseEvents: () => {},
+        show: () => {},
+        hide: () => {},
+        close: () => { w.__closed = true },
+        isDestroyed: () => w.__closed,
+        on: () => {},
+        webContents: {
+          send: () => {},
+          on: () => {},
+          once: (event: string, listener: any) => {
+            if (event === 'did-finish-load') finishLoadFns.push(listener)
+          },
+        },
+      }
+      return w as any
+    })
+
+    dispatchNotification({
+      type: 'notification',
+      kind: 'overlay',
+      level: 'info',
+      scenarioId: 'calendar-reminder',
+      title: 'Standup in 5 min',
+      body: 'Daily sync · room 4F',
+      ts: Date.now(),
+    })
+
+    expect(__getOverlayStackSizeForTesting()).toBe(1)
+    // did-finish-load 触发不抛
+    expect(() => { for (const fn of finishLoadFns) fn() }).not.toThrow()
+    // 5s ttl 不会瞬间触发，栈仍稳定
+    expect(__getOverlayStackSizeForTesting()).toBe(1)
+  })
+})
