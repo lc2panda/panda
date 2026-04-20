@@ -1816,6 +1816,13 @@ panda CLI 启动时（`panda` / `bun panda`）会通过 `src/buddy/desk-spawn.ts
 
 详见子包 [packages/panda-on-desk/README.md](./packages/panda-on-desk/README.md)。
 
+### 桌面端独立安装包（v1.0.0+）
+GitHub Release: https://github.com/lc2panda/panda/releases/tag/desk-v1.0.0
+- macOS Apple Silicon: panda-on-desk-1.0.0-arm64.dmg
+- macOS Intel: panda-on-desk-1.0.0-x64.dmg
+- Windows: panda-on-desk-Setup-1.0.0.exe
+- Linux: panda-on-desk-1.0.0.AppImage / .deb
+
 ## panda-on-desk 桌面宠物（v2.25.0+）
 
 panda 自带桌面宠物 — npm install 后自动启动，与 panda CLI 实时联动。
