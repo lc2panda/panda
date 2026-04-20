@@ -33,7 +33,7 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 | 维度 | 值 | 来源 |
 |---|---|---|
-| panda CLI 版本 | **v2.25.23** | `package.json` L3 |
+| panda CLI 版本 | **v2.25.25** | `package.json` L3 |
 | panda-on-desk 子包版本 | **v0.1.0-alpha** (内部) / 对外 desk-v1.0.1 GA | `packages/panda-on-desk/package.json` L3 |
 | 桌面端 GA 标签 | **desk-v1.0.1** (2026-04-20 推送) | `monitor/20260420-W11-T1-ci-retrigger.md` |
 | Electron runtime | **41.2.1** | `packages/panda-on-desk/package.json` devDeps |
@@ -106,9 +106,25 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 | 维度 | 值 | 来源 |
 |---|---|---|
-| panda CLI npm tarball | **6.4 MB** (含 9 截图 + 14 svg + scripts) | CHANGELOG v2.25.7 |
+| panda CLI npm tarball | **6.4 MB** (含 9 截图 + 14 svg + 7 apng + scripts) | CHANGELOG v2.25.7 / W16-T1 |
 | panda-on-desk 安装大小 | **~80 MB** (含 electron@41 runtime) | README §Comparison |
 | 9 PNG 截图 | **~158 KB** total | CHANGELOG v2.25.7 |
+| 7 APNG 真动图 | **~508 KB** total (48–95 KB / file) | W16-T1 · `build/screenshots/apng/` |
+
+### 3.4 7 APNG 真动图清单（W16-T1 · v2.25.25）
+
+| # | 状态 | 文件 | 帧数 | 时长 | 大小 | 动画要点 |
+|---|---|---|---|---|---|---|
+| 1 | idle | `panda-idle.apng` | 6 | 3000 ms | 72.5 KB | scale 1 ↔ 1.035 呼吸 |
+| 2 | thinking | `panda-thinking.apng` | 8 | 1000 ms | 95.4 KB | `?` y 42↔36 浮动 + 旋转 |
+| 3 | working | `panda-working.apng` | 6 | 800 ms | 75.7 KB | 脸 ±3° 摇头 + 齿轮 360° |
+| 4 | sleeping | `panda-sleeping.apng` | 8 | 2000 ms | 92.0 KB | 闭眼 + Z 飘起 + 慢呼吸 |
+| 5 | error | `panda-error.apng` | 4 | 1000 ms | 49.7 KB | 摔倒 0→30° + X 眼消失 |
+| 6 | attention | `panda-attention.apng` | 4 | 500 ms | 49.0 KB | 跳跃 0→-10px + 光圈脉冲 |
+| 7 | notification | `panda-notification.apng` | 6 | 400 ms | 74.3 KB | 头摇摆 + 铃铛晃动 |
+| — | **合计** | — | **42 帧** | — | **~508 KB** | 所有 PNG 超集 · acTL / fcTL / fdAT chunks · GitHub / 浏览器 / Discord / 邮件原生自动播放 |
+
+> 生成脚本：[`scripts/build-apng.cjs`](./scripts/build-apng.cjs) ([NEW-FILE:#W16-01])。sharp 光栅化 SVG 帧 + 纯 JS APNG chunk 合成器（Node 原生 zlib CRC32 + Buffer 拼接，0 新依赖）。嵌入位置：主仓 README `§🎬 视觉演示（7 状态序列）`（v2.25.25 W17-T2 主对比表升级为 APNG）+ 本子包 README `§实时 demo（APNG）`。
 
 ---
 

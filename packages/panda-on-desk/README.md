@@ -29,6 +29,22 @@
 
 > 截图占位：`build/screenshots/panda-demo-600x400.png`（W6-T1 落盘 · 真实美术 v1.5 替换）
 
+## 实时 demo（APNG · GitHub 自动播放）
+
+7 状态 APNG 在 GitHub Markdown 里**原生自动播放**（PNG 超集 · acTL / fcTL / fdAT chunks · 0 JS / 0 视频 / 0 GIF）。帧数与时长与 hit.html CSS 动画 / SVG SMIL 同源参数对齐（呼吸 3s、眨眼 5s、思考 1s、工作 0.8s、跳跃 0.5s、铃铛 0.4s）。
+
+| idle 待机（6 帧 / 3s） | thinking 思考（8 帧 / 1s） | working 工作（6 帧 / 0.8s） | sleeping 睡眠（8 帧 / 2s） |
+|:---:|:---:|:---:|:---:|
+| <img src="./build/screenshots/apng/panda-idle.apng" alt="idle apng" width="140"/> | <img src="./build/screenshots/apng/panda-thinking.apng" alt="thinking apng" width="140"/> | <img src="./build/screenshots/apng/panda-working.apng" alt="working apng" width="140"/> | <img src="./build/screenshots/apng/panda-sleeping.apng" alt="sleeping apng" width="140"/> |
+| 72.5 KB · scale 1↔1.035 呼吸 | 95.4 KB · `?` y 42↔36 浮动 + 旋转 | 75.7 KB · 脸 ±3° 摇头 + 齿轮 360° | 92.0 KB · 闭眼 + Z 飘 + 慢呼吸 |
+
+| error 错误（4 帧 / 1s） | attention 注意（4 帧 / 0.5s） | notification 通知（6 帧 / 0.4s） |
+|:---:|:---:|:---:|
+| <img src="./build/screenshots/apng/panda-error.apng" alt="error apng" width="140"/> | <img src="./build/screenshots/apng/panda-attention.apng" alt="attention apng" width="140"/> | <img src="./build/screenshots/apng/panda-notification.apng" alt="notification apng" width="140"/> |
+| 49.7 KB · 摔倒 0→30° + X 眼消失 | 49.0 KB · 跳跃 0→-10px + 光圈脉冲 | 74.3 KB · 头摇摆 + 铃铛晃动 |
+
+> 7 APNG 由 [`scripts/build-apng.cjs`](./scripts/build-apng.cjs) 程序化生成（W16-T1 · [NEW-FILE:#W16-01]，sharp 光栅化 + 纯 JS APNG chunk 合成器，0 新依赖，单文件 48–95 KB / ≈ 500 KB 总）。
+
 ## 架构总览（panda CLI ↔ HTTP IPC ↔ panda-on-desk）
 
 ```

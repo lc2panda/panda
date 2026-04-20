@@ -1882,25 +1882,43 @@ npm install -g @lc2panda/panda-code && panda
 
 ### 🎬 视觉演示（7 状态序列）
 
-panda CLI 的每一次状态变化，都会**实时同步**到桌面端 sprite — 这是一只**会呼吸、会思考、会困、会困惑**的桌面伙伴。
+#### 实时 demo（APNG · GitHub 自动播放）
+
+panda CLI 的每一次状态变化，都会**实时同步**到桌面端 sprite — 这是一只**会呼吸、会思考、会困、会困惑**的桌面伙伴。下方 7 个 APNG 在 GitHub Markdown 里**原生自动播放**（PNG 超集，acTL / fcTL / fdAT chunks，0 JS / 0 视频 / 0 GIF），打开页面即可看到实时动画。
 
 | idle 待机 | thinking 思考 | working 工作 | sleeping 睡眠 |
 |:---:|:---:|:---:|:---:|
-| ![idle](packages/panda-on-desk/build/screenshots/panda-200x200-idle.png) | ![thinking](packages/panda-on-desk/build/screenshots/panda-200x200-thinking.png) | ![working](packages/panda-on-desk/build/screenshots/panda-200x200-working.png) | ![sleeping](packages/panda-on-desk/build/screenshots/panda-200x200-sleeping.png) |
+| <img src="packages/panda-on-desk/build/screenshots/apng/panda-idle.apng" alt="idle apng" width="160"/> | <img src="packages/panda-on-desk/build/screenshots/apng/panda-thinking.apng" alt="thinking apng" width="160"/> | <img src="packages/panda-on-desk/build/screenshots/apng/panda-working.apng" alt="working apng" width="160"/> | <img src="packages/panda-on-desk/build/screenshots/apng/panda-sleeping.apng" alt="sleeping apng" width="160"/> |
 | 呼吸动画 + 偶尔眨眼 | 头顶 `…` 思考气泡 | 工具调用计数器 | 22:00+ 自动入睡 |
 
 | error 错误 | attention 注意 | notification 通知 |
 |:---:|:---:|:---:|
-| ![error](packages/panda-on-desk/build/screenshots/panda-200x200-error.png) | ![attention](packages/panda-on-desk/build/screenshots/panda-200x200-attention.png) | ![notification](packages/panda-on-desk/build/screenshots/panda-200x200-notification.png) |
+| <img src="packages/panda-on-desk/build/screenshots/apng/panda-error.apng" alt="error apng" width="160"/> | <img src="packages/panda-on-desk/build/screenshots/apng/panda-attention.apng" alt="attention apng" width="160"/> | <img src="packages/panda-on-desk/build/screenshots/apng/panda-notification.apng" alt="notification apng" width="160"/> |
 | 红色震动 + 错误代码 | 黄色脉冲 + 待办提示 | 蓝色徽章 + 计数 |
+
+> 7 APNG 由 `packages/panda-on-desk/scripts/build-apng.cjs` 程序化生成（W16-T1，sharp 光栅化 4–8 帧 + 纯 JS APNG chunk 合成器，0 新依赖，单文件 48–95 KB ≈ 500 KB 总）。帧数与时长：idle 6 帧/3s、thinking 8 帧/1s、working 6 帧/0.8s、sleeping 8 帧/2s、error 4 帧/1s、attention 4 帧/0.5s、notification 6 帧/0.4s。
+
+---
+
+#### 静态截图（PNG · 打印 / PDF / RSS 友好版）
+
+需要打印稿 / PDF 导出 / RSS 阅读器回退时使用（9 张 PNG ≈ 158 KB）：
+
+| idle | thinking | working | sleeping |
+|:---:|:---:|:---:|:---:|
+| ![idle](packages/panda-on-desk/build/screenshots/panda-200x200-idle.png) | ![thinking](packages/panda-on-desk/build/screenshots/panda-200x200-thinking.png) | ![working](packages/panda-on-desk/build/screenshots/panda-200x200-working.png) | ![sleeping](packages/panda-on-desk/build/screenshots/panda-200x200-sleeping.png) |
+
+| error | attention | notification |
+|:---:|:---:|:---:|
+| ![error](packages/panda-on-desk/build/screenshots/panda-200x200-error.png) | ![attention](packages/panda-on-desk/build/screenshots/panda-200x200-attention.png) | ![notification](packages/panda-on-desk/build/screenshots/panda-200x200-notification.png) |
 
 > 截图由 `packages/panda-on-desk/scripts/build-screenshots.cjs` 程序化生成（sharp + 内嵌 SVG，9 张 PNG ≈ 158 KB），无外部素材依赖。
 
 ---
 
-### 🎞️ 动起来的 panda（SVG SMIL 实时动画）
+#### SVG SMIL 矢量动画（无损缩放 · 轻量备份）
 
-静态截图只是一帧 — 真正的桌面 panda 是**会呼吸、会眨眼、会摇头**的活物。下方 7 个 SVG 在 GitHub 浏览器里**直接播放**（W3C SMIL 原生支持，0 JS / 0 视频文件 / 0 GIF 体积）：
+SVG SMIL 实时动画（W12-T1，单文件 ≤ 5 KB ≈ 32 KB 总）— W3C 原生 `<animate>` / `<animateTransform>`，与 hit.html CSS 动画同源参数：
 
 | idle 呼吸+眨眼 | thinking 头顶 ? 浮动 | working 摇头工作 | sleeping Z 飘起 |
 |:---:|:---:|:---:|:---:|
@@ -1909,8 +1927,6 @@ panda CLI 的每一次状态变化，都会**实时同步**到桌面端 sprite �
 | error 摔倒 X 眼 | attention 跳跃 | notification 摇铃 |
 |:---:|:---:|:---:|
 | <img src="packages/panda-on-desk/build/screenshots/animations/panda-error.svg" alt="error animation" width="120"/> | <img src="packages/panda-on-desk/build/screenshots/animations/panda-attention.svg" alt="attention animation" width="120"/> | <img src="packages/panda-on-desk/build/screenshots/animations/panda-notification.svg" alt="notification animation" width="120"/> |
-
-> 7 SVG 动画由 `packages/panda-on-desk/scripts/build-animations.cjs` 程序化生成（W12-T1，纯 SVG SMIL `<animate>` / `<animateTransform>`，单文件 ≤ 5 KB ≈ 32 KB 总），与 hit.html CSS 动画同源参数（呼吸 3s、眨眼 5s、思考 1s、工作 0.8s、跳跃 0.5s、铃铛 0.4s）。
 
 ---
 

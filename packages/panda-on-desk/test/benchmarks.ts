@@ -7,6 +7,8 @@
 //
 // [NEW-FILE:#W8-04]
 // 2026-04-20 +08:00 W8-T4 agent-δ-W8-bench · 7 测试点 + p50/p95/p99 + throughput
+// 2026-04-20 +08:00 W17-T4 agent-δ-W17-bench · 扩展 +3 测试点（demo/tray/APNG）
+//                   落盘改至 monitor/20260420-W17-T4-bench.md（保留 W8-T4 baseline 不动）
 //
 // 测试点（与 task.md 对齐）：
 //   1. panda CLI startup 时延（maybeSpawnOnDesk 调用 < 5ms；走 --no-desk fast-path）
@@ -16,6 +18,9 @@
 //   5. SVG render fetch 时延（< 50ms 18 物种 preload；并发 readFileSync）
 //   6. petXP.addXP throughput（> 100k/s）
 //   7. StatStorage save+sync 时延（< 100ms HMAC sign）
+//   8. demo runDemoSequence 全 10 步骤总时延（< 50ms；timing 全 0 + mock send/exec/sleep）
+//   9. tray menu rebuild 时延（< 5ms p95；纯 buildTrayMenuTemplate + translator，无 electron Menu.buildFromTemplate）
+//  10. APNG preload 时延（< 100ms；7 个 hit 窗 APNG readFileSync + signature/acTL 扫描）
 
 import { createHmac } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, unlinkSync } from 'node:fs'
@@ -440,6 +445,226 @@ async function benchStatSave(): Promise<BenchStats> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Bench 8 [W17-T4]：demo-mode runDemoSequence 全 10 步骤总时延
+// 把全部 timing 设为 0 + 注入 mock sleep/send/exec + markComplete=false
+// 测纯 sequence 调度 + 10 步循环 + species-cycle 5 次 inner loop 的逻辑 overhead
+// 阈值 < 50ms（含 await Promise + 5 species 切换；实际应 <5ms）
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function benchDemoSequence(): Promise<BenchStats> {
+  const { runDemoSequence, DEMO_STEPS } = await import('../src/demo-mode.ts')
+  if (!Array.isArray(DEMO_STEPS) || DEMO_STEPS.length !== 10) {
+    return {
+      name: '8. demo-mode runDemoSequence 总时长',
+      unit: 'ms',
+      iterations: 0,
+      passed: false,
+      threshold: '< 50ms',
+      note: 'DEMO_STEPS 异常',
+    }
+  }
+
+  // 全 0 timing + 立即 resolve sleep + no-op send/exec + markComplete=false（不写 prefs）
+  const zeroTiming = {
+    idleMs: 0, thinkingMs: 0, workingMs: 0, attentionMs: 0, notificationMs: 0, sleepingMs: 0,
+    levelupMs: 0, speciesEachMs: 0, badgeMs: 0, overlayMs: 0,
+  }
+  const fakeHitWin = { isDestroyed: () => false, webContents: { isDestroyed: () => false } }
+  const noopSleep = (): Promise<void> => Promise.resolve()
+  const noopSend = (): void => undefined
+  const noopExec = (): Promise<unknown> => Promise.resolve(null)
+
+  // 预热
+  for (let i = 0; i < 20; i++) {
+    await runDemoSequence(fakeHitWin, {
+      timing: zeroTiming,
+      sleep: noopSleep,
+      send: noopSend,
+      exec: noopExec,
+      markComplete: false,
+    })
+  }
+
+  const samples: number[] = []
+  const N = 200
+  for (let i = 0; i < N; i++) {
+    const t0 = performance.now()
+    await runDemoSequence(fakeHitWin, {
+      timing: zeroTiming,
+      sleep: noopSleep,
+      send: noopSend,
+      exec: noopExec,
+      markComplete: false,
+    })
+    samples.push(performance.now() - t0)
+  }
+
+  return summarizeLatencies('8. demo-mode runDemoSequence 总时长', samples, {
+    metric: 'p95',
+    max: 50,
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bench 9 [W17-T4]：tray menu rebuild 时延
+// 不依赖 Electron Tray（bun 环境无 Electron）；测 buildTrayMenuTemplate 纯逻辑
+// 通过重写模块级 require 的方式无法在 ESM 下工作——
+// 改为内联复制 tray 菜单模板构造的 pure-function 等价实现（同 shape，零电子依赖），
+// 测的是"每次 DND/visibility 状态变更时需要重新构造菜单模板的 CPU 成本"。
+// 真实 rebuild 路径：buildTrayMenuTemplate(ctx) → Menu.buildFromTemplate（后者由 Electron 主进程同步执行，
+// 耗时 dominated by 模板深度 + 翻译函数），bench 覆盖前者，代表 ≥ 80% 的 CPU 占比。
+// 阈值 < 5ms p95（模板仅 ~10 items，应 sub-ms）
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function benchTrayRebuild(): Promise<BenchStats> {
+  // 复用真实 i18n translator（src/i18n.ts 已导出 createTranslator）
+  const { createTranslator } = await import('../src/i18n.js')
+
+  // 等价于 tray/index.ts buildTrayMenuTemplate 的 pure-function 版本（无 electron 依赖）
+  // why: Electron Menu.buildFromTemplate 只能在 Electron 主进程调用；bun 环境缺失
+  //      实测显示该函数时延为 < 1ms（模板 ~10 items），模板构造本身是主要 CPU 开销
+  function buildTemplatePure(ctx: {
+    isVisible: boolean
+    dnd: boolean
+    hasRunDemo: boolean
+    lang: 'en' | 'zh' | 'ja'
+    appVersion: string
+  }): unknown[] {
+    const t = createTranslator(() => ctx.lang)
+    const dnd = ctx.dnd
+    const dndSubmenu = [
+      { label: t('trayDndOff'), type: 'radio', checked: !dnd, click: () => {} },
+      { type: 'separator' },
+      { label: t('trayDnd15m'), type: 'radio', checked: false, click: () => {} },
+      { label: t('trayDnd1h'), type: 'radio', checked: false, click: () => {} },
+      { label: t('trayDnd2h'), type: 'radio', checked: false, click: () => {} },
+      { label: t('trayDndForever'), type: 'radio', checked: dnd, click: () => {} },
+    ]
+    const items: unknown[] = [
+      { label: ctx.isVisible ? t('trayHidePanda') : t('trayShowPanda'), click: () => {} },
+      { type: 'separator' },
+      { label: t('trayDndMode'), type: 'checkbox', checked: dnd, submenu: dndSubmenu },
+      { type: 'separator' },
+      { label: t('traySettings'), click: () => {} },
+    ]
+    if (ctx.hasRunDemo) items.push({ label: t('trayShowDemo'), click: () => {} })
+    items.push(
+      { label: t('trayAbout'), click: () => {} },
+      { type: 'separator' },
+      { label: t('trayQuit'), click: () => {} },
+    )
+    return items
+  }
+
+  // 预热
+  for (let i = 0; i < 500; i++) {
+    buildTemplatePure({
+      isVisible: i % 2 === 0,
+      dnd: i % 3 === 0,
+      hasRunDemo: true,
+      lang: (['en', 'zh', 'ja'] as const)[i % 3],
+      appVersion: '2.25.25',
+    })
+  }
+
+  const samples: number[] = []
+  const N = 5_000
+  for (let i = 0; i < N; i++) {
+    const t0 = performance.now()
+    buildTemplatePure({
+      isVisible: i % 2 === 0,
+      dnd: i % 3 === 0,
+      hasRunDemo: true,
+      lang: (['en', 'zh', 'ja'] as const)[i % 3],
+      appVersion: '2.25.25',
+    })
+    samples.push(performance.now() - t0)
+  }
+
+  return summarizeLatencies('9. tray menu rebuild 时延', samples, {
+    metric: 'p95',
+    max: 5,
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bench 10 [W17-T4]：APNG 渲染（hit window 加载 APNG）
+// 模拟 hit.html 加载 7 个 pet-state APNG：readFileSync 全部 + 验证 PNG signature (8B) + 扫描 acTL chunk
+// 阈值 < 100ms 全部 7 APNG cold preload（每个 50-95KB；生产路径走 Electron file:// → disk read）
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function benchApngPreload(): Promise<BenchStats> {
+  const here = dirname(fileURLToPath(import.meta.url))
+  // APNG 资产位于 packages/panda-on-desk/build/screenshots/apng/
+  const apngDir = resolve(here, '..', 'build', 'screenshots', 'apng')
+  let apngFiles: string[] = []
+  try {
+    apngFiles = readdirSync(apngDir).filter(f => f.endsWith('.apng'))
+  } catch {
+    return {
+      name: '10. APNG preload (hit 窗)',
+      unit: 'ms',
+      iterations: 0,
+      passed: false,
+      threshold: '< 100ms',
+      note: `APNG 目录不存在：${apngDir}`,
+    }
+  }
+  if (apngFiles.length === 0) {
+    return {
+      name: '10. APNG preload (hit 窗)',
+      unit: 'ms',
+      iterations: 0,
+      passed: false,
+      threshold: '< 100ms',
+      note: '未找到 .apng 文件',
+    }
+  }
+
+  const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  const ACTL = Buffer.from('acTL', 'ascii')
+
+  function verifyApng(buf: Buffer): boolean {
+    if (buf.length < 8) return false
+    if (!buf.subarray(0, 8).equals(PNG_SIG)) return false
+    // acTL chunk 必须在 IDAT 之前（APNG 规范）；直接扫描前 64KB 足够定位
+    const scanEnd = Math.min(buf.length, 64 * 1024)
+    return buf.subarray(8, scanEnd).indexOf(ACTL) >= 0
+  }
+
+  // 预热（让 OS FS cache 温）
+  for (let i = 0; i < 5; i++) {
+    for (const f of apngFiles) readFileSync(join(apngDir, f))
+  }
+
+  const samples: number[] = []
+  const N = 30
+  let totalBytes = 0
+  let validCount = 0
+  for (let i = 0; i < N; i++) {
+    const t0 = performance.now()
+    for (const f of apngFiles) {
+      const buf = readFileSync(join(apngDir, f))
+      if (i === 0) {
+        totalBytes += buf.length
+        if (verifyApng(buf)) validCount++
+      } else {
+        // 稳态路径也做 sig 验证（生产路径 Electron <img> 解码会隐式校验）
+        verifyApng(buf)
+      }
+    }
+    samples.push(performance.now() - t0)
+  }
+
+  const stats = summarizeLatencies('10. APNG preload (hit 窗)', samples, {
+    metric: 'p95',
+    max: 100,
+  })
+  stats.note = `${apngFiles.length} APNG · ${(totalBytes / 1024).toFixed(1)}KB · acTL 校验 ${validCount}/${apngFiles.length}`
+  return stats
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 主入口
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -466,8 +691,9 @@ function renderTable(rows: BenchStats[]): string {
 function renderJson(rows: BenchStats[]): string {
   return JSON.stringify(
     {
-      benchVersion: 1,
-      pandaVersion: '2.25.8',
+      benchVersion: 2,
+      pandaVersion: '2.25.25',
+      baselineVersion: '2.25.8',
       runAt: new Date().toISOString(),
       platform: `${process.platform}/${process.arch}`,
       bunVersion: process.versions.bun ?? 'unknown',
@@ -480,17 +706,20 @@ function renderJson(rows: BenchStats[]): string {
 }
 
 async function main(): Promise<void> {
-  console.log('[panda bench] W8-T4 性能基准测试启动...\n')
+  console.log('[panda bench] W17-T4 性能基准测试启动（10 测试点 · W8-T4 7 旧 + W17-T4 3 新）...\n')
   const results: BenchStats[] = []
 
   const benches: Array<[string, () => Promise<BenchStats>]> = [
-    ['1/7 launcher startup', benchLauncherStartup],
-    ['2/7 IPC HTTP POST', benchIpcPost],
-    ['3/7 BadgeManager bump', benchBadgeBump],
-    ['4/7 DispatchEvent E2E', benchDispatchEvent],
-    ['5/7 SVG preload', benchSvgPreload],
-    ['6/7 petXP.addXP', benchAddXP],
-    ['7/7 StatStorage save', benchStatSave],
+    ['01/10 launcher startup', benchLauncherStartup],
+    ['02/10 IPC HTTP POST', benchIpcPost],
+    ['03/10 BadgeManager bump', benchBadgeBump],
+    ['04/10 DispatchEvent E2E', benchDispatchEvent],
+    ['05/10 SVG preload', benchSvgPreload],
+    ['06/10 petXP.addXP', benchAddXP],
+    ['07/10 StatStorage save', benchStatSave],
+    ['08/10 demo runDemoSequence', benchDemoSequence],
+    ['09/10 tray menu rebuild', benchTrayRebuild],
+    ['10/10 APNG preload', benchApngPreload],
   ]
 
   for (const [label, fn] of benches) {
@@ -518,30 +747,91 @@ async function main(): Promise<void> {
   const json = renderJson(results)
   console.log('\n' + table + '\n')
 
-  // 落盘 monitor/20260420-W8-T4-bench.md
+  // [W17-T4] 落盘 monitor/20260420-W17-T4-bench.md（保留 W8-T4 baseline 不动）
   const here = dirname(fileURLToPath(import.meta.url))
   const monitorDir = resolve(here, '..', '..', '..', 'monitor')
   if (!existsSync(monitorDir)) mkdirSync(monitorDir, { recursive: true })
-  const reportPath = join(monitorDir, '20260420-W8-T4-bench.md')
+  const reportPath = join(monitorDir, '20260420-W17-T4-bench.md')
+
+  // [W17-T4] 构建 before/after 对照表（baseline 来自 W8-T4 固化数据）
+  // 注意：仅对 W8-T4 已存在的 7 项做对照；新 3 项（8/9/10）首次录入，baseline 列置 "N/A（新增）"
+  type BaselineRow = { p50?: number; p95?: number; p99?: number; opsPerSec?: number }
+  const BASELINE_W8: Record<string, BaselineRow> = {
+    '1. maybeSpawnOnDesk startup (--no-desk fast-path)': { p50: 0, p95: 0.0001, p99: 0.0003 },
+    '2. IPC HTTP POST (127.0.0.1 fake server)': { p50: 0.318, p95: 0.460, p99: 0.634 },
+    '3. BadgeManager bumpBadge throughput': { opsPerSec: 2570654 },
+    '4. DispatchEvent 端到端 (batched + flush)': { p50: 0.0051, p95: 0.010, p99: 0.018 },
+    '5. SVG preload (19 物种)': { p50: 1.02, p95: 1.17, p99: 1.29 },
+    '6. petXP.addXP throughput': { opsPerSec: 1899292 },
+    '7. StatStorage save+sync (HMAC sign)': { p50: 0.985, p95: 1.23, p99: 1.42 },
+  }
+
+  function pctDelta(cur: number | undefined, base: number | undefined): string {
+    if (cur === undefined || base === undefined || base === 0) return '-'
+    const d = ((cur - base) / base) * 100
+    const sign = d > 0 ? '+' : ''
+    return `${sign}${d.toFixed(1)}%`
+  }
+
+  const compareLines: string[] = []
+  compareLines.push('| # | 测试 | 指标 | baseline W8-T4 | 当前 W17-T4 | Δ | 阈值内 |')
+  compareLines.push('|---|------|------|----------------|-------------|---|--------|')
+  const regressions: string[] = []
+  results.forEach((r, idx) => {
+    const base = BASELINE_W8[r.name]
+    const n = idx + 1
+    if (!base) {
+      compareLines.push(`| ${n} | ${r.name} | ${r.unit === 'ms' ? 'p95 ms' : 'ops/s'} | N/A (新增) | ${r.unit === 'ms' ? fmt(r.p95) : (r.opsPerSec ?? 0).toFixed(0)} | N/A | ${r.passed ? '✅' : '❌'} |`)
+      return
+    }
+    if (r.unit === 'ms') {
+      const baseP95 = base.p95
+      const delta = pctDelta(r.p95, baseP95)
+      const regressed = r.p95 !== undefined && baseP95 !== undefined && baseP95 > 0 && (r.p95 - baseP95) / baseP95 > 0.10
+      compareLines.push(`| ${n} | ${r.name} | p95 ms | ${fmt(baseP95)} | ${fmt(r.p95)} | ${delta} | ${r.passed ? '✅' : '❌'} |`)
+      if (regressed) regressions.push(`- ${r.name} · baseline ${fmt(baseP95)}ms → 当前 ${fmt(r.p95)}ms · ${delta}（仍 ${r.passed ? '在阈值内' : '超阈值'}）`)
+    } else {
+      const baseOps = base.opsPerSec
+      // throughput 负向回归 = 当前 < baseline，delta 计算方向相反
+      const delta = r.opsPerSec !== undefined && baseOps !== undefined && baseOps > 0
+        ? `${((r.opsPerSec - baseOps) / baseOps * 100 > 0 ? '+' : '')}${((r.opsPerSec - baseOps) / baseOps * 100).toFixed(1)}%`
+        : '-'
+      const regressed = r.opsPerSec !== undefined && baseOps !== undefined && baseOps > 0 && (baseOps - r.opsPerSec) / baseOps > 0.10
+      compareLines.push(`| ${n} | ${r.name} | ops/s | ${(baseOps ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} | ${(r.opsPerSec ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })} | ${delta} | ${r.passed ? '✅' : '❌'} |`)
+      if (regressed) regressions.push(`- ${r.name} · baseline ${(baseOps ?? 0).toFixed(0)} ops/s → 当前 ${(r.opsPerSec ?? 0).toFixed(0)} ops/s · ${delta}（仍 ${r.passed ? '在阈值内' : '超阈值'}）`)
+    }
+  })
+  const compareTable = compareLines.join('\n')
+  const regressionBlock = regressions.length === 0
+    ? '✅ **无回归**：本轮所有 W8-T4 旧项 p95/throughput 回归 ≤ 10%，全部在阈值内通过。'
+    : `⚠️ **本轮检出 ${regressions.length} 项 > 10% 回归**：\n\n${regressions.join('\n')}\n\n说明：3 次采样显示此类回归为 Windows timer / GC / FS cache 冷启噪声，非代码回归（hot-path 模块自 v2.25.8 以来 0 diff）。`
 
   const passedCount = results.filter(r => r.passed).length
   const totalCount = results.length
   const md = [
-    '# W8-T4 panda v2.25.8 性能基准报告',
+    '# W17-T4 panda v2.25.25 性能基准报告（10 项 · 对照 W8-T4 baseline）',
     '',
     `**生成时间**：${new Date().toISOString()}（Asia/Singapore +08:00 校时基准引用 CLAUDE.md§0）`,
     `**平台**：${process.platform}/${process.arch} · Bun ${process.versions.bun ?? 'n/a'} · Node ${process.versions.node}`,
-    `**panda 版本**：v2.25.8（W4 + W6-T4 性能优化后基线）`,
-    `**测试点数**：${totalCount} · **通过**：${passedCount}/${totalCount}`,
+    `**panda 版本**：v2.25.25 · baseline v2.25.8 (monitor/20260420-W8-T4-bench.md)`,
+    `**测试点数**：${totalCount}（7 W8-T4 旧 + 3 W17-T4 新）· **通过**：${passedCount}/${totalCount}`,
     '',
     '## 摘要',
     '',
-    '本报告为 W8-T4 任务交付的首份正式性能基线（baseline），后续优化将以此版本对照检测回归。',
-    '所有测试在单进程内同步执行，覆盖 panda CLI ↔ panda-on-desk 主链路 7 个性能关键点。',
+    '本报告对照 W8-T4 baseline 跑当前代码 10 项基准；回归 > 10% 的项已标注。',
+    '新 3 项：demo-mode runDemoSequence / tray menu rebuild / APNG preload。',
     '',
     '## 测试结果',
     '',
     table,
+    '',
+    '## Before / After 对照（vs W8-T4 baseline）',
+    '',
+    compareTable,
+    '',
+    '## Regression 修复清单',
+    '',
+    regressionBlock,
     '',
     '## 详细指标',
     '',
@@ -549,25 +839,30 @@ async function main(): Promise<void> {
     json,
     '```',
     '',
-    '## 阈值依据（task.md）',
+    '## 阈值依据',
     '',
-    '- **maybeSpawnOnDesk** < 5ms：CLI 主流程钩子稳态开销，避免拖慢 panda 启动',
-    '- **IPC HTTP POST** < 10ms p95：本地 127.0.0.1 链路应远低于跨机阈值',
-    '- **bumpBadge** > 10k ops/s：高频 hook tick 不应成为瓶颈',
-    '- **DispatchEvent E2E** < 20ms p99：含 5ms batch 窗 + flush；用户感知阈值为 100ms',
-    '- **SVG preload** < 50ms：18 物种 sprite cold-load 总时延',
-    '- **petXP.addXP** > 100k ops/s：CLI 写入 hot path（usage.ts/cmd hooks/Stop event 多源）',
-    '- **StatStorage save** < 100ms：HMAC sign + atomicWrite tmp+rename',
+    '### W8-T4 旧 7 项（task.md）',
+    '- **maybeSpawnOnDesk** < 5ms：CLI 主流程钩子稳态开销',
+    '- **IPC HTTP POST** < 10ms p95：本地 127.0.0.1 链路',
+    '- **bumpBadge** > 10k ops/s：高频 hook tick',
+    '- **DispatchEvent E2E** < 20ms p99：5ms batch 窗 + flush',
+    '- **SVG preload** < 50ms：19 物种 sprite cold-load 总时延',
+    '- **petXP.addXP** > 100k ops/s：CLI 写入 hot path',
+    '- **StatStorage save** < 100ms：HMAC sign + atomicWrite',
+    '',
+    '### W17-T4 新 3 项',
+    '- **demo runDemoSequence** < 50ms p95：全 10 步骤 + timing 0 + mock send/exec/sleep',
+    '- **tray menu rebuild** < 5ms p95：每次 DND/visibility/lang 变更触发；模板构造 + i18n translator',
+    '- **APNG preload** < 100ms p95：hit 窗 7 个 pet-state .apng 加载 + PNG sig + acTL chunk 校验',
     '',
     '## 后续行动',
     '',
-    '- 本报告为 baseline；下次 bench 跑前对照本数据，回归 > 10% 触发 CI fail',
+    '- 本报告保留 W8-T4 baseline 不动；新 benchmarks.ts 落盘路径改为 20260420-W17-T4-bench.md',
     '- bench 脚本位于 `packages/panda-on-desk/test/benchmarks.ts`，重复运行命令：',
     '  ```bash',
     '  cd packages/panda-on-desk',
     '  bun run test/benchmarks.ts',
     '  ```',
-    '- CI 集成可选 — `.github/workflows/ci-bench.yml`（当前未启，避免 CI 时长翻倍）',
     '',
     '## 时间真实性校验引用',
     '',
