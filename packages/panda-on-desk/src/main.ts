@@ -548,9 +548,18 @@ function stopTopmostWatchdog() {
 }
 
 // ── macOS 可见性 / dock ────────────────────────────────────────────────────────
+// [W21-P0-NUCLEAR 20260420] reapplyMacVisibility 仅对 hitWin 注入 stationary 行为。
+//   根因：mac-window.ts:applyStationaryCollectionBehavior 会调
+//     setCanHide:false / setHidesOnDeactivate:false / setLevel:1500 (CGAssistiveTechHigh)
+//     + delegateWindowToStationarySpace（SkyLight 私有 space 注入），即使 BrowserWindow
+//     show:false 也会因 NSWindow 已被注入 1500 级 + canHide=false 而强制可见。
+//     mainWin 是逻辑容器（永久 hidden），一旦被注入就以 transparent panel 残影
+//     形式出现在 macOS 顶部 → "黑横条"现场。
+//   修复：candidates 只含 hitWin（可见 panda）；mainWin 完全跳过 NSWindow 注入。
 function reapplyMacVisibility() {
   if (!isMac) return
-  const candidates = [win, hitWin].filter((w) => w && !w.isDestroyed())
+  // [W21-P0-NUCLEAR] 只对 hitWin 注入 stationary 行为，mainWin 永久 hidden 不需要。
+  const candidates = [hitWin].filter((w) => w && !w.isDestroyed())
   for (const w of candidates) {
     try { applyStationaryCollectionBehavior(w) } catch {}
   }
@@ -748,7 +757,11 @@ function showPetContextMenu() {
   if (_menu && typeof _menu.showContextMenu === 'function') _menu.showContextMenu()
 }
 function popupMenuAt(menu: any) {
-  try { menu.popup({ window: win }) } catch {}
+  // [W21-P0-NUCLEAR 20260420] menu.popup 必须用 hitWin —— mainWin 永久 hidden，
+  //   传 win (mainWin) 作为 popup owner 会触发 Electron 内部短暂 show，进而触发
+  //   mac NSPanel transparent + alwaysOnTop 的黑框残影。改用 hitWin（唯一可见）即可。
+  const owner = (hitWin && !hitWin.isDestroyed()) ? hitWin : win
+  try { menu.popup({ window: owner }) } catch {}
 }
 function createTray() {
   if (_menu && typeof _menu.createTray === 'function') _menu.createTray()
@@ -928,11 +941,17 @@ function createWindow() {
   const startupNeedsRegularize =
     (prefs.positionSaved || prefs.miniMode) && hasStoredPositionThemeMismatch(prefs)
 
-  // ── 窗 ① pet 透明 overlay ──
+  // ── 窗 ① pet 逻辑容器 ──
   // [W14-P0-FIX 20260420] mainWin (pet) 是逻辑容器（位置/状态机/IPC owner），
   //   不再渲染 panda 视觉（v2.24.3 误将 win.loadFile 改为 hit.html 致 mac 双 panda）；
-  //   hitWin 才是唯一可见 panda（loadFile hit.html）。show: false 确保启动即隐藏，
-  //   防止 panel 类型透明窗在 macOS 残留黑色矩形（"顶部黑横条" 现场）。
+  //   hitWin 才是唯一可见 panda（loadFile hit.html）。show: false 确保启动即隐藏。
+  // [W21-P0-NUCLEAR 20260420] 删除 mainWin 的 transparent + type:'panel' + alwaysOnTop。
+  //   根因：mainWin 永久 hidden，但 mac NSPanel + transparent + alwaysOnTop 三者叠加会
+  //   导致 Electron 创建 NSWindow 时分配 windowNumber + 注入合成层，即便不 show 也会因
+  //   reapplyMacVisibility（已在本轮排除 win）以外的代码路径（如 setBounds / move / focus
+  //   竞态）短暂出现"幽灵帧"在屏幕顶部，呈现透明 panel 边界 → 黑横条。
+  //   修复：mainWin 改为标准 hidden BrowserWindow（无 transparent/无 panel/无 alwaysOnTop），
+  //   纯逻辑容器；视觉 + 顶层 + 透明全交给 hitWin。
   win = new BrowserWindow({
     width: size.width,
     height: size.height,
@@ -940,15 +959,17 @@ function createWindow() {
     y: startBounds.y,
     show: false, // [W14-P0-FIX] 永不显示 mainWin —— hitWin 是唯一可见 panda
     frame: false,
-    transparent: true,
-    alwaysOnTop: true,
+    // [W21-P0-NUCLEAR] mainWin 不需要 transparent —— 它永远 hidden，无视觉
+    transparent: false,
+    // [W21-P0-NUCLEAR] mainWin 不需要 alwaysOnTop —— hitWin 才是顶层 panda
+    alwaysOnTop: false,
     resizable: false,
     skipTaskbar: true,
     hasShadow: false,
     fullscreenable: false,
     enableLargerThanScreen: true,
+    // [W21-P0-NUCLEAR] mac 下 mainWin 不再设 type:'panel'，避免 NSPanel 合成层残影
     ...(isLinux ? { type: LINUX_WINDOW_TYPE } : {}),
-    ...(isMac ? { type: 'panel', roundedCorners: false } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload', 'main.js'),
       backgroundThrottling: false,

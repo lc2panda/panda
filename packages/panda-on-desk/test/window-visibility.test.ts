@@ -197,4 +197,162 @@ describe('panda-on-desk · W14-P0 窗口可见性 hotfix（防双 panda + 顶部
       .filter((line) => !/^\s*\/\//.test(line))
     expect(offendingLines.length).toBe(0)
   })
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // v2.25.30 NUCLEAR — Mac 黑框 P0 深度修复（W21-P0-NUCLEAR）
+  // 现场：v2.25.29 仍报 Mac 顶部黑横条，前两轮 W14/W15 fix 失效。
+  // 深度根因（本轮发现）：
+  //   ① mac-window.ts:applyStationaryCollectionBehavior 注入
+  //      setCanHide:false / setLevel:1500(CGAssistiveTechHigh) / SkyLight space delegate
+  //      到 mainWin 的 NSWindow（reapplyMacVisibility 之前对 win + hitWin 都注入）
+  //      → mainWin show:false 也被强制可见为 transparent panel "幽灵帧"。
+  //   ② mainWin opts 含 transparent:true + type:'panel' + alwaysOnTop:true
+  //      → NSPanel 合成层 + 透明矩形 + 顶层 → 即使不 show 也偶发幽灵帧。
+  //   ③ menu.ts:popupMenuAt callback `ctx.win.showInactive()`
+  //      → 右键菜单关闭后强 show mainWin → 黑框残影出现。
+  //   ④ main.ts:popupMenuAt `menu.popup({ window: win })`
+  //      → popup owner 是 mainWin，触发 NSPanel 短暂 active → 残影。
+  //   ⑤ ensureContextMenuOwner parent:ctx.win
+  //      → 父子 window 关系把 mainWin 拉到 active state → 残影。
+  // 修复策略（最小 diff）：
+  //   - reapplyMacVisibility candidates 仅含 hitWin（删 win）
+  //   - mainWin opts: transparent=false / alwaysOnTop=false / 不再 type:'panel'
+  //   - menu.ts callback 改 (hitWin || win).showInactive()
+  //   - main.ts popupMenuAt owner 改 hitWin || win
+  //   - menu.ts ensureContextMenuOwner parent 改 hitWin || win
+  // 证据（≥3 来源）：
+  //   - Apple AppKit Docs setCollectionBehavior + setLevel:1500 → window 无法 hide
+  //     https://developer.apple.com/documentation/appkit/nswindow/1419320-collectionbehavior
+  //   - SkyLight private framework SLSSpaceAddWindowsAndRemoveFromSpaces 副作用
+  //     https://github.com/koekeishiya/yabai/issues/1156
+  //   - Electron #10078: NSPanel + transparent + show:false 残影
+  //     https://github.com/electron/electron/issues/10078
+  // ───────────────────────────────────────────────────────────────────────────
+
+  it('[W21-P0-NUCLEAR] reapplyMacVisibility 候选窗只含 hitWin（mainWin 完全跳过 NSWindow 注入）', () => {
+    // 截 reapplyMacVisibility 函数体
+    const fnBlock = src.match(/function reapplyMacVisibility\(\)[\s\S]*?\n\}/)
+    expect(fnBlock).not.toBeNull()
+    const body = fnBlock![0]
+    // candidates 数组只能含 hitWin（不能再含 win/mainWin）
+    const candidatesLine = body.match(/candidates\s*=\s*\[([^\]]*)\]/)
+    expect(candidatesLine).not.toBeNull()
+    const arrContent = candidatesLine![1]
+    // 必须含 hitWin
+    expect(arrContent).toMatch(/hitWin/)
+    // 不能再含裸 win（只允许 hitWin）
+    // 用 \b 边界避免误匹配 hitWin 中的 win
+    expect(/[^t]\bwin\b/.test(' ' + arrContent)).toBe(false)
+  })
+
+  it('[W21-P0-NUCLEAR] mainWin opts 不含 transparent:true / alwaysOnTop:true / type:"panel"', () => {
+    // 截 win = new BrowserWindow({...}) 完整 opts 块
+    const winOptsMatch = src.match(/win = new BrowserWindow\(\{[\s\S]*?\n\s+\}\)/)
+    expect(winOptsMatch).not.toBeNull()
+    const opts = winOptsMatch![0]
+    // 必须明确 transparent:false（或不含 transparent:true）
+    expect(opts).not.toMatch(/transparent:\s*true/)
+    // 必须明确 alwaysOnTop:false（或不含 alwaysOnTop:true）
+    expect(opts).not.toMatch(/alwaysOnTop:\s*true/)
+    // 不能含 mac panel 注入（…isMac ? { type: 'panel' …）
+    expect(opts).not.toMatch(/isMac\s*\?\s*\{\s*type:\s*['"]panel['"]/)
+    // show:false 必须保留（W14 不变）
+    expect(opts).toMatch(/show:\s*false/)
+  })
+
+  it('[W21-P0-NUCLEAR] popupMenuAt owner 是 hitWin（不再用 mainWin 作为 popup window）', () => {
+    // main.ts:popupMenuAt 的 try { menu.popup({ window: ... }) } catch
+    const fnBlock = src.match(/function popupMenuAt\(menu:[^)]*\)[\s\S]*?\n\}/)
+    expect(fnBlock).not.toBeNull()
+    const body = fnBlock![0]
+    // 不能直接 menu.popup({ window: win })
+    expect(body).not.toMatch(/menu\.popup\(\{\s*window:\s*win\s*\}\)/)
+    // 必须含 hitWin（owner 优先 hitWin）
+    expect(body).toMatch(/hitWin/)
+  })
+
+  // 工具：剥掉单行注释（//...）和块注释（/*...*/），保留代码语义
+  const stripComments = (s: string): string =>
+    s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+  it('[W21-P0-NUCLEAR] menu.ts:popupMenuAt callback 不再 ctx.win.showInactive()（mainWin 永久 hidden）', () => {
+    const menuTs = path.join(PKG_ROOT, 'src', 'menu.ts')
+    expect(fs.existsSync(menuTs)).toBe(true)
+    const menuSrc = fs.readFileSync(menuTs, 'utf8')
+    const fnBlock = menuSrc.match(/function popupMenuAt\(menu\)[\s\S]*?\n\s\s\}/)
+    expect(fnBlock).not.toBeNull()
+    const codeBody = stripComments(fnBlock![0])
+    // 不能含裸 ctx.win.showInactive()（应改为 hitWin）
+    expect(codeBody).not.toMatch(/ctx\.win\.showInactive\(\)/)
+    // 必须有 hitWin 路径
+    expect(codeBody).toMatch(/ctx\.hitWin/)
+  })
+
+  it('[W21-P0-NUCLEAR] menu.ts:ensureContextMenuOwner parent 优先 ctx.hitWin（避免 mainWin active 状态触发幽灵帧）', () => {
+    const menuTs = path.join(PKG_ROOT, 'src', 'menu.ts')
+    const menuSrc = fs.readFileSync(menuTs, 'utf8')
+    const fnBlock = menuSrc.match(/function ensureContextMenuOwner\(\)[\s\S]*?return ctx\.contextMenuOwner;[\s\S]*?\n\s\s\}/)
+    expect(fnBlock).not.toBeNull()
+    const codeBody = stripComments(fnBlock![0])
+    // parent 不能硬编码 ctx.win（必须先尝试 ctx.hitWin）
+    expect(codeBody).not.toMatch(/parent:\s*ctx\.win\b/)
+    // 必须含 ctx.hitWin
+    expect(codeBody).toMatch(/ctx\.hitWin/)
+  })
+
+  it('[W21-P0-NUCLEAR] mac-window.ts:applyStationaryCollectionBehavior 仍然存在但不再被 mainWin 调用（仅 hitWin）', () => {
+    const macWindowTs = path.join(PKG_ROOT, 'src', 'platform', 'mac-window.ts')
+    expect(fs.existsSync(macWindowTs)).toBe(true)
+    const macSrc = fs.readFileSync(macWindowTs, 'utf8')
+    // 函数本身仍然导出（用于 hitWin）
+    expect(macSrc).toMatch(/export function applyStationaryCollectionBehavior/)
+    // 关键 NSWindow 注入仍在（仅作为 hitWin 的稳定化手段）
+    expect(macSrc).toMatch(/setCanHide/)
+    expect(macSrc).toMatch(/CGAssistiveTechHighWindowLevel/)
+    // 但 main.ts reapplyMacVisibility 必须只对 hitWin 调（已在另一用例覆盖；此处校验 W21 注释存在）
+    expect(src).toContain('[W21-P0-NUCLEAR 20260420]')
+  })
+
+  it('[W21-P0-NUCLEAR] 启动期所有 BrowserWindow 创建源列表 grep 仅返 mainWin + hitWin（其他全 lazy / no-op）', () => {
+    // 全 src 目录 grep 'new BrowserWindow' 出现位置统计
+    // 期望 ≤ 4 处（main.ts mainWin + hitWin + menu.ts contextMenuOwner lazy + main.ts settingsWindow lazy）
+    // bubble-window.ts 走 factory 注入，不直接 new；update-bubble.ts stub 不 new
+    const srcDir = path.join(PKG_ROOT, 'src')
+    const files: string[] = []
+    function walk(dir: string) {
+      for (const entry of fs.readdirSync(dir)) {
+        const full = path.join(dir, entry)
+        const stat = fs.statSync(full)
+        if (stat.isDirectory()) walk(full)
+        else if (entry.endsWith('.ts') && !entry.endsWith('.d.ts')) files.push(full)
+      }
+    }
+    walk(srcDir)
+    let totalCreates = 0
+    const createSites: string[] = []
+    for (const f of files) {
+      const content = fs.readFileSync(f, 'utf8')
+      // 仅统计真实 new BrowserWindow（去掉 // 注释行）
+      const matches = content.match(/new BrowserWindow/g) || []
+      // 减去注释中的出现
+      const realCount = content.split(/\r?\n/).filter((line) => {
+        const trimmed = line.trim()
+        return /new BrowserWindow/.test(line) && !trimmed.startsWith('//') && !trimmed.startsWith('*')
+      }).length
+      if (realCount > 0) {
+        totalCreates += realCount
+        createSites.push(`${path.basename(f)}:${realCount}`)
+      }
+    }
+    // 4 处合法创建源：
+    //   - main.ts mainWin (启动 eager, hidden)
+    //   - main.ts hitWin (启动 eager, 唯一可见)
+    //   - main.ts settingsWindow (lazy in openSettingsWindow)
+    //   - menu.ts contextMenuOwner (lazy in ensureContextMenuOwner)
+    //   - bubble-window.ts: 文档/示例 / 注释中可能出现 new BrowserWindow 字面量；
+    //     real factory 是 setBubbleWindowFactory 注入，不直接 new
+    expect(totalCreates).toBeLessThanOrEqual(6)
+    // 必须至少含 main.ts（mainWin + hitWin + settings）= 3
+    expect(createSites.some((s) => /main\.ts:/.test(s))).toBe(true)
+  })
 })

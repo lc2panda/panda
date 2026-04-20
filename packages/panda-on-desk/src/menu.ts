@@ -181,10 +181,17 @@ module.exports = function initMenu(ctx) {
 
   function ensureContextMenuOwner() {
     if (ctx.contextMenuOwner && !ctx.contextMenuOwner.isDestroyed()) return ctx.contextMenuOwner;
-    if (!ctx.win || ctx.win.isDestroyed()) return null;
+    // [W21-P0-NUCLEAR 20260420] parent 优先用 hitWin（唯一可见 panda）。
+    //   若 ctx.hitWin 不可用 fallback 到 ctx.win。过去固定 parent:ctx.win 会让 macOS
+    //   把 mainWin 拉到 active state（panel 容器闪现） → 黑框残影。
+    const parentWin =
+      ctx.hitWin && !ctx.hitWin.isDestroyed()
+        ? ctx.hitWin
+        : (ctx.win && !ctx.win.isDestroyed() ? ctx.win : null);
+    if (!parentWin) return null;
 
     ctx.contextMenuOwner = new BrowserWindow({
-      parent: ctx.win,
+      parent: parentWin,
       x: 0,
       y: 0,
       width: 1,
@@ -235,12 +242,18 @@ module.exports = function initMenu(ctx) {
       callback: () => {
         ctx.menuOpen = false;
         if (owner && !owner.isDestroyed()) owner.hide();
-        if (ctx.win && !ctx.win.isDestroyed()) {
-          ctx.win.showInactive();
+        // [W21-P0-NUCLEAR 20260420] menu close 后 reactivate hitWin（唯一可见 panda），
+        //   不再 show mainWin (ctx.win)。mainWin 永久 hidden（W14-P0-FIX）。
+        //   过去这里 ctx.win.showInactive() 是"右键菜单关闭后顶部黑横条出现"的元凶之一：
+        //   menu 弹起时 mainWin 短暂获得焦点 → callback 又主动 showInactive 把
+        //   transparent+panel+alwaysOnTop 容器拉出来 → 黑框残影。
+        const visiblePet = (ctx.hitWin && !ctx.hitWin.isDestroyed()) ? ctx.hitWin : null;
+        if (visiblePet) {
+          visiblePet.showInactive();
           if (isMac) {
             ctx.reapplyMacVisibility();
-          } else if (isWin) {
-            ctx.win.setAlwaysOnTop(true, WIN_TOPMOST_LEVEL);
+          } else if (isWin && typeof visiblePet.setAlwaysOnTop === "function") {
+            visiblePet.setAlwaysOnTop(true, WIN_TOPMOST_LEVEL);
           }
         }
       },
