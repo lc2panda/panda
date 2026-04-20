@@ -390,20 +390,25 @@ describe('panda-on-desk · themes/panda · P1-T6', () => {
       })
     }
 
-    it('14 W4 升级物种 SVG 行数显著大于 5 旧物种（特征图形扩容）', () => {
-      const sizes = new Map<string, number>()
+    it('14 W4 升级物种 SVG 元素数显著大于 5 旧物种（特征图形扩容）', () => {
+      // W6-T4：minify 后无法用行数断言；改用 SVG element 数（<tag）作"复杂度"代理指标，
+      // 与 minify 无关，仍能区分"程序化叠层多"vs"占位简版"。
+      const elementCounts = new Map<string, number>()
       for (const sp of [...W4_SPECIES, 'duck', 'robot', 'owl', 'chonk', 'default']) {
         const text = fs.readFileSync(path.join(SPRITES_DIR, `${sp}.svg`), 'utf8')
-        sizes.set(sp, text.split('\n').length)
+        const matches = text.match(/<[a-zA-Z]/g) ?? []
+        elementCounts.set(sp, matches.length)
       }
-      // 旧 5 物种 ~ 120-124 行；W4 升级物种 ≥ 200 行
+      // W4 升级物种 ≥ 150 element（SPECIES_GRAPHICS 函数注入大量 ellipse/path）
+      // 实测范围 [174, 270]；阈值 150 留 ~13% 缓冲
       for (const sp of W4_SPECIES) {
-        const lines = sizes.get(sp)!
-        expect(lines).toBeGreaterThanOrEqual(200)
+        const cnt = elementCounts.get(sp)!
+        expect(cnt).toBeGreaterThanOrEqual(150)
       }
+      // 旧 5 物种特征图形较少 → element 数不应超过 100（实测 ~87-91）
       for (const sp of ['duck', 'robot', 'owl', 'chonk', 'default']) {
-        const lines = sizes.get(sp)!
-        expect(lines).toBeLessThanOrEqual(130) // 旧 byte-equal 区间
+        const cnt = elementCounts.get(sp)!
+        expect(cnt).toBeLessThanOrEqual(100)
       }
     })
 

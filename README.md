@@ -1827,6 +1827,16 @@ GitHub Release: https://github.com/lc2panda/panda/releases/tag/desk-v1.0.0
 
 panda 自带桌面宠物 — npm install 后自动启动，与 panda CLI 实时联动。
 
+### 桌面宠物展示
+
+![panda-on-desk hero](packages/panda-on-desk/build/screenshots/panda-hero-1200x600.png)
+
+7 状态切换（panda CLI 状态变化 → 桌面端 sprite 实时同步）：
+
+| idle | thinking | working | sleeping | error | attention | notification |
+|------|----------|---------|----------|-------|-----------|--------------|
+| ![idle](packages/panda-on-desk/build/screenshots/panda-200x200-idle.png) | ![thinking](packages/panda-on-desk/build/screenshots/panda-200x200-thinking.png) | ![working](packages/panda-on-desk/build/screenshots/panda-200x200-working.png) | ![sleeping](packages/panda-on-desk/build/screenshots/panda-200x200-sleeping.png) | ![error](packages/panda-on-desk/build/screenshots/panda-200x200-error.png) | ![attention](packages/panda-on-desk/build/screenshots/panda-200x200-attention.png) | ![notification](packages/panda-on-desk/build/screenshots/panda-200x200-notification.png) |
+
 ### 快速启用
 ```bash
 npm install -g @lc2panda/panda-code   # 安装 panda CLI（自带 panda-on-desk）
@@ -1844,12 +1854,16 @@ panda                                  # 启动 panda — 桌面宠物自动浮�
 - 托盘：系统托盘菜单（Show/Hide/DND/Settings/Quit）
 - DND：勿扰时段 + 5min 通知聚合 + 离线累积
 
+![panda-on-desk demo](packages/panda-on-desk/build/screenshots/panda-demo-600x400.png)
+
 ### 关闭
 ```bash
 panda --no-desk    # 单次不拉
 ```
 
-详见 packages/panda-on-desk/README.md
+> 截图由 `packages/panda-on-desk/scripts/build-screenshots.cjs` 程序化生成（基于 sharp + 内嵌 SVG，9 张 PNG 共 ~158 KB）。
+>
+> 详见 [packages/panda-on-desk/README.md](packages/panda-on-desk/README.md)。
 
 #### `/brief`
 - **用法**: `/brief [on|off]`

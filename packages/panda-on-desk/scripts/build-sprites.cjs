@@ -436,14 +436,24 @@ function buildOneSpecies(species) {
     `  </defs>`,
   ].join('\n')
 
-  const svg = [
+  // W6-T4 bundle 优化：BUILD_SPRITES_MINIFY=1 (默认) → 去注释 + 合并空白
+  // 削减 ~25% 文件体积；非 minify 模式仍保留头注释便于人工 diff（dev/CI 可显式 BUILD_SPRITES_MINIFY=0）
+  const minify = process.env.BUILD_SPRITES_MINIFY !== '0'
+
+  const svgLines = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
-    `<!--`,
-    `  Input: themes/panda/sprites/${species}.ascii (${frames.length} frames, programmatically embedded)`,
-    `  Output: panda 物种 ${species} SVG sprite — 12 PetState groups (visibility 切换) + 渐变 + drop-shadow`,
-    `  Pos: panda-on-desk Phase 3 P3-T5 美术资产 — 由 scripts/build-sprites.cjs 程序化生成`,
-    `       [W1-T2-ART 20260419] linearGradient + filter(drop-shadow) 注入 — 不要手改本文件，重跑脚本会覆盖。`,
-    `-->`,
+  ]
+  if (!minify) {
+    svgLines.push(
+      `<!--`,
+      `  Input: themes/panda/sprites/${species}.ascii (${frames.length} frames, programmatically embedded)`,
+      `  Output: panda 物种 ${species} SVG sprite — 12 PetState groups (visibility 切换) + 渐变 + drop-shadow`,
+      `  Pos: panda-on-desk Phase 3 P3-T5 美术资产 — 由 scripts/build-sprites.cjs 程序化生成`,
+      `       [W1-T2-ART 20260419] linearGradient + filter(drop-shadow) 注入 — 不要手改本文件，重跑脚本会覆盖。`,
+      `-->`,
+    )
+  }
+  svgLines.push(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SVG_VIEWBOX_W} ${SVG_VIEWBOX_H}" width="${SVG_VIEWBOX_W}" height="${SVG_VIEWBOX_H}" data-species="${species}" data-frames="${frames.length}">`,
     defs,
     `  <rect width="${SVG_VIEWBOX_W}" height="${SVG_VIEWBOX_H}" fill="transparent"/>`,
@@ -452,11 +462,48 @@ function buildOneSpecies(species) {
     `  </g>`,
     `</svg>`,
     ``,
-  ].join('\n')
+  )
+  let svg = svgLines.join('\n')
+
+  if (minify) {
+    // 安全 minify — 不破坏 <text>/<tspan> 内容（ASCII 字符 + 等宽布局）；
+    // 仅压缩元素间多余空白与换行（XML pretty-print artifact）。
+    svg = minifySvgPreservingText(svg)
+  }
 
   const outPath = path.join(SPRITES_DIR, `${species}.svg`)
   fs.writeFileSync(outPath, svg, 'utf8')
   return { species, outPath, frameCount: frames.length, groupCount: PANDA_PET_STATES.length }
+}
+
+/**
+ * W6-T4 — 安全 SVG minifier。
+ * - 保留 <text>/<tspan>/<title>/<desc> 内文本（ASCII 等宽布局敏感）
+ * - 压缩元素间换行 + 缩进空白
+ * - 去掉 <!-- ... --> 注释（XML 注释允许，但占字节）
+ * - 不动属性引号（兼容已存在的 stop-color/fill 等）
+ * 输出 byte-stable（同输入 → 同输出）便于 git diff 审查。
+ */
+function minifySvgPreservingText(input) {
+  // 1. 保护 <text>...</text>（含 <tspan>）→ 占位
+  const TEXT_RE = /<text\b[^>]*>[\s\S]*?<\/text>/g
+  const placeholders = []
+  let out = input.replace(TEXT_RE, (match) => {
+    const idx = placeholders.length
+    placeholders.push(match)
+    return `\u0000TEXT_${idx}\u0000`
+  })
+  // 2. 去 XML 注释（保留 <?xml ... ?> declaration）
+  out = out.replace(/<!--[\s\S]*?-->/g, '')
+  // 3. 合并行间空白：把 ">\n   <" 折叠为 "><"
+  out = out.replace(/>\s+</g, '><')
+  // 4. 行首/行尾空白清理（防止合并后单行残留缩进）
+  out = out.replace(/^\s+/gm, '').replace(/\s+$/gm, '')
+  // 5. 多余空行去除
+  out = out.replace(/\n+/g, '\n').trim() + '\n'
+  // 6. 还原 <text> 占位
+  out = out.replace(/\u0000TEXT_(\d+)\u0000/g, (_, i) => placeholders[Number(i)])
+  return out
 }
 
 function main() {

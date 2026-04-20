@@ -17,8 +17,29 @@ export interface BadgeState {
   lastUpdated: number
 }
 
-/** 内存角标计数（按 scenarioId 索引） */
+/**
+ * 内存角标计数（按 scenarioId 索引）
+ *
+ * W6-T4 性能 polish 第二波：BadgeManager 内存上限。
+ * Map 本身按插入顺序迭代 — 当超过 MAX_BADGE_ENTRIES 时按 FIFO 淘汰最旧条目，
+ * 防止恶意/失控的业务方持续注入新 scenarioId 导致 Map 无界增长。
+ *
+ * 256 经验值：
+ *   - 正常 panda CLI 场景白名单约 10-30 个（CI、test、build、磁盘、token 等）
+ *   - 留 8-25× 余量容纳第三方插件 / 用户自定义场景
+ *   - 256 个 BadgeState ≈ 10KB 常驻内存，远低于 hit 窗其他 GC 压力源
+ */
+export const MAX_BADGE_ENTRIES = 256
 const badgeStates = new Map<string, BadgeState>()
+
+function enforceBadgeCap(): void {
+  // 仅在 set 后调用 — 严格大于上限时按 Map 插入序删最旧
+  while (badgeStates.size > MAX_BADGE_ENTRIES) {
+    const oldestKey = badgeStates.keys().next().value
+    if (oldestKey === undefined) break
+    badgeStates.delete(oldestKey)
+  }
+}
 
 /**
  * IPC 通道名 — main 侧 sendToHitWin('badge:update', payload) → hit renderer。
@@ -111,7 +132,11 @@ export function bumpBadge(scenarioId: string, delta = 1, color?: string): BadgeS
     color: color ?? cur?.color,
     lastUpdated: Date.now(),
   }
+  // why: 先 delete 再 set —— 把命中条目移到 Map 尾，刷新其 LRU 排位，
+  //      使 enforceBadgeCap 的 FIFO 淘汰退化为 LRU（活跃条目不被误删）
+  badgeStates.delete(scenarioId)
   badgeStates.set(scenarioId, next)
+  enforceBadgeCap()
   publishSnapshot()
   return next
 }
@@ -119,11 +144,14 @@ export function bumpBadge(scenarioId: string, delta = 1, color?: string): BadgeS
 /** 角标清零 — 保留 entry 以便外部观察 lastUpdated；count=0 时 hit 窗不渲染圆点 */
 export function resetBadge(scenarioId: string): void {
   const cur = badgeStates.get(scenarioId)
+  // 同 bumpBadge：删→设刷新 LRU 排位
+  badgeStates.delete(scenarioId)
   badgeStates.set(scenarioId, {
     count: 0,
     color: cur?.color,
     lastUpdated: Date.now(),
   })
+  enforceBadgeCap()
   publishSnapshot()
 }
 

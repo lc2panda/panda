@@ -142,6 +142,13 @@ export function dispatchNotification(event: NotificationEvent): void {
 /** 5ms 合并窗口（与渲染节拍 60fps≈16ms 对齐的小子集，避免视觉延迟） */
 export const NOTIFICATION_BATCH_WINDOW_MS = 5
 
+/**
+ * W6-T4 — batch size 上限（防止异常上游高频 unique-key 注入耗内存）。
+ * 单批超过 512 个 distinct (scenario,kind,level) → 立即 flush 并重置 timer。
+ * 经验值：正常一帧（~16ms）内 distinct key 通常 < 50；512 留 10× 余量。
+ */
+export const NOTIFICATION_BATCH_MAX_SIZE = 512
+
 interface BatchSlot {
   event: NotificationEvent
   /** 累计被合并的次数（≥1）— 测试 / 诊断用 */
@@ -192,6 +199,14 @@ export function dispatchNotificationBatched(event: NotificationEvent): void {
   }
   if (_notificationBatchTimer === null) {
     _notificationBatchTimer = setTimeout(flushNotificationBatch, NOTIFICATION_BATCH_WINDOW_MS)
+  }
+  // W6-T4：超过 size cap 立即 flush（背压 — 避免 timer 未到却堆积过多 distinct key）
+  if (_notificationBatch.size >= NOTIFICATION_BATCH_MAX_SIZE) {
+    if (_notificationBatchTimer !== null) {
+      clearTimeout(_notificationBatchTimer)
+      _notificationBatchTimer = null
+    }
+    flushNotificationBatch()
   }
 }
 

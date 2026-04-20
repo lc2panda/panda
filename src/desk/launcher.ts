@@ -49,12 +49,15 @@ export function maybeSpawnOnDesk(): void {
   if (_spawned) return
   // 2. 编译期 feature flag
   if (!feature('BUDDY')) return
-  // 3. 用户显式关
-  if (!readCompanionOnDeskFlag()) return
+  // 3. CLI flag — 提前 short-circuit，避免后续 require config 链 + sync fs 探测的耗时
+  //    (W6-T4 perf polish：CI/sandbox 高频 spawn panda 时此分支命中率高)
+  if (process.argv.includes('--no-desk')) return
+  // 3b. env 快速 gate — process.env 比 process.argv.includes O(1) vs O(n)，且文档化运维侧关闭方式
+  if (process.env.PANDA_NO_DESK === '1' || process.env.PANDA_NO_DESK === 'true') return
   // 4. 非交互模式（CI / pipe / SDK）
   if (!process.stdout.isTTY) return
-  // 5. CLI flag
-  if (process.argv.includes('--no-desk')) return
+  // 5. 用户显式关（最后再 require config — 前面 gate 已挡住 99% non-desk 场景）
+  if (!readCompanionOnDeskFlag()) return
 
   try {
     const launchCjs = locatePandaOnDeskLaunch()
