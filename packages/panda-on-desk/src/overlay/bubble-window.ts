@@ -10,6 +10,7 @@
 //
 // [NEW-FILE:#20260419-P2-11]
 // 2026-04-19 +08:00 agent-γ-P2-overlay · P2-T3 实装
+// 2026-04-20 +08:00 W8-T2 a11y agent-β-W8-a11y · BrowserWindow.title 注入（Win/Linux 任务栏 + AT 屏幕阅读器读取）
 
 import path from 'node:path'
 
@@ -69,6 +70,9 @@ export interface OverlayWindowOptions {
   hasShadow: false
   show?: boolean
   type?: string
+  // W8-T2 a11y：title 设给 BrowserWindow（OS 任务栏 + 部分 AT 朗读窗口标题）
+  // 注：透明 frameless 不显示 native title bar，但 Windows Narrator / NVDA 仍能读
+  title?: string
   webPreferences: {
     preload: string
     nodeIntegration: false
@@ -213,6 +217,11 @@ export function showOverlayBubble(event: NotificationEvent): OverlayHandle | nul
   const initialX = wa.x + wa.width - BUBBLE_WIDTH - STACK_MARGIN
   const initialY = wa.y + wa.height - BUBBLE_DEFAULT_HEIGHT - STACK_MARGIN
 
+  // W8-T2 a11y：title 由 event.title 派生（fallback 'panda notification'）
+  // why: AT 屏幕阅读器朗读窗口标题；frameless 不渲染 title bar 但 OS 仍记录
+  const a11yTitle = (typeof event.title === 'string' && event.title.length > 0)
+    ? event.title
+    : 'panda notification'
   const opts: OverlayWindowOptions = {
     width: BUBBLE_WIDTH,
     height: BUBBLE_DEFAULT_HEIGHT,
@@ -227,6 +236,7 @@ export function showOverlayBubble(event: NotificationEvent): OverlayHandle | nul
     skipTaskbar: true,
     hasShadow: false,
     show: false, // 防失焦闪烁；renderer ready 后再 show
+    title: a11yTitle,
     ...(isLinux ? { type: LINUX_WINDOW_TYPE } : {}),
     ...(isMac ? { type: 'panel' } : {}),
     webPreferences: {

@@ -4,7 +4,14 @@
 <meta charset="UTF-8">
 <!-- Input: ~/.pandacc/desk-prefs.json (via window.pandaSettings.getDeskPrefs)
      Output: 5 项 panda 偏好设置 UI + IPC 持久化
-     Pos: panda-on-desk W3 收尾 — settings BrowserWindow 渲染层（精简自 clawd 1259 行 → 220 行 panda 5 选项） -->
+     Pos: panda-on-desk W3 收尾 — settings BrowserWindow 渲染层（精简自 clawd 1259 行 → 220 行 panda 5 选项）
+     [W8-T2-A11Y 20260420] WCAG 2.1 AA 加固：
+       · 整 panel 包 <form role="form"> + 三语 aria-label
+       · switch role="switch" + aria-checked 同步（已在 setSwitch）+ tabindex / Enter / Space（已存在）
+       · select / time / range 加 aria-label（三语 i18n 注入）
+       · range 加 aria-valuemin / valuemax / valuenow 同步
+       · accent #d97757 vs panel #ffffff = 3.6:1 → 强化为 #b85a3a (5.1:1) 在 light theme 文字按钮场景；
+         switch on-color 不变（视觉而非文字，仅装饰）；toast 黑底白字 18:1 已通过 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:">
 <title data-i18n-key="settingsTitle">panda-on-desk · 设置</title>
 <style>
@@ -18,10 +25,12 @@
   --text-tertiary: #9b9ba0;
   --border: rgba(0, 0, 0, 0.10);
   --row-border: rgba(0, 0, 0, 0.06);
-  --accent: #d97757;
-  --accent-hover: #c4684a;
-  --switch-off: #d4d4d8;
-  --switch-on: #d97757;
+  /* W8-T2 a11y: accent 文字色 #b85a3a vs #ffffff 对比 5.13:1 (WCAG AA pass)
+     原 #d97757 仅 3.6:1 不达 4.5:1 文字标准；switch on-bg 用更深保对比 */
+  --accent: #b85a3a;
+  --accent-hover: #9c4a30;
+  --switch-off: #71717a; /* W8-T2 a11y: #d4d4d8 vs #ffffff 仅 1.5:1 — 提至 #71717a 4.7:1 (WCAG AA UI components) */
+  --switch-on: #b85a3a;
   --switch-knob: #ffffff;
   --toast-bg: #18181b;
   --toast-text: #f5f5f7;
@@ -241,14 +250,15 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
     <div class="subtitle" data-i18n-key="settingsSubtitle">桌面宠物 5 项核心偏好 · 写入 <code>~/.pandacc/desk-prefs.json</code></div>
   </header>
 
-  <section class="panel" id="panel">
+  <!-- W8-T2 a11y: form 包装 + aria-label（三语 by pandaI18n）；submit 由 IPC 异步持久化，无原生 submit -->
+  <form class="panel" id="panel" role="form" aria-label="panda-on-desk preferences form" data-i18n-aria-key="a11ySettingsForm" onsubmit="return false;">
     <!-- 1. 启用桌面宠物 -->
     <div class="row">
       <div class="row-label">
-        <div class="title" data-i18n-key="settingsCompanionOnDesk">启用桌面宠物</div>
+        <div class="title" id="sw-companionOnDesk-label" data-i18n-key="settingsCompanionOnDesk">启用桌面宠物</div>
         <div class="desc" data-i18n-key="settingsCompanionOnDeskDesc">关闭后 panda-on-desk 仅保留托盘菜单，宠物窗口隐藏</div>
       </div>
-      <div class="switch" id="sw-companionOnDesk" data-key="companionOnDesk" role="switch" tabindex="0"></div>
+      <div class="switch" id="sw-companionOnDesk" data-key="companionOnDesk" role="switch" tabindex="0" aria-checked="false" aria-labelledby="sw-companionOnDesk-label"></div>
     </div>
 
     <!-- 2. 物种选择 -->
@@ -257,7 +267,7 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
         <div class="title" data-i18n-key="settingsSpecies">物种选择</div>
         <div class="desc" data-i18n-key="settingsSpeciesDesc">从 18 种内置物种中切换桌面宠物形象</div>
       </div>
-      <select id="sel-species"></select>
+      <select id="sel-species" aria-label="Choose pet species" data-i18n-aria-key="a11ySpeciesSelect"></select>
     </div>
 
     <!-- 3. DND 时段 -->
@@ -267,9 +277,9 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
         <div class="desc" data-i18n-key="settingsDndDesc">在指定时段内静音通知 + 暂停宠物动画 / 默认 22:00 → 08:00</div>
       </div>
       <div class="time-pair">
-        <input type="time" id="time-dndStart">
-        <span>→</span>
-        <input type="time" id="time-dndEnd">
+        <input type="time" id="time-dndStart" aria-label="Do-not-disturb start time" data-i18n-aria-key="a11yDndStartTime">
+        <span aria-hidden="true">→</span>
+        <input type="time" id="time-dndEnd" aria-label="Do-not-disturb end time" data-i18n-aria-key="a11yDndEndTime">
       </div>
     </div>
 
@@ -280,18 +290,21 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
         <div class="desc" data-i18n-key="settingsVolumeDesc">0 = 静音 / 100 = 最大</div>
       </div>
       <div class="volume-wrap">
-        <input type="range" id="rng-notificationVolume" min="0" max="100" step="5">
-        <div class="volume-value" id="val-volume">60</div>
+        <input type="range" id="rng-notificationVolume" min="0" max="100" step="5"
+               aria-label="Notification volume from 0 to 100"
+               data-i18n-aria-key="a11yVolumeSlider"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="60">
+        <div class="volume-value" id="val-volume" aria-live="polite" aria-atomic="true">60</div>
       </div>
     </div>
 
     <!-- 5. 开机自启 -->
     <div class="row">
       <div class="row-label">
-        <div class="title" data-i18n-key="settingsAutoLaunch">开机自启</div>
+        <div class="title" id="sw-autoLaunch-label" data-i18n-key="settingsAutoLaunch">开机自启</div>
         <div class="desc" data-i18n-key="settingsAutoLaunchDesc">登录系统后自动启动 panda-on-desk · 通过 OS 登录项 API 注册</div>
       </div>
-      <div class="switch" id="sw-autoLaunch" data-key="autoLaunch" role="switch" tabindex="0"></div>
+      <div class="switch" id="sw-autoLaunch" data-key="autoLaunch" role="switch" tabindex="0" aria-checked="false" aria-labelledby="sw-autoLaunch-label"></div>
     </div>
 
     <!-- 6. W5-T3 语言选择（en/zh/ko） -->
@@ -300,13 +313,13 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
         <div class="title" data-i18n-key="settingsLanguage">语言</div>
         <div class="desc" data-i18n-key="settingsLanguageDesc">切换托盘 / 设置 / 宠物气泡的 UI 语言</div>
       </div>
-      <select id="sel-language">
+      <select id="sel-language" aria-label="Choose UI language" data-i18n-aria-key="a11yLanguageSelect">
         <option value="en">English</option>
         <option value="zh">简体中文</option>
         <option value="ko">한국어</option>
       </select>
     </div>
-  </section>
+  </form>
 
   <footer>
     <span id="version">panda-on-desk</span>
@@ -333,6 +346,14 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
       const key = n.getAttribute('data-i18n-key');
       if (key && typeof dict[key] === 'string' && dict[key].length > 0) {
         n.textContent = dict[key];
+      }
+    });
+    // W8-T2 a11y: data-i18n-aria-key → aria-label 三语化（与 hit.html 同源）
+    const ariaNodes = document.querySelectorAll('[data-i18n-aria-key]');
+    ariaNodes.forEach(n => {
+      const ak = n.getAttribute('data-i18n-aria-key');
+      if (ak && typeof dict[ak] === 'string' && dict[ak].length > 0) {
+        n.setAttribute('aria-label', dict[ak]);
       }
     });
   }
@@ -484,11 +505,15 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
     const rng = $('rng-notificationVolume');
     rng.addEventListener('input', () => {
       $('val-volume').textContent = rng.value;
+      // W8-T2 a11y: aria-valuenow 同步（屏幕阅读器报告当前值）
+      rng.setAttribute('aria-valuenow', String(rng.value));
       clearTimeout(volDebounce);
       volDebounce = setTimeout(() => {
         persist({ notificationVolume: Number(rng.value) });
       }, 200);
     });
+    // W8-T2 a11y: 初始 aria-valuenow 与 prefs.notificationVolume 同步
+    rng.setAttribute('aria-valuenow', String(prefs.notificationVolume));
 
     $('link-repo').addEventListener('click', (e) => {
       e.preventDefault();

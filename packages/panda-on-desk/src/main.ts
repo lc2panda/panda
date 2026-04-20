@@ -68,6 +68,16 @@ import initState from './state'
 import initFocus from './util/focus'
 import initTick from './util/tick'
 import * as loginItemHelpers from './platform/login-item'
+// W8-T3：错误监控 + 用户可见诊断日志（替换部分 silent try/catch + console.warn 吞错）
+import { log as deskLog } from './util/logger'
+
+// 主进程未捕获异常 / Promise rejection — 写入 logger 而非让 Electron 默认处理静默崩
+process.on('uncaughtException', (err) => {
+  try { deskLog.error('[main] uncaughtException', err) } catch {}
+})
+process.on('unhandledRejection', (reason) => {
+  try { deskLog.error('[main] unhandledRejection', reason) } catch {}
+})
 
 // menu.ts / shortcuts.ts / updater.ts 上游仍是 CommonJS 工厂；用 require 形态消费
 const initMenu = require('./menu') as (ctx: any) => any
@@ -512,8 +522,8 @@ function forwardBridgeEventToRenderer(event: any) {
     sendToHitWin('panda-event', event)
     sendToRenderer('panda-event', event)
   } catch (err) {
-    // 静默：renderer 未就绪时不应阻塞 bridge ack
-    console.warn('[panda-on-desk] forwardBridgeEventToRenderer failed:', (err as Error)?.message)
+    // renderer 未就绪不阻塞 bridge ack；warn 级别（非致命，但需诊断）
+    deskLog.warn('forwardBridgeEventToRenderer failed', err)
   }
 }
 function syncRendererStateAfterLoad() {
@@ -938,7 +948,7 @@ function createWindow() {
       syncHitStateAfterLoad()
     })
     hitWin.webContents.on('render-process-gone', (_event: any, details: any) => {
-      console.error('[panda-on-desk] hitWin renderer crashed:', details && details.reason)
+      deskLog.error('hitWin renderer crashed', details && details.reason, details)
       hitWin.webContents.reload()
     })
   }
@@ -1040,7 +1050,7 @@ function createWindow() {
   })
 
   win.webContents.on('render-process-gone', (_event: any, details: any) => {
-    console.error('[panda-on-desk] renderer crashed:', details && details.reason)
+    deskLog.error('pet renderer crashed', details && details.reason, details)
     dragLocked = false
     idlePaused = false
     mouseOverPet = false
@@ -1345,24 +1355,32 @@ if (!gotTheLock) {
     // 端口 1455+ 自动探测；secret 32 字节随机；落盘 ~/.pandacc/runtime.json。
     // 失败容错：bridge 拉起失败不影响 4 BrowserWindow 主路径，只是 panda CLI 推送会 ECONNREFUSED 静默吞。
     if (bridgeServerMod && typeof bridgeServerMod.startBridgeServer === 'function') {
-      try {
-        const appVersion = (() => {
-          try { return app.getVersion() } catch { return undefined }
-        })()
-        const startPromise = bridgeServerMod.startBridgeServer({
-          // bridge 收到 /event → 转发给 hitWin renderer 触发 UI
-          onEvent: (event: any) => forwardBridgeEventToRenderer(event),
-          appVersion,
-        })
-        startPromise.then(handle => {
-          _bridgeHandle = handle
-          console.log(`[panda-on-desk] bridge IPC server listening on 127.0.0.1:${handle.port}`)
-        }).catch((err: Error) => {
-          console.warn('[panda-on-desk] bridge IPC server start failed:', err && err.message)
-        })
-      } catch (err) {
-        console.warn('[panda-on-desk] startBridgeServer threw synchronously:', (err as Error)?.message)
+      // W8-T3：bridge 启动是 panda CLI ↔ desk 关键链路；失败要 log.error + 简单重试 1 次
+      const startBridge = (attempt: number): void => {
+        try {
+          const appVersion = (() => {
+            try { return app.getVersion() } catch { return undefined }
+          })()
+          const startPromise = bridgeServerMod.startBridgeServer({
+            onEvent: (event: any) => forwardBridgeEventToRenderer(event),
+            appVersion,
+          })
+          startPromise.then(handle => {
+            _bridgeHandle = handle
+            deskLog.info(`bridge IPC server listening on 127.0.0.1:${handle.port}`)
+          }).catch((err: Error) => {
+            deskLog.error(`bridge IPC server start failed (attempt ${attempt})`, err)
+            if (attempt < 2) {
+              // 单次延迟重试（端口竞态 / 临时 EACCES 自愈）
+              setTimeout(() => startBridge(attempt + 1), 1500)
+            }
+          })
+        } catch (err) {
+          deskLog.error(`startBridgeServer threw synchronously (attempt ${attempt})`, err)
+          if (attempt < 2) setTimeout(() => startBridge(attempt + 1), 1500)
+        }
       }
+      startBridge(1)
     }
   })
 

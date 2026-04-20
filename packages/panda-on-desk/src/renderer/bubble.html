@@ -353,23 +353,24 @@ body { padding: 6px; }
 </style>
 </head>
 <body>
-<div class="card" id="card">
+<!-- W8-T2 a11y: role="alertdialog" + aria-label + aria-describedby + 键盘 ESC 关闭 -->
+<div class="card" id="card" role="alertdialog" aria-modal="true" aria-label="Permission request bubble" aria-describedby="commandBlock" tabindex="-1">
   <div class="header">
-    <span class="header-title">Permission Request</span>
-    <span class="tool-pill" id="toolPill"></span>
+    <span class="header-title" id="headerTitle">Permission Request</span>
+    <span class="tool-pill" id="toolPill" role="img" aria-label="tool name"></span>
   </div>
 
   <div class="session-tag" id="sessionTag"></div>
 
   <div class="command-block" id="commandBlock"></div>
   <div class="elicitation-form" id="elicitationForm"></div>
-  
+
   <div class="actions">
-    <button class="btn btn-allow" id="btnAllow">Allow</button>
-    <button class="btn btn-deny" id="btnDeny">Deny</button>
+    <button class="btn btn-allow" id="btnAllow" type="button" aria-label="Allow this permission request">Allow</button>
+    <button class="btn btn-deny" id="btnDeny" type="button" aria-label="Deny this permission request">Deny</button>
   </div>
-  
-  <div class="suggestions" id="suggestions"></div>
+
+  <div class="suggestions" id="suggestions" role="group" aria-label="Suggestions"></div>
 </div>
 
 <script>
@@ -840,6 +841,40 @@ btnDeny.addEventListener("click", () => {
 
 window.bubbleAPI.onPermissionShow(show);
 window.bubbleAPI.onPermissionHide(hide);
+
+// ── W8-T2 a11y：ESC 关闭气泡 + Tab focus 起点 + bubble 显示后聚焦 Allow ──
+// why: WCAG 2.1.2 No Keyboard Trap — ESC 必须能离开 alertdialog
+//      WCAG 2.4.3 Focus Order — 显示后焦点落到主操作（Allow）
+function focusFirstAction() {
+  // 优先聚焦 Allow（默认主操作）；隐藏时聚焦到 card 自身
+  if (btnAllow && !btnAllow.disabled && btnAllow.style.display !== "none") {
+    try { btnAllow.focus(); return; } catch (e) {}
+  }
+  if (btnDeny && !btnDeny.disabled && btnDeny.style.display !== "none") {
+    try { btnDeny.focus(); return; } catch (e) {}
+  }
+  try { card.focus(); } catch (e) {}
+}
+// why: revealCard 是 function 声明（hoist），用 MutationObserver 监听 card.classList.visible
+//      添加比 monkey-patch 函数更安全（避免 strict 模式下不能重新绑定 declaration）
+const _a11yObserver = new MutationObserver(() => {
+  if (card.classList.contains("visible") && !card.classList.contains("hiding")) {
+    requestAnimationFrame(focusFirstAction);
+  }
+});
+_a11yObserver.observe(card, { attributes: true, attributeFilter: ["class"] });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    // ESC 等价 Deny（保留 SSE 协议契约 — 不直接 close 窗口，让 main 走 deny 路径）
+    if (!btnDeny.disabled && btnDeny.style.display !== "none") {
+      btnDeny.click();
+    } else if (!btnAllow.disabled) {
+      // CodexExec 单按钮场景 — ESC 等价 Got it
+      btnAllow.click();
+    }
+  }
+});
 </script>
 </body>
 </html>

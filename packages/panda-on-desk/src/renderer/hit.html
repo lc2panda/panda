@@ -31,6 +31,14 @@
                                 避免与首屏渲染争用主线程；hit 窗启动可见时间 ↓
                               · SPECIES cache LRU cap=12 — 18 物种全 cache ≈ 18×6KB=108KB；cap 后 ≤ 72KB
                                 (用户高频切换的常见 ≤ 12 物种；冷物种淘汰，下次 setSpecies 重新 fetch)
+    [W8-T2-A11Y 20260420] WCAG 2.1 AA 可访问性加固：
+                              · panda SVG 加 role="img" + <title>/<desc>/aria-labelledby/aria-describedby
+                              · #pet 容器加 role="button" + tabindex="0" + 三语 aria-label（pandaI18n 注入）
+                              · stats 卡片 role="dialog" + aria-modal="false" + aria-label
+                              · level 容器 aria-label / 移除 aria-hidden
+                              · badge aria-live="polite" + aria-atomic="true"（保留三语 aria-label）
+                              · 键盘等价：Enter/Space 触发 poke；keydown 长按 1s 触发 stats（pointer 等价）
+                              · 不修改 anthropic byte-equal、不引入新依赖
   -->
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -360,7 +368,7 @@
   </style>
 </head>
 <body data-pet-state="idle" data-species="default">
-  <div id="pet">
+  <div id="pet" role="button" tabindex="0" aria-label="panda desktop pet" aria-describedby="panda-desc">
     <div class="panda-stage">
       <!-- 装饰层（按 state 显形） -->
       <span class="deco deco-question" aria-hidden="true">?</span>
@@ -371,17 +379,25 @@
       <!-- W2-T4 交互反应层 -->
       <span class="reaction-heart" aria-hidden="true">&#x2764;</span>
       <!-- W2-T2 等级显示 + XP 进度条容器（默认 display:none；__pandaSetLevel 显形） -->
-      <div id="panda-level-container" data-visible="0" aria-hidden="true"></div>
-      <div id="badge" class="badge" aria-live="polite" aria-label="未读通知">0</div>
+      <!-- W8-T2 a11y: 移除 aria-hidden（可见时需暴露给 AT），加 aria-label 由 pandaI18n 注入三语 -->
+      <div id="panda-level-container" data-visible="0" role="status" aria-label="Pet level and XP progress" data-i18n-aria-key="a11yLevelContainer"></div>
+      <!-- W2-T4 + W8-T2 a11y：badge aria-live=polite + aria-atomic + 三语 aria-label（pandaI18n 注入） -->
+      <div id="badge" class="badge" aria-live="polite" aria-atomic="true" aria-label="Unread notifications" data-i18n-aria-key="a11yBadgeUnread" role="status">0</div>
       <!-- W5-T3: stats 标签由 pandaI18n 动态填充（hitStatsLevel/hitStatsXp）；textContent 默认 en -->
-      <div id="stats-card" class="stats-card" aria-hidden="true">
+      <!-- W8-T2 a11y：role="dialog" + aria-modal="false"（非阻塞） + aria-label（三语 i18n） -->
+      <div id="stats-card" class="stats-card" role="dialog" aria-modal="false" aria-label="Pet stats card" data-i18n-aria-key="a11yStatsDialog">
         <div class="stats-line"><span class="i18n-label" data-i18n-key="hitStatsLevel">Lv</span> <span id="stats-lv">1</span></div>
         <div class="stats-line"><span class="i18n-label" data-i18n-key="hitStatsXp">XP</span> <span id="stats-xp">0</span></div>
         <div class="stats-line stats-rarity-N" id="stats-rarity-line">[<span id="stats-rarity">N</span>]</div>
       </div>
+      <!-- W8-T2 a11y：屏幕阅读器专用 desc（视觉隐藏，AT 可读） -->
+      <span id="panda-desc" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;" data-i18n-key="a11yPandaDesc">Animated panda desktop pet showing your panda CLI status.</span>
 
       <!-- 精美 panda：渐变 + 高光 + 多层阴影 -->
-      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="panda-face" aria-label="panda companion">
+      <!-- W8-T2 a11y：role="img" + <title> + <desc> + aria-labelledby + aria-describedby（WCAG 2.1 AA SVG 标准） -->
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="panda-face" role="img" aria-label="panda companion" aria-labelledby="panda-svg-title" aria-describedby="panda-svg-desc">
+        <title id="panda-svg-title" data-i18n-key="a11yPandaTitle">Panda companion</title>
+        <desc id="panda-svg-desc" data-i18n-key="a11yPandaDesc">Animated panda desktop pet showing your panda CLI status.</desc>
         <defs>
           <!-- 黑耳/眼罩：暗到更暗的纵向渐变（立体感） -->
           <linearGradient id="gradEar" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -762,6 +778,46 @@
         console.warn('[panda-on-desk:hit] interaction listeners failed:', e && e.message);
       }
 
+      // ── W8-T2 a11y：键盘等价交互 — Enter/Space 触发 poke；长按 1s 触发 stats ──
+      // 鼠标用户走 dblclick / pointerdown；键盘用户走 keydown（焦点在 #pet 上）
+      // why：WCAG 2.1.1 Keyboard — 所有功能必须键盘可达。stopPropagation 避免触发
+      //      浏览器默认 Space 滚动 / Enter form submit（虽透明窗内无 form，仍稳妥）
+      var kbHeldFrom = 0;
+      var kbLongPressTimer = null;
+      function onKeyDownW8A11y(e) {
+        if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+        if (e.repeat) return; // keyboard auto-repeat 仅算一次
+        e.preventDefault();
+        kbHeldFrom = Date.now();
+        if (kbLongPressTimer !== null) clearTimeout(kbLongPressTimer);
+        kbLongPressTimer = setTimeout(function () {
+          kbLongPressTimer = null;
+          try { window.__pandaShowStats(); } catch (err) {}
+        }, LONG_PRESS_MS);
+      }
+      function onKeyUpW8A11y(e) {
+        if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+        e.preventDefault();
+        var held = Date.now() - kbHeldFrom;
+        if (kbLongPressTimer !== null) {
+          clearTimeout(kbLongPressTimer);
+          kbLongPressTimer = null;
+        }
+        // 短按（< 1s）→ 等价 dblclick → poke；长按已在 timer 中触发 stats
+        if (held < LONG_PRESS_MS) {
+          try { window.__pandaPoke(); } catch (err) {}
+        }
+      }
+      try {
+        var petEl = document.getElementById('pet');
+        if (petEl) {
+          petEl.addEventListener('keydown', onKeyDownW8A11y);
+          petEl.addEventListener('keyup', onKeyUpW8A11y);
+        }
+      } catch (e) {
+        console.warn('[panda-on-desk:hit] a11y keyboard listeners failed:', e && e.message);
+      }
+
       // badge:update IPC 订阅（preload 注入 window.pandaBadge.onUpdate）
       try {
         if (window.pandaBadge && typeof window.pandaBadge.onUpdate === 'function') {
@@ -1003,6 +1059,20 @@
           if (key && typeof dict[key] === 'string' && dict[key].length > 0) {
             nodes[i].textContent = dict[key];
           }
+        }
+        // W8-T2 a11y：data-i18n-aria-key → aria-label 三语化
+        // why：屏幕阅读器读 aria-label 而非 textContent；分两个 attr 避免污染可见文字
+        var ariaNodes = document.querySelectorAll('[data-i18n-aria-key]');
+        for (var j = 0; j < ariaNodes.length; j++) {
+          var ak = ariaNodes[j].getAttribute('data-i18n-aria-key');
+          if (ak && typeof dict[ak] === 'string' && dict[ak].length > 0) {
+            ariaNodes[j].setAttribute('aria-label', dict[ak]);
+          }
+        }
+        // W8-T2 a11y：#pet 容器 aria-label 同步
+        var petHost = document.getElementById('pet');
+        if (petHost && typeof dict.a11yPandaLabel === 'string' && dict.a11yPandaLabel.length > 0) {
+          petHost.setAttribute('aria-label', dict.a11yPandaLabel);
         }
       }
       try {

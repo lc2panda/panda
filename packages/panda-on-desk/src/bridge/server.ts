@@ -16,6 +16,8 @@ import { dispatchBadge } from '../badge/manager.js'
 import { dispatchDnd } from '../dnd/state.js'
 import { dispatchDragTarget } from '../dnd/target.js'
 import { dispatchNotification } from '../notification/dispatcher.js'
+// W8-T3：bridge 内部 dispatch / event 处理失败 → log.warn 而非静默吞
+import { log as deskLog } from '../util/logger.js'
 import {
   APP_IDENTITY,
   type EventAck,
@@ -289,9 +291,8 @@ export function dispatchEvent(event: OnDeskEvent): void {
     default: {
       // 未知事件 — 已被 isValidEvent 拦截，但 dispatchEvent 可单测调用，留兜底
       const _exhaustive: never = event
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[on-desk:dispatchEvent] unknown event type: ${(_exhaustive as { type?: string }).type ?? 'undefined'}`,
+      deskLog.warn(
+        `dispatchEvent unknown event type: ${(_exhaustive as { type?: string }).type ?? 'undefined'}`,
       )
     }
   }
@@ -339,14 +340,15 @@ export async function startBridgeServer(
         }
         try {
           opts.onEvent?.(body)
-        } catch {
-          // dispatcher 异常不影响 ack；on-desk 不让 panda CLI 因下游 bug 重试
+        } catch (err) {
+          // W8-T3：dispatcher 异常不影响 ack 返回，但要 log.warn 留痕便于排查
+          deskLog.warn('bridge onEvent business handler threw', err)
         }
         // why: P2-T1 — 业务 onEvent 之外，再走内部场景分发器（notification/badge/dnd/drag）
         try {
           dispatchEvent(body)
-        } catch {
-          // 占位 stub 不应抛错；万一 P2-T2+ 实装后抛错也吞，保证 ack
+        } catch (err) {
+          deskLog.warn('bridge dispatchEvent threw', err)
         }
         const ack: EventAck = { ok: true, receivedAt: Date.now() }
         jsonResponse(res, 200, ack)

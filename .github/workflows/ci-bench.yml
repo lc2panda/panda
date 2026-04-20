@@ -1,0 +1,59 @@
+# Input:  push 到 main / PR / 手动 dispatch 触发
+# Output: 跑 packages/panda-on-desk/test/benchmarks.ts；任一阈值 fail → CI fail
+# Pos:    panda v2.25.8 W8-T4 性能回归守卫；与 ci.yml 解耦避免拖慢主 CI
+#
+# [NEW-FILE:#W8-04]
+# 2026-04-20 +08:00 W8-T4 agent-δ-W8-bench · 性能基准 CI 集成
+
+name: CI Bench (W8-T4)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/panda-on-desk/test/benchmarks.ts'
+      - 'packages/panda-on-desk/src/badge/**'
+      - 'packages/panda-on-desk/src/notification/**'
+      - 'src/desk/**'
+      - 'src/buddy/petXP.ts'
+      - 'src/buddy/petStats.ts'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/panda-on-desk/test/benchmarks.ts'
+      - 'packages/panda-on-desk/src/badge/**'
+      - 'packages/panda-on-desk/src/notification/**'
+      - 'src/desk/**'
+      - 'src/buddy/petXP.ts'
+      - 'src/buddy/petStats.ts'
+  workflow_dispatch:
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run W8-T4 benchmarks
+        # benchmarks.ts 内部按阈值判定通过/失败；
+        # 任一测试点超阈值 → process.exit(1) 让 CI step fail
+        # 性能回归 > 10% 自动 fail（阈值留足缓冲；详 monitor/20260420-W8-T4-bench.md §阈值依据）
+        working-directory: packages/panda-on-desk
+        run: bun run test/benchmarks.ts
+
+      - name: Upload bench report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: panda-bench-report
+          path: monitor/20260420-W8-T4-bench.md
+          retention-days: 30
