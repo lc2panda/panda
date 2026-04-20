@@ -20,6 +20,20 @@
 
 ---
 
+## v2.25.34 — 2026-04-20 · P0 Mac 顶部黑框第 5 次复发彻底修复（W24 hotfix · hitGeometry 参数错位）
+- **真正根因**（v2.25.30 W21 nuclear 后仍复发）：
+  `packages/panda-on-desk/src/main.ts:446` 的 `getHitRectScreen` wrapper 调用
+  `hitGeometry.getHitRectScreen(petBounds, activeTheme)` 只传 2 参，而真实签名是 6 参
+  `(theme, bounds, state, file, hitBox, options)` → 参数错位：theme=petBounds、bounds=activeTheme。
+  内部 `fallbackHitRect(bounds)` 读 activeTheme.x/y/width/height（都 undefined）→ 走默认 100/100/200/200
+  → 返回 `{left:80, top:80, right:320, bottom:320}` → hitWin 被创建在屏幕左上 (80,80,240×240)
+  → `applyStationaryCollectionBehavior` 注入 `setLevel:1500` (CGAssistiveTechHigh, > menu bar)
+  → 用户看到"屏幕顶部大黑框"（实际是左上 240×240 + menu bar 被遮挡）。
+- **修复**：绕过 hitGeometry（2 参调用本就是错的），直接用 petBounds + 20px pad。
+  petBounds 由 `getPetWindowBounds()` 保证非空（`_petVirtualBounds || win.getBounds() || 0s`）。
+- 同步修改 `main.ts` + `main.js`（生产运行文件）。
+- 新增 `test/mac-hit-rect-blackbar.test.ts` 7 个回归用例（守护 hitGeometry 参数错位不再发生）。
+
 ## v2.25.33 — 2026-04-20 · 波 23 全 4/4（install UX + STATUS 收官 + 最终 1651/0 + 23h 总结 · 终版）
 - W23-T1 install UX：`src/desk/installer.ts` 加 `InstallErrorKind` / `InstallProgressEvent` 类型 + `__classifyInstallErrorForTesting` / `__parseProgressLineForTesting` / `__verifyElectronLoadableForTesting` 三个 helper；外层加自动重试（仅 timeout/network）+ 安装后 `require('electron')` 自检。`src/cli/handlers/desk-install.ts` +spinner（10 帧）+ % + ETA 渲染 + 失败按 errorKind 给 4 类 hint。`installer.test.ts` 41 pass / 0 fail / 116 expect。
 - W23-T2 STATUS 收官：`packages/panda-on-desk/STATUS.md` 收尾 23h 进展（120 行新增）。

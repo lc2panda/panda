@@ -440,13 +440,17 @@ function applyPetWindowBounds(b: { x: number; y: number; width: number; height: 
   }
 }
 function getHitRectScreen(petBounds: { x: number; y: number; width: number; height: number }) {
-  // [DESK-PET-VISIBLE-FIX 20260419] hitGeometry.getHitRectScreen 真实签名为 6 参（theme/bounds/state/file/hitBox/options）
-  // 当前以 2 参调用，必返 null；为避免 main.ts:758 / :447 撞 'Cannot read properties of null'
-  // 给一个基于 petBounds 的合理 fallback（与宠物窗 1:1 对齐，再外扩 20px 作 hit 边距）。
-  const rect = hitGeometry.getHitRectScreen(petBounds as any, activeTheme as any) as
-    | { left: number; top: number; right: number; bottom: number }
-    | null
-  if (rect && Number.isFinite(rect.left)) return rect
+  // [W24-P0-MAC-BLACKBAR 20260420] 顶部黑框真正根因（v2.25.30 W21 nuclear 后第 4 次复发）：
+  //   hitGeometry.getHitRectScreen 真实签名 6 参（theme/bounds/state/file/hitBox/options）；
+  //   此处以 2 参 (petBounds, activeTheme) 调用 → 参数错位：theme=petBounds、bounds=activeTheme。
+  //   内部 fallbackHitRect(bounds) 读 activeTheme.x/y/width/height（都 undefined）
+  //   → 走默认 100/100/200/200 → 返回 {left:80, top:80, right:320, bottom:320}
+  //   → hitWin 被创建在屏幕左上 (80,80,240×240)
+  //   → applyStationaryCollectionBehavior 注 setLevel:1500 (CGAssistiveTechHigh, > menu bar)
+  //   → 用户看到"屏幕顶部大黑框"（实际左上 240×240 + menu bar 被遮挡）。
+  //
+  //   修复：彻底绕过 hitGeometry（2 参调用本就是错的），直接用 petBounds + 20px pad。
+  //   petBounds 由 getPetWindowBounds() 保证非空（_petVirtualBounds || win.getBounds() || 0s）。
   const pad = 20
   const bx = Number.isFinite(petBounds?.x) ? petBounds.x : 100
   const by = Number.isFinite(petBounds?.y) ? petBounds.y : 100
