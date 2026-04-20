@@ -112,7 +112,9 @@ export interface InstallOptions {
   onLog?: (line: string) => void
   /** 自定义 npm 可执行（测试注入用，默认 'npm' 走 PATH） */
   npmCmd?: string
-  /** 子进程超时 ms（默认 600000 = 10 分钟，electron 80MB 下载兜底） */
+  /** 子进程超时 ms（默认 1800000 = 30 分钟，electron 80MB 下载兜底；
+   *  v2.25.18 由 600s 提到 1800s — Mac 实测 600s 不够慢网络场景。
+   *  ENV PANDA_DESK_INSTALL_TIMEOUT_MS 可覆盖） */
   timeoutMs?: number
 }
 
@@ -357,7 +359,10 @@ export function installPandaOnDeskDeps(
     }
 
     const npmCmd = opts.npmCmd ?? 'npm'
-    const timeoutMs = opts.timeoutMs ?? 600_000
+    // v2.25.18: 默认从 600s 提到 1800s（30min），允许 ENV 覆盖
+    // why: Mac 实测 600s 不够 electron 80MB 下载在慢网络场景
+    const envTimeout = Number(process.env.PANDA_DESK_INSTALL_TIMEOUT_MS)
+    const timeoutMs = opts.timeoutMs ?? (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : 1_800_000)
     // why --no-package-lock: stage 是一次性目录，无需 lock；省一次 IO
     // why --omit=dev: 与原 --production 等价的现代 npm 写法
     const args = [
@@ -439,7 +444,7 @@ export function installPandaOnDeskDeps(
           ok: false,
           code,
           durationMs,
-          message: `npm install 超时（${Math.round(timeoutMs / 1000)}s）— 检查网络或代理后重试`,
+          message: `npm install 超时（${Math.round(timeoutMs / 1000)}s）— 网络太慢；可设 PANDA_DESK_INSTALL_TIMEOUT_MS=3600000（1h）后重试`,
         })
         return
       }
