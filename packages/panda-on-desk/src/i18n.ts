@@ -4,6 +4,9 @@
 //
 // Forked from clawd-on-desk@4b07658:src/i18n.js (MIT License)
 // JS → TS 直接转 + Clawd 品牌词替换为 panda。
+// 2026-04-20 +08:00 W5-T3 agent-γ-W5-i18n: 新增 panda 桌面端词条（PetState/SPECIES/MILESTONES/HATS/EYES/
+//   PetState 解锁阶梯/settings 5 项/tray 6 项/overlay fallback/stats 卡片标签），language 字段持久化由
+//   prefs.ts DeskPrefs.language 承载，detectInitialLang() 自动从 process.env.LANG / app.getLocale() 选首语。
 
 // ── Internationalization ──
 // String pool extracted from src/menu.js so settings panel can also depend on it.
@@ -112,6 +115,105 @@ export const i18n: Record<LangCode, Dict> = {
     shortcutErrorRegistrationFailed:
       'Saved, but currently not active due to system conflict. Rebind or try again later.',
     quit: 'Quit',
+
+    // ── W5-T3 panda 桌面端词条（en） ─────────────────────────────────────
+    // 7 PetState 名称（与 src/buddy/types.ts PET_STATES 子集对齐 — overlay/hit 显示用）
+    petStateIdle: 'Idle',
+    petStateThinking: 'Thinking',
+    petStateWorking: 'Working',
+    petStateSleeping: 'Sleeping',
+    petStateError: 'Error',
+    petStateAttention: 'Attention',
+    petStateNotification: 'Notification',
+    // 12 PetState 解锁阶梯提示（A2 §4.1，Lv N 解锁 X）
+    unlockHintIdle: 'Unlocked from Lv 1',
+    unlockHintSleeping: 'Unlocked from Lv 1',
+    unlockHintDozing: 'Unlocked from Lv 1',
+    unlockHintThinking: 'Unlock at Lv 5',
+    unlockHintWaking: 'Unlock at Lv 5',
+    unlockHintWorking: 'Unlock at Lv 10',
+    unlockHintNotification: 'Unlock at Lv 10',
+    unlockHintAttention: 'Unlock at Lv 15',
+    unlockHintError: 'Unlock at Lv 15',
+    unlockHintCarrying: 'Unlock at Lv 20',
+    unlockHintJuggling: 'Unlock at Lv 30',
+    unlockHintSweeping: 'Unlock at Lv 45',
+    // 18 物种名称（与 src/buddy/types.ts SPECIES 1:1）
+    speciesDuck: 'Duck',
+    speciesGoose: 'Goose',
+    speciesBlob: 'Blob',
+    speciesCat: 'Cat',
+    speciesDragon: 'Dragon',
+    speciesOctopus: 'Octopus',
+    speciesOwl: 'Owl',
+    speciesPenguin: 'Penguin',
+    speciesTurtle: 'Turtle',
+    speciesSnail: 'Snail',
+    speciesGhost: 'Ghost',
+    speciesAxolotl: 'Axolotl',
+    speciesCapybara: 'Capybara',
+    speciesCactus: 'Cactus',
+    speciesRobot: 'Robot',
+    speciesRabbit: 'Rabbit',
+    speciesMushroom: 'Mushroom',
+    speciesChonk: 'Chonk',
+    // 13 milestone 名称（与 src/buddy/types.ts MILESTONES 1:1）
+    milestoneFirst1mTokens: 'First 1M tokens',
+    milestoneFirst100Commits: 'First 100 commits',
+    milestoneStreak7: '7-day streak',
+    milestoneStreak30: '30-day streak',
+    milestoneFirstDeepdream: 'First deep dream',
+    milestoneFirstFixBug: 'First bug fixed',
+    milestoneFirstPrMerged: 'First PR merged',
+    milestoneFirstSkillCreated: 'First skill created',
+    milestoneEpicMarathon4h: 'Epic 4h marathon',
+    milestoneMidnightOwl: 'Midnight owl',
+    milestoneLv10: 'Reached Lv 10',
+    milestoneLv25: 'Reached Lv 25',
+    milestoneLv50: 'Reached Lv 50',
+    // settings 5 选项标签（与 prefs.ts DeskPrefs 字段一一对应）
+    settingsTitle: 'panda-on-desk · Settings',
+    settingsSubtitle: '5 core preferences for desktop pet · written to ~/.pandacc/desk-prefs.json',
+    settingsCompanionOnDesk: 'Enable Desktop Pet',
+    settingsCompanionOnDeskDesc: 'When off, panda-on-desk keeps only the tray menu; pet window stays hidden',
+    settingsSpecies: 'Species',
+    settingsSpeciesDesc: 'Switch the desktop pet form across 18 built-in species',
+    settingsDnd: 'DND Window (Do Not Disturb)',
+    settingsDndDesc: 'Mute notifications + pause pet animation in window / default 22:00 → 08:00',
+    settingsVolume: 'Notification Volume',
+    settingsVolumeDesc: '0 = mute / 100 = max',
+    settingsAutoLaunch: 'Start on Login',
+    settingsAutoLaunchDesc: 'Auto-launch panda-on-desk after login · registered via OS login items API',
+    settingsLanguage: 'Language',
+    settingsLanguageDesc: 'Switch UI language for tray, settings, and pet bubbles',
+    settingsToastSaved: 'Saved',
+    settingsToastSaveFailed: 'Save failed',
+    settingsBridgeNotReady: 'preload bridge not ready',
+    settingsBridgeNotReadyDesc: 'window.pandaSettings is not injected; verify main process loaded preload/settings.js',
+    // tray 6 项菜单（panda 单 provider Tray — Show/Hide/DND/Settings/About/Quit）
+    trayShowPanda: 'Show panda',
+    trayHidePanda: 'Hide panda',
+    trayDndMode: 'DND mode',
+    traySettings: 'Settings…',
+    trayAbout: 'About panda-on-desk',
+    trayQuit: 'Quit panda-on-desk',
+    trayAboutTitle: 'About panda-on-desk',
+    trayAboutDetail:
+      'panda single-provider desktop GUI enhancement\n' +
+      'Electron 41 transparent overlay + 18-species pet companion\n\n' +
+      'Based on clawd-on-desk (MIT) 81% fork · Apache-2.0\n' +
+      'https://github.com/lc2panda/panda',
+    trayAboutOk: 'OK',
+    trayAboutOpenRepo: 'Open repo',
+    // overlay 通知 fallback 文案（dispatcher 兜底 / native 通知 fallback）
+    overlayDefaultTitle: 'panda',
+    overlayDefaultBody: 'Notification',
+    overlayPermissionRequest: 'Permission Request',
+    overlayUnknownTool: 'Unknown',
+    // hit window stats 卡片（长按 1s 显示）
+    hitStatsLevel: 'Lv',
+    hitStatsXp: 'XP',
+    hitStatsRarity: 'Rarity',
   },
   zh: {
     size: '大小',
@@ -208,6 +310,97 @@ export const i18n: Record<LangCode, Dict> = {
     shortcutErrorRegistrationFailed:
       '已保存，但当前因系统冲突未生效。请重新绑定或稍后再试。',
     quit: '退出',
+
+    // ── W5-T3 panda 桌面端词条（zh） ─────────────────────────────────────
+    petStateIdle: '空闲',
+    petStateThinking: '思考中',
+    petStateWorking: '工作中',
+    petStateSleeping: '睡眠中',
+    petStateError: '出错',
+    petStateAttention: '需要关注',
+    petStateNotification: '有通知',
+    unlockHintIdle: '1 级解锁',
+    unlockHintSleeping: '1 级解锁',
+    unlockHintDozing: '1 级解锁',
+    unlockHintThinking: '5 级解锁',
+    unlockHintWaking: '5 级解锁',
+    unlockHintWorking: '10 级解锁',
+    unlockHintNotification: '10 级解锁',
+    unlockHintAttention: '15 级解锁',
+    unlockHintError: '15 级解锁',
+    unlockHintCarrying: '20 级解锁',
+    unlockHintJuggling: '30 级解锁',
+    unlockHintSweeping: '45 级解锁',
+    speciesDuck: '小鸭',
+    speciesGoose: '大鹅',
+    speciesBlob: '黏菌',
+    speciesCat: '猫咪',
+    speciesDragon: '小龙',
+    speciesOctopus: '章鱼',
+    speciesOwl: '猫头鹰',
+    speciesPenguin: '企鹅',
+    speciesTurtle: '乌龟',
+    speciesSnail: '蜗牛',
+    speciesGhost: '幽灵',
+    speciesAxolotl: '六角恐龙',
+    speciesCapybara: '水豚',
+    speciesCactus: '仙人掌',
+    speciesRobot: '机器人',
+    speciesRabbit: '兔子',
+    speciesMushroom: '蘑菇',
+    speciesChonk: '胖墩',
+    milestoneFirst1mTokens: '首次百万 token',
+    milestoneFirst100Commits: '首次百次提交',
+    milestoneStreak7: '七日连击',
+    milestoneStreak30: '三十日连击',
+    milestoneFirstDeepdream: '首次深度梦境',
+    milestoneFirstFixBug: '首次修复 bug',
+    milestoneFirstPrMerged: '首次 PR 合并',
+    milestoneFirstSkillCreated: '首次创建技能',
+    milestoneEpicMarathon4h: '史诗 4h 马拉松',
+    milestoneMidnightOwl: '午夜猫头鹰',
+    milestoneLv10: '抵达 10 级',
+    milestoneLv25: '抵达 25 级',
+    milestoneLv50: '抵达 50 级',
+    settingsTitle: 'panda-on-desk · 设置',
+    settingsSubtitle: '桌面宠物 5 项核心偏好 · 写入 ~/.pandacc/desk-prefs.json',
+    settingsCompanionOnDesk: '启用桌面宠物',
+    settingsCompanionOnDeskDesc: '关闭后 panda-on-desk 仅保留托盘菜单，宠物窗口隐藏',
+    settingsSpecies: '物种选择',
+    settingsSpeciesDesc: '从 18 种内置物种中切换桌面宠物形象',
+    settingsDnd: 'DND 时段（免打扰）',
+    settingsDndDesc: '在指定时段内静音通知 + 暂停宠物动画 / 默认 22:00 → 08:00',
+    settingsVolume: '通知音量',
+    settingsVolumeDesc: '0 = 静音 / 100 = 最大',
+    settingsAutoLaunch: '开机自启',
+    settingsAutoLaunchDesc: '登录系统后自动启动 panda-on-desk · 通过 OS 登录项 API 注册',
+    settingsLanguage: '语言',
+    settingsLanguageDesc: '切换托盘 / 设置 / 宠物气泡的 UI 语言',
+    settingsToastSaved: '已保存',
+    settingsToastSaveFailed: '保存失败',
+    settingsBridgeNotReady: 'preload 桥未就绪',
+    settingsBridgeNotReadyDesc: 'window.pandaSettings 未注入，请确认主进程已正确加载 preload/settings.js',
+    trayShowPanda: '显示 panda',
+    trayHidePanda: '隐藏 panda',
+    trayDndMode: '免打扰模式',
+    traySettings: '设置…',
+    trayAbout: '关于 panda-on-desk',
+    trayQuit: '退出 panda-on-desk',
+    trayAboutTitle: '关于 panda-on-desk',
+    trayAboutDetail:
+      'panda 单 provider 桌面端 GUI 增强\n' +
+      'Electron 41 透明 overlay + 18 物种宠物养成\n\n' +
+      '基于 clawd-on-desk (MIT) 81% fork · Apache-2.0\n' +
+      'https://github.com/lc2panda/panda',
+    trayAboutOk: '确定',
+    trayAboutOpenRepo: '打开仓库',
+    overlayDefaultTitle: 'panda',
+    overlayDefaultBody: '通知',
+    overlayPermissionRequest: '权限请求',
+    overlayUnknownTool: '未知',
+    hitStatsLevel: '等级',
+    hitStatsXp: '经验',
+    hitStatsRarity: '稀有度',
   },
   ko: {
     size: '크기',
@@ -305,6 +498,97 @@ export const i18n: Record<LangCode, Dict> = {
     shortcutErrorRegistrationFailed:
       '저장되었지만 현재는 시스템 충돌로 활성화되지 않았습니다. 다시 바인딩하거나 나중에 다시 시도해 주세요.',
     quit: '종료',
+
+    // ── W5-T3 panda 桌面端 词条（ko） ─────────────────────────────────────
+    petStateIdle: '대기',
+    petStateThinking: '생각 중',
+    petStateWorking: '작업 중',
+    petStateSleeping: '수면 중',
+    petStateError: '오류',
+    petStateAttention: '주의 필요',
+    petStateNotification: '알림',
+    unlockHintIdle: 'Lv 1 해제',
+    unlockHintSleeping: 'Lv 1 해제',
+    unlockHintDozing: 'Lv 1 해제',
+    unlockHintThinking: 'Lv 5 해제',
+    unlockHintWaking: 'Lv 5 해제',
+    unlockHintWorking: 'Lv 10 해제',
+    unlockHintNotification: 'Lv 10 해제',
+    unlockHintAttention: 'Lv 15 해제',
+    unlockHintError: 'Lv 15 해제',
+    unlockHintCarrying: 'Lv 20 해제',
+    unlockHintJuggling: 'Lv 30 해제',
+    unlockHintSweeping: 'Lv 45 해제',
+    speciesDuck: '오리',
+    speciesGoose: '거위',
+    speciesBlob: '블롭',
+    speciesCat: '고양이',
+    speciesDragon: '드래곤',
+    speciesOctopus: '문어',
+    speciesOwl: '올빼미',
+    speciesPenguin: '펭귄',
+    speciesTurtle: '거북이',
+    speciesSnail: '달팽이',
+    speciesGhost: '유령',
+    speciesAxolotl: '아홀로틀',
+    speciesCapybara: '카피바라',
+    speciesCactus: '선인장',
+    speciesRobot: '로봇',
+    speciesRabbit: '토끼',
+    speciesMushroom: '버섯',
+    speciesChonk: '청크',
+    milestoneFirst1mTokens: '첫 1M 토큰',
+    milestoneFirst100Commits: '첫 100 커밋',
+    milestoneStreak7: '7일 연속',
+    milestoneStreak30: '30일 연속',
+    milestoneFirstDeepdream: '첫 딥드림',
+    milestoneFirstFixBug: '첫 버그 수정',
+    milestoneFirstPrMerged: '첫 PR 머지',
+    milestoneFirstSkillCreated: '첫 스킬 생성',
+    milestoneEpicMarathon4h: '에픽 4시간 마라톤',
+    milestoneMidnightOwl: '심야 올빼미',
+    milestoneLv10: 'Lv 10 도달',
+    milestoneLv25: 'Lv 25 도달',
+    milestoneLv50: 'Lv 50 도달',
+    settingsTitle: 'panda-on-desk · 설정',
+    settingsSubtitle: '데스크탑 펫 5 가지 핵심 환경설정 · ~/.pandacc/desk-prefs.json 에 저장',
+    settingsCompanionOnDesk: '데스크탑 펫 활성화',
+    settingsCompanionOnDeskDesc: '끄면 panda-on-desk 는 트레이 메뉴만 유지하고 펫 창은 숨겨집니다',
+    settingsSpecies: '종 선택',
+    settingsSpeciesDesc: '내장된 18 종 가운데 데스크탑 펫의 모습을 전환합니다',
+    settingsDnd: 'DND 시간대 (방해 금지)',
+    settingsDndDesc: '지정한 시간대에 알림을 음소거하고 펫 애니메이션을 일시 중지 / 기본 22:00 → 08:00',
+    settingsVolume: '알림 음량',
+    settingsVolumeDesc: '0 = 음소거 / 100 = 최대',
+    settingsAutoLaunch: '로그인 시 자동 시작',
+    settingsAutoLaunchDesc: '로그인 후 panda-on-desk 자동 실행 · OS 로그인 항목 API 로 등록',
+    settingsLanguage: '언어',
+    settingsLanguageDesc: '트레이, 설정, 펫 말풍선의 UI 언어를 전환합니다',
+    settingsToastSaved: '저장됨',
+    settingsToastSaveFailed: '저장 실패',
+    settingsBridgeNotReady: 'preload 브리지 준비 안 됨',
+    settingsBridgeNotReadyDesc: 'window.pandaSettings 가 주입되지 않았습니다. 메인 프로세스가 preload/settings.js 를 올바르게 로드했는지 확인하세요',
+    trayShowPanda: 'panda 보이기',
+    trayHidePanda: 'panda 숨기기',
+    trayDndMode: 'DND 모드',
+    traySettings: '설정…',
+    trayAbout: 'panda-on-desk 정보',
+    trayQuit: 'panda-on-desk 종료',
+    trayAboutTitle: 'panda-on-desk 정보',
+    trayAboutDetail:
+      'panda 단일 provider 데스크탑 GUI 강화\n' +
+      'Electron 41 투명 overlay + 18 종 펫 육성\n\n' +
+      'clawd-on-desk (MIT) 81% fork 기반 · Apache-2.0\n' +
+      'https://github.com/lc2panda/panda',
+    trayAboutOk: '확인',
+    trayAboutOpenRepo: '저장소 열기',
+    overlayDefaultTitle: 'panda',
+    overlayDefaultBody: '알림',
+    overlayPermissionRequest: '권한 요청',
+    overlayUnknownTool: '알 수 없음',
+    hitStatsLevel: 'Lv',
+    hitStatsXp: 'XP',
+    hitStatsRarity: '등급',
   },
 }
 
@@ -319,6 +603,62 @@ export function createTranslator(getLang: () => LangCode | string): Translator {
   return function t(key: string): string {
     const lang = getLang() as LangCode
     const dict = i18n[lang] || i18n.en
-    return dict[key] || key
+    // 缺 key fallback 到 en；en 仍缺则返回 key 自身（与 clawd 上游兼容）
+    return dict[key] ?? i18n.en[key] ?? key
   }
+}
+
+/**
+ * 归一任意 locale 字符串到三语之一。
+ * 规则（按优先级）：
+ *   - 'zh' / 'zh-CN' / 'zh_CN.UTF-8' → 'zh'
+ *   - 'ko' / 'ko-KR' → 'ko'
+ *   - 其它 / undefined / 非法 → 'en'
+ * 容错：null/undefined/数字/对象 → 'en'，从不抛错。
+ */
+export function normalizeLang(input: unknown): LangCode {
+  if (typeof input !== 'string' || input.length === 0) return 'en'
+  const head = input.toLowerCase().split(/[._-]/)[0]
+  if (head === 'zh') return 'zh'
+  if (head === 'ko') return 'ko'
+  return 'en'
+}
+
+/**
+ * 自动检测初始语言 — 优先级：
+ *   1. 已持久化的 explicit prefs（外部传入）
+ *   2. process.env.LANG / LC_ALL / LC_MESSAGES（POSIX 环境变量）
+ *   3. app.getLocale() 回调（Electron 主进程注入；可选）
+ *   4. 'en' 默认
+ *
+ * why callback：i18n.ts 不依赖 electron（test/preload 都能 import）；
+ *   getAppLocale 由 main.ts 注入 () => app.getLocale()。
+ */
+export function detectInitialLang(opts?: {
+  persistedLang?: string | null
+  getAppLocale?: () => string | undefined
+}): LangCode {
+  const persisted = opts?.persistedLang
+  if (typeof persisted === 'string' && persisted.length > 0) {
+    const norm = normalizeLang(persisted)
+    // 持久化的 lang 即便归一为 en（如显式 'en-US'）也尊重用户选择
+    if ((['en', 'zh', 'ko'] as const).includes(persisted as LangCode)) {
+      return persisted as LangCode
+    }
+    if (norm !== 'en' || persisted.toLowerCase().startsWith('en')) return norm
+  }
+  // POSIX 环境变量：LC_ALL > LC_MESSAGES > LANG（GNU libc 优先级）
+  const envLang =
+    (typeof process !== 'undefined' && process.env?.LC_ALL) ||
+    (typeof process !== 'undefined' && process.env?.LC_MESSAGES) ||
+    (typeof process !== 'undefined' && process.env?.LANG)
+  if (envLang) return normalizeLang(envLang)
+  // Electron app.getLocale() — 仅 main 进程可用
+  try {
+    const fromApp = opts?.getAppLocale?.()
+    if (fromApp) return normalizeLang(fromApp)
+  } catch {
+    // ignore — getAppLocale 在 renderer / 非 electron 环境必然抛
+  }
+  return 'en'
 }

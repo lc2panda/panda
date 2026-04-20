@@ -26,6 +26,11 @@
                               · 未知 species → fallback 'default'（保留嵌入简笔 SVG）
                               · pet-state 路径不变（body[data-pet-state] 仍由 __pandaSetState 控制）
                               · bridge 'species' 事件 → 自动驱动 __pandaSetSpecies（含 pending 缓存回放）
+    [W5-T4-PERF 20260419] 性能 polish：
+                              · preloadSpeciesSvgs 移到 requestIdleCallback（fallback setTimeout 200ms）
+                                避免与首屏渲染争用主线程；hit 窗启动可见时间 ↓
+                              · SPECIES cache LRU cap=12 — 18 物种全 cache ≈ 18×6KB=108KB；cap 后 ≤ 72KB
+                                (用户高频切换的常见 ≤ 12 物种；冷物种淘汰，下次 setSpecies 重新 fetch)
   -->
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -368,9 +373,10 @@
       <!-- W2-T2 等级显示 + XP 进度条容器（默认 display:none；__pandaSetLevel 显形） -->
       <div id="panda-level-container" data-visible="0" aria-hidden="true"></div>
       <div id="badge" class="badge" aria-live="polite" aria-label="未读通知">0</div>
+      <!-- W5-T3: stats 标签由 pandaI18n 动态填充（hitStatsLevel/hitStatsXp）；textContent 默认 en -->
       <div id="stats-card" class="stats-card" aria-hidden="true">
-        <div class="stats-line">Lv <span id="stats-lv">1</span></div>
-        <div class="stats-line">XP <span id="stats-xp">0</span></div>
+        <div class="stats-line"><span class="i18n-label" data-i18n-key="hitStatsLevel">Lv</span> <span id="stats-lv">1</span></div>
+        <div class="stats-line"><span class="i18n-label" data-i18n-key="hitStatsXp">XP</span> <span id="stats-xp">0</span></div>
         <div class="stats-line stats-rarity-N" id="stats-rarity-line">[<span id="stats-rarity">N</span>]</div>
       </div>
 
@@ -476,6 +482,26 @@
       ];
       // 物种 SVG cache：species → svgString | null（null = 加载中或失败）
       var SPECIES_CACHE = window.__pandaSpeciesCache = window.__pandaSpeciesCache || Object.create(null);
+      // W5-T4：cache LRU cap — 18 物种 × ~6KB = ~108KB；cap=12 → ≤ 72KB 内存
+      var SPECIES_CACHE_CAP = 12;
+      // 访问顺序记录（最近用的在尾）
+      var SPECIES_LRU_ORDER = window.__pandaSpeciesLRU = window.__pandaSpeciesLRU || [];
+      function touchSpeciesLRU(sp) {
+        var idx = SPECIES_LRU_ORDER.indexOf(sp);
+        if (idx !== -1) SPECIES_LRU_ORDER.splice(idx, 1);
+        SPECIES_LRU_ORDER.push(sp);
+        // 超 cap 时淘汰最早访问的（且 cache 内容非 null 的）
+        while (SPECIES_LRU_ORDER.length > SPECIES_CACHE_CAP) {
+          var evict = SPECIES_LRU_ORDER.shift();
+          if (evict && evict !== document.body.dataset.species) {
+            // 不淘汰当前正在显示的物种，避免下次 setState 触发重 fetch
+            try { delete SPECIES_CACHE[evict]; } catch (e) { SPECIES_CACHE[evict] = undefined; }
+          } else if (evict) {
+            // 当前显示物种保留 — 重新塞回 LRU 尾
+            SPECIES_LRU_ORDER.push(evict);
+          }
+        }
+      }
       // 保留 W1-T2 嵌入的简笔 panda 作为 'default' 物种基线（fallback）
       var DEFAULT_SPECIES = 'default';
       // 缓存初始内嵌 .panda-face SVG outerHTML（首次替换前抓取，作 default 还原源）
@@ -501,6 +527,8 @@
               }).then(function (text) {
                 if (typeof text === 'string' && text.indexOf('<svg') !== -1) {
                   SPECIES_CACHE[sp] = text;
+                  // W5-T4：preload 也记 LRU（后被 setSpecies 命中无需 re-fetch）
+                  try { touchSpeciesLRU(sp); } catch (e) {}
                 } else if (text !== undefined) {
                   SPECIES_CACHE[sp] = null;
                 }
@@ -553,6 +581,7 @@
         var cached = SPECIES_CACHE[target];
         if (typeof cached === 'string' && cached.length > 0) {
           applySvgString(cached, target);
+          try { touchSpeciesLRU(target); } catch (e) {}
           return;
         }
         // cache miss：现场 fetch；失败则回退 default
@@ -564,6 +593,7 @@
           }).then(function (text) {
             if (typeof text === 'string' && text.indexOf('<svg') !== -1) {
               SPECIES_CACHE[target] = text;
+              try { touchSpeciesLRU(target); } catch (e) {}
               if (document.body.dataset.species === target) {
                 applySvgString(text, target);
               }
@@ -577,8 +607,17 @@
           });
         } catch (e) { /* swallow */ }
       };
-      // 启动时立即触发 preload（不阻塞渲染）
-      try { captureDefaultFace(); preloadSpeciesSvgs(); } catch (e) {}
+      // W5-T4：启动时延迟到 idle callback 触发 preload（不阻塞首屏渲染）
+      // 优先 requestIdleCallback（Chromium ≥ 47 支持）；fallback setTimeout 200ms
+      try {
+        captureDefaultFace();
+        var schedulePreload = (typeof window.requestIdleCallback === 'function')
+          ? function () { window.requestIdleCallback(preloadSpeciesSvgs, { timeout: 1500 }); }
+          : function () { setTimeout(preloadSpeciesSvgs, 200); };
+        schedulePreload();
+      } catch (e) {
+        try { preloadSpeciesSvgs(); } catch (_) {}
+      }
       console.log('[panda-on-desk] hit window ready - panda visible (W1-T2 art + W2-T1 species)');
 
       // 若 W1-T4 bridge 在 __pandaSetState 注入前已收到 pet-state，回放一次
@@ -950,6 +989,37 @@
         _state.level = tl;
         repaintLevel();
       };
+    })();
+
+    // ── W5-T3：i18n 应用 — 替换 [data-i18n-key] 节点 textContent 为 dict[key] ─
+    // 启动：pandaI18n.getDict() 拉当前 lang 字典 → 应用；订阅 onLangChanged 重新应用。
+    // 失败容错：preload 未暴露 / IPC 失败 → 保持 HTML 内嵌默认 textContent（en 兜底）。
+    (function () {
+      function applyDict(dict) {
+        if (!dict || typeof dict !== 'object') return;
+        var nodes = document.querySelectorAll('[data-i18n-key]');
+        for (var i = 0; i < nodes.length; i++) {
+          var key = nodes[i].getAttribute('data-i18n-key');
+          if (key && typeof dict[key] === 'string' && dict[key].length > 0) {
+            nodes[i].textContent = dict[key];
+          }
+        }
+      }
+      try {
+        if (!window.pandaI18n || typeof window.pandaI18n.getDict !== 'function') return;
+        window.pandaI18n.getDict().then(function (res) {
+          if (res && res.dict) applyDict(res.dict);
+        }).catch(function () {});
+        if (typeof window.pandaI18n.onLangChanged === 'function') {
+          window.pandaI18n.onLangChanged(function (lang) {
+            window.pandaI18n.getDict(lang).then(function (res) {
+              if (res && res.dict) applyDict(res.dict);
+            }).catch(function () {});
+          });
+        }
+      } catch (e) {
+        console.warn('[panda-on-desk:hit] pandaI18n apply failed:', e && e.message);
+      }
     })();
 
     // ── W2-T2：sound:play IPC 监听（继承 P2-T4 player）──────────────────────

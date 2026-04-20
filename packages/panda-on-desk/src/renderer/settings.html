@@ -6,7 +6,7 @@
      Output: 5 项 panda 偏好设置 UI + IPC 持久化
      Pos: panda-on-desk W3 收尾 — settings BrowserWindow 渲染层（精简自 clawd 1259 行 → 220 行 panda 5 选项） -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:">
-<title>panda-on-desk · 设置</title>
+<title data-i18n-key="settingsTitle">panda-on-desk · 设置</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -237,16 +237,16 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
 <body>
 <div class="app">
   <header>
-    <h1>panda-on-desk · 设置</h1>
-    <div class="subtitle">桌面宠物 5 项核心偏好 · 写入 <code>~/.pandacc/desk-prefs.json</code></div>
+    <h1 data-i18n-key="settingsTitle">panda-on-desk · 设置</h1>
+    <div class="subtitle" data-i18n-key="settingsSubtitle">桌面宠物 5 项核心偏好 · 写入 <code>~/.pandacc/desk-prefs.json</code></div>
   </header>
 
   <section class="panel" id="panel">
     <!-- 1. 启用桌面宠物 -->
     <div class="row">
       <div class="row-label">
-        <div class="title">启用桌面宠物</div>
-        <div class="desc">关闭后 panda-on-desk 仅保留托盘菜单，宠物窗口隐藏</div>
+        <div class="title" data-i18n-key="settingsCompanionOnDesk">启用桌面宠物</div>
+        <div class="desc" data-i18n-key="settingsCompanionOnDeskDesc">关闭后 panda-on-desk 仅保留托盘菜单，宠物窗口隐藏</div>
       </div>
       <div class="switch" id="sw-companionOnDesk" data-key="companionOnDesk" role="switch" tabindex="0"></div>
     </div>
@@ -254,8 +254,8 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
     <!-- 2. 物种选择 -->
     <div class="row">
       <div class="row-label">
-        <div class="title">物种选择</div>
-        <div class="desc">从 18 种内置物种中切换桌面宠物形象</div>
+        <div class="title" data-i18n-key="settingsSpecies">物种选择</div>
+        <div class="desc" data-i18n-key="settingsSpeciesDesc">从 18 种内置物种中切换桌面宠物形象</div>
       </div>
       <select id="sel-species"></select>
     </div>
@@ -263,8 +263,8 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
     <!-- 3. DND 时段 -->
     <div class="row">
       <div class="row-label">
-        <div class="title">DND 时段（免打扰）</div>
-        <div class="desc">在指定时段内静音通知 + 暂停宠物动画 / 默认 22:00 → 08:00</div>
+        <div class="title" data-i18n-key="settingsDnd">DND 时段（免打扰）</div>
+        <div class="desc" data-i18n-key="settingsDndDesc">在指定时段内静音通知 + 暂停宠物动画 / 默认 22:00 → 08:00</div>
       </div>
       <div class="time-pair">
         <input type="time" id="time-dndStart">
@@ -276,8 +276,8 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
     <!-- 4. 通知音量 -->
     <div class="row">
       <div class="row-label">
-        <div class="title">通知音量</div>
-        <div class="desc">0 = 静音 / 100 = 最大</div>
+        <div class="title" data-i18n-key="settingsVolume">通知音量</div>
+        <div class="desc" data-i18n-key="settingsVolumeDesc">0 = 静音 / 100 = 最大</div>
       </div>
       <div class="volume-wrap">
         <input type="range" id="rng-notificationVolume" min="0" max="100" step="5">
@@ -288,10 +288,23 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
     <!-- 5. 开机自启 -->
     <div class="row">
       <div class="row-label">
-        <div class="title">开机自启</div>
-        <div class="desc">登录系统后自动启动 panda-on-desk · 通过 OS 登录项 API 注册</div>
+        <div class="title" data-i18n-key="settingsAutoLaunch">开机自启</div>
+        <div class="desc" data-i18n-key="settingsAutoLaunchDesc">登录系统后自动启动 panda-on-desk · 通过 OS 登录项 API 注册</div>
       </div>
       <div class="switch" id="sw-autoLaunch" data-key="autoLaunch" role="switch" tabindex="0"></div>
+    </div>
+
+    <!-- 6. W5-T3 语言选择（en/zh/ko） -->
+    <div class="row">
+      <div class="row-label">
+        <div class="title" data-i18n-key="settingsLanguage">语言</div>
+        <div class="desc" data-i18n-key="settingsLanguageDesc">切换托盘 / 设置 / 宠物气泡的 UI 语言</div>
+      </div>
+      <select id="sel-language">
+        <option value="en">English</option>
+        <option value="zh">简体中文</option>
+        <option value="ko">한국어</option>
+      </select>
     </div>
   </section>
 
@@ -307,10 +320,27 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
   'use strict';
 
   const api = window.pandaSettings;
+  // W5-T3：i18n dict cache（启动时拉一次；onLangChanged 时刷新）
+  let i18nDict = {};
+  function tt(key) {
+    return (i18nDict && typeof i18nDict[key] === 'string') ? i18nDict[key] : key;
+  }
+  function applyDict(dict) {
+    if (!dict || typeof dict !== 'object') return;
+    i18nDict = dict;
+    const nodes = document.querySelectorAll('[data-i18n-key]');
+    nodes.forEach(n => {
+      const key = n.getAttribute('data-i18n-key');
+      if (key && typeof dict[key] === 'string' && dict[key].length > 0) {
+        n.textContent = dict[key];
+      }
+    });
+  }
+
   if (!api) {
     document.getElementById('panel').innerHTML =
-      '<div class="row"><div class="row-label"><div class="title">preload 桥未就绪</div>' +
-      '<div class="desc">window.pandaSettings 未注入，请确认主进程已正确加载 preload/settings.js</div></div></div>';
+      '<div class="row"><div class="row-label"><div class="title">' + tt('settingsBridgeNotReady') + '</div>' +
+      '<div class="desc">' + tt('settingsBridgeNotReadyDesc') + '</div></div></div>';
     return;
   }
 
@@ -339,6 +369,7 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
     dndEnd: '08:00',
     notificationVolume: 60,
     autoLaunch: false,
+    language: 'en',
   };
 
   async function persist(patch) {
@@ -346,9 +377,9 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
       const res = await api.saveDeskPrefs(patch);
       if (res && res.status === 'ok') {
         prefs = { ...prefs, ...res.data };
-        showToast('已保存');
+        showToast(tt('settingsToastSaved'));
       } else {
-        showToast((res && res.message) || '保存失败', 'error');
+        showToast((res && res.message) || tt('settingsToastSaveFailed'), 'error');
       }
     } catch (err) {
       showToast(String(err && err.message || err), 'error');
@@ -369,6 +400,24 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
   }
 
   async function init() {
+    // W5-T3：先拉 i18n dict 应用 — 所有 [data-i18n-key] 节点立即三语化
+    try {
+      if (typeof api.getDict === 'function') {
+        const res = await api.getDict();
+        if (res && res.dict) applyDict(res.dict);
+      }
+      if (typeof api.onLangChanged === 'function') {
+        api.onLangChanged(async (lang) => {
+          try {
+            const res = await api.getDict(lang);
+            if (res && res.dict) applyDict(res.dict);
+            const sel = $('sel-language');
+            if (sel) sel.value = lang;
+          } catch {}
+        });
+      }
+    } catch {}
+
     // 加载物种白名单
     let species = ['default'];
     try {
@@ -410,6 +459,13 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
     bindSwitch('sw-autoLaunch', 'autoLaunch');
 
     sel.addEventListener('change', () => persist({ species: sel.value }));
+
+    // W5-T3：语言下拉 — 应用当前 prefs.language + 监听 change
+    const selLang = $('sel-language');
+    if (selLang) {
+      selLang.value = ['en','zh','ko'].includes(prefs.language) ? prefs.language : 'en';
+      selLang.addEventListener('change', () => persist({ language: selLang.value }));
+    }
 
     let timeDebounce;
     const onTimeChange = () => {

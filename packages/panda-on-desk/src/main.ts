@@ -295,7 +295,19 @@ function getShortcutFailure(actionId: string) { return _shortcutFailures.get(act
 function clearShortcutFailure(actionId: string) { _shortcutFailures.delete(actionId) }
 
 // ── 模块级运行时状态（lang 等镜像缓存——subscriber 同步） ──────────────────────
-let lang = _settingsController.get('lang')
+// W5-T3：lang 初值由 detectInitialLang() 决定（desk-prefs.language > LC_ALL/LC_MESSAGES/LANG > app.getLocale() > en）
+//        loadDeskPrefs 在 whenReady 内执行，此处仅设默认值；ready 后会被 _hydrateLangFromDeskPrefs 覆盖。
+let lang = (() => {
+  try {
+    const i18nMod = require('./i18n') as { detectInitialLang?: (opts?: any) => string }
+    if (typeof i18nMod.detectInitialLang === 'function') {
+      return i18nMod.detectInitialLang({
+        getAppLocale: () => { try { return app.getLocale() } catch { return undefined } },
+      })
+    }
+  } catch {}
+  return _settingsController.get('lang') || 'en'
+})()
 let showTray = _settingsController.get('showTray')
 let showDock = _settingsController.get('showDock')
 let isQuitting = false
@@ -1119,12 +1131,47 @@ ipcMain.handle('panda:desk-prefs:save', (_event: any, patch: any) => {
           console.warn('[panda-on-desk] autoLaunch sync failed:', (err as Error).message)
         }
       }
+      // W5-T3：language 变更 → 同步 lang 镜像 + 重建 tray menu + 通知 settings/hit webContents
+      if (res && res.status === 'ok' && res.data && typeof res.data.language === 'string' && res.data.language.length > 0) {
+        lang = res.data.language
+        try {
+          if (_trayHandle && typeof _trayHandle.rebuild === 'function') _trayHandle.rebuild()
+        } catch (err) {
+          console.warn('[panda-on-desk] tray rebuild after lang change failed:', (err as Error).message)
+        }
+        try {
+          if (settingsWindow && !settingsWindow.isDestroyed()) {
+            settingsWindow.webContents.send('panda:lang-changed', lang)
+          }
+          if (hitWin && !hitWin.isDestroyed()) {
+            hitWin.webContents.send('panda:lang-changed', lang)
+          }
+        } catch (err) {
+          console.warn('[panda-on-desk] lang webContents broadcast failed:', (err as Error).message)
+        }
+      }
       return res
     } catch (err) {
       return { status: 'error', message: (err as Error)?.message }
     }
   }
   return { status: 'error', message: 'desk-prefs module not loaded' }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W5-T3：i18n 暴露给 renderer（settings.html / hit.html 通过 preload 调用）
+// ─────────────────────────────────────────────────────────────────────────────
+ipcMain.handle('panda:i18n:get-lang', () => lang)
+ipcMain.handle('panda:i18n:get-dict', (_event: any, requestedLang?: string) => {
+  try {
+    const i18nMod = require('./i18n') as { i18n: Record<string, Record<string, string>> }
+    if (typeof requestedLang === 'string' && i18nMod.i18n[requestedLang]) {
+      return { lang: requestedLang, dict: i18nMod.i18n[requestedLang] }
+    }
+    return { lang, dict: i18nMod.i18n[lang] || i18nMod.i18n.en }
+  } catch (err) {
+    return { lang: 'en', dict: {}, error: (err as Error)?.message }
+  }
 })
 ipcMain.handle('panda:species:list', () => {
   if (deskPrefsMod && Array.isArray(deskPrefsMod.PANDA_SPECIES_WHITELIST)) {
@@ -1257,6 +1304,8 @@ if (!gotTheLock) {
           setDoNotDisturb,
           requestQuit: requestPandaQuit,
           appVersion: (() => { try { return app.getVersion() } catch { return undefined } })(),
+          // W5-T3：tray menu 三语 — 每次 buildMenu 都问 getLang，保证 saveDeskPrefs 后 rebuild 即生效
+          getLang: () => lang,
         })
         console.log('[panda-on-desk] panda tray initialized (W3-T1)')
       } catch (err) {
@@ -1265,14 +1314,19 @@ if (!gotTheLock) {
     }
 
     // ── W3-T1：从 desk-prefs 同步 autoLaunch 到系统登录项（首次启动幂等） ──
+    // ── W5-T3：同步 desk-prefs.language → lang 镜像 + 重建 tray menu（三语生效） ──
     if (deskPrefsMod && typeof deskPrefsMod.loadDeskPrefs === 'function') {
       try {
         const _deskPrefs = deskPrefsMod.loadDeskPrefs()
         if (_deskPrefs && typeof _deskPrefs.autoLaunch === 'boolean') {
           _writeSystemOpenAtLogin(_deskPrefs.autoLaunch)
         }
+        if (_deskPrefs && typeof _deskPrefs.language === 'string' && _deskPrefs.language.length > 0) {
+          lang = _deskPrefs.language
+          if (_trayHandle && typeof _trayHandle.rebuild === 'function') _trayHandle.rebuild()
+        }
       } catch (err) {
-        console.warn('[panda-on-desk] desk-prefs autoLaunch hydrate failed:', (err as Error).message)
+        console.warn('[panda-on-desk] desk-prefs hydrate failed:', (err as Error).message)
       }
     }
 

@@ -9,6 +9,8 @@
 // 2026-04-19 +08:00 P2-T1 扩展：6 helpers (push/bumpBadge/resetBadge/enableDrag/disableDrag/setDnd)
 // 2026-04-19 +08:00 W1-T4 扩展：pushPetStateChange + throttle 500ms（实测端到端 IPC）
 // 2026-04-19 +08:00 W2-T2 扩展：pushLevelUp / pushXpUpdate / pushLevelChange — 升级烟花动画 IPC
+// 2026-04-19 +08:00 W5-T4 扩展：pushNotification 同 (scenarioId,kind,level,title) 500ms 去重窗口
+//                    防 hook tick + bridge SSE 双触发刷屏 desk overlay（性能优化点 2）
 
 import { feature } from 'bun:bundle'
 import { existsSync, readFileSync } from 'node:fs'
@@ -302,14 +304,71 @@ export function buildDndEvent(
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// W5-T4 性能优化：pushNotification 去重窗口
+// 同 (scenarioId,kind,level,title) 500ms 内的重复 push → 仅首次落地，避免上层 hook tick
+// + bridge SSE 双触发同源通知刷屏 desk overlay。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 去重窗口（ms） — 与 PET_STATE_THROTTLE_MS 同源 */
+export const NOTIFICATION_DEDUP_WINDOW_MS = 500
+
+interface NotificationDedupeEntry {
+  ts: number
+}
+
+/** key = `${scenarioId}#${kind}#${level}#${title}`；value = 上次发送 ts */
+const _notificationDedupe = new Map<string, NotificationDedupeEntry>()
+
+function buildNotificationDedupeKey(opts: Omit<NotificationEvent, 'type' | 'ts'>): string {
+  return `${opts.scenarioId}#${opts.kind}#${opts.level}#${opts.title}`
+}
+
+/** 测试隔离 — 清空 dedupe map */
+export function __resetNotificationDedupeForTesting(): void {
+  _notificationDedupe.clear()
+}
+
+/**
+ * 内部：纯去重核心（与 isOnDeskEnabled gate 解耦），便于单元测试。
+ *
+ * @returns 是否实际发送（true = emit；false = 被 dedupe 吞）
+ */
+export function __pushNotificationDedupedCore(
+  opts: Omit<NotificationEvent, 'type' | 'ts'>,
+  emit: (event: NotificationEvent) => void,
+  nowMs: number = Date.now(),
+): boolean {
+  const key = buildNotificationDedupeKey(opts)
+  const last = _notificationDedupe.get(key)
+  if (last && nowMs - last.ts < NOTIFICATION_DEDUP_WINDOW_MS) {
+    return false
+  }
+  _notificationDedupe.set(key, { ts: nowMs })
+  // 简单 GC：每 100 entries 清 stale（> 2× 窗口）
+  if (_notificationDedupe.size > 100) {
+    const cutoff = nowMs - NOTIFICATION_DEDUP_WINDOW_MS * 2
+    for (const [k, v] of _notificationDedupe) {
+      if (v.ts < cutoff) _notificationDedupe.delete(k)
+    }
+  }
+  emit(buildNotificationEvent(opts))
+  return true
+}
+
 /**
  * 推送通知事件 — A/B/F/E/D 五类呈现统一入口。
  *
  * 业务方按 A3 §3 TOP 10 表选 kind；同时弹横幅 + overlay + badge 时串发 3 次。
  * why: helper 屏蔽 type+ts 字段，让调用点无需感知 OnDeskEvent union。
+ *
+ * W5-T4：500ms dedupe — 同 (scenarioId,kind,level,title) 重复推送被吞。
  */
 export function pushNotification(opts: Omit<NotificationEvent, 'type' | 'ts'>): void {
-  void pushEventToOnDesk(buildNotificationEvent(opts))
+  if (!isOnDeskEnabled()) return
+  __pushNotificationDedupedCore(opts, ev => {
+    void pushEventToOnDesk(ev)
+  })
 }
 
 /**

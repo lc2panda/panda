@@ -15,6 +15,7 @@
 import { app, Menu, Tray, nativeImage, nativeTheme, dialog, shell } from 'electron'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
+import { createTranslator, type LangCode } from '../i18n.js'
 
 const isMac = process.platform === 'darwin'
 
@@ -27,6 +28,8 @@ export type TrayCtx = {
   setDoNotDisturb: (enabled: boolean) => void
   requestQuit: () => void
   appVersion?: string
+  /** W5-T3 三语：getLang 回调由 main 注入；缺失则 fallback 'en' */
+  getLang?: () => LangCode | string
 }
 
 export type TrayHandle = {
@@ -73,40 +76,38 @@ function buildTrayMenuTemplate(ctx: TrayCtx): Electron.MenuItemConstructorOption
   const win = ctx.getWin()
   const isVisible = !!(win && !win.isDestroyed() && win.isVisible())
   const dnd = !!ctx.getDoNotDisturb()
+  // W5-T3：动态语言 — 每次 buildMenu 都问 ctx.getLang()，运行时切换语言下次 rebuild 即生效
+  const t = createTranslator(() => ctx.getLang?.() || 'en')
 
   return [
     {
-      label: isVisible ? 'Hide panda' : 'Show panda',
+      label: isVisible ? t('trayHidePanda') : t('trayShowPanda'),
       click: () => ctx.togglePetVisibility(),
     },
     { type: 'separator' },
     {
-      label: 'DND mode',
+      label: t('trayDndMode'),
       type: 'checkbox',
       checked: dnd,
       click: (menuItem) => ctx.setDoNotDisturb(menuItem.checked),
     },
     { type: 'separator' },
     {
-      label: 'Settings…',
+      label: t('traySettings'),
       click: () => ctx.openSettingsWindow(),
     },
     {
-      label: 'About panda-on-desk',
+      label: t('trayAbout'),
       click: () => {
         const ver = ctx.appVersion || (() => {
           try { return app.getVersion() } catch { return '0.0.0' }
         })()
         dialog.showMessageBox({
           type: 'info',
-          title: 'About panda-on-desk',
+          title: t('trayAboutTitle'),
           message: `panda-on-desk v${ver}`,
-          detail:
-            'panda 单 provider 桌面端 GUI 增强\n' +
-            'Electron 41 透明 overlay + 18 物种宠物养成\n\n' +
-            '基于 clawd-on-desk (MIT) 81% fork · Apache-2.0\n' +
-            'https://github.com/lc2panda/panda',
-          buttons: ['OK', 'Open repo'],
+          detail: t('trayAboutDetail'),
+          buttons: [t('trayAboutOk'), t('trayAboutOpenRepo')],
           defaultId: 0,
           cancelId: 0,
         }).then(res => {
@@ -118,7 +119,7 @@ function buildTrayMenuTemplate(ctx: TrayCtx): Electron.MenuItemConstructorOption
     },
     { type: 'separator' },
     {
-      label: 'Quit panda-on-desk',
+      label: t('trayQuit'),
       click: () => ctx.requestQuit(),
     },
   ]

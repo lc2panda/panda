@@ -55,6 +55,24 @@ contextBridge.exposeInMainWorld('panda', {
   },
 })
 
+// W5-T3：window.pandaI18n —— hit.html 内 stats 卡片标签三语化
+// 设计：preload 暴露 getLang() / getDict() / onLangChanged(cb)；
+//   hit.html inline script 启动时 await getDict() → 替换 stats-card label；订阅 lang 变化重渲染。
+contextBridge.exposeInMainWorld('pandaI18n', {
+  getLang: (): Promise<string> => ipcRenderer.invoke('panda:i18n:get-lang'),
+  getDict: (lang?: string): Promise<{ lang: string; dict: Record<string, string> }> =>
+    ipcRenderer.invoke('panda:i18n:get-dict', lang),
+  onLangChanged: (cb: (lang: string) => void): (() => void) => {
+    const handler = (_e: unknown, lang: string) => {
+      try { cb(lang) } catch (err) {
+        console.warn('[panda-on-desk:hit-preload] pandaI18n.onLangChanged handler threw:', (err as Error)?.message)
+      }
+    }
+    ipcRenderer.on('panda:lang-changed', handler)
+    return () => ipcRenderer.removeListener('panda:lang-changed', handler)
+  },
+})
+
 // W2-T4：window.pandaBadge.onUpdate —— P2-T4 badge/manager 推送通道
 // main.ts 启动时调 setBadgeRendererNotifier((channel, payload) => sendToHitWin(channel, payload))，
 // 该回调把 'badge:update' channel 转发到 hit 窗 webContents；preload 透传给 inline script，

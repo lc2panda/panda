@@ -32,4 +32,20 @@ contextBridge.exposeInMainWorld('pandaSettings', {
 
   /** 关闭 settings 窗口 */
   closeWindow: (): void => ipcRenderer.send('panda:settings:close'),
+
+  /** W5-T3：当前 UI 语言（从 main 进程查询，反映 desk-prefs.language 实时值） */
+  getLang: (): Promise<string> => ipcRenderer.invoke('panda:i18n:get-lang'),
+
+  /** W5-T3：获取三语字典（缺省返回当前 lang 词典；显式传 lang 返回指定语言词典） */
+  getDict: (lang?: string): Promise<{ lang: string; dict: Record<string, string> }> =>
+    ipcRenderer.invoke('panda:i18n:get-dict', lang),
+
+  /** W5-T3：订阅 lang 变更（saveDeskPrefs language 后 main 进程广播） */
+  onLangChanged: (cb: (lang: string) => void): (() => void) => {
+    const handler = (_e: unknown, lang: string) => {
+      try { cb(lang) } catch {}
+    }
+    ipcRenderer.on('panda:lang-changed', handler)
+    return () => ipcRenderer.removeListener('panda:lang-changed', handler)
+  },
 })

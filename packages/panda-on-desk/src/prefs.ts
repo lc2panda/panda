@@ -7,6 +7,7 @@
 //   - 新增 ~/.pandacc/desk-prefs.json 双写入口（loadDeskPrefs / saveDeskPrefs）
 //     供 settings.html / preload/settings.ts 使用，与上游 userData 路径并存。
 //   - 5 个 panda 选项：companionOnDesk / species / dndStart / dndEnd / notificationVolume / autoLaunch
+//   - W5-T3 (2026-04-20 +08:00): 新增 language ∈ {en,zh,ko}（PANDA_LANG_WHITELIST），三语 UI 持久化
 //
 // 上游 fork：clawd-on-desk@4b07658:src/prefs.js（MIT）— 仅借鉴 atomic-write 思路
 // [NEW-FILE:#20260419-DESK-FIX-02]（原 stub 创建标签）
@@ -47,6 +48,11 @@ export const PANDA_SPECIES_WHITELIST = [
 
 export type PandaSpecies = (typeof PANDA_SPECIES_WHITELIST)[number];
 
+// ── 三语 LangCode 白名单（与 i18n.ts SUPPORTED_LANGS 1:1） ──
+// W5-T3 新增：language 持久化字段，detectInitialLang() 自动从 process.env.LANG / app.getLocale() 选首语
+export const PANDA_LANG_WHITELIST = ["en", "zh", "ko"] as const;
+export type PandaLang = (typeof PANDA_LANG_WHITELIST)[number];
+
 // ── 5 选项 panda 偏好 schema ──
 export interface DeskPrefs {
   companionOnDesk: boolean;          // 启用桌面宠物总开关
@@ -55,6 +61,7 @@ export interface DeskPrefs {
   dndEnd: string;                     // DND 结束时间 "HH:MM"
   notificationVolume: number;         // 通知音量 0~100
   autoLaunch: boolean;                // 开机自启
+  language: PandaLang;                // W5-T3 三语 UI 语言（默认按 detectInitialLang() 决定）
 }
 
 export const DEFAULT_DESK_PREFS: DeskPrefs = {
@@ -64,6 +71,7 @@ export const DEFAULT_DESK_PREFS: DeskPrefs = {
   dndEnd: "08:00",
   notificationVolume: 60,
   autoLaunch: false,
+  language: "en",
 };
 
 // ── ~/.pandacc/desk-prefs.json 路径 ──
@@ -93,6 +101,9 @@ export function validateDeskPrefs(input: unknown): DeskPrefs {
   const species = (PANDA_SPECIES_WHITELIST as readonly string[]).includes(inp.species as string)
     ? (inp.species as PandaSpecies)
     : DEFAULT_DESK_PREFS.species;
+  const language = (PANDA_LANG_WHITELIST as readonly string[]).includes(inp.language as string)
+    ? (inp.language as PandaLang)
+    : DEFAULT_DESK_PREFS.language;
   return {
     companionOnDesk: typeof inp.companionOnDesk === "boolean" ? inp.companionOnDesk : DEFAULT_DESK_PREFS.companionOnDesk,
     species,
@@ -100,6 +111,7 @@ export function validateDeskPrefs(input: unknown): DeskPrefs {
     dndEnd: isValidTime(inp.dndEnd) ? (inp.dndEnd as string) : DEFAULT_DESK_PREFS.dndEnd,
     notificationVolume: isValidVolume(inp.notificationVolume) ? (inp.notificationVolume as number) : DEFAULT_DESK_PREFS.notificationVolume,
     autoLaunch: typeof inp.autoLaunch === "boolean" ? inp.autoLaunch : DEFAULT_DESK_PREFS.autoLaunch,
+    language,
   };
 }
 

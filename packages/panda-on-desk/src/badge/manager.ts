@@ -5,6 +5,8 @@
 //
 // [NEW-FILE:#20260419-P2-02] 原 P2-T1 占位
 // 2026-04-19 +08:00 agent-δ-P2-vfx · P2-T4 实装：状态持久 + 渲染通知
+// 2026-04-19 +08:00 agent-δ-W5-perf · W5-T4 dedupe — 同 (scenarioId,count) 聚合签名不变则吞 publishSnapshot
+//                    ／避免重复 webContents.send 给 hit 窗（性能优化点 4）
 
 import type { BadgeEvent } from '../bridge/types.js'
 
@@ -51,6 +53,22 @@ export function setBadgeRendererNotifier(fn: NotifyFn | null): void {
   notifyHitWin = fn
 }
 
+// W5-T4 dedupe：上一次 publish 的聚合签名（scenarioId|count 排序拼接 + total）
+// 同签名连续 publish → 跳过 webContents.send，避免高频通知刷屏 hit 窗 IPC 通道。
+let _lastPublishSig: string | null = null
+
+function buildPublishSig(
+  entries: ReadonlyArray<{ scenarioId: string; count: number }>,
+  total: number,
+): string {
+  // why: 排序保证签名稳定（Map 迭代顺序与插入有关，但 dedupe 应基于内容）
+  const parts = entries
+    .map(e => `${e.scenarioId}=${e.count}`)
+    .sort()
+    .join('|')
+  return `${total}#${parts}`
+}
+
 function publishSnapshot(): void {
   if (!notifyHitWin) return
   const entries = Array.from(badgeStates.entries()).map(([scenarioId, st]) => ({
@@ -59,9 +77,15 @@ function publishSnapshot(): void {
     color: st.color,
     lastUpdated: st.lastUpdated,
   }))
+  const total = getTotalCount()
+  // W5-T4：内容签名 dedupe — 同 entries+total 不变则跳过 webContents.send
+  // 注意 lastUpdated 不参与签名（同 count 多次 set 会刷新它，但渲染端不感知）
+  const sig = buildPublishSig(entries, total)
+  if (_lastPublishSig === sig) return
+  _lastPublishSig = sig
   const payload: BadgeUpdatePayload = {
     entries,
-    total: getTotalCount(),
+    total,
     ts: Date.now(),
   }
   try {
@@ -136,10 +160,16 @@ export function __getBadgeCountForTesting(scenarioId: string): number {
   return badgeStates.get(scenarioId)?.count ?? 0
 }
 
-/** 测试隔离 — 清空所有角标 + 解绑 notifier */
+/** 测试隔离 — 清空所有角标 + 解绑 notifier + 清空 dedupe 签名 */
 export function __resetBadgeCountsForTesting(): void {
   badgeStates.clear()
   notifyHitWin = null
+  _lastPublishSig = null
+}
+
+/** W5-T4 测试辅助 — 仅清 dedupe 签名（保留 state；用于断言下次 publish 真实触发） */
+export function __resetBadgeDedupeSigForTesting(): void {
+  _lastPublishSig = null
 }
 
 /** 测试辅助 — 全量 snapshot */
