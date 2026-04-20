@@ -252,14 +252,19 @@ describe('W7-T3 · launcher integration · locator 优先级', () => {
 // W7-T3-5 · port-already-in-use 影响 — launcher 本身不开端口，但 spawn 后子进程
 // 会尝试 bind 1455。launcher 的契约：spawn 只发起，端口冲突由子进程 probe 解决，
 // launcher 不应同步检测端口冲突。
+//
+// why 用 18900 而非真 PORT_BASE 1455：
+//   bun test 默认并发跑多个 *.test.ts；bridge.test.ts 与 e2e-real-process.test.ts
+//   也会探测 PORT_BASE 区段。占用真 PORT_BASE 会与并发的端口探测用例 race。
+//   选 18900 是符号占位 — 表达"任何 launcher 不关心的端口被占用都应不阻塞"语义。
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('W7-T3 · launcher integration · port-already-in-use 不阻塞 launcher', () => {
-  test('1455 占用 → launcher 仍可正常 spawn（端口协商交由子进程）', async () => {
-    // 起一个 blocker 占住 1455（PORT_BASE）
+  test('外部端口占用 → launcher 仍可正常 spawn（端口协商交由子进程）', async () => {
+    // 起一个 blocker 占住一个独立端口（避开 PORT_BASE 1455~1471 区段防 race）
     const http = require('node:http') as typeof import('node:http')
     const blocker = http.createServer((_req, res) => res.end())
-    await new Promise<void>(resolve => blocker.listen(1455, '127.0.0.1', () => resolve()))
+    await new Promise<void>(resolve => blocker.listen(18_900, '127.0.0.1', () => resolve()))
     try {
       // mock spawn — 验证 launcher 不会因为 1455 占用而 short-circuit
       const cp = require('node:child_process') as {
