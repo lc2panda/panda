@@ -5,6 +5,7 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
         [NEW-FILE:#W12-03] · 2026-04-20 +08:00 W12-T4 文档审计落盘（agent-δ-W12-docs-audit）
         W15-T3 · 2026-04-20 +08:00 CHANGELOG agent（agent-γ-W15-changelog）同步 v2.25.16–23 + 14 波交付列表
         W21-T3 · 2026-04-20 +08:00 README v4 agent（agent-γ-W21-readme）同步 v2.25.24–30 + 21 波交付列表 + Mac 顶部黑框 P0 nuclear fix
+        W22-T3 · 2026-04-20 +08:00 final agent（agent-γ-W22-final）同步 v2.25.31 + 全量 1610 pass / 0 fail + RELEASE_NOTES_v2.25.md
         一旦发版 / 测试基线 / 性能基线 / 已知 bug 列表 变化，请同步本文件。
 -->
 
@@ -34,15 +35,16 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 | 维度 | 值 | 来源 |
 |---|---|---|
-| panda CLI 版本 | **v2.25.30** | `package.json` L3 |
+| panda CLI 版本 | **v2.25.31** | `package.json` L3 |
 | panda-on-desk 子包版本 | **v0.1.0-alpha** (内部) / 对外 desk-v1.0.2 GA | `packages/panda-on-desk/package.json` L3 |
 | 桌面端 GA 标签 | **desk-v1.0.2** (2026-04-20 W19-T4 重触发) | `monitor/20260420-W19-T4-ci.md` |
 | Electron runtime | **41.2.1** | `packages/panda-on-desk/package.json` devDeps |
 | Node 兼容 | ≥ 18.0.0 | `package.json` engines |
 | Bun 兼容 | ≥ 1.2.0 | `package.json` engines |
 | 仓库 | `lc2panda/panda` (private) | git remote |
-| 最新发版日期 | **2026-04-20** (UTC+8 · 18:19) | git log HEAD `f24f9c4` |
-| 最新 commit | `f24f9c4` — `fix: P0 Mac 顶部黑框深度彻查修复 — 5 重根因 (v2.25.30)` | `git log -1` |
+| 最新发版日期 | **2026-04-20** (UTC+8) | git log HEAD `9a9c19e` |
+| 最新 commit | `9a9c19e` — `feat: 波 21 全 4/4 — Mac e2e + demo polish + README v4 + 性能 v5 RSS 158MB (v2.25.31)` | `git log -1` |
+| 全量测试基线 | **1654 pass · 0 fail · 1 skip** (W22-T3 final) | `monitor/20260420-W22-T3-final.md` |
 
 ---
 

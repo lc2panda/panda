@@ -19,6 +19,14 @@
 
 ---
 
+## v2.25.31 — 2026-04-20 · 波 21 全 4/4（Mac e2e + demo polish + README v4 + 性能 v5 RSS 158MB）
+- W21-T1 Mac e2e mock 测试加固：覆盖 v2.25.30 nuclear fix 全 5 重根因 regression（21 pass 全过）。
+- W21-T2 demo polish：首启场景脚本完善 + 时间轴 + 三件套触发 + welcome 升级。
+- W21-T3 README v4 终极打磨：badges/截图/用户故事三段式，加 21 波交付列表与 Mac 黑框 P0 nuclear fix 摘要。
+- W21-T4 性能 v5 内存优化：SVG cache LRU + 5MB 字节上限；Badge cap 256 LRU 验证；新建 `test/stress-mem.test.ts` 1h-stress 套件（5 pass）。RSS 启动 112.50MB → 5min 等价负载后 158.01MB（delta 45.51MB << 50MB 阈值）。
+- bun test 全量持续 0 fail；anthropic byte-equal 0 触碰；0 新依赖；32 版本端到端。
+- commit `9a9c19e`。
+
 ## v2.25.30 — 2026-04-20 · P0 Mac 顶部黑框深度彻查修复（5 重根因 nuclear fix）
 - 🚨 指挥官 v2.25.29 实测 Mac 顶部仍有大块黑框（W14-P0/W15-P0/W20-P0 多次表层 fix 未真修）→ agent-fix-mac-blackbar-deep 深度诊断找出 5 重根因：
   1. `mainWin` (pet) `transparent + panel + alwaysOnTop` 三组合 → Mac 渲染顶部黑条；
