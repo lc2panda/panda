@@ -3,6 +3,7 @@ Input:  panda-on-desk 全部版本/测试/性能/bug/排查信息散落在多个
 Output: 一键查看的子产品总状态看板（指挥官 / 用户 / 维护者通用）
 Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRIBUTING/PRIVACY 平级
         [NEW-FILE:#W12-03] · 2026-04-20 +08:00 W12-T4 文档审计落盘（agent-δ-W12-docs-audit）
+        W15-T3 · 2026-04-20 +08:00 CHANGELOG agent（agent-γ-W15-changelog）同步 v2.25.16–23 + 14 波交付列表
         一旦发版 / 测试基线 / 性能基线 / 已知 bug 列表 变化，请同步本文件。
 -->
 
@@ -32,15 +33,15 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 | 维度 | 值 | 来源 |
 |---|---|---|
-| panda CLI 版本 | **v2.25.15** | `package.json` L3 |
+| panda CLI 版本 | **v2.25.23** | `package.json` L3 |
 | panda-on-desk 子包版本 | **v0.1.0-alpha** (内部) / 对外 desk-v1.0.1 GA | `packages/panda-on-desk/package.json` L3 |
 | 桌面端 GA 标签 | **desk-v1.0.1** (2026-04-20 推送) | `monitor/20260420-W11-T1-ci-retrigger.md` |
 | Electron runtime | **41.2.1** | `packages/panda-on-desk/package.json` devDeps |
 | Node 兼容 | ≥ 18.0.0 | `package.json` engines |
 | Bun 兼容 | ≥ 1.2.0 | `package.json` engines |
 | 仓库 | `lc2panda/panda` (private) | git remote |
-| 最新发版日期 | **2026-04-20** (UTC+8) | git log HEAD `d3cd8d7` |
-| 最新 commit | `d3cd8d7` — `feat: 波 11 全 4/4 — desk-v1.0.1 + 真截图 + README 精装 + startup -9.2% (v2.25.15)` | `git log -1` |
+| 最新发版日期 | **2026-04-20** (UTC+8) | git log HEAD `fddb1ac` |
+| 最新 commit | `fddb1ac` — `feat: 波 14 收尾 — tray 真实装 6 items + 首次启动 demo 模式 (v2.25.23)` | `git log -1` |
 
 ---
 
@@ -50,8 +51,8 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 | 维度 | 值 | 锚点 |
 |---|---|---|
-| 全量测试用例 | **1257+ pass / 4 fail** | v2.25.15 commit body |
-| 预存基线 fail | 4 (MatrixTheme env / getFrozenStats 历史遗留) | CHANGELOG v2.25.7+ |
+| 全量测试用例 | **1275+ pass / 2 fail** | v2.25.19 commit body（波 13 修 MatrixTheme 6 + frozen 1 后 4 fail → 2 fail） |
+| 预存基线 fail | **2** (原 4 基线 → v2.25.19 修 2 残留 2) | CHANGELOG v2.25.19 |
 | panda-on-desk 子包用例 | **226+ pass** + 后续波次新加（a11y 13 / logger 14 / telemetry 12 / window-lifecycle / petStats.migration / benchmarks 7 / perf 12 / perf-v2 10 / e2e-real-process 13 / screenshots 8 / a11y-headless / startup 5 / real-screenshots 4 + ...） | CHANGELOG v2.25.0–v2.25.15 / `packages/panda-on-desk/test/` |
 | 子包测试目录 | `packages/panda-on-desk/test/` | — |
 | 关键模块覆盖率 | **+74.32%** (W10-T1 retry 提升基线) | CHANGELOG v2.25.14 |
@@ -111,7 +112,7 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 
 ---
 
-## 4. 17+ 版本端到端列表（v2.22.0 → v2.25.15 · 27 版本）
+## 4. 14 波端到端 agent 交付列表（v2.22.0 → v2.25.23 · 35 版本）
 
 > 完整变更详见 [`../../CHANGELOG.md`](../../CHANGELOG.md)。本节仅列「commit + 关键交付」一行表。
 
@@ -144,8 +145,16 @@ Pos:    panda-on-desk 子包根 STATUS 看板 — 与 README/ARCHITECTURE/CONTRI
 | 25 | v2.25.13 | `4634ba8` | 2026-04-20 | 波 10 部分：9 PNG 截图视觉升级 (状态文字/hero 背景/demo 多元素) + GitHub Pages docs/index.md |
 | 26 | v2.25.14 | `0491314` | 2026-04-20 | 波 10 收尾：覆盖率 +74% + tsc 修 105/125 errors + 留 20 TODO |
 | 27 | v2.25.15 | `d3cd8d7` | 2026-04-20 | **波 11 全 4/4**：desk-v1.0.1 + 真 electron headless 7 截屏 + README 精装 + startup -9.2% |
+| 28 | v2.25.16 | `cf336a2` | 2026-04-20 | P0 MatrixHUD null usage crash 修复 + 波 12 收尾（W12 四 agent 2 批次合并 — badges/STATUS/死链/CHANGELOG） |
+| 29 | v2.25.17 | `4b4a6fe` | 2026-04-20 | P0 `panda --install-desk` EUNSUPPORTEDPROTOCOL workspace:* hotfix（npm 不识别 bun workspace:*） |
+| 30 | v2.25.18 | `7db3d8c` | 2026-04-20 | `panda --install-desk` timeout 600s → 1800s（30min）+ ENV `PANDA_DESK_INSTALL_TIMEOUT_MS` 可覆盖 |
+| 31 | v2.25.19 | `eb13780` | 2026-04-20 | **波 13 全 4/4**：e2e +8 用例 + launch 跨平台 resolver + MatrixTheme 修 6 fail + frozen 修 1 fail（基线 4 → 2 fail） |
+| 32 | v2.25.20 | `39c5aca` | 2026-04-20 | P0 Mac 双 panda（PID 锁 + runtime.lock 互斥）+ Mac 顶部黑条第 1 版修（LSUIElement + hidden 初始） |
+| 33 | v2.25.21 | `f1922cf` | 2026-04-20 | P0 Mac 顶部黑条（v2.25.20 残留）— settings 窗 lazy 创建 |
+| 34 | v2.25.22 | `d52e338` | 2026-04-20 | 波 14 部分：hit IPC 全接通（click/dblclick/drag）+ overlay 真弹出（5s auto-dismiss + DND） |
+| 35 | v2.25.23 | `fddb1ac` | 2026-04-20 | **波 14 收尾**：tray 6 菜单真实装 + 首次启动 demo 模式（3 步引导 + `demoSeen` 持久化）+ i18n 三语补齐 |
 
-> **byte-equal 守护**：27 版本 0 触碰 `src/services/api/claude.ts` / `src/services/oauth/*` / `src/services/api/providers.ts`（每次发版前 `git diff main` 输出空验证）。
+> **byte-equal 守护**：35 版本 0 触碰 `src/services/api/claude.ts` / `src/services/oauth/*` / `src/services/api/providers.ts`（每次发版前 `git diff main` 输出空验证）。
 
 ### 4.1 桌面 GA tag
 
@@ -225,7 +234,7 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.config\panda"
 | 文档 | 路径 | 存在 | 行数 | 最新基线 |
 |---|---|---|---|---|
 | 主仓 README | `README.md` | ✅ | 2393 | v2.25.0+ 段 + desk-v1.0.1 链接 |
-| 主仓 CHANGELOG | `CHANGELOG.md` | ✅ | 220+ (W12-T4 补 v2.25.8–15 后) | v2.22.0 → v2.25.15 全 27 版本 |
+| 主仓 CHANGELOG | `CHANGELOG.md` | ✅ | 260+ (W15-T3 补 v2.25.16–23 后) | v2.22.0 → v2.25.23 全 35 版本 |
 | 主仓 LICENSE | `LICENSE` | ❌ | — | 缺：建议添加（与子包对齐） |
 | 主仓 NOTICE | `NOTICE` | ❌ | — | 缺：建议添加 |
 | 主仓 CONTRIBUTING | `CONTRIBUTING.md` | ❌ | — | 缺：子包独立有 |
@@ -263,10 +272,10 @@ Remove-Item -Recurse -Force "$env:USERPROFILE\.config\panda"
 
 | 出处 | 版本号 | 状态 |
 |---|---|---|
-| `package.json` (主仓) version | `2.25.15` | ✅ source of truth |
+| `package.json` (主仓) version | `2.25.23` | ✅ source of truth |
 | `packages/panda-on-desk/package.json` version | `0.1.0-alpha` | ✅（子包内部版本，对外用 desk-vX.Y.Z tag） |
-| 主仓 CHANGELOG 顶部说明 | "v2.22.0 → v2.25.15" | ✅（W12-T4 已修） |
-| 子包 README badge | `version-2.25.15` | ✅（W12-T4 已修） |
+| 主仓 CHANGELOG 顶部说明 | "v2.22.0 → v2.25.23" | ✅（W15-T3 已修） |
+| 子包 README badge | `version-2.25.23` | ✅（W15-T3 已修） |
 | 子包 README §当前版本 | `v1.0 GA（Phase 3 收尾）` | ✅ |
 | 子包 ARCHITECTURE 基线 | `v2.25.7` | ⚠️ 落后（建议下波同步） |
 | 子包 CONTRIBUTING 基线 | `v2.25.7` | ⚠️ 落后 |

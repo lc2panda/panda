@@ -663,8 +663,11 @@ req.end()
 describe('W5-T1 · 真 e2e · Bun.spawn 子进程 → 父进程 server 跨进程 IPC', () => {
   test('子进程 (panda CLI 模拟) POST /event → 父进程 (on-desk 模拟) onEvent 接到 + child exit 0', async () => {
     const onEventCalls: OnDeskEvent[] = []
+    // why(W15-T2): 改 18_000 避免与 Group G 17_900 重合 — 同文件内 server.close()
+    // 触发的 fd 释放有 OS 级延迟（Windows TIME_WAIT），重用相同 basePort 的 fallback
+    // 探测在并发跑全量 bun test 时容易撞 EADDRINUSE 全 20 个端口而 fail
     const handle = await startBridgeServer({
-      basePort: 17_900,
+      basePort: 18_000,
       maxProbe: 20,
       secret: 'w5t1-child-spawn',
       onEvent: e => onEventCalls.push(e),

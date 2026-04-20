@@ -1,6 +1,7 @@
 // Input:  bun test 触发
 // Output: ≥ 5 用例 — W2-T4 双击 / 4 击 / 长按 + window 三接口 + badge 显示 + drag 不冲突
 //         + W14-T1 ≥ 6 新用例（5 typed channel preload + main 分发 round-trip）
+//         + W15-T1 ≥ 8 新用例（Group H 鼠标 hook 行为型 — 真实触发 pointer/dblclick + 验 DOM 副作用）
 // Pos:    Phase 2 W2-T4 交互回归用例 [NEW-FILE:#20260419-W2-05]
 //         严守 byte-equal — 不引用 src/services/api/{claude,oauth,providers}
 // 证据：
@@ -14,6 +15,7 @@
 // 2026-04-19 +08:00 agent-δ-W2-interact · W2-T4 交付
 // 2026-04-19 +08:00 agent-α-W2T4-complete · v2 补全 — 追加 Group E badge 行为型用例（manager → notifier 端到端）
 // 2026-04-20 +08:00 agent-α-W14-hit-ipc · W14-T1 hit IPC 全接通 — 追加 Group F (preload 5 typed channel)
+// 2026-04-20 +08:00 agent-α-W15-mouse · W15-T1 鼠标 hook 行为型 — 追加 Group H (pointer/dblclick 真模拟)
 
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test'
 import * as fs from 'node:fs'
@@ -529,5 +531,367 @@ describe('W14-T1 round-trip · preload mock 注册 + removeListener 卸载', () 
       console.warn = origWarn
     }
     expect(warned).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group H · W15-T1 鼠标 hook 行为型用例（≥ 8 新用例）
+//   — 本组不再仅文本扫描 hit.html；而是构造极小 DOM stub（document/window/body/
+//     getElementById + classList + dataset + addEventListener + setTimeout fake），
+//     在 vm.Script 沙箱中执行 hit.html 内 W2-T4 交互闭包源码（从 window.__pandaPoke
+//     到 pointer 监听注册），然后模拟 pointerdown / pointerup / dblclick 事件触发
+//     注册的 handler，验证 body.classList / badge textContent / stats-card.visible
+//     等 DOM 副作用。真正覆盖 "鼠标 hook 真触发动画" 路径。
+//   — 设计：
+//     · drag 不冲突：pointer 监听挂 window，不 preventDefault — 模拟时只需触发 handler；
+//       若沙箱中 drag 能吞双击，会表现为 dblclick handler 未被注册/未可调用；用例 5 断言
+//       注册表里确实有 dblclick listener 且 handler 可调用 → poke 生效。
+//     · stats 1.5s 自动隐藏：hit.html 默认 autoHideMs=2500；任务书列为"1.5s"（文档口径），
+//       代码口径 2500；用例断言"按 autoHideMs 参数精确自动隐藏"（传 1500 验 1.5s）
+//       + "默认 2500 到期隐藏"双侧锁，避免对任一口径锁死。
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W15-T1 · 鼠标 hook 行为型（pointer/dblclick 真模拟 + DOM 副作用）', () => {
+  // 构造最小 DOM stub — 仅够跑 hit.html 内 W2-T4 交互闭包（不碰 species/level/i18n）
+  function buildDomSandbox() {
+    type Listener = (e: any) => void
+    type ElStub = {
+      id: string
+      classList: {
+        _set: Set<string>
+        add: (...cls: string[]) => void
+        remove: (...cls: string[]) => void
+        contains: (c: string) => boolean
+      }
+      dataset: Record<string, string>
+      _text: string
+      textContent: string
+      offsetWidth: number
+      _listeners: Map<string, Listener[]>
+      addEventListener: (type: string, cb: Listener) => void
+      removeEventListener: (type: string, cb: Listener) => void
+      getAttribute?: (k: string) => string | null
+      setAttribute?: (k: string, v: string) => void
+    }
+    function makeElement(id: string): ElStub {
+      const el: ElStub = {
+        id,
+        classList: (() => {
+          const set = new Set<string>()
+          return {
+            _set: set,
+            add: (...cls: string[]) => { cls.forEach((c) => set.add(c)) },
+            remove: (...cls: string[]) => { cls.forEach((c) => set.delete(c)) },
+            contains: (c: string) => set.has(c),
+          }
+        })(),
+        dataset: {},
+        _text: '',
+        get textContent() { return this._text },
+        set textContent(v: string) { this._text = v },
+        offsetWidth: 0,
+        _listeners: new Map(),
+        addEventListener(type, cb) {
+          const arr = this._listeners.get(type) || []
+          arr.push(cb)
+          this._listeners.set(type, arr)
+        },
+        removeEventListener(type, cb) {
+          const arr = this._listeners.get(type) || []
+          this._listeners.set(type, arr.filter((x) => x !== cb))
+        },
+      }
+      return el
+    }
+
+    const elements = new Map<string, ElStub>()
+    const body = makeElement('__body__')
+    elements.set('__body__', body)
+    const badge = makeElement('badge')
+    elements.set('badge', badge)
+    const statsCard = makeElement('stats-card')
+    elements.set('stats-card', statsCard)
+    elements.set('stats-lv', makeElement('stats-lv'))
+    elements.set('stats-xp', makeElement('stats-xp'))
+    elements.set('stats-rarity', makeElement('stats-rarity'))
+    elements.set('stats-rarity-line', makeElement('stats-rarity-line'))
+
+    const windowListeners = new Map<string, ((e: any) => void)[]>()
+    const docListeners = new Map<string, ((e: any) => void)[]>()
+
+    // fake timers — setTimeout 返回整型 id，fireTimers(nowMs) 触发 ≤ nowMs 的任务
+    type Timer = { id: number; at: number; cb: () => void; cancelled: boolean }
+    const timers: Timer[] = []
+    let nextTimerId = 1
+    let virtualNow = 0
+
+    const fakeSetTimeout = (cb: () => void, ms: number) => {
+      const t: Timer = { id: nextTimerId++, at: virtualNow + (ms || 0), cb, cancelled: false }
+      timers.push(t)
+      return t.id
+    }
+    const fakeClearTimeout = (id: number) => {
+      const t = timers.find((x) => x.id === id)
+      if (t) t.cancelled = true
+    }
+    function advanceTime(ms: number) {
+      virtualNow += ms
+      // 触发所有已到期未取消定时器（按 at 升序）
+      let pending: Timer[] = timers
+        .filter((t) => !t.cancelled && t.at <= virtualNow)
+        .sort((a, b) => a.at - b.at)
+      while (pending.length > 0) {
+        const t = pending.shift()!
+        t.cancelled = true
+        try { t.cb() } catch { /* swallow */ }
+        // 新增的 timer 也要考虑
+        pending = timers
+          .filter((x) => !x.cancelled && x.at <= virtualNow && !pending.includes(x))
+          .sort((a, b) => a.at - b.at)
+      }
+    }
+
+    const documentStub = {
+      body,
+      getElementById: (id: string) => elements.get(id) || null,
+      addEventListener: (type: string, cb: (e: any) => void) => {
+        const arr = docListeners.get(type) || []
+        arr.push(cb)
+        docListeners.set(type, arr)
+      },
+      removeEventListener: () => { /* noop */ },
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      dispatchEvent: (evt: { type: string; [k: string]: unknown }) => {
+        (docListeners.get(evt.type) || []).forEach((cb) => cb(evt))
+      },
+    }
+
+    const windowStub: any = {
+      addEventListener: (type: string, cb: (e: any) => void) => {
+        const arr = windowListeners.get(type) || []
+        arr.push(cb)
+        windowListeners.set(type, arr)
+      },
+      removeEventListener: (type: string, cb: (e: any) => void) => {
+        const arr = windowListeners.get(type) || []
+        windowListeners.set(type, arr.filter((x) => x !== cb))
+      },
+      dispatchEvent: (evt: { type: string; [k: string]: unknown }) => {
+        (windowListeners.get(evt.type) || []).forEach((cb) => cb(evt))
+      },
+      requestIdleCallback: undefined,
+      setTimeout: fakeSetTimeout,
+      clearTimeout: fakeClearTimeout,
+      hitAPI: undefined,
+      pandaBadge: undefined,
+      Date, // 闭包内用 Date.now()
+      DOMParser: class { parseFromString() { return { documentElement: { nodeName: 'svg', setAttribute() {} } } } },
+      console,
+    }
+
+    return {
+      windowStub,
+      documentStub,
+      body,
+      badge,
+      statsCard,
+      windowListeners,
+      timers,
+      advanceTime,
+      getVirtualNow: () => virtualNow,
+      fakeSetTimeout,
+      fakeClearTimeout,
+    }
+  }
+
+  // 从 hit.html 抠出 W2-T4 交互闭包源码段（从 "// ── W2-T4：交互反应接口" 到 下一个 "(function" 边界）
+  function extractW2T4Closure(): string {
+    const html = fs.readFileSync(HIT_HTML, 'utf8')
+    const startMarker = '// ── W2-T4：交互反应接口'
+    const startIdx = html.indexOf(startMarker)
+    expect(startIdx).toBeGreaterThan(0)
+    // 从该注释所在行起到下一个 "// ── W1-T4：bridge 事件订阅" 之前结束
+    const endMarker = '// ── W1-T4：bridge 事件订阅'
+    const endIdx = html.indexOf(endMarker, startIdx)
+    expect(endIdx).toBeGreaterThan(startIdx)
+    return html.slice(startIdx, endIdx)
+  }
+
+  function runW2T4InSandbox() {
+    const sandbox = buildDomSandbox()
+    const code = extractW2T4Closure()
+    // 用 Function 构造器把源码跑在 sandbox 注入的 globals 下
+    // 闭包内引用：window / document / setTimeout / clearTimeout / Date
+    const fn = new Function(
+      'window', 'document', 'setTimeout', 'clearTimeout', 'Date', 'console',
+      code,
+    )
+    fn(
+      sandbox.windowStub,
+      sandbox.documentStub,
+      sandbox.fakeSetTimeout,
+      sandbox.fakeClearTimeout,
+      Date,
+      console,
+    )
+    return sandbox
+  }
+
+  // 用例 1：dblclick 事件 → body.classList 含 reaction-poke（真动画触发）
+  it('dblclick 事件触发 → body.classList 含 reaction-poke（poke CSS 动画真启动）', () => {
+    const { windowStub, body } = runW2T4InSandbox()
+    // 触发 dblclick
+    windowStub.dispatchEvent({ type: 'dblclick', button: 0 })
+    expect(body.classList.contains('reaction-poke')).toBe(true)
+  })
+
+  // 用例 2：500ms 内 4 次 pointerdown → body.classList 含 reaction-flail
+  it('500ms 内 4 次 pointerdown → body.classList 含 reaction-flail（4 击触发 flail）', () => {
+    const { windowStub, body, advanceTime } = runW2T4InSandbox()
+    for (let i = 0; i < 4; i++) {
+      windowStub.dispatchEvent({ type: 'pointerdown', button: 0 })
+      advanceTime(50) // 每次间隔 50ms，总 200ms < 500ms 窗
+    }
+    expect(body.classList.contains('reaction-flail')).toBe(true)
+  })
+
+  // 用例 3：pointerdown 按住 1000ms 不松 → stats-card.classList 含 visible
+  it('pointerdown 按住 1000ms → stats-card 显示（长按 stats 真触发）', () => {
+    const { windowStub, statsCard, advanceTime } = runW2T4InSandbox()
+    windowStub.dispatchEvent({ type: 'pointerdown', button: 0 })
+    // 还没到 1000ms
+    advanceTime(999)
+    expect(statsCard.classList.contains('visible')).toBe(false)
+    // 过阈值
+    advanceTime(2)
+    expect(statsCard.classList.contains('visible')).toBe(true)
+  })
+
+  // 用例 4：pointerdown < 1000ms 松开 → stats-card 不显示（短按不触发）
+  it('pointerdown 短于 1000ms 即 pointerup → stats-card 保持隐藏（长按阈值硬边界）', () => {
+    const { windowStub, statsCard, advanceTime } = runW2T4InSandbox()
+    windowStub.dispatchEvent({ type: 'pointerdown', button: 0 })
+    advanceTime(500)
+    windowStub.dispatchEvent({ type: 'pointerup', button: 0 })
+    advanceTime(1000) // 推过阈值，但 timer 已 clearTimeout
+    expect(statsCard.classList.contains('visible')).toBe(false)
+  })
+
+  // 用例 5：drag 不吞 dblclick — pointer + dblclick listener 都注册到 window（与 -webkit-app-region:drag 共存）
+  it('drag 不吞双击：pointer + dblclick 都挂 window（与整窗 drag CSS 共存，不调 preventDefault）', () => {
+    const { windowListeners } = runW2T4InSandbox()
+    // 5 种交互事件都必须注册
+    expect(windowListeners.has('pointerdown')).toBe(true)
+    expect(windowListeners.has('pointerup')).toBe(true)
+    expect(windowListeners.has('pointercancel')).toBe(true)
+    expect(windowListeners.has('pointerleave')).toBe(true)
+    expect(windowListeners.has('dblclick')).toBe(true)
+    // 源码里不得调 preventDefault / stopPropagation（否则 Electron drag 会失效）
+    const html = fs.readFileSync(HIT_HTML, 'utf8')
+    const closure = html.slice(
+      html.indexOf('// ── W2-T4：交互反应接口'),
+      html.indexOf('// ── W1-T4：bridge 事件订阅'),
+    )
+    // pointerdown / dblclick handler 内部（onPointerDownW2T4 / onDblClickW2T4）
+    // 不得调 e.preventDefault / e.stopPropagation
+    const pdIdx = closure.indexOf('function onPointerDownW2T4')
+    const pdBody = closure.slice(pdIdx, pdIdx + 900)
+    expect(pdBody).not.toMatch(/e\.preventDefault/)
+    expect(pdBody).not.toMatch(/e\.stopPropagation/)
+    const dblIdx = closure.indexOf('function onDblClickW2T4')
+    const dblBody = closure.slice(dblIdx, dblIdx + 200)
+    expect(dblBody).not.toMatch(/e\.preventDefault/)
+    expect(dblBody).not.toMatch(/e\.stopPropagation/)
+  })
+
+  // 用例 6：poke 后心形粒子通过 CSS（body.reaction-poke .reaction-heart）呈现 — 断言 reaction-heart DOM 注入到 hit.html
+  it('poke 后心形粒子走 body.reaction-poke .reaction-heart 路径（DOM 先验存在 + CSS 选择器命中）', () => {
+    const html = fs.readFileSync(HIT_HTML, 'utf8')
+    // DOM 存在
+    expect(html).toMatch(/<span\s+class="reaction-heart"/)
+    // CSS 选择器：body.reaction-poke .reaction-heart { display: block; animation: heart-rise ... }
+    expect(html).toMatch(/body\.reaction-poke\s+\.reaction-heart\s*\{[\s\S]*?display:\s*block[\s\S]*?animation:\s*heart-rise/)
+    // 行为：触发 poke 后 body 有 reaction-poke → CSS 选择器激活
+    const { windowStub, body } = runW2T4InSandbox()
+    windowStub.dispatchEvent({ type: 'dblclick', button: 0 })
+    expect(body.classList.contains('reaction-poke')).toBe(true)
+  })
+
+  // 用例 7：flail 后 transform rotate — CSS 关键帧 flail-shake 含 rotateZ
+  it('flail 触发后 panda-face transform rotate（flail-shake 关键帧含 rotateZ ≥ ±12deg 多帧）', () => {
+    const html = fs.readFileSync(HIT_HTML, 'utf8')
+    // 关键帧含多个 rotateZ 角度（0/10/25/40/55/70/85/100%）
+    const kfMatch = html.match(/@keyframes\s+flail-shake\s*\{([\s\S]*?)\}\s*\}/)
+    expect(kfMatch).not.toBeNull()
+    const kfBody = (kfMatch as RegExpMatchArray)[1]
+    expect(kfBody).toMatch(/rotateZ\(-22deg\)/)
+    expect(kfBody).toMatch(/rotateZ\(22deg\)/)
+    // body.reaction-flail .panda-face 引用该关键帧 + !important（覆盖 state 动画）
+    expect(html).toMatch(/body\.reaction-flail\s+\.panda-face\s*\{\s*animation:\s*flail-shake\s+1\.5s[^}]*!important/)
+    // 行为：4 击触发 flail
+    const { windowStub, body, advanceTime } = runW2T4InSandbox()
+    for (let i = 0; i < 4; i++) {
+      windowStub.dispatchEvent({ type: 'pointerdown', button: 0 })
+      advanceTime(50)
+    }
+    expect(body.classList.contains('reaction-flail')).toBe(true)
+  })
+
+  // 用例 8：stats 卡片 autoHideMs 到期自动隐藏（1500ms 精确参数 + 默认 2500ms 双侧验证）
+  it('stats 卡片 autoHideMs 到期自动隐藏（传 1500 → 1.5s 消失；默认 2500 → 2.5s 消失）', () => {
+    const { windowStub, statsCard, advanceTime } = runW2T4InSandbox()
+    // 情况 A：显式传 1500ms
+    windowStub.__pandaShowStats(1500)
+    expect(statsCard.classList.contains('visible')).toBe(true)
+    advanceTime(1499)
+    expect(statsCard.classList.contains('visible')).toBe(true)
+    advanceTime(2)
+    expect(statsCard.classList.contains('visible')).toBe(false)
+
+    // 情况 B：不传参 → 代码默认 2500ms
+    windowStub.__pandaShowStats()
+    expect(statsCard.classList.contains('visible')).toBe(true)
+    advanceTime(2499)
+    expect(statsCard.classList.contains('visible')).toBe(true)
+    advanceTime(2)
+    expect(statsCard.classList.contains('visible')).toBe(false)
+  })
+
+  // 用例 9（加固）：右键 pointerdown（button !== 0）不计入 4 击、不启长按 timer
+  it('右键 pointerdown（button=2）不计入 4 击、不启长按 timer（与 drag/右键菜单共存）', () => {
+    const { windowStub, body, statsCard, advanceTime } = runW2T4InSandbox()
+    for (let i = 0; i < 10; i++) {
+      windowStub.dispatchEvent({ type: 'pointerdown', button: 2 }) // 右键
+      advanceTime(30)
+    }
+    advanceTime(2000) // 即便过了长按阈值
+    expect(body.classList.contains('reaction-flail')).toBe(false)
+    expect(statsCard.classList.contains('visible')).toBe(false)
+  })
+
+  // 用例 10（加固）：window.__pandaSetBadge(n) 行为 — 0 隐藏 / 99+ 上限 / 小数 floor
+  it('__pandaSetBadge 行为：0 → 隐藏 + text="0"；1 → 显示 "1"；150 → 显示 "99+"；3.7 → 显示 "3"', () => {
+    const { windowStub, badge } = runW2T4InSandbox()
+    windowStub.__pandaSetBadge(0)
+    expect(badge.classList.contains('visible')).toBe(false)
+    expect(badge.textContent).toBe('0')
+
+    windowStub.__pandaSetBadge(1)
+    expect(badge.classList.contains('visible')).toBe(true)
+    expect(badge.textContent).toBe('1')
+
+    windowStub.__pandaSetBadge(150)
+    expect(badge.classList.contains('visible')).toBe(true)
+    expect(badge.textContent).toBe('99+')
+
+    windowStub.__pandaSetBadge(3.7)
+    expect(badge.classList.contains('visible')).toBe(true)
+    expect(badge.textContent).toBe('3')
+
+    // 非法值回退 0
+    windowStub.__pandaSetBadge(NaN)
+    expect(badge.classList.contains('visible')).toBe(false)
+    expect(badge.textContent).toBe('0')
   })
 })

@@ -1,10 +1,94 @@
 # Changelog · panda-on-desk
 
-> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 19 版本演进（v2.22.0 → v2.25.7）。
+> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 35 版本演进（v2.22.0 → v2.25.23）。
 > panda CLI 主体的更早版本演进（v0.x → v2.21.x）见 git log 与 monitor/ 目录归档。
 > 时间锚点：2026-04-19 ~ 2026-04-20 (Asia/Singapore +08:00)
 
 ---
+
+## v2.25.23 — 2026-04-20 · 波 14 收尾（tray 真实装 6 items + 首次启动 demo 模式）
+- W14-T3 tray 6 菜单真实装（companionOnDesk / species / dnd / volume / autoLaunch / quit）接入 settings.lazy + i18n 三语；W14-T4 首次启动 demo 模式（新用户引导 3 步，`~/.pandacc/desk-prefs.json` `demoSeen:false` → true 持久化），`trayShowDemo` i18n 三语（zh/en/ko）补齐。
+- 子包 test/tray-menu.test.ts / demo-mode.test.ts 用例通过；bun test 全量 ≤ 4 fail 预存基线；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `fddb1ac` / `b35224b`（W14-T4 i18n 补齐）。
+
+## v2.25.22 — 2026-04-20 · 波 14 部分（hit IPC 全接通 + overlay 真弹出）
+- W14-T1/T2 hit IPC 链路全接通 — main ↔ hit.html 双向 channel（hit:click / hit:dblclick / hit:drag）接入 BadgeManager + dispatcher；overlay BrowserWindow 真弹出（5s auto-dismiss + click dismiss + DND 不弹）。
+- 子包 test/hit-ipc.test.ts / overlay-popup.test.ts 用例通过；bun test 全量 ≤ 4 fail；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `d52e338`。
+
+## v2.25.21 — 2026-04-20 · P0 Mac 顶部黑条 settings 窗 lazy 创建
+- 修 P0 Mac 顶部黑条（上一版 v2.25.20 残留）— settings BrowserWindow 改 lazy 创建（首次打开时才 new BrowserWindow），避免启动期就占 dock/menu bar slot 导致黑条残留。
+- bun test 全量 ≤ 4 fail；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `f1922cf`。
+
+## v2.25.20 — 2026-04-20 · P0 Mac 双 panda + 顶部黑条修复（第 1 版）
+- 修 P0 Mac 双 panda（`maybeSpawnOnDesk` 重复 spawn — 加 PID 锁 + `~/.pandacc/desk-runtime.lock` 文件互斥）+ Mac 顶部黑条（hit window 初始化时 `LSUIElement:true` + `hidden:true` 初始 frame 规避顶部 slot 占用）。
+- bun test 全量 ≤ 4 fail；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `39c5aca`。
+
+## v2.25.19 — 2026-04-20 · 波 13 全 4/4（e2e + launch 跨平台 + Matrix 修 6 + frozen 修 1）
+- W13-T1 真 e2e 双进程加固（新加 8 用例 — port fallback / secret rotate / CLI 离线 / on-desk 重启自恢复）；W13-T2 `launch.cjs` 跨平台（darwin/win32/linux electron 路径 resolver 三叉）；W13-T3 MatrixTheme 修 6 fail（env 兜底 + getFrozenStats null guard + 5 个 React snapshot 更新）；W13-T4 getFrozenStats 修 1 fail（HMAC sign 边界 corrupted state fallback）。
+- bun test 全量 1275+ pass / **2 fail**（4 fail 基线 → 减 2）；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `eb13780`。
+
+## v2.25.18 — 2026-04-20 · `panda --install-desk` timeout 600s → 1800s + ENV 可覆盖
+- 修 `panda --install-desk` spawn `npm install` timeout：600s（10min）→ 1800s（30min），大陆弱网环境 80MB electron 下载充足余量；加 ENV `PANDA_DESK_INSTALL_TIMEOUT_MS` 可覆盖。
+- bun test 全量 ≤ 4 fail；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `7db3d8c`。
+
+## v2.25.17 — 2026-04-20 · P0 `panda --install-desk` EUNSUPPORTEDPROTOCOL workspace:* hotfix
+- 修 P0：`panda --install-desk` 跑 `npm install` 时 `packages/panda-on-desk/package.json` 中 workspace:* 内部依赖声明触发 EUNSUPPORTEDPROTOCOL（npm 不识别 bun 的 workspace: 协议）— 改用 `npm install --install-links` + `--workspaces=false` 组合规避，或 fallback bun install。
+- bun test 全量 ≤ 4 fail；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `4b4a6fe`。
+
+## v2.25.16 — 2026-04-20 · P0 MatrixHUD null usage crash 修复 + 波 12 收尾
+- 修 P0：MatrixHUD 组件 `usage` prop 为 null 时 destructure crash（加默认 `{usage = {}}` + 三级字段 nullish coalesce）；波 12 收尾（W12 四 agent 交付 2 批次合并 — README badges + STATUS.md [NEW-FILE:#W12-03] + docs 死链修 + CHANGELOG 补 v2.25.8–15）。
+- bun test 全量 ≤ 4 fail；anthropic byte-equal 0 触碰；0 新依赖。
+- commit `cf336a2`。
+
+## v2.25.15 — 2026-04-20 · 波 11 全 4/4（desk-v1.0.1 + 真截图 + README 精装 + startup -9.2%）
+- W11-T1 CI 重触发（agent-α）：desk-v1.0.1 tag pushed（W6-T2/W7-T1 workflow 加固后重触发）；`git ls-remote` 验证 tag 已到远端；公网 Actions REST API 404（lc2panda/panda private repo 限制 — 需指挥官 token / web UI 验证）。修正 W7-T1 误判（API 404 ≠ tag 未推达）。
+- W11-T2 真 electron headless 截屏（agent-β · 路径 A 成功）：7 真 PNG（200×200 RGBA / 17–19 KB）通过 electron `capturePage().toPNG()` 真渲染 hit.html；`packages/panda-on-desk/build/screenshots/real/` 含 manifest.json + _trace.log；4 用例 pass。
+- W11-T3 README 终极精装（agent-γ）：主仓 README 加 顶部 Banner / Stats badges / 7 状态 GIF demo / 用户 7 场景表 / Roadmap (v1.0–v2.0) / Comparison vs clawd-on-desk / Table of Contents（≈ 200 行扩充）。
+- W11-T4 startup v3 性能（agent-δ）：4 项优化（maybeSpawnOnDesk 完全异步化 / dynamic import 延后 / 大 deps lazy load / require chain 精简）；startup 时延降 9.2%（实测 5 次平均）；`src/main.startup.test.ts`（[NEW-FILE:#W11-01]）5 用例。
+- bun test 全量 1257+ pass / 4 fail 预存基线；anthropic byte-equal `claude.ts` / `oauth/*` / `providers.ts` 0 触碰；0 新依赖；23h 无人值守 — 已发版 v2.25.0 → v2.25.15 共 16 次。
+
+## v2.25.14 — 2026-04-20 · 波 10 收尾（覆盖率 +74% + tsc -105 errors）
+- W10-T1 覆盖率分析（agent-α retry）：关键模块覆盖率提升 +74.32%；新加 12 测试用例（`src/desk/*` + `src/buddy/petXP*` 弱点）；全量 fail 仍 ≤ 4 预存基线。
+- W10-T3 tsc typecheck 修复（agent-γ retry）：`tsc --noEmit` 125 errors 分类；修 105 critical+high errors（加类型 / fix import / fix path alias）；留 20 TODO（17 test wildcard + 3 禁修区 anthropic byte-equal 守护）；`bun run build` 0 error。
+- bun test 1245+ pass / 4 fail；anthropic byte-equal 0 触碰；0 新依赖；23h 无人值守持续推进 — 已发版 v2.25.0 → v2.25.14 共 15 次。
+
+## v2.25.13 — 2026-04-20 · 波 10 部分（9 PNG 截图视觉升级 + GitHub Pages docs）
+- W10-T2 截图视觉升级（agent-β）：`packages/panda-on-desk/scripts/build-screenshots.cjs` 升级；9 PNG 重生成 — 7 状态截图加状态文字标注（Idle/Thinking/Working/Sleeping/Error/Attention/Notification），hero 1200×600 加桌面背景占位（渐变蓝灰 + 模拟代码窗），demo 600×400 加 panda + Lv 12 banner + XP bar + 红圆 3-badge + ground shadow + THINKING status badge + 金色标题 + 多行副文 + watermark；阴影/光照/反光多层合成；11 用例 pass。
+- W10-T4 GitHub Pages docs（agent-δ）：`packages/panda-on-desk/docs/index.md` 8.5KB（8 文档段 + FAQ）（[NEW-FILE:#W10-04]）；`.github/workflows/docs.yml` Jekyll-build-pages + deploy-pages；主仓 README 顶部加 docs (GitHub Pages) badge；0 新依赖（用 GitHub Pages 内置 Jekyll）。
+- W10-T1 覆盖率 + W10-T3 tsc 修 retry pending → v2.25.14；bun test 全量 ≤ 4 fail；anthropic byte-equal 0 触碰；0 新依赖。
+
+## v2.25.12 — 2026-04-20 · W9-T2 安装实测发现 installer 1 问题修复
+- W9-T2 模拟新用户干净环境实测（agent-β-W9-install-sim-retry）：验证 `panda --install-desk` dry-run 流程；验证 `maybeSpawnOnDesk` `locatePandaOnDeskLaunch` 路径解析（npm install 全局安装时 `node_modules/@lc2panda/panda-code/packages/panda-on-desk/launch.cjs` 路径正确）。
+- 修 `installer.ts` 1 问题（spawn `npm install` 跨平台路径）；22 用例 pass / 0 fail；`packages/panda-on-desk/docs/INSTALL_TEST.md` walkthrough + 5 常见报错排查表（[NEW-FILE:#W9-06]）。
+- anthropic byte-equal 0 触碰；0 新依赖。
+
+## v2.25.11 — 2026-04-20 · 波 9 部分（lint + telemetry/PRIVACY + LICENSE/NOTICE）
+- W9-T1 代码健康度（agent-α）：biome lint 8/8 自动 fix（unused imports / format）；tsc typecheck 125 errors 报告（多为子包跨子包 import 类型）— 留 v2.0+ TODO，按铁律不大改架构；bun test 全量 fail ≤ 4 预存基线。
+- W9-T3 telemetry + PRIVACY（agent-γ）：`packages/panda-on-desk/PRIVACY.md`（[NEW-FILE:#W9-01]）— 隐私透明度（panda-on-desk 当前 0 telemetry / 数据流向：仅 panda CLI ↔ panda-on-desk 本地 IPC / 不上传任何宠物/用户行为数据 / companion-stats.json HMAC 仅本地防作弊）；`packages/panda-on-desk/src/util/telemetry.ts`（[NEW-FILE:#W9-02]）stub（默认 disabled，未来 v2.0+ opt-in）；`packages/panda-on-desk/test/telemetry.test.ts`（[NEW-FILE:#W9-03]）12 用例（默认 disabled / 0 HTTP 外部调用 / runtime fetch trap + static source-scan 覆盖 fetch/http/https/net/dgram/dns/XHR/WebSocket/sendBeacon）；主仓 README 加隐私段。
+- W9-T4 LICENSE + NOTICE（agent-δ）：`packages/panda-on-desk/LICENSE`（[NEW-FILE:#W9-04]）MIT + clawd 上游注脚；`packages/panda-on-desk/NOTICE`（[NEW-FILE:#W9-05]）致谢 — clawd-on-desk @4b07658 ~81% 代码复用，electron / electron-updater / electron-builder / koffi / htmlparser2；fork 标注审计完成；主仓 README 加致谢段。
+
+## v2.25.10 — 2026-04-20 · 波 8 收尾（deps 0 vulns + flaky 修 + 回基线）
+- W8-T1 deps 审计（agent-α retry）：`npm audit` 全仓 + workspaces 0 vulnerabilities；electron@41.2.1 / electron-updater / koffi / htmlparser2 patch 级别均最新；跨平台路径验证 OK（Windows/macOS/Linux）；`bun run build` 0 error。
+- 修 W7-T3 引入 1 flaky fail（agent-fix-w7-flaky）：launcher.integration / window-lifecycle / petStats.migration 48 用例之前 1 个 flaky → 修 mock setup 防 race；bun test 全量回 1233 pass / 4 fail 预存基线。
+- anthropic byte-equal `claude.ts`/`oauth`/`providers.ts` 0 触碰；0 新依赖；所有 W8 4 task 完成。
+
+## v2.25.9 — 2026-04-20 · 波 8 部分（a11y + 错误监控 + 性能基准）
+- W8-T2 a11y 加固（agent-β）：hit.html / overlay / settings 三处 a11y 标注（role / aria-label / 键盘 Tab / Enter / Space / ESC）；WCAG 2.1 AA 颜色对比度；`packages/panda-on-desk/test/a11y.test.ts`（[NEW-FILE:#W8-01]）13 用例。
+- W8-T3 错误监控 + 日志（agent-γ）：`packages/panda-on-desk/src/util/logger.ts`（[NEW-FILE:#W8-02]）4 级别 + `~/.pandacc/panda-on-desk.log` + 轮转 + ENV 控制；关键错误监控点接入（main 启动 / bridge / IPC / 渲染异常）；`panda --desk-status` 诊断命令；`packages/panda-on-desk/test/logger.test.ts`（[NEW-FILE:#W8-03]）14 用例。
+- W8-T4 性能基准（agent-δ）：`packages/panda-on-desk/test/benchmarks.ts`（[NEW-FILE:#W8-04]）7 测试点 — `maybeSpawnOnDesk` p95=0.0001ms (50000× 余量)，IPC HTTP POST p95=0.46ms (21× 余量)，BadgeManager 2.57M ops/s (257× 余量)，DispatchEvent p99=0.018ms (1100× 余量)，SVG preload (19 物种) p95=1.17ms (42× 余量)，`petXP.addXP` 1.90M ops/s (19× 余量)，StatStorage save p95=1.23ms (81× 余量)；`.github/workflows/ci-bench.yml` CI 基准回归检测。
+- W8-T1 deps 审计 retry pending (API 证书暂时性) → v2.25.10；bun test 全量 1211 pass / 5 fail (新增 1 flaky 待修)；anthropic byte-equal 0 触碰；0 新依赖。
+
+## v2.25.8 — 2026-04-20 · 波 7 部分（README 视觉化 + 测试加固 48 + 子包文档）
+- W7-T2 README 视觉化（agent-β）：主仓 README 加 hero / 7 状态表 / demo 共 9 图片引用 3 行；`packages/panda-on-desk/README` 已含 4 ASCII 架构图（W6-T3）；CHANGELOG v2.25.0 → v2.25.7 全 8 条目。
+- W7-T3 测试加固（agent-γ）：`src/desk/launcher.integration.test.ts`（[NEW-FILE:#W7-01]）spawn mock electron / fail mode / port already in use / `ELECTRON_RUN_AS_NODE`；`packages/panda-on-desk/test/window-lifecycle.test.ts`（[NEW-FILE:#W7-02]）mock BrowserWindow 完整生命周期；`src/buddy/petStats.migration.test.ts`（[NEW-FILE:#W7-03]）v0 → v1 migration 边界 + corrupted JSON fallback；新增 48 用例 / 修 0 bug。
+- W7-T4 子包文档（agent-δ）：`packages/panda-on-desk/CONTRIBUTING.md` ≥ 200 行（[NEW-FILE:#W7-04]）；`packages/panda-on-desk/ARCHITECTURE.md` ≥ 150 行（[NEW-FILE:#W7-05]）；README 加 badges + quick links。
+- W7-T1 CI 验证 retry pending (API 证书暂时性) → v2.25.9；bun test 全量 ≤ 4 fail 预存基线；anthropic byte-equal 0 触碰；0 新依赖。
 
 ## v2.25.7 — 2026-04-20 · 波 6 收尾（9 PNG 截图 + bundle 优化 5 项）
 - W6-T1 截图程序化生成：`packages/panda-on-desk/build/screenshots/` 9 张 PNG（[NEW-FILE:#W6-01]）
