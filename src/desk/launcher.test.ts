@@ -22,6 +22,8 @@ import {
   __resetSpawnedFlagForTesting,
   maybeSpawnOnDesk,
   __locatePandaOnDeskLaunchForTesting,
+  __shouldRestartForTesting,
+  markUserQuit,
 } from './launcher.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -197,5 +199,67 @@ describe('maybeSpawnOnDesk · 容错', () => {
     } finally {
       cp.spawn = original
     }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W19-T3：crash 自动恢复 — __shouldRestartForTesting 纯函数决策 + markUserQuit
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('__shouldRestartForTesting · W19-T3 crash 决策', () => {
+  test('code=0 正常退出 → 不重启', () => {
+    const d = __shouldRestartForTesting(0, Date.now(), [], false)
+    expect(d.restart).toBe(false)
+    expect(d.reason).toContain('normal exit')
+  })
+
+  test('code=1 crash + 无历史 → 重启，时间戳入数组', () => {
+    const now = 1_700_000_000_000
+    const d = __shouldRestartForTesting(1, now, [], false)
+    expect(d.restart).toBe(true)
+    expect(d.nextTimestamps).toEqual([now])
+    expect(d.reason).toContain('crash detected')
+  })
+
+  test('code=null (signal 杀死) → 重启', () => {
+    const d = __shouldRestartForTesting(null, Date.now(), [], false)
+    expect(d.restart).toBe(true)
+    expect(d.reason).toContain('signal')
+  })
+
+  test('5min 窗口内已 3 次重启 → 第 4 次拒绝（crash-loop guard）', () => {
+    const now = 1_700_000_000_000
+    const within = [now - 60_000, now - 120_000, now - 180_000]
+    const d = __shouldRestartForTesting(1, now, within, false)
+    expect(d.restart).toBe(false)
+    expect(d.reason).toContain('crash-loop guard')
+    expect(d.reason).toContain('3/3')
+  })
+
+  test('5min 外的旧时间戳被裁剪 → 重启照常', () => {
+    const now = 1_700_000_000_000
+    // 两条 5min 外（>300s 前）+ 一条窗口内；裁剪后只剩 1 条，仍可重启（1<3）
+    const mixed = [now - 10 * 60 * 1_000, now - 7 * 60 * 1_000, now - 60_000]
+    const d = __shouldRestartForTesting(1, now, mixed, false)
+    expect(d.restart).toBe(true)
+    // 裁剪后仅剩 1 条 window 内 + 本次推入共 2 条
+    expect(d.nextTimestamps.length).toBe(2)
+  })
+
+  test('用户主动 quit → 任何 code 都不重启', () => {
+    const d1 = __shouldRestartForTesting(1, Date.now(), [], true)
+    expect(d1.restart).toBe(false)
+    expect(d1.reason).toContain('user-initiated')
+    const d2 = __shouldRestartForTesting(null, Date.now(), [], true)
+    expect(d2.restart).toBe(false)
+  })
+
+  test('markUserQuit 后 __resetSpawnedFlagForTesting 清除该标记', () => {
+    markUserQuit()
+    // 触发 reset（afterEach 也会调，这里显式验证）
+    __resetSpawnedFlagForTesting()
+    // 重置后再跑决策，userQuit=false 路径应生效
+    const d = __shouldRestartForTesting(1, Date.now(), [], false)
+    expect(d.restart).toBe(true)
   })
 })

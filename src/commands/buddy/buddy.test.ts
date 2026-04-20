@@ -342,6 +342,10 @@ describe('/buddy desk（W16-T2 新增）', () => {
       maybeSpawnOnDesk: (_opts: unknown) => {
         launcherCalls.push('spawn')
       },
+      // W19-T3：mock 也暴露 markUserQuit，避免跨 describe mock 缓存覆盖
+      markUserQuit: () => {
+        launcherCalls.push('markUserQuit')
+      },
     }))
     mock.module('../../utils/envUtils.js', () => ({
       getClaudeConfigHomeDir: () => '/tmp/pandacc-test-W16-T2',
@@ -731,6 +735,132 @@ describe('statsViz 纯函数（W18-T4）', () => {
     expect(out[28]).toBe(50)
     // 超窗事件不计入
     expect(out.reduce((a, b) => a + b, 0)).toBeLessThan(999)
+  })
+})
+
+// ─── W19-T3：/buddy desk logs --follow + markUserQuit 集成 ──────────────────
+// why 专注 parser 路径 + mock 注入：fs.watchFile 是异步且依赖真实 I/O，单测
+//   只覆盖 "follow 参数解析 + 初始 header/末尾 20 行输出" + "markUserQuit 调用路径"，
+//   真实 watcher 行为由 launcher.integration.test 回归保证（或 W19-T3 集成 smoke）。
+
+describe('/buddy desk logs --follow（W19-T3）', () => {
+  const launcherCallsW19: string[] = []
+  let tmpLogDir: string
+  let tmpLogPath: string
+
+  beforeEach(async () => {
+    launcherCallsW19.length = 0
+    // 真实临时目录 + 文件：避免 mock 整个 fs 模块（太侵入）
+    const { mkdtempSync, writeFileSync, mkdirSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    tmpLogDir = mkdtempSync(join(tmpdir(), 'panda-buddy-logs-W19-'))
+    tmpLogPath = join(tmpLogDir, 'panda-on-desk.log')
+    mkdirSync(tmpLogDir, { recursive: true })
+    // 种子：20 行 + 2 行留作 tail 读取
+    const seed = Array.from({ length: 22 }, (_, i) =>
+      `[2026-04-20T09:${String(i).padStart(2, '0')}:00.000Z] [INFO ] seed line ${i}`,
+    ).join('\n') + '\n'
+    writeFileSync(tmpLogPath, seed, 'utf-8')
+
+    // Mock envUtils 指向 tmpLogDir
+    mock.module('../../utils/envUtils.js', () => ({
+      getClaudeConfigHomeDir: () => tmpLogDir,
+    }))
+    // Mock bridge：stop 路径需要 runtime + sendDeskQuit（测试 markUserQuit 调用）
+    mock.module('../../desk/bridge.js', () => ({
+      getRuntimeSnapshot: () => ({
+        version: 1,
+        port: 1455,
+        secret: 'x',
+        pid: 4242,
+        startedAt: 0,
+      }),
+      fetchDetailedHealth: async () => null,
+      sendDeskQuit: async () => true,
+    }))
+    // Mock launcher：markUserQuit 存在即可（记录调用链路）
+    mock.module('../../desk/launcher.js', () => ({
+      __resetSpawnedFlagForTesting: () => {
+        launcherCallsW19.push('reset')
+      },
+      maybeSpawnOnDesk: (_opts: unknown) => {
+        launcherCallsW19.push('spawn')
+      },
+      markUserQuit: () => {
+        launcherCallsW19.push('markUserQuit')
+      },
+    }))
+  })
+
+  afterEach(async () => {
+    const { rmSync } = await import('node:fs')
+    try {
+      rmSync(tmpLogDir, { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
+  })
+
+  test('/buddy desk logs（无 --follow）→ tail -20 静态输出（W16-T2 旧路径守护）', async () => {
+    const { result, display } = await runBuddy('desk logs')
+    expect(display).toBe('system')
+    expect(result).toContain('panda-on-desk 日志（最新')
+    expect(result).toContain('seed line 21') // 最末行
+    expect(result).not.toContain('following')
+  })
+
+  test('/buddy desk logs --follow → 初始 header 含 "following (Ctrl+C 退出)"', async () => {
+    const { result, display } = await runBuddy('desk logs --follow')
+    expect(display).toBe('system')
+    expect(result).toContain('实时 tail')
+    expect(result).toContain('following')
+    // 初始 20 行上下文
+    expect(result).toContain('seed line 21')
+  })
+
+  test('/buddy desk logs -f（短参）→ 与 --follow 等价', async () => {
+    const { result } = await runBuddy('desk logs -f')
+    expect(result).toContain('实时 tail')
+    expect(result).toContain('following')
+  })
+
+  test('/buddy desk logs --follow 文件不存在 → 提示 "日志不存在"', async () => {
+    // 把 mock 目录换为一个没有 log 文件的目录
+    const { mkdtempSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const emptyDir = mkdtempSync(join(tmpdir(), 'panda-buddy-empty-W19-'))
+    mock.module('../../utils/envUtils.js', () => ({
+      getClaudeConfigHomeDir: () => emptyDir,
+    }))
+    const { result } = await runBuddy('desk logs --follow')
+    expect(result).toContain('日志不存在')
+  })
+
+  test('/buddy desk stop → 触发 markUserQuit（防止 launcher 自动重启）', async () => {
+    // 重新注入 mock — 前面 test 可能覆盖了 envUtils/launcher mock
+    mock.module('../../desk/bridge.js', () => ({
+      getRuntimeSnapshot: () => ({
+        version: 1, port: 1455, secret: 'x', pid: 4242, startedAt: 0,
+      }),
+      fetchDetailedHealth: async () => null,
+      sendDeskQuit: async () => true,
+    }))
+    mock.module('../../desk/launcher.js', () => ({
+      __resetSpawnedFlagForTesting: () => { launcherCallsW19.push('reset') },
+      maybeSpawnOnDesk: (_opts: unknown) => { launcherCallsW19.push('spawn') },
+      markUserQuit: () => { launcherCallsW19.push('markUserQuit') },
+    }))
+    const { result } = await runBuddy('desk stop')
+    expect(result).toContain('已停止')
+    expect(launcherCallsW19).toContain('markUserQuit')
+  })
+
+  test('/buddy desk logs unknown-arg → 走 tail -20（宽容；parser 不崩）', async () => {
+    // 'logs xyz' 当前解析为 logsArgs=['xyz']，不含 --follow/-f → fallback tail -20
+    const { result } = await runBuddy('desk logs xyz')
+    expect(result).toContain('panda-on-desk 日志（最新')
   })
 })
 

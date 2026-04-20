@@ -1,5 +1,6 @@
 // Input:  panda CLI 启动钩子（main.tsx preAction 内 init() 完成后）
 // Output: spawn panda-on-desk Electron 子进程（detached + unref，不阻塞 panda CLI 主进程）
+//         W19-T3：child.on('exit') 监听 → crash (code !== 0) 自动重启，5min 内最多 3 次防 crash loop
 // Pos:    panda CLI → panda-on-desk 自动拉起入口；
 //         feature('BUDDY') + globalConfig.companionOnDesk + isTTY + --no-desk 四重 gate；
 //         严守 anthropic byte-equal — 仅 node 内置 + 自家 utils
@@ -8,6 +9,7 @@
 // 2026-04-19 23:34 +08:00 W1-T1 panda v2.24.4 桌面端自动启动支持
 // 2026-04-20 08:13 +08:00 W4-T1 增强：spawn 前 checkElectronInstalled + friendly hint
 // 2026-04-20 11:42 +08:00 W11-T4 startup perf：defer 选项 + 路径缓存 + cfg 缓存 (≥3 项)
+// 2026-04-20 17:50 +08:00 W19-T3 crash 自动恢复：child.on('exit') + 限频 3次/5min
 
 import { feature } from 'bun:bundle'
 import { spawn } from 'node:child_process'
@@ -39,12 +41,77 @@ let _launchCjsCache: string | null | undefined = undefined
 //   require 缓存命中时仍有 jsonParse 开销；缓存判定结果省去重复函数调用栈。
 let _companionOnDeskCache: boolean | undefined = undefined
 
-/** 测试用 — 重置幂等标志 */
+// ─────────────────────────────────────────────────────────────────────────────
+// W19-T3：crash 自动恢复 — 限频窗口 + 用户主动 quit 标记
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 设计：
+//   · 子进程 exit code 0 → 视为正常退出（before-quit 走完），不重启。
+//   · code !== 0（含 null=signal 杀死）→ 视为 crash，按窗口限频重启。
+//   · 限频：滚动 5 分钟窗口内最多 3 次重启（_restartTimestamps 数组裁剪）。
+//   · _userQuit 由 /buddy desk stop 路径 (markUserQuit) 设置，标记后任何 exit 都不重启。
+//   · 用 _spawned 与重启路径解耦：每次重启重置 _spawned=false，使重启走完整 spawn 链路。
+//
+// why 不是直接 setTimeout 重试：限频判断依据"窗口内已重启次数"而非"当前是否在退避"，
+//   语义更接近 supervisor 而非 retry 调度器。
+
+const RESTART_WINDOW_MS = 5 * 60 * 1_000 // 5 分钟
+const RESTART_MAX_COUNT = 3 // 窗口内最多 3 次
+
+let _restartTimestamps: number[] = []
+let _userQuit = false
+
+/**
+ * /buddy desk stop 调用前先 markUserQuit() — 让 child.on('exit') 不再触发重启。
+ * /buddy desk start / restart 路径会清掉该标记。
+ */
+export function markUserQuit(): void {
+  _userQuit = true
+}
+
+/**
+ * 决定是否应该重启 — 纯函数便于测试。
+ *   · code === 0 → false（正常退出）
+ *   · _userQuit  → false（用户主动）
+ *   · 5min 内已重启 ≥ RESTART_MAX_COUNT → false（防 crash loop）
+ *   · 其他 → true，并把当前 ts 推入数组（裁剪超窗的）
+ */
+export function __shouldRestartForTesting(
+  code: number | null,
+  now: number,
+  timestamps: number[],
+  userQuit: boolean,
+): { restart: boolean; nextTimestamps: number[]; reason: string } {
+  if (userQuit) {
+    return { restart: false, nextTimestamps: timestamps, reason: 'user-initiated quit' }
+  }
+  if (code === 0) {
+    return { restart: false, nextTimestamps: timestamps, reason: 'normal exit (code=0)' }
+  }
+  // 裁剪：丢弃 5min 窗口外的旧时间戳
+  const fresh = timestamps.filter(ts => now - ts < RESTART_WINDOW_MS)
+  if (fresh.length >= RESTART_MAX_COUNT) {
+    return {
+      restart: false,
+      nextTimestamps: fresh,
+      reason: `crash-loop guard: ${fresh.length}/${RESTART_MAX_COUNT} in last ${RESTART_WINDOW_MS / 1000}s`,
+    }
+  }
+  return {
+    restart: true,
+    nextTimestamps: [...fresh, now],
+    reason: `crash detected (code=${code === null ? 'signal' : code})`,
+  }
+}
+
+/** 测试用 — 重置幂等标志 + W19-T3 重启状态 */
 export function __resetSpawnedFlagForTesting(): void {
   _spawned = false
   _hintPrinted = false
   _launchCjsCache = undefined
   _companionOnDeskCache = undefined
+  _restartTimestamps = []
+  _userQuit = false
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -123,6 +190,58 @@ export function maybeSpawnOnDesk(opts: MaybeSpawnOnDeskOptions = {}): void {
         stdio: 'ignore',
         windowsHide: true,
       })
+
+      // W19-T3：crash 自动恢复 — 监听 child exit，code !== 0 自动重启（限频 3次/5min）
+      // why 在 unref 之前注册：listener 注册是同步行为，不影响 unref 语义；
+      //   child 即使 unref 后父进程仍存活时，'exit' 事件仍会派发到本进程的事件循环。
+      //   父进程退出后整个 process tree 终结，listener 自然失效，符合 detached 设计。
+      // why cast EventEmitter 接口：tsconfig types:["bun"] 不含 node ChildProcess 完整 EventEmitter 定义
+      try {
+        (child as unknown as {
+          on: (ev: 'exit', cb: (code: number | null) => void) => void
+        }).on('exit', (code) => {
+          try {
+            const decision = __shouldRestartForTesting(
+              code,
+              Date.now(),
+              _restartTimestamps,
+              _userQuit,
+            )
+            _restartTimestamps = decision.nextTimestamps
+            if (!decision.restart) {
+              // why stderr：与 spawn 失败 hint 同通道；不污染用户 stdout pipe
+              if (process.env.PANDA_DESK_VERBOSE === '1') {
+                try {
+                  process.stderr.write(
+                    `[panda-on-desk] child exit code=${code} → no restart (${decision.reason})\n`,
+                  )
+                } catch {}
+              }
+              return
+            }
+            // 重启：重置幂等 + 重新走 maybeSpawnOnDesk（保留 _userQuit/_restartTimestamps）
+            try {
+              process.stderr.write(
+                `[panda-on-desk] child exit code=${code} → restart (${decision.reason})\n`,
+              )
+            } catch {}
+            _spawned = false
+            // 异步触发避免在 exit handler 内同步重新 spawn 造成栈累积
+            setImmediate(() => {
+              try {
+                maybeSpawnOnDesk({ defer: false })
+              } catch {
+                // 静默 — 重启失败不应抛
+              }
+            })
+          } catch {
+            // listener 内任何异常都吞 — 决不能让 panda CLI 因桌面端 crash 监听失败而崩
+          }
+        })
+      } catch {
+        // child.on 理论不抛；极端情况下静默不影响 spawn 主路径
+      }
+
       child.unref()
       _spawned = true
     } catch {

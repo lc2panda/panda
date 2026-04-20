@@ -1,5 +1,6 @@
 // Input: launch.cjs spawn → electron main 进程入口
 // Output: 4 类 BrowserWindow（pet / hit / settings / update-bubble）+ 透明 overlay + 单实例锁 + 生命周期编排
+//         W19-T3：uncaughtException/unhandledRejection → logger.error + process.exit(1/2) 让 CLI launcher 重启
 // Pos: panda-on-desk 主进程 god file（改造 fork — 上游 3119 行 → 单 panda provider 削皮 ~30%）
 //
 // Forked from clawd-on-desk@4b07658:src/main.js (MIT License) - Adapted to panda single provider
@@ -71,12 +72,23 @@ import * as loginItemHelpers from './platform/login-item'
 // W8-T3：错误监控 + 用户可见诊断日志（替换部分 silent try/catch + console.warn 吞错）
 import { log as deskLog } from './util/logger'
 
+// W19-T3：crash 自动恢复 — 退出码语义
+//   · 0   = 正常退出（before-quit 走完）
+//   · 1   = uncaughtException 触发 process.exit(1)
+//   · 2   = unhandledRejection 触发 process.exit(2)
+//   panda CLI 端 launcher.ts child.on('exit', code) 据此判定是否重启（code !== 0 即 crash）。
+const PANDA_DESK_CRASH_EXIT_CODES = { uncaught: 1, unhandledRejection: 2 } as const
+
 // 主进程未捕获异常 / Promise rejection — 写入 logger 而非让 Electron 默认处理静默崩
+//   why exit(1/2)：Electron 默认行为是 uncaughtException 后保持运行（可能僵死）；
+//   显式 exit + 非 0 退出码让 panda CLI launcher 能感知 crash 自动重启。
 process.on('uncaughtException', (err) => {
-  try { deskLog.error('[main] uncaughtException', err) } catch {}
+  try { deskLog.error('[main] uncaughtException → exit(1) for CLI launcher restart', err) } catch {}
+  try { process.exit(PANDA_DESK_CRASH_EXIT_CODES.uncaught) } catch {}
 })
 process.on('unhandledRejection', (reason) => {
-  try { deskLog.error('[main] unhandledRejection', reason) } catch {}
+  try { deskLog.error('[main] unhandledRejection → exit(2) for CLI launcher restart', reason) } catch {}
+  try { process.exit(PANDA_DESK_CRASH_EXIT_CODES.unhandledRejection) } catch {}
 })
 
 // menu.ts / shortcuts.ts / updater.ts 上游仍是 CommonJS 工厂；用 require 形态消费
