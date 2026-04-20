@@ -16,7 +16,13 @@
 # v1.0 GA 阶段 dry-run 注意事项：
 #   - 实际跑 CI 前需先 `cd packages/panda-on-desk && bun add electron@41 electron-builder@25 electron-updater@6.8 -d`
 #   - icon 资产为占位文本，真打包前需替换 build/icons/panda.{png,icns,ico} 为真实图像
-#   - GH_TOKEN: 由 GitHub Actions 自动注入 secrets.GITHUB_TOKEN
+#
+# GITHUB_TOKEN 用法说明（W4-T4 补全）：
+#   - GH_TOKEN env 由 GitHub Actions 自动注入 secrets.GITHUB_TOKEN（无需在仓库 Secrets 里手动配置）
+#   - build-* jobs 的 GH_TOKEN：electron-builder 在 `--publish never` 模式下不直接调用 GH API，
+#       但内部 metadata 写入 latest*.yml 时会读取它做仓库归属校验 → 注入做防御
+#   - publish job 的 GH_TOKEN：gh CLI 创建 draft Release 必需 → 直接走 contents:write 权限
+#   - 默认创建 draft Release：维护者手动审核 assets 后再点 "Publish release" 推送给用户
 
 name: Release panda-on-desk
 

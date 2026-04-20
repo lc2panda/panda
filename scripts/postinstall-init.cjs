@@ -181,19 +181,21 @@ function maybeHintDeskDeps() {
     if (electronInstalled) {
       return
     }
+    // W4-T1：友好引导 — 用户期望"npm install 后即可有桌面宠物"，但 electron ~80MB
+    // 拆成两步显式同意：先 install panda，再 panda --install-desk 触发 deps 下载。
     // eslint-disable-next-line no-console
     console.log('')
     // eslint-disable-next-line no-console
-    console.log('[Panda] 桌面宠物可选 — 未检测到 electron')
+    console.log('🐼 panda 安装完成！')
     // eslint-disable-next-line no-console
     console.log(
-      '[Panda]   启用方式: cd ' +
-        deskPkgDir +
-        ' && npm install electron@41',
+      '✨ 桌面宠物可选 — 跑 `panda --install-desk` 启用（首次 ~80MB 下载）',
     )
     // eslint-disable-next-line no-console
+    console.log('🎮 进入对话 — 跑 `panda`')
+    // eslint-disable-next-line no-console
     console.log(
-      '[Panda]   (CLI 仍可独立运行；缺 electron 时桌面端会静默降级)',
+      '   （CLI 仍可独立运行；缺 electron 时桌面端会静默降级，附 friendly hint）',
     )
   } catch (_e) {
     // 任何意外都不阻塞 npm install

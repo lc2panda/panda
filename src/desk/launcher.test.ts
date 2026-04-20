@@ -152,6 +152,28 @@ describe('locatePandaOnDeskLaunch · 路径解析', () => {
     const found = __locatePandaOnDeskLaunchForTesting([ghost, real])
     expect(found).toBe(real)
   })
+
+  // v2.25 polish-e2e 回归：npm install 主路径
+  // dist/cli.js bundle → here = <install>/dist/，正确路径仅需 1 个 '..'
+  test('regression v2.25: npm install 路径（dist/ → ../packages/panda-on-desk/launch.cjs） → 命中', () => {
+    // 模拟 npm 安装结构：node_modules/@lc2panda/panda-code/{dist,packages/panda-on-desk}
+    const installRoot = join(tmpDir, 'node_modules', '@lc2panda', 'panda-code')
+    mkdirSync(join(installRoot, 'dist'), { recursive: true })
+    const pkgDir = join(installRoot, 'packages', 'panda-on-desk')
+    mkdirSync(pkgDir, { recursive: true })
+    const launchPath = join(pkgDir, 'launch.cjs')
+    writeFileSync(launchPath, '// npm install fake launch.cjs', 'utf-8')
+    // here 模拟 dist/ 同层：dist/cli.js bundle 内 import.meta.url
+    const here = join(installRoot, 'dist')
+    // 与 buildCandidatePaths 同生成方式，验证 4 候选含 1 个 '..' 命中
+    const candidates = [
+      join(here, '..', '..', 'packages', 'panda-on-desk', 'launch.cjs'),
+      join(here, '..', 'packages', 'panda-on-desk', 'launch.cjs'),
+      join(here, '..', '..', '..', 'packages', 'panda-on-desk', 'launch.cjs'),
+    ]
+    const found = __locatePandaOnDeskLaunchForTesting(candidates)
+    expect(found).toBe(launchPath)
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

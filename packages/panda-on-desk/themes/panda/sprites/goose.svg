@@ -11,6 +11,10 @@
       <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.95"/>
       <stop offset="100%" stop-color="#cfcfff" stop-opacity="0.7"/>
     </linearGradient>
+    <linearGradient id="bodyGrad-goose" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#f5f5f5" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#d8d8d8" stop-opacity="1"/>
+    </linearGradient>
     <filter id="spriteShadow" x="-15%" y="-15%" width="130%" height="130%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="1.4"/>
       <feOffset dx="0" dy="2" result="off"/>
@@ -27,6 +31,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-notification" data-state="notification" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffcc00" xml:space="preserve">
@@ -35,6 +47,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-sweeping" data-state="sweeping" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#88ccff" xml:space="preserve">
@@ -43,6 +63,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-attention" data-state="attention" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffaa00" xml:space="preserve">
@@ -51,6 +79,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-juggling" data-state="juggling" data-frame-idx="2" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#cc88ff" xml:space="preserve">
@@ -59,6 +95,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-carrying" data-state="carrying" data-frame-idx="1" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#88ff88" xml:space="preserve">
@@ -67,6 +111,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-working" data-state="working" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#00ccff" xml:space="preserve">
@@ -75,6 +127,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-thinking" data-state="thinking" data-frame-idx="2" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffff66" xml:space="preserve">
@@ -83,6 +143,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-waking" data-state="waking" data-frame-idx="2" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffaaaa" xml:space="preserve">
@@ -91,6 +159,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-idle" data-state="idle" data-frame-idx="0" visibility="visible">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffffff" xml:space="preserve">
@@ -99,6 +175,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-dozing" data-state="dozing" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#aaaaaa" xml:space="preserve">
@@ -107,6 +191,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-sleeping" data-state="sleeping" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#666688" xml:space="preserve">
@@ -115,6 +207,14 @@
       <tspan x="20" dy="14">   _(__)_</tspan>
       <tspan x="20" dy="14">    ^^^^</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="110" cy="160" rx="34" ry="20" fill="url(#bodyGrad-goose)" stroke="#888" stroke-width="1"/>
+      <path d="M 100 145 Q 92 110 110 90 Q 130 78 138 88" fill="none" stroke="url(#bodyGrad-goose)" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="138" cy="86" r="9" fill="url(#bodyGrad-goose)"/>
+      <polygon points="146,84 162,86 146,92" fill="#ff9933"/>
+      <circle cx="140" cy="84" r="1.6" fill="#1a1a1a"/>
+      <ellipse cx="100" cy="150" rx="18" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   </g>
 </svg>

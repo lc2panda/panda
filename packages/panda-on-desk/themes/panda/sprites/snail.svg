@@ -11,6 +11,10 @@
       <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.95"/>
       <stop offset="100%" stop-color="#cfcfff" stop-opacity="0.7"/>
     </linearGradient>
+    <linearGradient id="bodyGrad-snail" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#e6c98e" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#a87f3a" stop-opacity="1"/>
+    </linearGradient>
     <filter id="spriteShadow" x="-15%" y="-15%" width="130%" height="130%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="1.4"/>
       <feOffset dx="0" dy="2" result="off"/>
@@ -27,6 +31,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">   ~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-notification" data-state="notification" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffcc00" xml:space="preserve">
@@ -35,6 +51,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">  ~~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-sweeping" data-state="sweeping" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#88ccff" xml:space="preserve">
@@ -43,6 +71,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">  ~~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-attention" data-state="attention" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffaa00" xml:space="preserve">
@@ -51,6 +91,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">  ~~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-juggling" data-state="juggling" data-frame-idx="2" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#cc88ff" xml:space="preserve">
@@ -59,6 +111,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">   ~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-carrying" data-state="carrying" data-frame-idx="1" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#88ff88" xml:space="preserve">
@@ -67,6 +131,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">  ~~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-working" data-state="working" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#00ccff" xml:space="preserve">
@@ -75,6 +151,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">  ~~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-thinking" data-state="thinking" data-frame-idx="2" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffff66" xml:space="preserve">
@@ -83,6 +171,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">   ~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-waking" data-state="waking" data-frame-idx="2" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffaaaa" xml:space="preserve">
@@ -91,6 +191,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">   ~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-idle" data-state="idle" data-frame-idx="0" visibility="visible">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffffff" xml:space="preserve">
@@ -99,6 +211,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">  ~~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-dozing" data-state="dozing" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#aaaaaa" xml:space="preserve">
@@ -107,6 +231,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">  ~~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   <g id="state-sleeping" data-state="sleeping" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#666688" xml:space="preserve">
@@ -115,6 +251,18 @@
       <tspan x="20" dy="14">   \_`--´</tspan>
       <tspan x="20" dy="14">  ~~~~~~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <ellipse cx="120" cy="155" rx="40" ry="14" fill="url(#bodyGrad-snail)" stroke="#a87f3a" stroke-width="1"/>
+      <circle cx="100" cy="125" r="34" fill="url(#bodyGrad-snail)" stroke="#7fc97f" stroke-width="1.5"/>
+      <path d="M 100 125 m 0 -28 a 28 28 0 1 1 -0.1 0 m 4 4 a 22 22 0 1 1 -0.1 0 m 4 4 a 16 16 0 1 1 -0.1 0 m 4 4 a 10 10 0 1 1 -0.1 0" fill="none" stroke="#5a8a5a" stroke-width="1.4"/>
+      <circle cx="158" cy="148" r="7" fill="url(#bodyGrad-snail)"/>
+      <circle cx="156" cy="148" r="2" fill="#1a1a1a"/>
+      <path d="M 160 142 Q 168 130 168 122" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="168" cy="120" r="2.4" fill="#1a1a1a"/>
+      <path d="M 152 145 Q 162 132 164 124" stroke="#a87f3a" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="164" cy="122" r="2.4" fill="#1a1a1a"/>
+      <ellipse cx="92" cy="105" rx="22" ry="6" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
   </g>
   </g>
 </svg>

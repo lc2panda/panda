@@ -6,6 +6,7 @@
 //
 // [NEW-FILE:#20260419-W1-01]
 // 2026-04-19 23:34 +08:00 W1-T1 panda v2.24.4 桌面端自动启动支持
+// 2026-04-20 08:13 +08:00 W4-T1 增强：spawn 前 checkElectronInstalled + friendly hint
 
 import { feature } from 'bun:bundle'
 import { spawn } from 'node:child_process'
@@ -13,15 +14,21 @@ import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { checkElectronInstalled } from './installer.js'
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 单进程内幂等标志 — maybeSpawnOnDesk 可被多个钩子点调用，但子进程只起一次
 // ─────────────────────────────────────────────────────────────────────────────
 
 let _spawned = false
 
+// W4-T1：友好提示节流 — 同一进程内只打一次（避免多个钩子点重复刷屏）
+let _hintPrinted = false
+
 /** 测试用 — 重置幂等标志 */
 export function __resetSpawnedFlagForTesting(): void {
   _spawned = false
+  _hintPrinted = false
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,6 +59,23 @@ export function maybeSpawnOnDesk(): void {
   try {
     const launchCjs = locatePandaOnDeskLaunch()
     if (!launchCjs) return
+
+    // W4-T1 增强：spawn 前先 checkElectronInstalled，缺 electron 时打印 friendly hint
+    // 而非让 launch.cjs 撞 'Cannot find module electron' 静默崩
+    if (!checkElectronInstalled()) {
+      if (!_hintPrinted) {
+        _hintPrinted = true
+        try {
+          // hint 走 stderr，避免污染用户 stdout pipe；中文 + emoji 与 postinstall 风格一致
+          process.stderr.write(
+            '[panda] 桌面宠物未安装。跑 `panda --install-desk` 启用 ✨\n',
+          )
+        } catch {
+          // tty 异常忽略
+        }
+      }
+      return
+    }
 
     // detached + ignore stdio + unref 防止阻塞 panda CLI 退出
     // why: 不继承 stdio — panda-on-desk 自带 GUI，不应往终端写
@@ -118,8 +142,14 @@ function buildCandidatePaths(): string[] {
   return [
     // dev：src/desk/launcher.ts → ../../packages/panda-on-desk/launch.cjs
     join(here, '..', '..', 'packages', 'panda-on-desk', 'launch.cjs'),
+    // dist 单 bundle (npm install 主路径)：
+    //   build.ts 把 src/* 打成 dist/cli.js + dist/chunk-*.js（同层），
+    //   import.meta.url 指向 dist/chunk-*.js → here = <pkg-root>/dist/
+    //   → here/../packages/panda-on-desk/launch.cjs（仅 1 个 ..）
+    // why: v2.25 polish-e2e 实测发现 npm install 后此路径才正确，原 candidate 漏写
+    join(here, '..', 'packages', 'panda-on-desk', 'launch.cjs'),
     // dist：dist/desk/launcher.js → ../../packages/panda-on-desk/launch.cjs
-    // （build.ts 把 src/* 编到 dist/* 保持目录结构，与 dev 一致；这里冗余兜底）
+    // （若未来 build.ts 改为按目录结构落盘 dist/desk/launcher.js，这条仍兜底）
     join(here, '..', '..', '..', 'packages', 'panda-on-desk', 'launch.cjs'),
     // cwd：用户从仓库根跑 panda 时
     join(process.cwd(), 'packages', 'panda-on-desk', 'launch.cjs'),

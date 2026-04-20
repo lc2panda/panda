@@ -253,6 +253,20 @@ async function main(): Promise<void> {
         return;
     }
 
+    // W4-T1 fast-path：panda --install-desk → 触发 packages/panda-on-desk
+    // 子包 deps 安装（electron@41 等）。轻量路径：不走 enableConfigs/profiler/sinks，
+    // 直接 dynamic import handler。失败 exit 1，成功 exit 0。
+    // why fast-path：用户期望此命令秒级启动 npm install，不应被 main.tsx ~135ms imports 拖累
+    if (args.length === 1 && args[0] === "--install-desk") {
+        const { runDeskInstall } = await import(
+            "../cli/handlers/desk-install.js"
+        );
+        const code = await runDeskInstall();
+        // process.exit (not return) — 防止后续 lazy import 副作用阻塞退出
+        // eslint-disable-next-line custom-rules/no-process-exit
+        process.exit(code);
+    }
+
     // For all other paths, load the startup profiler
     const { profileCheckpoint } = await import("../utils/startupProfiler.js");
     profileCheckpoint("cli_entry");

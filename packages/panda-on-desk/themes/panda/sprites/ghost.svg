@@ -11,6 +11,10 @@
       <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.95"/>
       <stop offset="100%" stop-color="#cfcfff" stop-opacity="0.7"/>
     </linearGradient>
+    <linearGradient id="bodyGrad-ghost" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#e0e6ff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#9aa3c0" stop-opacity="1"/>
+    </linearGradient>
     <filter id="spriteShadow" x="-15%" y="-15%" width="130%" height="130%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="1.4"/>
       <feOffset dx="0" dy="2" result="off"/>
@@ -28,6 +32,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~~`~~`~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-notification" data-state="notification" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffcc00" xml:space="preserve">
@@ -36,6 +49,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~`~``~`~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-sweeping" data-state="sweeping" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#88ccff" xml:space="preserve">
@@ -44,6 +66,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~`~``~`~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-attention" data-state="attention" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffaa00" xml:space="preserve">
@@ -52,6 +83,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~`~``~`~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-juggling" data-state="juggling" data-frame-idx="2" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#cc88ff" xml:space="preserve">
@@ -61,6 +101,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~~`~~`~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-carrying" data-state="carrying" data-frame-idx="1" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#88ff88" xml:space="preserve">
@@ -69,6 +118,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  `~`~~`~`</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-working" data-state="working" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#00ccff" xml:space="preserve">
@@ -77,6 +135,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~`~``~`~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-thinking" data-state="thinking" data-frame-idx="2" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffff66" xml:space="preserve">
@@ -86,6 +153,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~~`~~`~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-waking" data-state="waking" data-frame-idx="2" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffaaaa" xml:space="preserve">
@@ -95,6 +171,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~~`~~`~~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-idle" data-state="idle" data-frame-idx="0" visibility="visible">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#ffffff" xml:space="preserve">
@@ -103,6 +188,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~`~``~`~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-dozing" data-state="dozing" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#aaaaaa" xml:space="preserve">
@@ -111,6 +205,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~`~``~`~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   <g id="state-sleeping" data-state="sleeping" data-frame-idx="0" visibility="hidden">
     <text x="20" y="30" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#666688" xml:space="preserve">
@@ -119,6 +222,15 @@
       <tspan x="20" dy="14">  |      |</tspan>
       <tspan x="20" dy="14">  ~`~``~`~</tspan>
     </text>
+    <g class="species-art" opacity="0.92">
+      <path d="M 70 105 Q 70 70 100 70 Q 130 70 130 105 L 130 165 L 122 175 L 116 165 L 108 175 L 100 165 L 92 175 L 84 165 L 78 175 L 70 165 Z" fill="url(#bodyGrad-ghost)" fill-opacity="0.85" stroke="#9aa3c0" stroke-width="1"/>
+      <ellipse cx="88" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="112" cy="108" rx="6" ry="8" fill="#1a1a1a"/>
+      <ellipse cx="89" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="113" cy="106" rx="2" ry="3" fill="#ffffff"/>
+      <ellipse cx="100" cy="130" rx="8" ry="6" fill="#1a1a1a" fill-opacity="0.7"/>
+      <ellipse cx="92" cy="86" rx="22" ry="7" fill="#ffffff" fill-opacity="0.5"/>
+    </g>
   </g>
   </g>
 </svg>

@@ -317,6 +317,113 @@ describe('panda-on-desk · themes/panda · P1-T6', () => {
     })
   })
 
+  // ── W4-T2 美术资产新增用例 ── 14 物种特征图形升级 ─────────────────────
+  // [W4-T2-ART 20260419] 14 物种 SVG 在 W1-T2 5 核心物种之外补齐"物种特征图形"
+  // 标准（继承 W1-T2 风格）：linearGradient bodyGrad-{species} + drop-shadow filter
+  // + 顶部高光 fill-opacity:0.4 + 12 state group + 物种特征几何元素。
+  describe('W4-T2 14 物种特征图形 — sprites/*.svg', () => {
+    const SPRITES_DIR = path.join(PANDA_THEME_DIR, 'sprites')
+    const W4_SPECIES = [
+      'goose',
+      'blob',
+      'cat',
+      'dragon',
+      'octopus',
+      'penguin',
+      'turtle',
+      'snail',
+      'ghost',
+      'axolotl',
+      'capybara',
+      'cactus',
+      'rabbit',
+      'mushroom',
+    ] as const
+
+    // 物种特征锚点 — 每物种至少 1 个标志性几何元素或属性，证明特征图形已注入。
+    const SPECIES_FEATURE = {
+      goose:    /M 100 145 Q 92 110/, // 长脖 path
+      blob:     /M 70 110 Q 60 160 100 170/, // 滴水 body path
+      cat:      /<polygon points="70,90 80,68 92,90"/, // 三角耳
+      dragon:   /<path d="M 50 110 Q 30 90 50 80/, // 翅膀 path
+      octopus:  /M 70 138 Q 64 158 70 175/, // 触手
+      penguin:  /<ellipse cx="100" cy="142" rx="20" ry="30" fill="#ffffff"/, // 白肚皮
+      turtle:   /<ellipse cx="100" cy="135" rx="44" ry="30"/, // 龟壳
+      snail:    /<circle cx="100" cy="125" r="34" fill="url\(#bodyGrad-snail\)"/, // 螺旋壳
+      ghost:    /M 70 105 Q 70 70 100 70/, // 半透明体（fill-opacity 0.85）
+      axolotl:  /M 74 92 Q 60 86/, // 鳃粉
+      capybara: /<ellipse cx="100" cy="138" rx="48" ry="32"/, // 圆胖
+      cactus:   /<rect x="86" y="100" width="28" height="68"/, // 绿柱
+      rabbit:   /<ellipse cx="86" cy="80" rx="8" ry="26"/, // 长耳
+      mushroom: /M 50 110 Q 50 60 100 60 Q 150 60 150 110/, // 圆顶
+    } as const
+
+    for (const species of W4_SPECIES) {
+      it(`${species}.svg 含 W1-T2 风格全标准（bodyGrad linearGradient + spriteShadow + 12 state group + 物种特征 + 顶部高光 fill-opacity 0.4）`, () => {
+        const filePath = path.join(SPRITES_DIR, `${species}.svg`)
+        expect(fs.existsSync(filePath)).toBe(true)
+        const text = fs.readFileSync(filePath, 'utf8')
+
+        // 1) 物种专属 linearGradient（bodyGrad-{species}）
+        expect(text).toContain(`<linearGradient id="bodyGrad-${species}"`)
+        // 2) 旧 W1-T2 共享 spriteAccent 仍保留
+        expect(text).toContain('<linearGradient id="spriteAccent"')
+        // 3) drop-shadow filter
+        expect(text).toContain('id="spriteShadow"')
+        expect(text).toContain('feGaussianBlur')
+        expect(text).toMatch(/filter="url\(#spriteShadow\)"/)
+        // 4) 12 state group 完整
+        const stateGroups = text.match(/<g\s+id="state-[a-z]+"/g) ?? []
+        expect(stateGroups.length).toBe(PANDA_PET_STATES.length)
+        for (const st of PANDA_PET_STATES) {
+          expect(text).toContain(`id="state-${st}"`)
+        }
+        // 5) viewBox 200×200 + 等宽字体
+        expect(text).toContain('viewBox="0 0 200 200"')
+        expect(text).toContain('font-family="ui-monospace')
+        // 6) 顶部高光（白色 ellipse fill-opacity 0.4 或 0.5）
+        expect(text).toMatch(/<ellipse[^>]+fill="#ffffff"[^>]+fill-opacity="0\.[45]"/)
+        // 7) 物种特征几何元素
+        expect(text).toMatch(SPECIES_FEATURE[species])
+        // 8) species-art class 注入证明
+        expect(text).toContain('class="species-art"')
+      })
+    }
+
+    it('14 W4 升级物种 SVG 行数显著大于 5 旧物种（特征图形扩容）', () => {
+      const sizes = new Map<string, number>()
+      for (const sp of [...W4_SPECIES, 'duck', 'robot', 'owl', 'chonk', 'default']) {
+        const text = fs.readFileSync(path.join(SPRITES_DIR, `${sp}.svg`), 'utf8')
+        sizes.set(sp, text.split('\n').length)
+      }
+      // 旧 5 物种 ~ 120-124 行；W4 升级物种 ≥ 200 行
+      for (const sp of W4_SPECIES) {
+        const lines = sizes.get(sp)!
+        expect(lines).toBeGreaterThanOrEqual(200)
+      }
+      for (const sp of ['duck', 'robot', 'owl', 'chonk', 'default']) {
+        const lines = sizes.get(sp)!
+        expect(lines).toBeLessThanOrEqual(130) // 旧 byte-equal 区间
+      }
+    })
+
+    it('SPECIES_PALETTE / SPECIES_GRAPHICS 在 build-sprites.cjs 暴露 14 物种全集', () => {
+      const mod = require('../scripts/build-sprites.cjs')
+      expect(mod.SPECIES_PALETTE).toBeDefined()
+      expect(mod.SPECIES_GRAPHICS).toBeDefined()
+      expect(typeof mod.isW4Species).toBe('function')
+      for (const sp of W4_SPECIES) {
+        expect(mod.SPECIES_PALETTE[sp]).toBeDefined()
+        expect(typeof mod.SPECIES_GRAPHICS[sp]).toBe('function')
+        expect(mod.isW4Species(sp)).toBe(true)
+      }
+      // 旧 5 物种不在 W4 升级清单
+      for (const sp of ['duck', 'robot', 'owl', 'chonk', 'default']) {
+        expect(mod.isW4Species(sp)).toBe(false)
+      }
+    })
+  })
+
   // ── P3-T5 美术资产新增用例 ── icon 资产 ──────────────────────────────
   describe('P3-T5 icon 资产 — build/icons/', () => {
     const ICONS_DIR = path.join(PKG_ROOT, 'build', 'icons')
