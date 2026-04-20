@@ -2,7 +2,7 @@
   "name": "@lc2panda/panda-on-desk",
   "version": "0.1.0-alpha",
   "private": true,
-  "description": "panda 桌面端 — 感知 panda CLI 状态 + 宠物养成可视化（基于 clawd-on-desk 81% 吸收）",
+  "description": "panda desktop companion - CLI status perception + pet visualization",
   "author": "lc2panda <imladrisel@gmail.com>",
   "main": "src/main.js",
   "scripts": {

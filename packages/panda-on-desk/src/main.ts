@@ -1281,41 +1281,84 @@ ipcMain.handle('panda:desk-prefs:get', () => {
   return null
 })
 ipcMain.handle('panda:desk-prefs:save', (_event: any, patch: any) => {
-  if (deskPrefsMod && typeof deskPrefsMod.saveDeskPrefs === 'function') {
-    try {
-      const res = deskPrefsMod.saveDeskPrefs(patch || {})
-      // autoLaunch 变更 → 联动系统登录项（复用 _writeSystemOpenAtLogin）
-      if (res && res.status === 'ok' && res.data && typeof res.data.autoLaunch === 'boolean') {
-        try { _writeSystemOpenAtLogin(res.data.autoLaunch) } catch (err) {
-          console.warn('[panda-on-desk] autoLaunch sync failed:', (err as Error).message)
-        }
-      }
-      // W5-T3：language 变更 → 同步 lang 镜像 + 重建 tray menu + 通知 settings/hit webContents
-      if (res && res.status === 'ok' && res.data && typeof res.data.language === 'string' && res.data.language.length > 0) {
-        lang = res.data.language
-        try {
-          if (_trayHandle && typeof _trayHandle.rebuild === 'function') _trayHandle.rebuild()
-        } catch (err) {
-          console.warn('[panda-on-desk] tray rebuild after lang change failed:', (err as Error).message)
-        }
-        try {
-          if (settingsWindow && !settingsWindow.isDestroyed()) {
-            settingsWindow.webContents.send('panda:lang-changed', lang)
-          }
-          if (hitWin && !hitWin.isDestroyed()) {
-            hitWin.webContents.send('panda:lang-changed', lang)
-          }
-        } catch (err) {
-          console.warn('[panda-on-desk] lang webContents broadcast failed:', (err as Error).message)
-        }
-      }
-      return res
-    } catch (err) {
-      return { status: 'error', message: (err as Error)?.message }
+  return _saveDeskPrefsWithSideEffects(patch)
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W16-T3（2026-04-20 +08:00）：settings:load / settings:save 短通道
+//   · preload/settings.ts 新 window.pandaSettings.load/save 的 IPC 后端
+//   · 与 panda:desk-prefs:get/save 同底层（prefs.ts loadDeskPrefs/saveDeskPrefs）
+//   · save 路径触发 autoLaunch 系统登录项联动 + language 广播 + species → hitWin
+// ─────────────────────────────────────────────────────────────────────────────
+ipcMain.handle('settings:load', () => {
+  if (deskPrefsMod && typeof deskPrefsMod.loadDeskPrefs === 'function') {
+    try { return deskPrefsMod.loadDeskPrefs() } catch (err) {
+      return { error: (err as Error)?.message }
     }
   }
-  return { status: 'error', message: 'desk-prefs module not loaded' }
+  return null
 })
+ipcMain.handle('settings:save', (_event: any, patch: any) => {
+  return _saveDeskPrefsWithSideEffects(patch)
+})
+
+/**
+ * W16-T3 共享 desk-prefs save 路径 —
+ * 被 panda:desk-prefs:save 与 settings:save 两个通道共用，避免逻辑漂移。
+ *
+ * 副作用：
+ *   · autoLaunch 变更 → _writeSystemOpenAtLogin
+ *   · language 变更 → lang 镜像 + tray rebuild + settings/hit lang broadcast
+ *   · species 变更 → hitWin 'panda:species' typed channel（__pandaSetSpecies 实时 swap SVG）
+ */
+function _saveDeskPrefsWithSideEffects(patch: any) {
+  if (!deskPrefsMod || typeof deskPrefsMod.saveDeskPrefs !== 'function') {
+    return { status: 'error', message: 'desk-prefs module not loaded' }
+  }
+  try {
+    const res = deskPrefsMod.saveDeskPrefs(patch || {})
+    // autoLaunch 变更 → 联动系统登录项（复用 _writeSystemOpenAtLogin）
+    if (res && res.status === 'ok' && res.data && typeof res.data.autoLaunch === 'boolean') {
+      try { _writeSystemOpenAtLogin(res.data.autoLaunch) } catch (err) {
+        console.warn('[panda-on-desk] autoLaunch sync failed:', (err as Error).message)
+      }
+    }
+    // W5-T3：language 变更 → 同步 lang 镜像 + 重建 tray menu + 通知 settings/hit webContents
+    if (res && res.status === 'ok' && res.data && typeof res.data.language === 'string' && res.data.language.length > 0) {
+      lang = res.data.language
+      try {
+        if (_trayHandle && typeof _trayHandle.rebuild === 'function') _trayHandle.rebuild()
+      } catch (err) {
+        console.warn('[panda-on-desk] tray rebuild after lang change failed:', (err as Error).message)
+      }
+      try {
+        if (settingsWindow && !settingsWindow.isDestroyed()) {
+          settingsWindow.webContents.send('panda:lang-changed', lang)
+        }
+        if (hitWin && !hitWin.isDestroyed()) {
+          hitWin.webContents.send('panda:lang-changed', lang)
+        }
+      } catch (err) {
+        console.warn('[panda-on-desk] lang webContents broadcast failed:', (err as Error).message)
+      }
+    }
+    // W16-T3：species 变更 → broadcast hitWin 'panda:species' typed channel
+    //   hit.html inline handler → window.__pandaSetSpecies(species) → applySvgString 实时切换
+    //   仅在 patch 真的包含 species 字段时触发（避免冗余广播）
+    if (
+      res && res.status === 'ok' && res.data &&
+      typeof res.data.species === 'string' && res.data.species.length > 0 &&
+      patch && typeof patch === 'object' && typeof (patch as any).species === 'string'
+    ) {
+      try { sendToHitWin('panda:species', res.data.species) } catch (err) {
+        console.warn('[panda-on-desk] species webContents broadcast failed:', (err as Error).message)
+      }
+    }
+    return res
+  } catch (err) {
+    return { status: 'error', message: (err as Error)?.message }
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // W5-T3：i18n 暴露给 renderer（settings.html / hit.html 通过 preload 调用）
@@ -1560,6 +1603,15 @@ if (!gotTheLock) {
           const startPromise = bridgeServerMod.startBridgeServer({
             onEvent: (event: any) => forwardBridgeEventToRenderer(event),
             appVersion,
+            // W16-T2：panda CLI `/buddy desk stop` → POST /quit → app.quit()
+            // bridge/server.ts 内部已 setImmediate 先 flush response 再回调；
+            // 这里直接调 app.quit() 即可，before-quit 钩子负责清理。
+            onQuit: () => {
+              try {
+                deskLog.info('bridge /quit received, shutting down Electron host')
+              } catch { /* ignore */ }
+              try { app.quit() } catch { /* ignore */ }
+            },
           })
           startPromise.then(handle => {
             _bridgeHandle = handle

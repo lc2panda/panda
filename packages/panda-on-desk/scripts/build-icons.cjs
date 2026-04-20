@@ -80,23 +80,133 @@ async function renderSvgToPngSizes(svgPath, baseName, sizes) {
   return outputs
 }
 
+// 将多尺寸 PNG 打包为 Windows ICO（ICONDIR + ICONDIRENTRY* + PNG payload）。
+// ICO 规范：https://en.wikipedia.org/wiki/ICO_(file_format)
+// 每个 ICONDIRENTRY = 16 bytes (width/height/color/reserved/planes/bpp/size/offset)，
+// Vista+ 支持 PNG 直接内嵌（不需 BMP 解码），electron-builder 通过此分发 Windows 图标。
+function buildIcoFromPngs(pngPaths) {
+  const entries = pngPaths
+    .map((p) => ({ path: p, buf: fs.readFileSync(p) }))
+    .filter((e) => e.buf && e.buf.length > 0)
+
+  if (entries.length === 0) throw new Error('buildIcoFromPngs: no PNG inputs')
+
+  const count = entries.length
+  const headerSize = 6
+  const entrySize = 16
+  const offsetBase = headerSize + entrySize * count
+
+  const header = Buffer.alloc(headerSize)
+  header.writeUInt16LE(0, 0) // reserved
+  header.writeUInt16LE(1, 2) // type = 1 (ICO)
+  header.writeUInt16LE(count, 4) // image count
+
+  const dirEntries = []
+  const payloads = []
+  let offset = offsetBase
+  for (const e of entries) {
+    // 从 PNG IHDR 读 width/height（bytes 16-23）
+    const pngW = e.buf.readUInt32BE(16)
+    const pngH = e.buf.readUInt32BE(20)
+    // ICO dimension field 0 代表 256（因为字段仅 1 byte，0-255）
+    const dimW = pngW >= 256 ? 0 : pngW
+    const dimH = pngH >= 256 ? 0 : pngH
+
+    const entry = Buffer.alloc(entrySize)
+    entry.writeUInt8(dimW, 0)
+    entry.writeUInt8(dimH, 1)
+    entry.writeUInt8(0, 2) // color palette count
+    entry.writeUInt8(0, 3) // reserved
+    entry.writeUInt16LE(1, 4) // planes
+    entry.writeUInt16LE(32, 6) // bits per pixel
+    entry.writeUInt32LE(e.buf.length, 8) // image size
+    entry.writeUInt32LE(offset, 12) // offset
+    dirEntries.push(entry)
+    payloads.push(e.buf)
+    offset += e.buf.length
+  }
+
+  return Buffer.concat([header, ...dirEntries, ...payloads])
+}
+
+// 将多尺寸 PNG 打包为 macOS ICNS（"icns" magic + type blocks）。
+// ICNS 规范：https://en.wikipedia.org/wiki/Apple_Icon_Image_format
+// macOS 10.7+ 支持 PNG payload（"ic07"/"ic08"/"ic09"/"ic10"/"ic11"/"ic12"/"ic13"/"ic14"）。
+const ICNS_TYPE_MAP = {
+  16: 'icp4',
+  32: 'icp5',
+  64: 'icp6',
+  128: 'ic07',
+  256: 'ic08',
+  512: 'ic09',
+}
+function buildIcnsFromPngs(pngPaths) {
+  const blocks = []
+  let totalSize = 8 // magic + size header
+  for (const p of pngPaths) {
+    const buf = fs.readFileSync(p)
+    if (!buf || buf.length === 0) continue
+    const w = buf.readUInt32BE(16)
+    const typeTag = ICNS_TYPE_MAP[w]
+    if (!typeTag) continue
+    const block = Buffer.alloc(8 + buf.length)
+    block.write(typeTag, 0, 'ascii')
+    block.writeUInt32BE(8 + buf.length, 4)
+    buf.copy(block, 8)
+    blocks.push(block)
+    totalSize += block.length
+  }
+  const header = Buffer.alloc(8)
+  header.write('icns', 0, 'ascii')
+  header.writeUInt32BE(totalSize, 4)
+  return Buffer.concat([header, ...blocks])
+}
+
 function writeIcoIcnsPlaceholders() {
-  // mac .icns 需 iconutil（仅 mac）；win .ico 需 ico packer。本脚本不强求；
-  // 写一个文本占位，标识"待 CI 替换"，确保 electron-builder 不会因缺文件 fail。
   const icnsPath = path.join(ICONS_DIR, 'panda.icns')
   const icoPath = path.join(ICONS_DIR, 'panda.ico')
-  const note =
-    `# panda-on-desk icon placeholder\n` +
-    `# Generated: ${new Date().toISOString()}\n` +
-    `# Source: build/icons/panda.svg\n` +
-    `# Action required: replace with real ${path.basename(icnsPath)} via iconutil (mac) / png-to-ico (win) at packaging time.\n`
+
   if (DRY) return { icnsPath, icoPath, dry: true }
-  // 仅在文件不存在或为旧占位（< 1KB）时刷新；避免覆盖已 CI 生成的真 icon
-  for (const p of [icnsPath, icoPath]) {
-    if (!fs.existsSync(p) || fs.statSync(p).size < 1024) {
-      fs.writeFileSync(p, note, 'utf8')
-    }
+
+  // 从生成的 PNG 合成真 ICO / ICNS。ICO 用 16/32/64/128/256 全尺寸。
+  // ICNS 用 16/32/64/128/256/512 全尺寸。
+  const icoSizes = [16, 32, 64, 128, 256]
+  const icnsSizes = [16, 32, 64, 128, 256, 512]
+
+  const pngPathFor = (size) => {
+    // build-icons 主尺寸 = max；其余用 -{size} 后缀
+    const maxSize = Math.max(...PANDA_SIZES)
+    return size === maxSize
+      ? path.join(ICONS_DIR, 'panda.png')
+      : path.join(ICONS_DIR, `panda-${size}.png`)
   }
+
+  try {
+    const icoPngs = icoSizes.map(pngPathFor).filter((p) => fs.existsSync(p))
+    if (icoPngs.length > 0) {
+      const icoBuf = buildIcoFromPngs(icoPngs)
+      fs.writeFileSync(icoPath, icoBuf)
+      console.log(`     - panda.ico: ${icoBuf.length} bytes (${icoPngs.length} sizes)`)
+    } else {
+      console.warn('[warn] no PNG inputs for panda.ico')
+    }
+  } catch (err) {
+    console.error('[err] buildIcoFromPngs:', err.message)
+  }
+
+  try {
+    const icnsPngs = icnsSizes.map(pngPathFor).filter((p) => fs.existsSync(p))
+    if (icnsPngs.length > 0) {
+      const icnsBuf = buildIcnsFromPngs(icnsPngs)
+      fs.writeFileSync(icnsPath, icnsBuf)
+      console.log(`     - panda.icns: ${icnsBuf.length} bytes (${icnsPngs.length} sizes)`)
+    } else {
+      console.warn('[warn] no PNG inputs for panda.icns')
+    }
+  } catch (err) {
+    console.error('[err] buildIcnsFromPngs:', err.message)
+  }
+
   return { icnsPath, icoPath }
 }
 
@@ -132,9 +242,7 @@ async function main() {
   for (const s of summary) {
     console.log(`     - ${s.base}: ${s.count} output(s)`)
   }
-  console.log(
-    `[note] panda.icns / panda.ico are text placeholders; replace at CI/packaging step.`,
-  )
+  console.log(`[ok] panda.ico / panda.icns generated from PNG (electron-builder ready).`)
 }
 
 if (require.main === module) {

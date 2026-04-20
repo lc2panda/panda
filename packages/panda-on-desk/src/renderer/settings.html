@@ -395,7 +395,9 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
 
   async function persist(patch) {
     try {
-      const res = await api.saveDeskPrefs(patch);
+      // W16-T3：优先新短别名 api.save；回落 saveDeskPrefs 保持向后兼容
+      const saver = (typeof api.save === 'function') ? api.save : api.saveDeskPrefs;
+      const res = await saver(patch);
       if (res && res.status === 'ok') {
         prefs = { ...prefs, ...res.data };
         showToast(tt('settingsToastSaved'));
@@ -454,9 +456,10 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
       sel.appendChild(opt);
     });
 
-    // 加载当前 prefs
+    // 加载当前 prefs — W16-T3：优先 api.load（settings:load IPC）；回落 getDeskPrefs
     try {
-      const cur = await api.getDeskPrefs();
+      const loader = (typeof api.load === 'function') ? api.load : api.getDeskPrefs;
+      const cur = await loader();
       if (cur && typeof cur === 'object') prefs = { ...prefs, ...cur };
     } catch {}
 
@@ -518,6 +521,16 @@ footer a:hover { color: var(--accent-hover); text-decoration: underline; }
     $('link-repo').addEventListener('click', (e) => {
       e.preventDefault();
       api.openExternal('https://github.com/lc2panda/panda').catch(() => {});
+    });
+
+    // W16-T3：ESC 关闭 settings 窗（WCAG 2.1.2 可聚焦对话框的标准键盘交互）
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        try {
+          if (typeof api.closeWindow === 'function') api.closeWindow();
+        } catch {}
+      }
     });
   }
 

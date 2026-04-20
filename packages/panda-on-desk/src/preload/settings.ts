@@ -1,5 +1,5 @@
 // Input: Electron preload context — settings BrowserWindow 加载前注入
-// Output: window.pandaSettings 沙箱 API（getDeskPrefs / saveDeskPrefs / openExternal / quitApp）
+// Output: window.pandaSettings 沙箱 API（load / save / getDeskPrefs / saveDeskPrefs / openExternal / quitApp）
 // Pos: panda-on-desk W3 收尾 — settings.html 与 main 进程之间的安全 IPC 桥
 //
 // [NEW-FILE:#20260419-W3-02]
@@ -8,11 +8,23 @@
 // 证据：
 //   1. Electron 41 contextBridge — https://www.electronjs.org/docs/latest/api/context-bridge
 //   2. 同包 src/preload/main.ts 的 contextBridge 风格（保持一致）
-// 最小化方案：单文件 ~50 行，仅暴露 4 个最小 IPC 函数；零新依赖。
+// 最小化方案：单文件 ~55 行，仅暴露最小 IPC 函数；零新依赖。
+//
+// W16-T3（2026-04-20 +08:00）新增 load/save 短别名：
+//   · window.pandaSettings.load() → settings:load → prefs.ts loadDeskPrefs()
+//   · window.pandaSettings.save(patch) → settings:save → prefs.ts saveDeskPrefs() + hitWin broadcast
+//   · 保留 getDeskPrefs/saveDeskPrefs 向后兼容（settings.html 既有 binding 仍工作）
 
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('pandaSettings', {
+  /** W16-T3 短别名：读取 desk-prefs.json（等价 getDeskPrefs） */
+  load: (): Promise<any> => ipcRenderer.invoke('settings:load'),
+
+  /** W16-T3 短别名：写入 desk-prefs.json + broadcast hitWin（等价 saveDeskPrefs） */
+  save: (patch: Record<string, unknown>): Promise<any> =>
+    ipcRenderer.invoke('settings:save', patch),
+
   /** 读取 ~/.pandacc/desk-prefs.json */
   getDeskPrefs: (): Promise<any> => ipcRenderer.invoke('panda:desk-prefs:get'),
 

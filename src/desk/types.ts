@@ -303,12 +303,28 @@ export interface EventError {
   error: string
 }
 
-/** /health GET 响应 */
+/** /health GET 响应
+ *
+ * W16-T2：扩展可见字段 — 让 panda CLI `/buddy desk` 能显示桌面端运行状态详情。
+ * 新字段均为可选，旧 panda CLI 不读取即可保持向后兼容（byte-equal 守护已存字段）。
+ */
 export interface HealthResponse {
   app: typeof APP_IDENTITY
   version: number
   pid: number
   uptimeMs: number
+  /** panda-on-desk 包版本（app.getVersion()） */
+  appVersion?: string
+  /** Electron runtime 版本（process.versions.electron） */
+  electronVersion?: string
+  /** bridge 启动以来处理过的 /event POST 总数 */
+  eventsProcessed?: number
+  /** 其中 NotificationEvent (type='notification') 的累计数 */
+  notifications?: number
+  /** dispatcher / onEvent 抛错累计数 */
+  errors?: number
+  /** bridge 启动时刻 epoch ms（= runtime.json.startedAt） */
+  startedAt?: number
 }
 
 /** SSE state 推送消息（desk → panda CLI） */

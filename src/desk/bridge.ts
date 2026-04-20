@@ -23,6 +23,7 @@ import {
   type BadgeEvent,
   type DndEvent,
   type DragTargetEvent,
+  type HealthResponse,
   type LevelUpEvent,
   type NotificationEvent,
   type OnDeskEvent,
@@ -797,6 +798,118 @@ export function subscribeToOnDesk(
       timer = null
     }
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W16-T2：扩展 API — `/buddy desk` 命令直接读取 runtime + 详细 /health + 远端退出
+// 设计：fetchDetailedHealth 返回 HealthResponse（含 uptime/stats/versions）
+//       sendDeskQuit  POST /quit（带鉴权 header）→ on-desk 自行 app.quit()
+//       getRuntimeSnapshot 暴露只读 runtime.json 拷贝（端口/pid/startedAt）
+//       3 个均 fire-and-forget 或 promise，永不抛；on-desk 离线时返回 null/false
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 暴露 runtime.json 快照（只读拷贝） — /buddy desk 需读 pid/port/startedAt */
+export function getRuntimeSnapshot(): RuntimeJson | null {
+  return getRuntime()
+}
+
+/** 详细 /health 探测 — 失败/离线返回 null；成功返回完整 HealthResponse */
+export function fetchDetailedHealth(timeoutMs = 1_000): Promise<HealthResponse | null> {
+  return new Promise(resolve => {
+    const runtime = getRuntime()
+    if (!runtime) {
+      resolve(null)
+      return
+    }
+    const req = httpRequest(
+      {
+        host: '127.0.0.1',
+        port: runtime.port,
+        path: '/health',
+        method: 'GET',
+        timeout: timeoutMs,
+      },
+      (res: IncomingMessage) => {
+        if ((res.statusCode ?? 0) !== 200) {
+          res.resume()
+          resolve(null)
+          return
+        }
+        const chunks: Buffer[] = []
+        res.on('data', (c: Buffer) => chunks.push(c))
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(
+              Buffer.concat(chunks).toString('utf-8'),
+            ) as Partial<HealthResponse>
+            if (parsed.app !== APP_IDENTITY) {
+              resolve(null)
+              return
+            }
+            resolve({
+              app: APP_IDENTITY,
+              version: parsed.version ?? 1,
+              pid: parsed.pid ?? runtime.pid,
+              uptimeMs: parsed.uptimeMs ?? 0,
+              appVersion: parsed.appVersion,
+              electronVersion: parsed.electronVersion,
+              eventsProcessed: parsed.eventsProcessed,
+              notifications: parsed.notifications,
+              errors: parsed.errors,
+              startedAt: parsed.startedAt ?? runtime.startedAt,
+            })
+          } catch {
+            resolve(null)
+          }
+        })
+      },
+    )
+    req.on('error', () => resolve(null))
+    req.on('timeout', () => {
+      req.destroy()
+      resolve(null)
+    })
+    req.end()
+  })
+}
+
+/**
+ * 远端退出请求 — POST /quit（带鉴权 header）。
+ * @returns true 表示 on-desk ack 了 quit；false 表示离线 / 鉴权失败 / 未启用。
+ */
+export function sendDeskQuit(timeoutMs = 1_500): Promise<boolean> {
+  return new Promise(resolve => {
+    const runtime = getRuntime()
+    if (!runtime) {
+      resolve(false)
+      return
+    }
+    const req = httpRequest(
+      {
+        host: '127.0.0.1',
+        port: runtime.port,
+        path: '/quit',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': '0',
+          [SECRET_HEADER]: runtime.secret,
+        },
+        timeout: timeoutMs,
+      },
+      (res: IncomingMessage) => {
+        res.resume()
+        const status = res.statusCode ?? 0
+        resolve(status >= 200 && status < 300)
+      },
+    )
+    req.on('error', () => resolve(false))
+    req.on('timeout', () => {
+      req.destroy()
+      resolve(false)
+    })
+    req.end()
+  })
 }
 
 /** 单次探测 — GET /health；可独立用于 isAvailable() 等场景 */

@@ -183,6 +183,12 @@ export interface BridgeServerOptions {
   host?: string
   /** 自定义 secret（仅测试），生产路径每次启动随机生成 */
   secret?: string
+  /**
+   * W16-T2：远端 quit 回调 — panda CLI `/buddy desk stop` 通过 POST /quit 触发。
+   * 未注入时 /quit 返回 501 not-implemented；注入后 bridge 在 ack 回后调用（让
+   * response 能正常返回，再由 main 触发 app.quit() 退出 Electron 宿主进程）。
+   */
+  onQuit?: () => void
 }
 
 export interface BridgeServerHandle {
@@ -305,17 +311,35 @@ export async function startBridgeServer(
   const secret = opts.secret ?? randomBytes(32).toString('hex')
   const hub = new SseHub()
 
+  // W16-T2：运行时 stats counters（进程生命周期内累加）
+  // why 3 计数器：eventsProcessed = 所有 /event POST；notifications = 其中 type=notification 子集；
+  //   errors = onEvent/dispatchEvent 抛错次数。panda CLI /buddy desk 展示用。
+  let eventsProcessed = 0
+  let notificationsCount = 0
+  let errorsCount = 0
+
   const server = createServer(async (req, res) => {
     const url = req.url ?? ''
     const method = req.method ?? 'GET'
 
     // ── /health (GET) — 不要求鉴权（panda CLI 探测用）
+    // W16-T2：带 appVersion/electronVersion/stats 的详细状态，供 `/buddy desk` 显示
     if (method === 'GET' && url === '/health') {
       const payload: HealthResponse = {
         app: APP_IDENTITY,
         version: RUNTIME_SCHEMA_VERSION,
         pid: process.pid,
         uptimeMs: Date.now() - startedAt,
+        // 新增字段 — 调用方 `/buddy desk` 读取
+        appVersion: opts.appVersion,
+        electronVersion:
+          typeof process.versions.electron === 'string'
+            ? process.versions.electron
+            : undefined,
+        eventsProcessed,
+        notifications: notificationsCount,
+        errors: errorsCount,
+        startedAt,
       }
       jsonResponse(res, 200, payload)
       return
@@ -338,16 +362,21 @@ export async function startBridgeServer(
           jsonResponse(res, 400, err)
           return
         }
+        // W16-T2：有效事件计数（放在 try 外；invalid 不计入 processed）
+        eventsProcessed += 1
+        if (body.type === 'notification') notificationsCount += 1
         try {
           opts.onEvent?.(body)
         } catch (err) {
           // W8-T3：dispatcher 异常不影响 ack 返回，但要 log.warn 留痕便于排查
+          errorsCount += 1
           deskLog.warn('bridge onEvent business handler threw', err)
         }
         // why: P2-T1 — 业务 onEvent 之外，再走内部场景分发器（notification/badge/dnd/drag）
         try {
           dispatchEvent(body)
         } catch (err) {
+          errorsCount += 1
           deskLog.warn('bridge dispatchEvent threw', err)
         }
         const ack: EventAck = { ok: true, receivedAt: Date.now() }
@@ -357,6 +386,27 @@ export async function startBridgeServer(
         const e: EventError = { ok: false, error: msg }
         jsonResponse(res, 400, e)
       }
+      return
+    }
+
+    // ── /quit (POST) — W16-T2 panda CLI `/buddy desk stop` 远程触发退出
+    // 鉴权上面已过；仅当调用方注入 onQuit 才响应 200，否则 501。
+    // 实现策略：先 ack 回 response，再 nextTick 调 onQuit — 让客户端能拿到回执
+    // 而不会因 Electron app.quit() 立即关掉 socket。
+    if (method === 'POST' && url === '/quit') {
+      if (typeof opts.onQuit !== 'function') {
+        jsonResponse(res, 501, { ok: false, error: 'quit-not-implemented' })
+        return
+      }
+      jsonResponse(res, 200, { ok: true, quitting: true })
+      // why setImmediate：先让 HTTP response flush 到 client，再触发退出链
+      setImmediate(() => {
+        try {
+          opts.onQuit!()
+        } catch (err) {
+          deskLog.warn('bridge onQuit handler threw', err)
+        }
+      })
       return
     }
 

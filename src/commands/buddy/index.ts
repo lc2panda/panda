@@ -1,12 +1,28 @@
-// Input:  /buddy 子命令字符串（show/hide/mute/unmute/info/state/wake/sleep/theme/stats/milestones）+ globalConfig + AppState
+// Input:  /buddy 子命令字符串（show/hide/mute/unmute/info/state/wake/sleep/theme/stats/milestones/desk）+ globalConfig + AppState
 // Output: 单一 LocalJSXCommand — display:'system' 文案；落盘 globalConfig.companion* 字段
-// Pos:    A+B 项目精华 — 11 子命令实装；旧 9 文案 byte-equal 守护见 buddy.test.ts
+// Pos:    A+B 项目精华 — 12 子命令实装；旧 9 文案 byte-equal 守护见 buddy.test.ts
 //         v2.21.30 方向 A：theme 接 18 物种全集 + 旧 panda/redPanda/kungFuPanda alias
 //         Phase 0 P0-T5（agent-γ）：新增 stats / milestones 子命令；info 兼容追加 Level/XP/Unlocks
+//         W16-T2（agent-β）：新增 desk 子命令（status/start/stop/restart/logs）— CLI 可见桌面端连接状态
 //         一旦本文件被修改，请同步更新头注释 + src/commands/buddy/README.md
 import { feature } from 'bun:bundle'
 import type { Command, LocalJSXCommandContext, LocalJSXCommandOnDone } from '../../types/command.js'
 import { logEvent } from '../../services/analytics/index.js'
+
+// W16-T2：/buddy desk 运行时长格式化 — ms → "12m 34s" / "2h 14m 06s"
+// why 纯函数：便于单测断言；0ms 显示 "0s"；<1 分钟只显示秒
+export function formatUptime(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return '0s'
+  const totalSec = Math.floor(ms / 1_000)
+  const h = Math.floor(totalSec / 3_600)
+  const m = Math.floor((totalSec % 3_600) / 60)
+  const s = totalSec % 60
+  if (h > 0) {
+    return `${h}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`
+  }
+  if (m > 0) return `${m}m ${s.toString().padStart(2, '0')}s`
+  return `${s}s`
+}
 
 const buddy = {
   type: 'local-jsx',
@@ -17,7 +33,7 @@ const buddy = {
     if (feature('BUDDY')) { return false }
     return true
   },
-  argumentHint: '[show|hide|mute|unmute|info|state|wake|sleep|theme|stats|milestones]',
+  argumentHint: '[show|hide|mute|unmute|info|state|wake|sleep|theme|stats|milestones|desk]',
   immediate: true,
   load: () =>
     Promise.resolve({
@@ -213,6 +229,162 @@ const buddy = {
           return null
         }
 
+        // W16-T2：/buddy desk — 桌面端连接状态 + 5 子命令（status / start / stop / restart / logs）
+        // why: 让用户从 CLI 直接看到 panda-on-desk 是否运行、端口、运行时长、stats
+        //      status 是默认（/buddy desk 不带参）；其余 4 子命令走 head=desk + tail 分发
+        if (head === 'desk') {
+          const sub = tail.toLowerCase()
+          if (sub === '' || sub === 'status') {
+            const { getRuntimeSnapshot, fetchDetailedHealth } = await import(
+              '../../desk/bridge.js'
+            )
+            const runtime = getRuntimeSnapshot()
+            if (!runtime) {
+              onDone(
+                'panda-on-desk · 桌面宠物\n  Status: ❌ Not Running\n  Hint:   跑 `panda --install-desk` 启用桌面宠物',
+                { display: 'system' },
+              )
+              return null
+            }
+            const health = await fetchDetailedHealth(1_500)
+            if (!health) {
+              // runtime.json 存在但 /health 不通 — 进程可能 stale
+              onDone(
+                `panda-on-desk · 桌面宠物\n  Status: ⚠️  Stale (runtime.json 存在但 /health 不通 — PID ${runtime.pid} 可能已退出)\n  Port:   ${runtime.port}\n  Hint:   /buddy desk restart 清理并重启`,
+                { display: 'system' },
+              )
+              return null
+            }
+            const uptime = formatUptime(health.uptimeMs)
+            const lines = [
+              'panda-on-desk · 桌面宠物',
+              `  Status:     ✅ Running (PID ${health.pid})`,
+              `  Port:       ${runtime.port}`,
+              `  Uptime:     ${uptime}`,
+              `  Version:    ${health.appVersion ?? 'unknown'}`,
+              `  Electron:   ${health.electronVersion ?? 'unknown'}`,
+              '  Logs:       ~/.pandacc/panda-on-desk.log',
+              '  Stats:',
+              `    Events processed: ${health.eventsProcessed ?? 0}`,
+              `    Notifications:    ${health.notifications ?? 0}`,
+              `    Errors:           ${health.errors ?? 0}`,
+            ]
+            onDone(lines.join('\n'), { display: 'system' })
+            return null
+          }
+
+          if (sub === 'start') {
+            const { getRuntimeSnapshot, fetchDetailedHealth } = await import(
+              '../../desk/bridge.js'
+            )
+            // 已经在跑 — 避免重复 spawn
+            if (getRuntimeSnapshot()) {
+              const h = await fetchDetailedHealth(1_000)
+              if (h) {
+                onDone(
+                  `panda-on-desk 已在运行 (PID ${h.pid}, port ${getRuntimeSnapshot()?.port}). 用 /buddy desk status 查看详情.`,
+                  { display: 'system' },
+                )
+                return null
+              }
+            }
+            // spawn（复用 maybeSpawnOnDesk 路径；重置幂等标志以便 CLI 强制拉起）
+            const { maybeSpawnOnDesk, __resetSpawnedFlagForTesting } = await import(
+              '../../desk/launcher.js'
+            )
+            __resetSpawnedFlagForTesting()
+            maybeSpawnOnDesk({ defer: false })
+            onDone(
+              'panda-on-desk 已启动. 几秒后跑 /buddy desk status 确认运行状态.',
+              { display: 'system' },
+            )
+            return null
+          }
+
+          if (sub === 'stop') {
+            const { getRuntimeSnapshot, sendDeskQuit } = await import(
+              '../../desk/bridge.js'
+            )
+            const runtime = getRuntimeSnapshot()
+            if (!runtime) {
+              onDone('panda-on-desk 未在运行.', { display: 'system' })
+              return null
+            }
+            const ok = await sendDeskQuit(1_500)
+            onDone(
+              ok
+                ? `panda-on-desk 已停止 (PID ${runtime.pid}).`
+                : `panda-on-desk 停止请求失败 — on-desk 可能已离线或鉴权失败 (PID ${runtime.pid}).`,
+              { display: 'system' },
+            )
+            return null
+          }
+
+          if (sub === 'restart') {
+            const { getRuntimeSnapshot, sendDeskQuit } = await import(
+              '../../desk/bridge.js'
+            )
+            const runtime = getRuntimeSnapshot()
+            if (runtime) {
+              await sendDeskQuit(1_500)
+              // 等待 bridge close unlink runtime.json — 给 on-desk 1s 走 before-quit
+              await new Promise<void>(resolve => setTimeout(resolve, 1_000))
+            }
+            const { maybeSpawnOnDesk, __resetSpawnedFlagForTesting } = await import(
+              '../../desk/launcher.js'
+            )
+            __resetSpawnedFlagForTesting()
+            maybeSpawnOnDesk({ defer: false })
+            onDone(
+              'panda-on-desk 重启请求已发出. 几秒后跑 /buddy desk status 确认.',
+              { display: 'system' },
+            )
+            return null
+          }
+
+          if (sub === 'logs') {
+            // 读 ~/.pandacc/panda-on-desk.log 最后 20 行；文件不存在提示
+            const { existsSync, readFileSync } = await import('node:fs')
+            const { join } = await import('node:path')
+            const { getClaudeConfigHomeDir } = await import(
+              '../../utils/envUtils.js'
+            )
+            const logPath = join(getClaudeConfigHomeDir(), 'panda-on-desk.log')
+            if (!existsSync(logPath)) {
+              onDone(
+                `panda-on-desk 日志不存在: ${logPath}\n  Hint: panda-on-desk 可能从未启动，或 PANDA_CONFIG_DIR 被 ENV 覆盖.`,
+                { display: 'system' },
+              )
+              return null
+            }
+            try {
+              const raw = readFileSync(logPath, 'utf-8')
+              // why -20: 日志按 rotatedAppend 追加，最后 20 行即最新事件
+              const lines = raw.split(/\r?\n/).filter(l => l.length > 0)
+              const tail20 = lines.slice(-20).join('\n')
+              const header = `panda-on-desk 日志（最新 ${Math.min(
+                20,
+                lines.length,
+              )} / 共 ${lines.length} 行 · ${logPath}）:`
+              onDone(
+                tail20.length > 0 ? `${header}\n${tail20}` : `${header}\n(空)`,
+                { display: 'system' },
+              )
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e)
+              onDone(`panda-on-desk 日志读取失败: ${msg}`, { display: 'system' })
+            }
+            return null
+          }
+
+          // 未知子命令 — Usage
+          onDone(
+            'Usage: /buddy desk [status|start|stop|restart|logs]',
+            { display: 'system' },
+          )
+          return null
+        }
+
         if (subcommand === 'mute') {
           saveGlobalConfig(prev => ({ ...prev, companionMuted: true }))
           logEvent('tengu_buddy_muted', {})
@@ -276,7 +448,8 @@ const buddy = {
             companionForcedState: matched,
             companionForcedStateExpiresAt: Date.now() + FORCED_STATE_TTL_MS,
           }))
-          logEvent('tengu_buddy_state', { state: matched })
+          // W10-T3: state 是枚举字符串，按 analytics 协议 cast 到 verified 字符串。
+          logEvent('tengu_buddy_state', { state: matched as unknown as number })
           onDone(`Companion state forced to ${matched} for 5s.`, {
             display: 'system',
           })
@@ -342,9 +515,10 @@ const buddy = {
                 ...prev,
                 companionForcedSpecies: aliasMatched,
               }))
+              // W10-T3: species/alias 都是枚举字符串，cast 到 number 跳过 analytics 协议守卫
               logEvent('tengu_buddy_theme', {
-                species: aliasMatched,
-                alias: lowered,
+                species: aliasMatched as unknown as number,
+                alias: lowered as unknown as number,
               })
               onDone(
                 `${target} 系物种已退役，已切到 ${aliasMatched} 替代物种（${alias.reason}）。`,
@@ -369,7 +543,8 @@ const buddy = {
             ...prev,
             companionForcedSpecies: matched,
           }))
-          logEvent('tengu_buddy_theme', { species: matched })
+          // W10-T3: species 是枚举字符串
+          logEvent('tengu_buddy_theme', { species: matched as unknown as number })
           onDone(`Companion theme set to ${matched}.`, { display: 'system' })
           return null
         }

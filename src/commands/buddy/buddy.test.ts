@@ -90,13 +90,13 @@ async function runBuddy(args: string): Promise<{
 
 // ─── argumentHint 守护 ───────────────────────────────────────────────────────
 
-describe('argumentHint 同步 11 子命令（D4 9 + Phase 0 P0-T5 +2）', () => {
-  test('argumentHint 含全部 11 子命令', async () => {
+describe('argumentHint 同步 12 子命令（D4 9 + Phase 0 P0-T5 +2 + W16-T2 +1）', () => {
+  test('argumentHint 含全部 12 子命令', async () => {
     const mod = await import('./index.js?hint=1')
     const cmd = mod.default
-    // why D4 9 + Phase 0 P0-T5：旧 9 子命令 byte-equal 出现在前；新增 stats / milestones 追加在末尾
+    // why D4 9 + Phase 0 P0-T5 + W16-T2：旧 9 byte-equal 在前；stats / milestones / desk 追加在末尾
     expect(cmd.argumentHint).toBe(
-      '[show|hide|mute|unmute|info|state|wake|sleep|theme|stats|milestones]',
+      '[show|hide|mute|unmute|info|state|wake|sleep|theme|stats|milestones|desk]',
     )
   })
 })
@@ -292,6 +292,224 @@ describe('/buddy theme — 18 物种全集 + alias（v2.21.30 方向 A）', () =
     expect(result).toContain('duck')
     expect(result).toContain('robot')
     expect(configState.companionForcedSpecies).toBeUndefined()
+  })
+})
+
+// ─── W16-T2：/buddy desk 5 子命令 ────────────────────────────────────────────
+
+describe('/buddy desk（W16-T2 新增）', () => {
+  // ─── 共享 mock：runtime + health + sendDeskQuit + launcher ───────────────
+  type BridgeMock = {
+    runtime: { version: number; port: number; secret: string; pid: number; startedAt: number; appVersion?: string } | null
+    health: {
+      app: string
+      version: number
+      pid: number
+      uptimeMs: number
+      appVersion?: string
+      electronVersion?: string
+      eventsProcessed?: number
+      notifications?: number
+      errors?: number
+      startedAt?: number
+    } | null
+    quitResult: boolean
+  }
+  const bridgeState: BridgeMock = {
+    runtime: null,
+    health: null,
+    quitResult: true,
+  }
+  const launcherCalls: string[] = []
+
+  beforeEach(() => {
+    bridgeState.runtime = null
+    bridgeState.health = null
+    bridgeState.quitResult = true
+    launcherCalls.length = 0
+    // why 连同前面 beforeEach 再叠 3 mock — resetState 不重置已 mock.module，
+    //   但 afterEach mock.restore 会清；本 describe 内先注入。
+    mock.module('../../desk/bridge.js', () => ({
+      getRuntimeSnapshot: () => bridgeState.runtime,
+      fetchDetailedHealth: async () => bridgeState.health,
+      sendDeskQuit: async () => bridgeState.quitResult,
+    }))
+    mock.module('../../desk/launcher.js', () => ({
+      __resetSpawnedFlagForTesting: () => {
+        launcherCalls.push('reset')
+      },
+      maybeSpawnOnDesk: (_opts: unknown) => {
+        launcherCalls.push('spawn')
+      },
+    }))
+    mock.module('../../utils/envUtils.js', () => ({
+      getClaudeConfigHomeDir: () => '/tmp/pandacc-test-W16-T2',
+    }))
+  })
+
+  test('/buddy desk（默认 status）— 未运行 → Not Running 文案', async () => {
+    bridgeState.runtime = null
+    const { result, display } = await runBuddy('desk')
+    expect(display).toBe('system')
+    expect(result).toContain('Not Running')
+    expect(result).toContain('panda --install-desk')
+  })
+
+  test('/buddy desk status — 运行中 → 完整字段', async () => {
+    bridgeState.runtime = {
+      version: 1,
+      port: 1456,
+      secret: 'testsecret',
+      pid: 12345,
+      startedAt: Date.now() - 754_000, // ~12m34s
+    }
+    bridgeState.health = {
+      app: 'panda-on-desk',
+      version: 1,
+      pid: 12345,
+      uptimeMs: 754_000,
+      appVersion: '0.1.0-alpha',
+      electronVersion: '41.2.1',
+      eventsProcessed: 42,
+      notifications: 3,
+      errors: 0,
+      startedAt: Date.now() - 754_000,
+    }
+    const { result, display } = await runBuddy('desk status')
+    expect(display).toBe('system')
+    expect(result).toContain('Running (PID 12345)')
+    expect(result).toContain('Port:       1456')
+    expect(result).toContain('Uptime:     12m 34s')
+    expect(result).toContain('Version:    0.1.0-alpha')
+    expect(result).toContain('Electron:   41.2.1')
+    expect(result).toContain('Events processed: 42')
+    expect(result).toContain('Notifications:    3')
+    expect(result).toContain('Errors:           0')
+  })
+
+  test('/buddy desk status — runtime.json 存在但 /health 不通 → Stale 提示', async () => {
+    bridgeState.runtime = {
+      version: 1,
+      port: 1457,
+      secret: 'x',
+      pid: 999,
+      startedAt: 0,
+    }
+    bridgeState.health = null // /health 返回 null（进程可能 stale）
+    const { result, display } = await runBuddy('desk')
+    expect(display).toBe('system')
+    expect(result).toContain('Stale')
+    expect(result).toContain('PID 999')
+    expect(result).toContain('restart')
+  })
+
+  test('/buddy desk start — 未运行 → spawn + 成功文案', async () => {
+    bridgeState.runtime = null
+    const { result, display } = await runBuddy('desk start')
+    expect(display).toBe('system')
+    expect(result).toContain('已启动')
+    expect(launcherCalls).toContain('reset')
+    expect(launcherCalls).toContain('spawn')
+  })
+
+  test('/buddy desk start — 已运行 → 跳过 spawn', async () => {
+    bridgeState.runtime = {
+      version: 1,
+      port: 1455,
+      secret: 'x',
+      pid: 88,
+      startedAt: 0,
+    }
+    bridgeState.health = {
+      app: 'panda-on-desk',
+      version: 1,
+      pid: 88,
+      uptimeMs: 5_000,
+    }
+    const { result } = await runBuddy('desk start')
+    expect(result).toContain('已在运行')
+    expect(launcherCalls).not.toContain('spawn')
+  })
+
+  test('/buddy desk stop — 运行中 → sendDeskQuit 成功', async () => {
+    bridgeState.runtime = {
+      version: 1,
+      port: 1455,
+      secret: 'x',
+      pid: 77,
+      startedAt: 0,
+    }
+    bridgeState.quitResult = true
+    const { result, display } = await runBuddy('desk stop')
+    expect(display).toBe('system')
+    expect(result).toContain('已停止')
+    expect(result).toContain('PID 77')
+  })
+
+  test('/buddy desk stop — 未运行 → 提示', async () => {
+    bridgeState.runtime = null
+    const { result } = await runBuddy('desk stop')
+    expect(result).toBe('panda-on-desk 未在运行.')
+  })
+
+  test('/buddy desk restart — 调 sendDeskQuit + spawn', async () => {
+    bridgeState.runtime = {
+      version: 1,
+      port: 1455,
+      secret: 'x',
+      pid: 66,
+      startedAt: 0,
+    }
+    bridgeState.quitResult = true
+    const { result, display } = await runBuddy('desk restart')
+    expect(display).toBe('system')
+    expect(result).toContain('重启请求已发出')
+    expect(launcherCalls).toContain('spawn')
+  }, 3_000)
+
+  test('/buddy desk logs — 日志文件不存在 → 提示路径', async () => {
+    const { result, display } = await runBuddy('desk logs')
+    expect(display).toBe('system')
+    expect(result).toContain('日志不存在')
+    expect(result).toContain('panda-on-desk.log')
+  })
+
+  test('/buddy desk <unknown> → Usage 提示', async () => {
+    const { result, display } = await runBuddy('desk nonsense')
+    expect(display).toBe('system')
+    expect(result).toContain('Usage: /buddy desk')
+    expect(result).toContain('status')
+    expect(result).toContain('start')
+    expect(result).toContain('stop')
+    expect(result).toContain('restart')
+    expect(result).toContain('logs')
+  })
+})
+
+// ─── W16-T2：formatUptime 纯函数守护 ─────────────────────────────────────────
+
+describe('formatUptime（W16-T2 纯函数）', () => {
+  test('0ms → "0s"', async () => {
+    const mod = await import('./index.js?fmt=1')
+    expect(mod.formatUptime(0)).toBe('0s')
+    expect(mod.formatUptime(-1)).toBe('0s')
+    expect(mod.formatUptime(Number.NaN)).toBe('0s')
+  })
+  test('< 60s → 只显示秒', async () => {
+    const mod = await import('./index.js?fmt=2')
+    expect(mod.formatUptime(34_000)).toBe('34s')
+    expect(mod.formatUptime(59_999)).toBe('59s')
+  })
+  test('< 1h → "Xm YYs"', async () => {
+    const mod = await import('./index.js?fmt=3')
+    expect(mod.formatUptime(754_000)).toBe('12m 34s')
+    expect(mod.formatUptime(60_000)).toBe('1m 00s')
+  })
+  test('≥ 1h → "Xh YYm ZZs"', async () => {
+    const mod = await import('./index.js?fmt=4')
+    expect(mod.formatUptime(2 * 3_600_000 + 14 * 60_000 + 6_000)).toBe(
+      '2h 14m 06s',
+    )
   })
 })
 
