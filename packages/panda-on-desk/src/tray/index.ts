@@ -213,8 +213,13 @@ export function initPandaTray(ctx: TrayCtx): TrayHandle {
     let image: Electron.NativeImage
     if (iconPath) {
       image = nativeImage.createFromPath(iconPath)
-      if (!isMac && !image.isEmpty()) {
-        // Win/Linux 标准托盘图标 ~16/22 px；按需缩放避免高分屏放大模糊
+      // [W25-P0-MAC-BLACKBAR-TRAY 20260420] Mac menu bar 中间黑色大块真正根因：
+      //   tray-{dark,light}.png 是 256×256 panda 剪影；setTemplateImage(true) 后 macOS 把所有
+      //   非透明像素渲染成前景色（menu bar 黑）→ menu bar 上显示一个巨大的黑色圆形 panda 脸。
+      //   Mac 标准 tray icon 规格是 22×22 pt（@2x Retina 自动处理为 44×44）；
+      //   之前仅 !isMac 路径 resize 到 22×22，Mac 保持 256×256 → 异常大黑块。
+      //   修复：Mac 也 resize 到 22×22，与 Win/Linux 一致；setTemplateImage 保留（符合 Mac 规范）。
+      if (!image.isEmpty()) {
         try { image = image.resize({ width: 22, height: 22 }) } catch {}
       }
       if (isTemplate) image.setTemplateImage(true)
@@ -235,7 +240,8 @@ export function initPandaTray(ctx: TrayCtx): TrayHandle {
         const next = resolveTrayIconPath(path.join(__dirname, '..', '..'), app.isPackaged)
         if (next.iconPath) {
           let img = nativeImage.createFromPath(next.iconPath)
-          if (!isMac && !img.isEmpty()) {
+          // [W25-P0-MAC-BLACKBAR-TRAY 20260420] 同上：Mac 也 resize 22×22
+          if (!img.isEmpty()) {
             try { img = img.resize({ width: 22, height: 22 }) } catch {}
           }
           if (next.isTemplate) img.setTemplateImage(true)

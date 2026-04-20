@@ -20,6 +20,19 @@
 
 ---
 
+## v2.25.35 — 2026-04-20 · P0 Mac menu bar 黑色大圆真凶锁定（W25 · Tray icon 256×256 未 resize）
+- **真正根因**（v2.25.20 → v2.25.21 → v2.25.30 → v2.25.34 全部方向错误）：
+  `packages/panda-on-desk/src/tray/index.ts:216` 的 Mac tray icon 初始化代码只对 `!isMac` 平台
+  调用 `image.resize({ width: 22, height: 22 })`，**Mac 保留源文件 256×256 大小** +
+  `setTemplateImage(true)`。macOS template image 机制把所有非透明像素渲染成 menu bar 前景色
+  （light mode 下是黑色）→ 256×256 panda 剪影被缩放到 menu bar 高度 → 显示一个
+  **巨大黑色圆形块** 占据 menu bar 中央（用户截图的"黑色椭圆"就是它）。
+- **修复**：Mac 也 resize 到 22×22（Mac tray 标准尺寸，Retina @2x = 44×44 由 Electron 自动处理）；
+  保留 `setTemplateImage(true)`（符合 Mac 规范）。主题切换路径同步。
+- 同步改 `tray/index.ts` + `tray/index.js`（生产运行文件）。
+- 新增 `test/mac-tray-blackbar.test.ts` 8 回归用例。
+- 前 5 次修复聚焦 mainWin / hitWin 窗口可见性，完全错过了 **Tray icon 才是真正的"黑块"来源**。
+
 ## v2.25.34 — 2026-04-20 · P0 Mac 顶部黑框第 5 次复发彻底修复（W24 hotfix · hitGeometry 参数错位）
 - **真正根因**（v2.25.30 W21 nuclear 后仍复发）：
   `packages/panda-on-desk/src/main.ts:446` 的 `getHitRectScreen` wrapper 调用
