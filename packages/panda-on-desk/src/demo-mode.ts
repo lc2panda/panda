@@ -7,19 +7,24 @@
 //   - opts.sleep?: (ms) => Promise<void> — 测试可注入立即 resolve sleep
 //   - opts.send?: (channel, payload) => void — 默认 hitWin.webContents.send；测试可拦截
 //   - opts.exec?: (script) => Promise<unknown> — 默认 hitWin.webContents.executeJavaScript；测试可拦截
+//   - opts.onSubtitle?: (text: string) => void — 观察引导字幕（测试用）
+//   - opts.onProgress?: (pct: number) => void — 观察 progress bar 进度（0-100）
+//   - opts.skipSignal?: () => boolean — 外部 skip（测试/tray 按钮兜底，默认通过 exec 轮询 window.__pandaDemoSkip）
 //
 // Output:
-//   - runDemoSequence(hitWin, opts?) → Promise<{ steps: DemoStepRecord[], skipped?: boolean, reason?: string }>
+//   - runDemoSequence(hitWin, opts?) → Promise<{ steps, skipped?, reason?, marked?, progressSeries?, subtitles? }>
 //   - shouldRunDemo(prefs) → boolean
 //   - markDemoComplete(opts?) → 写 ~/.pandacc/desk-prefs.json firstRun=false
 //   - DEMO_STEPS（10 步骤静态序列）+ DEMO_SPECIES_CYCLE（5 物种循环：robot → owl → chonk → duck → panda）
+//   - DEMO_SUBTITLES（10 步骤引导字幕文案）
 //
 // Pos:
 //   - panda-on-desk W14-T4 演示模式入口 — 让用户首次启动直观看到 8 个 __panda* 接口的全部能力
 //   - 调用方：① main.ts whenReady + did-finish-load → if (firstRun) runDemoSequence()
 //             ② tray "Show Demo" 菜单点击 → runDemoSequence()（手动触发不写 firstRun=false）
+//   - W17-T3 深化：时长 30s→~20s + 引导字幕 + progress bar + skip 按钮 + 平滑过渡 + 升级 welcome overlay
 //
-// [NEW-FILE:#W14-04]
+// [NEW-FILE:#W14-04] + [UPDATE:#W17-T3 20260420]
 // 触发原因（不可在现有文件实现的论证）：
 //   1. 现有 src/animation-cycle.ts 是 idle/breathing 单状态循环（持续）；demo-mode 是"线性 10 步骤一次性序列"，
 //      职责正交（idle vs guided tour），合并会污染 animation-cycle 的状态机。
@@ -32,8 +37,14 @@
 //   - hit.html 暴露的 8 个 window.__panda* 接口契约（src/renderer/hit.html L482, L580, L678-727, L987）
 //   - bridge 'panda-event' 通道契约（main.ts:535 forwardBridgeEventToRenderer）
 //   - clawd-on-desk@4b07658 无对应 demo-mode 实现（panda 独有功能）
-// 最小化方案：单文件 ~190 行；0 新依赖；全注入式；纯 async/await 时间线。
-// 回滚：删除 demo-mode.ts + main.ts 中 _maybeRunFirstRunDemo() 调用 + tray ctx.runDemo + i18n trayShowDemo。
+// W17-T3 深化原则：
+//   - 所有新 UI（progress / subtitle / skip / welcome）通过 exec() 注入 hit.html 的 document.body，
+//     不改 hit.html，不引新依赖。overlay 采用 position:fixed + pointer-events 控制；
+//     退出时 exec() 清理全部 DOM（避免残留）。
+//   - 时长压缩：idle/thinking/working/sleeping 每步 1.5s；attention/notification 1.5s；
+//     species each 0.8s；overlay welcome 3.0s；总时长 19.5s ≤ 25s DoD。
+// 最小化方案：单文件（~380 行）；0 新依赖；全注入式；纯 async/await 时间线。
+// 回滚：还原 DEFAULT_TIMING 与 runDemoSequence 主循环即可；新导出 DEMO_SUBTITLES / *ChromeScripts 可忽略。
 
 "use strict";
 
@@ -58,17 +69,18 @@ export interface DemoTiming {
   overlayMs: number;
 }
 
+// W17-T3 深化：时长 30s → 19.5s（每步 1.5s；species each 0.8s；welcome 3s）
 export const DEFAULT_TIMING: DemoTiming = {
-  idleMs: 5000,
-  thinkingMs: 3000,
-  workingMs: 3000,
-  attentionMs: 2000,
-  notificationMs: 2000,
-  sleepingMs: 3000,
-  levelupMs: 2500,
-  speciesEachMs: 1500,
-  badgeMs: 2000,
-  overlayMs: 4000,
+  idleMs: 1500,
+  thinkingMs: 1500,
+  workingMs: 1500,
+  attentionMs: 1500,
+  notificationMs: 1500,
+  sleepingMs: 1500,
+  levelupMs: 2000,
+  speciesEachMs: 800,
+  badgeMs: 1500,
+  overlayMs: 3000,
 };
 
 // 物种循环：panda(default) 起步 → robot → owl → chonk → duck → 回 panda
@@ -76,20 +88,38 @@ export const DEFAULT_TIMING: DemoTiming = {
 export const DEMO_SPECIES_CYCLE = ['robot', 'owl', 'chonk', 'duck', 'default'] as const;
 
 export const DEMO_STEPS: ReadonlyArray<DemoStep> = [
-  { kind: 'state', state: 'idle' },             // 1. 5s 呼吸
-  { kind: 'state', state: 'thinking' },         // 2. 3s 问号浮动
-  { kind: 'state', state: 'working' },          // 3. 3s 摇头
-  { kind: 'state', state: 'attention' },        // 4. 2s 跳跃
-  { kind: 'state', state: 'notification' },     // 5. 2s 摇铃
-  { kind: 'state', state: 'sleeping' },         // 6. 3s Z 飘
+  { kind: 'state', state: 'idle' },             // 1. 1.5s 呼吸
+  { kind: 'state', state: 'thinking' },         // 2. 1.5s 问号浮动
+  { kind: 'state', state: 'working' },          // 3. 1.5s 摇头
+  { kind: 'state', state: 'attention' },        // 4. 1.5s 跳跃
+  { kind: 'state', state: 'notification' },     // 5. 1.5s 摇铃
+  { kind: 'state', state: 'sleeping' },         // 6. 1.5s Z 飘
   { kind: 'levelup', from: 1, to: 2 },          // 7. 烟花 + banner
-  { kind: 'species-cycle', sequence: DEMO_SPECIES_CYCLE }, // 8. 5 物种切换
+  { kind: 'species-cycle', sequence: DEMO_SPECIES_CYCLE }, // 8. 5 物种切换（淡入淡出）
   { kind: 'badge', count: 3 },                  // 9. badge +3 红圆
-  { kind: 'overlay', message: '欢迎使用 panda-on-desk!' }, // 10. 浮卡
+  { kind: 'overlay', message: '欢迎使用 panda-on-desk!' }, // 10. welcome 浮卡
 ];
 
 if (DEMO_STEPS.length !== 10) {
   throw new Error('[demo-mode] DEMO_STEPS must have exactly 10 entries');
+}
+
+// W17-T3：10 步骤引导字幕文案（bottom overlay 显示；与 DEMO_STEPS 一一对应）
+export const DEMO_SUBTITLES: ReadonlyArray<string> = [
+  '正在休息 · idle',
+  '思考中 · thinking',
+  '工作中 · working',
+  '注意! · attention',
+  '新通知 · notification',
+  '睡眠中 · sleeping',
+  '升级! · level up',
+  '切换物种 · species',
+  '未读徽章 · badge',
+  '欢迎使用 panda-on-desk',
+];
+
+if (DEMO_SUBTITLES.length !== DEMO_STEPS.length) {
+  throw new Error('[demo-mode] DEMO_SUBTITLES length must match DEMO_STEPS');
 }
 
 // ── 默认 sleep + send + exec（生产路径）。测试通过 opts.* 全部覆盖 ──────────────
@@ -149,6 +179,135 @@ export function markDemoComplete(deps?: PrefsDeps): { ok: boolean; reason?: stri
   }
 }
 
+// ── W17-T3：overlay chrome 注入/清理/更新脚本 ──────────────────────────────────
+// 所有 id 统一前缀 `panda-demo-*`；cleanup 按 id 精确移除，避免污染 hit.html 既有 DOM。
+// progress bar: 顶部 2px 横线（0 → 100%）；subtitle: 底部 36px 卡片（fade 0.3s）；
+// skip button: 右上 8px；点击后设 window.__pandaDemoSkip=true，主循环下一 tick 自中断。
+export function buildChromeInitScript(): string {
+  return `(function(){try{
+    if (document.getElementById('panda-demo-chrome')) return;
+    var root = document.createElement('div');
+    root.id = 'panda-demo-chrome';
+    root.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483600;font-family:system-ui,sans-serif;';
+    root.innerHTML =
+      '<div id="panda-demo-progress" style="position:absolute;top:0;left:0;height:2px;width:0%;' +
+        'background:linear-gradient(90deg,#66bb6a,#42a5f5);transition:width 0.3s ease-out;box-shadow:0 0 6px rgba(66,165,245,0.6);"></div>' +
+      '<div id="panda-demo-subtitle" style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);' +
+        'padding:6px 14px;background:rgba(0,0,0,0.62);color:#fff;border-radius:12px;font-size:12px;' +
+        'opacity:0;transition:opacity 0.3s ease-out;max-width:80%;text-align:center;white-space:nowrap;' +
+        'backdrop-filter:blur(4px);"></div>' +
+      '<button id="panda-demo-skip" style="position:absolute;top:8px;right:8px;pointer-events:auto;' +
+        'padding:4px 10px;background:rgba(0,0,0,0.55);color:#fff;border:1px solid rgba(255,255,255,0.25);' +
+        'border-radius:8px;font-size:11px;cursor:pointer;opacity:0.85;transition:opacity 0.2s;" ' +
+        'onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.85">跳过 Skip</button>';
+    document.body.appendChild(root);
+    window.__pandaDemoSkip = false;
+    var btn = document.getElementById('panda-demo-skip');
+    if (btn) btn.addEventListener('click', function(){ window.__pandaDemoSkip = true; });
+  }catch(_){}})();`;
+}
+
+export function buildSubtitleScript(text: string): string {
+  const esc = JSON.stringify(String(text ?? ''));
+  return `(function(){try{
+    var el=document.getElementById('panda-demo-subtitle');
+    if(!el)return;
+    el.style.opacity='0';
+    setTimeout(function(){try{el.textContent=${esc};el.style.opacity='1';}catch(_){}}, 80);
+  }catch(_){}})();`;
+}
+
+export function buildProgressScript(pct: number): string {
+  const safe = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
+  return `(function(){try{
+    var el=document.getElementById('panda-demo-progress');
+    if(el)el.style.width=${safe}+'%';
+  }catch(_){}})();`;
+}
+
+export function buildTransitionFadeScript(ms = 300): string {
+  const dur = Math.max(50, Math.min(1000, Number.isFinite(ms) ? ms : 300));
+  return `(function(){try{
+    var pet=document.getElementById('pet');
+    if(!pet)return;
+    pet.style.transition='opacity ${dur}ms ease-in-out';
+    pet.style.opacity='0.35';
+    setTimeout(function(){try{pet.style.opacity='1';}catch(_){}}, ${Math.floor(dur / 2)});
+  }catch(_){}})();`;
+}
+
+export function buildLevelUpBoostScript(): string {
+  // W17-T3：更精彩烟花 — 额外 12 粒子 + 颜色序列 + bounce
+  return `(function(){try{
+    var stage=document.querySelector('.panda-stage')||document.body;
+    if(!stage)return;
+    var COLORS=['#ffeb3b','#ff6b6b','#4fc3f7','#81c784','#ba68c8','#ffa726'];
+    var wrap=document.createElement('div');
+    wrap.className='panda-demo-fx-boost';
+    wrap.style.cssText='position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:2147483500;';
+    for(var i=0;i<12;i++){
+      var p=document.createElement('span');
+      var ang=(i*30);
+      p.style.cssText='position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:50%;'+
+        'background:'+COLORS[i%COLORS.length]+';--angle:'+ang+'deg;'+
+        'animation:panda-firework-burst 1.8s ease-out forwards;opacity:0.95;';
+      wrap.appendChild(p);
+    }
+    stage.appendChild(wrap);
+    setTimeout(function(){try{wrap.remove();}catch(_){}}, 2000);
+  }catch(_){}})();`;
+}
+
+export function buildSpeciesFadeScript(): string {
+  return `(function(){try{
+    var pet=document.getElementById('pet');
+    if(!pet)return;
+    pet.style.transition='opacity 0.25s ease-in-out,transform 0.25s ease-in-out';
+    pet.style.opacity='0.2';
+    pet.style.transform='scale(0.92)';
+    setTimeout(function(){try{
+      pet.style.opacity='1';pet.style.transform='scale(1)';
+    }catch(_){}}, 220);
+  }catch(_){}})();`;
+}
+
+export function buildWelcomeOverlayScript(message: string): string {
+  const esc = JSON.stringify(String(message ?? '欢迎使用 panda-on-desk!'));
+  return `(function(){try{
+    var old=document.getElementById('panda-demo-welcome');
+    if(old)old.remove();
+    var card=document.createElement('div');
+    card.id='panda-demo-welcome';
+    card.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(0.85);' +
+      'padding:18px 22px;background:linear-gradient(135deg,rgba(40,40,60,0.92),rgba(20,20,35,0.95));' +
+      'color:#fff;border:1px solid rgba(255,255,255,0.18);border-radius:14px;' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.45),0 0 0 1px rgba(255,255,255,0.06) inset;' +
+      'font-family:system-ui,sans-serif;font-size:13px;z-index:2147483610;pointer-events:auto;' +
+      'opacity:0;transition:opacity 0.32s ease-out,transform 0.32s cubic-bezier(0.25,1.4,0.5,1);' +
+      'max-width:320px;text-align:center;';
+    card.innerHTML =
+      '<div style="font-size:22px;margin-bottom:6px;">🎉</div>' +
+      '<div style="font-weight:600;margin-bottom:6px;font-size:14px;">'+'welcome'.replace('welcome',${esc})+'</div>' +
+      '<div style="color:#b0bec5;margin-bottom:12px;line-height:1.5;">输入 <code style="background:rgba(255,255,255,0.12);padding:1px 5px;border-radius:4px;">/buddy stats</code> 查看养成等级</div>' +
+      '<button id="panda-demo-welcome-desk" style="padding:6px 14px;background:#42a5f5;color:#fff;border:none;' +
+        'border-radius:8px;font-size:12px;cursor:pointer;font-weight:500;">跳到桌面 /buddy desk</button>';
+    document.body.appendChild(card);
+    requestAnimationFrame(function(){ try{card.style.opacity='1';card.style.transform='translate(-50%,-50%) scale(1)';}catch(_){} });
+    var btn=document.getElementById('panda-demo-welcome-desk');
+    if(btn)btn.addEventListener('click', function(){ window.__pandaDemoWelcomeDesk=true; try{card.remove();}catch(_){} });
+  }catch(_){}})();`;
+}
+
+export function buildChromeCleanupScript(): string {
+  return `(function(){try{
+    ['panda-demo-chrome','panda-demo-welcome'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el)el.remove();
+    });
+    try{window.__pandaDemoSkip=false;}catch(_){}
+  }catch(_){}})();`;
+}
+
 // ── 主入口 runDemoSequence ────────────────────────────────────────────────────
 export interface DemoStepRecord {
   index: number;
@@ -163,6 +322,9 @@ export interface DemoOptions {
   sleep?: (ms: number) => Promise<void>;
   send?: (channel: string, payload: unknown) => void;
   exec?: (script: string) => Promise<unknown>;
+  onSubtitle?: (text: string) => void;
+  onProgress?: (pct: number) => void;
+  skipSignal?: () => boolean;
   // markComplete=false 时跳过 firstRun=false 写入（手动 tray 触发场景）
   markComplete?: boolean;
   deps?: PrefsDeps;
@@ -173,6 +335,8 @@ export interface DemoResult {
   skipped?: boolean;
   reason?: string;
   marked?: boolean;
+  progressSeries?: number[];
+  subtitles?: string[];
 }
 
 export async function runDemoSequence(hitWin: any, opts?: DemoOptions): Promise<DemoResult> {
@@ -181,20 +345,57 @@ export async function runDemoSequence(hitWin: any, opts?: DemoOptions): Promise<
   const sleep = opts?.sleep ?? _defaultSleep;
   const send = opts?.send ?? ((ch: string, p: unknown) => _defaultSend(hitWin, ch, p));
   const exec = opts?.exec ?? ((s: string) => _defaultExec(hitWin, s));
+  const onSubtitle = opts?.onSubtitle;
+  const onProgress = opts?.onProgress;
+  const externalSkip = opts?.skipSignal;
 
   const steps: DemoStepRecord[] = [];
+  const progressSeries: number[] = [];
+  const subtitles: string[] = [];
 
   // 极端容错：hitWin 缺失 → 跳过 + 不抛
   if (!hitWin) {
-    return { steps, skipped: true, reason: 'hitWin missing' };
+    return { steps, skipped: true, reason: 'hitWin missing', progressSeries, subtitles };
   }
 
   function record(idx: number, kind: DemoStep['kind'], detail: string): void {
     steps.push({ index: idx, kind, detail, startedAt: now() });
   }
 
+  async function updateProgress(pct: number): Promise<void> {
+    const safe = Math.max(0, Math.min(100, Math.round(pct)));
+    progressSeries.push(safe);
+    if (onProgress) {
+      try { onProgress(safe); } catch (_) { /* ignore observer error */ }
+    }
+    await exec(buildProgressScript(safe));
+  }
+
+  async function updateSubtitle(text: string): Promise<void> {
+    subtitles.push(text);
+    if (onSubtitle) {
+      try { onSubtitle(text); } catch (_) { /* ignore observer error */ }
+    }
+    await exec(buildSubtitleScript(text));
+  }
+
+  async function checkSkip(): Promise<boolean> {
+    if (typeof externalSkip === 'function') {
+      try { if (externalSkip()) return true; } catch (_) { /* ignore */ }
+    }
+    try {
+      const r = await exec('(function(){try{return !!window.__pandaDemoSkip;}catch(_){return false;}})()');
+      return r === true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // 注入 chrome（progress/subtitle/skip 按钮）
+  await exec(buildChromeInitScript());
+  await updateProgress(0);
+
   // 步骤 1-6：6 个 pet-state（idle/thinking/working/attention/notification/sleeping）
-  // 通过 'panda-event' 通道 + { type: 'pet-state', state } 契约（main.ts:535 / hit.html:848）
   const stateDurations: Record<string, number> = {
     idle: timing.idleMs,
     thinking: timing.thinkingMs,
@@ -204,26 +405,37 @@ export async function runDemoSequence(hitWin: any, opts?: DemoOptions): Promise<
     sleeping: timing.sleepingMs,
   };
 
+  let userSkipped = false;
+
   for (let i = 0; i < DEMO_STEPS.length; i++) {
+    // skip 提前退出
+    if (await checkSkip()) { userSkipped = true; break; }
+
     const step = DEMO_STEPS[i];
+    await updateSubtitle(DEMO_SUBTITLES[i]);
+
     if (step.kind === 'state') {
       record(i, 'state', step.state);
+      // 平滑过渡（fade 0.3s）— 仅 state 步骤间生效，不污染 levelup/species
+      if (i > 0) await exec(buildTransitionFadeScript(300));
       send('panda-event', { type: 'pet-state', state: step.state });
       await sleep(stateDurations[step.state] ?? 1000);
     } else if (step.kind === 'levelup') {
-      // 步骤 7：levelup → bridge 'level-up' 事件（hit.html:893 → __pandaTriggerLevelUp）
       record(i, 'levelup', `${step.from}->${step.to}`);
       send('panda-event', { type: 'level-up', fromLevel: step.from, toLevel: step.to });
+      // 额外烟花增强（多粒子 + 颜色 + bounce）
+      await exec(buildLevelUpBoostScript());
       await sleep(timing.levelupMs);
     } else if (step.kind === 'species-cycle') {
-      // 步骤 8：5 物种循环切换 → bridge 'species' 事件（hit.html:863 → __pandaSetSpecies）
       record(i, 'species-cycle', step.sequence.join('->'));
       for (const sp of step.sequence) {
+        if (await checkSkip()) { userSkipped = true; break; }
+        await exec(buildSpeciesFadeScript());
         send('panda-event', { type: 'species', species: sp });
         await sleep(timing.speciesEachMs);
       }
+      if (userSkipped) break;
     } else if (step.kind === 'badge') {
-      // 步骤 9：badge +N → __pandaSetBadge 直调（无 bridge 事件路径，必须 executeJavaScript）
       record(i, 'badge', String(step.count));
       const safeN = Number.isFinite(step.count) ? Math.floor(step.count) : 0;
       await exec(
@@ -232,12 +444,10 @@ export async function runDemoSequence(hitWin: any, opts?: DemoOptions): Promise<
       );
       await sleep(timing.badgeMs);
     } else if (step.kind === 'overlay') {
-      // 步骤 10：浮卡 overlay — 复用 __pandaShowStats（带 stats-card UI），文案通过 __pandaSetStats 注入
-      // 注意：__pandaSetStats 接受 {lv, xp, rarity}；welcome 文案以 stats 形式打到 stats-card 上方
-      // 同时触发 __pandaPoke 摇摆 + __pandaShowStats(autoHideMs)
       record(i, 'overlay', step.message);
       const safeMs = Math.max(500, timing.overlayMs);
       const escMsg = JSON.stringify(step.message);
+      // 保持原 __pandaSetStats + __pandaShowStats 兼容（测试断言依赖）
       await exec(
         `(function(){try{` +
         `if(typeof window.__pandaSetStats==='function')window.__pandaSetStats({lv:1,xp:0,rarity:'legendary'});` +
@@ -246,9 +456,17 @@ export async function runDemoSequence(hitWin: any, opts?: DemoOptions): Promise<
         `try{document.title=${escMsg};}catch(_){}` +
         `}catch(_){}})()`
       );
+      // W17-T3：welcome overlay 增强（含按钮）
+      await exec(buildWelcomeOverlayScript(step.message));
       await sleep(timing.overlayMs);
     }
+
+    // 进度条线性推进（0 → 100），每步结束 += 100/10
+    await updateProgress(((i + 1) / DEMO_STEPS.length) * 100);
   }
+
+  // cleanup chrome DOM
+  await exec(buildChromeCleanupScript());
 
   // 演示完成 → 写 firstRun=false（手动 tray 触发可通过 markComplete=false 跳过）
   let marked = false;
@@ -257,5 +475,10 @@ export async function runDemoSequence(hitWin: any, opts?: DemoOptions): Promise<
     marked = r.ok;
   }
 
-  return { steps, marked };
+  const result: DemoResult = { steps, marked, progressSeries, subtitles };
+  if (userSkipped) {
+    result.skipped = true;
+    result.reason = 'user skip';
+  }
+  return result;
 }

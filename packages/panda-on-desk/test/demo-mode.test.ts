@@ -10,6 +10,13 @@ import {
   DEFAULT_TIMING,
   DEMO_SPECIES_CYCLE,
   DEMO_STEPS,
+  DEMO_SUBTITLES,
+  buildChromeCleanupScript,
+  buildChromeInitScript,
+  buildProgressScript,
+  buildSubtitleScript,
+  buildTransitionFadeScript,
+  buildWelcomeOverlayScript,
   markDemoComplete,
   runDemoSequence,
   shouldRunDemo,
@@ -120,7 +127,7 @@ describe('panda-on-desk · W14-T4 demo-mode 静态契约', () => {
     }
   })
 
-  test('DEFAULT_TIMING 总时长应 ≈ 27.5s（任务约定基线）', () => {
+  test('DEFAULT_TIMING 总时长应 ≤ 25s（W17-T3 DoD：压缩到 ~20s）', () => {
     const total =
       DEFAULT_TIMING.idleMs +
       DEFAULT_TIMING.thinkingMs +
@@ -132,9 +139,9 @@ describe('panda-on-desk · W14-T4 demo-mode 静态契约', () => {
       DEFAULT_TIMING.speciesEachMs * DEMO_SPECIES_CYCLE.length +
       DEFAULT_TIMING.badgeMs +
       DEFAULT_TIMING.overlayMs
-    // 5+3+3+2+2+3+2.5+(1.5*5)+2+4 = 30
-    expect(total).toBeGreaterThanOrEqual(20_000)
-    expect(total).toBeLessThanOrEqual(40_000)
+    // W17-T3：1500*6 + 2000 + (800*5) + 1500 + 3000 = 19500ms
+    expect(total).toBeLessThanOrEqual(25_000)
+    expect(total).toBeGreaterThanOrEqual(15_000)
   })
 })
 
@@ -270,5 +277,137 @@ describe('panda-on-desk · W14-T4 markDemoComplete 容错', () => {
     })
     expect(r.ok).toBe(true)
     expect(captured).toEqual({ firstRun: false })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W17-T3 深化：progress / subtitle / skip / transition / welcome
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('panda-on-desk · W17-T3 demo-mode 深化', () => {
+  let rec: Recorder
+  beforeEach(() => { rec = newRecorder() })
+
+  test('DoD1 · DEFAULT_TIMING 总时长 ≤ 25s（目标 ~20s）', () => {
+    const total =
+      DEFAULT_TIMING.idleMs +
+      DEFAULT_TIMING.thinkingMs +
+      DEFAULT_TIMING.workingMs +
+      DEFAULT_TIMING.attentionMs +
+      DEFAULT_TIMING.notificationMs +
+      DEFAULT_TIMING.sleepingMs +
+      DEFAULT_TIMING.levelupMs +
+      DEFAULT_TIMING.speciesEachMs * DEMO_SPECIES_CYCLE.length +
+      DEFAULT_TIMING.badgeMs +
+      DEFAULT_TIMING.overlayMs
+    expect(total).toBeLessThanOrEqual(25_000)
+    // 且必须 ≤ 22_000 以体现"压缩"
+    expect(total).toBeLessThanOrEqual(22_000)
+  })
+
+  test('DoD2 · 引导字幕：DEMO_SUBTITLES 10 条 + subtitle DOM 注入脚本包含 textContent 赋值', async () => {
+    expect(DEMO_SUBTITLES.length).toBe(10)
+    const subs: string[] = []
+    await runDemoSequence(fakeHitWin(), makeOpts(rec, {
+      onSubtitle: (t: string) => subs.push(t),
+    }))
+    // 主循环 10 步每步都会触发 subtitle 更新
+    expect(subs.length).toBe(10)
+    expect(subs[0]).toContain('idle')
+    expect(subs[6]).toContain('level up')
+    expect(subs[9]).toContain('欢迎')
+    // subtitle 脚本含 DOM 选择器 + textContent 赋值
+    const script = buildSubtitleScript('hello · test')
+    expect(script).toContain('panda-demo-subtitle')
+    expect(script).toContain('textContent')
+    expect(script).toContain('hello · test')
+  })
+
+  test('DoD3 · progress bar：0→100 单调递增 + 注入脚本含 style.width 赋值', async () => {
+    const progresses: number[] = []
+    const result = await runDemoSequence(fakeHitWin(), makeOpts(rec, {
+      onProgress: (p: number) => progresses.push(p),
+    }))
+    // 初始 0 + 10 步 × 1 = 11 条
+    expect(progresses.length).toBeGreaterThanOrEqual(11)
+    expect(progresses[0]).toBe(0)
+    expect(progresses[progresses.length - 1]).toBe(100)
+    // 单调递增
+    for (let i = 1; i < progresses.length; i++) {
+      expect(progresses[i]).toBeGreaterThanOrEqual(progresses[i - 1])
+    }
+    // result.progressSeries 也携带完整序列
+    expect(result.progressSeries).toBeDefined()
+    expect(result.progressSeries!.length).toBe(progresses.length)
+    // progress 脚本含 width 赋值
+    const ps = buildProgressScript(42)
+    expect(ps).toContain('panda-demo-progress')
+    expect(ps).toContain('42')
+    expect(ps).toContain("'%'")
+  })
+
+  test('DoD4 · skip 按钮：skipSignal=true 时中途终止 + result.skipped=true', async () => {
+    // 第 3 次 checkSkip 返回 true（允许前几步执行）
+    let calls = 0
+    const result = await runDemoSequence(fakeHitWin(), makeOpts(rec, {
+      skipSignal: () => { calls++; return calls >= 3 },
+    }))
+    expect(result.skipped).toBe(true)
+    expect(result.reason).toContain('skip')
+    // 中途退出 → step record 数 < 10
+    expect(result.steps.length).toBeLessThan(10)
+    // chrome 清理脚本仍会执行（avoid DOM 残留）
+    const cleanupCalls = rec.execs.filter(s => s.includes('panda-demo-chrome') && s.includes('remove'))
+    expect(cleanupCalls.length).toBeGreaterThanOrEqual(1)
+  })
+
+  test('DoD5 · chrome init / 平滑过渡 / welcome 按钮注入脚本正确', async () => {
+    await runDemoSequence(fakeHitWin(), makeOpts(rec))
+    // chrome 初始化脚本注入（progress/subtitle/skip 三组件）
+    const chromeInit = rec.execs.find(s => s.includes('panda-demo-chrome') && s.includes('appendChild'))
+    expect(chromeInit).toBeDefined()
+    expect(chromeInit!).toContain('panda-demo-progress')
+    expect(chromeInit!).toContain('panda-demo-subtitle')
+    expect(chromeInit!).toContain('panda-demo-skip')
+    expect(chromeInit!).toContain('跳过')
+    // 平滑过渡（state 间）脚本至少出现一次 — 含 opacity + transition
+    const fade = rec.execs.find(s => s.includes("transition='opacity"))
+    expect(fade).toBeDefined()
+    // welcome overlay 脚本含 /buddy stats 文案 + 按钮
+    const welcome = rec.execs.find(s => s.includes('panda-demo-welcome') && s.includes('跳到桌面'))
+    expect(welcome).toBeDefined()
+    expect(welcome!).toContain('/buddy stats')
+    expect(welcome!).toContain('panda-demo-welcome-desk')
+  })
+
+  test('DoD6 · 纯脚本生成器容错：无 NaN/Infinity/undefined + cleanup 幂等', () => {
+    const scripts = [
+      buildChromeInitScript(),
+      buildSubtitleScript('normal'),
+      buildSubtitleScript(''),
+      buildSubtitleScript('"with\\nquote"'),
+      buildProgressScript(-5),        // clamp → 0
+      buildProgressScript(250),       // clamp → 100
+      buildProgressScript(Number.NaN),// safe → 0
+      buildTransitionFadeScript(300),
+      buildTransitionFadeScript(10),  // clamp → 50
+      buildWelcomeOverlayScript('测试 "escape" ok'),
+      buildChromeCleanupScript(),
+    ]
+    for (const s of scripts) {
+      expect(s).not.toContain('NaN')
+      expect(s).not.toContain('Infinity')
+      // undefined 仅允许作为 JS 关键字（typeof 检查），不应出现为注入的值
+      expect(s.includes('=undefined')).toBe(false)
+    }
+    // progress clamp 验证
+    expect(buildProgressScript(-5)).toContain('0+')
+    expect(buildProgressScript(250)).toContain('100+')
+    expect(buildProgressScript(Number.NaN)).toContain('0+')
+  })
+
+  test('DoD7 · DEMO_SUBTITLES 长度必须 === DEMO_STEPS 长度（契约锁定）', () => {
+    expect(DEMO_SUBTITLES.length).toBe(DEMO_STEPS.length)
+    expect(DEMO_SUBTITLES.every(s => typeof s === 'string' && s.length > 0)).toBe(true)
   })
 })
