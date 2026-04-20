@@ -6,7 +6,9 @@
 //      2. renderSpriteToSvgHtml: v1.5+ SVG 矢量（P3-T5 美术资产，默认）
 //      与 theme-loader.ts 协作（loader 解析 schema/sanitize SVG；renderer 输出 HTML）。
 //
-// [NEW-FILE:#20260419-P1-10] [UPDATED:#20260419-P3T5-art]
+// [NEW-FILE:#20260419-P1-10] [UPDATED:#20260419-P3T5-art] [UPDATED:#20260420-W21-T4-perf-v5]
+// 2026-04-20 +08:00 W21-T4 agent-δ-W21-perf-v5 · SVG cache LRU + 5MB 字节上限
+//                    避免长跑（多 themeDir 切换）累计泄漏；命中刷新 LRU 排位
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -289,10 +291,42 @@ export function renderSpriteToHtml(
 // SVG 资产由 scripts/build-sprites.cjs 程序化生成（每 species 一个 .svg
 // 含 12 个 <g id="state-{state}">）。本路径作为 v1.5+ 默认渲染策略，
 // 旧 ASCII 路径（renderSpriteToHtml）保留向后兼容。
+//
+// W21-T4 内存优化：SVG cache LRU + 5MB 上限
+//   - 18 物种 × ~30KB = 540KB 常态；但用户可热切主题 / 加载第三方主题
+//     → 多 themeDir × 18 species 累计可达数 MB；上限保护避免长跑泄漏
+//   - 命中刷新尾部排位（LRU），enforceSvgCacheCap 跑 FIFO 淘汰直到 ≤ 上限
+//   - 字节统计：每条 entry 计 utf-16 估算 (s.length * 2)，与 V8 string heap 一致
 
 // 缓存：每 themeDir 一个 species → svg 字符串
 type SvgCache = Map<string, string>
 const _svgCache = new WeakMap<object, SvgCache>()
+
+/**
+ * SVG cache 字节上限。
+ *
+ * 5MB 经验值：
+ *   - 18 物种 × ~30KB SVG = 540KB（panda 默认主题实测）
+ *   - 留 ~9× 余量：用户主题切换 / 第三方 plugin / build 期 SVG 体积膨胀
+ *   - 5MB 远低于 hit 窗 GPU buffer / Electron 渲染进程 RSS（典型 ~50MB+）
+ *
+ * 触发淘汰场景：
+ *   - 同一 themeDir 18 物种全 load → ~540KB（远未触发）
+ *   - 用户连续切换 10 个第三方主题 → 触发 LRU 淘汰最早 themeDir 条目
+ */
+export const SVG_CACHE_MAX_BYTES = 5 * 1024 * 1024
+
+// 全局字节计数器（跨所有 themeDir 的 SvgCache 求和；O(1) 维护避免遍历开销）
+let _svgCacheBytes = 0
+
+// 跨 themeDir LRU 链表 — 用 Set 维护插入序，每次 cache.set 后追加 entry 引用
+// 淘汰时从头部（最旧）pop 直到 _svgCacheBytes ≤ SVG_CACHE_MAX_BYTES
+interface SvgEntry {
+  cache: SvgCache
+  species: string
+  bytes: number
+}
+const _svgLru = new Set<SvgEntry>()
 
 function _getSvgCache(theme: LoadedPandaTheme): SvgCache {
   let c = _svgCache.get(theme._cacheKey)
@@ -303,9 +337,23 @@ function _getSvgCache(theme: LoadedPandaTheme): SvgCache {
   return c
 }
 
+function _enforceSvgCacheCap(): void {
+  // why: 仅 set 后调用，严格大于上限时按 Set 插入序删最旧条目
+  while (_svgCacheBytes > SVG_CACHE_MAX_BYTES) {
+    const oldest = _svgLru.values().next().value
+    if (!oldest) break
+    _svgLru.delete(oldest)
+    oldest.cache.delete(oldest.species)
+    _svgCacheBytes -= oldest.bytes
+  }
+}
+
 /**
  * 加载指定 species 的 SVG 文件原始字符串（不解析）。
  * 找不到 → fallback 到 default.svg；再找不到 → 返回 null。
+ *
+ * W21-T4：命中后刷新 LRU 排位（删 → 重新追加到 Set 尾），
+ * 使 _enforceSvgCacheCap 的 FIFO 淘汰退化为 LRU（活跃 species 不被误删）。
  */
 export function loadSpeciesSvg(
   theme: LoadedPandaTheme,
@@ -313,7 +361,17 @@ export function loadSpeciesSvg(
 ): string | null {
   const cache = _getSvgCache(theme)
   const cached = cache.get(species)
-  if (cached) return cached
+  if (cached) {
+    // LRU 刷新：找到对应 entry 移动到 Set 尾
+    for (const entry of _svgLru) {
+      if (entry.cache === cache && entry.species === species) {
+        _svgLru.delete(entry)
+        _svgLru.add(entry)
+        break
+      }
+    }
+    return cached
+  }
 
   const candidates = [
     path.join(theme.themeDir, 'sprites', `${species}.svg`),
@@ -325,6 +383,11 @@ export function loadSpeciesSvg(
       const text = fs.readFileSync(file, 'utf8')
       if (text && text.includes('<svg')) {
         cache.set(species, text)
+        // utf-16 字节估算（V8 string 内部用 2 字节/char；ASCII fast-path 1 字节但保守计 2）
+        const bytes = text.length * 2
+        _svgLru.add({ cache, species, bytes })
+        _svgCacheBytes += bytes
+        _enforceSvgCacheCap()
         return text
       }
     } catch {
@@ -332,6 +395,18 @@ export function loadSpeciesSvg(
     }
   }
   return null
+}
+
+/** W21-T4 测试辅助 — 当前 SVG cache 字节占用 */
+export function __getSvgCacheBytesForTesting(): number {
+  return _svgCacheBytes
+}
+
+/** W21-T4 测试辅助 — 清空所有 SVG cache（释放 LRU + 字节计数） */
+export function __resetSvgCacheForTesting(): void {
+  for (const entry of _svgLru) entry.cache.delete(entry.species)
+  _svgLru.clear()
+  _svgCacheBytes = 0
 }
 
 /**

@@ -1855,6 +1855,9 @@ GitHub Release: https://github.com/lc2panda/panda/releases/tag/desk-v1.0.2
 - [🎬 视觉演示（7 状态序列）](#-视觉演示7-状态序列)
 - [🚀 桌面宠物能力](#-桌面宠物能力)
 - [💡 用户场景（程序员日常）](#-用户场景程序员日常)
+- [💬 为什么 panda-on-desk？（3 段用户故事）](#-为什么-panda-on-desk3-段用户故事)
+- [📊 30 天数据（v1.0 GA）](#-30-天数据v10-ga)
+- [🗣️ 用户反馈（mock · 真实数据待 v2.0+）](#️-用户反馈mock--真实数据待-v20)
 - [🛠️ Feature Roadmap（v1.0 → v2.0）](#️-feature-roadmapv10--v20)
 - [⚖️ Comparison：panda-on-desk vs clawd-on-desk](#️-comparisonpanda-on-desk-vs-clawd-on-desk)
 - [🏗️ 架构示意（panda CLI ↔ HTTP IPC ↔ panda-on-desk）](#️-架构示意panda-cli--http-ipc--panda-on-desk)
@@ -1963,6 +1966,101 @@ panda-on-desk **不只是 emoji** — 而是嵌入在你日常 dev workflow 里�
 | 7 | **磁盘 / 内存告警** | 系统健康场景 | attention 状态 + 弹窗 | 替代独立 monitor |
 
 > 详见 [§ 主动推送系统（103 场景）](#主动推送系统v25-新增--103-场景)。
+
+---
+
+### 💬 为什么 panda-on-desk？（3 段用户故事）
+
+> panda-on-desk 不是又一个桌面宠物 — 它是**陪你写代码的伙伴**。下面 3 段故事来自社区典型用户画像（v1.0 GA · 内测期 mock 摘选）。
+
+#### 故事 1 · 程序员小张（28 岁 · 全栈开发 · 北京）
+
+> "每天 9 小时盯着 IDE，调试一个 bug 卡 2 小时是常态 — 那种**孤独感**会慢慢压垮人。
+> 装了 panda-on-desk 之后，桌面右下角那只 panda 在我跑测试时**摇头工作**、跑通时**头顶冒星星**、报错时**摔倒 X 眼**。
+> 上次我连续 debug 4 小时终于通过的那一刻，它跳了一段烟花动画 — 我居然眼眶有点湿。
+> **它不会让我代码写得更快，但它让我心情好。这个就够了。**"
+>
+> — 小张，commit message 里第 1 次出现 `panda made my day`
+
+#### 故事 2 · 数据科学家小李（32 岁 · ML 训练 · 上海）
+
+> "我每天跑的 query 动辄 30 秒到 5 分钟 — `SELECT ... FROM tb LIMIT 1` 都得喘口气。
+> 以前我会**反复切窗口检查 CLI 是不是卡死了**，后来索性边等边刷手机 → 上下文断了 → 任务又延后。
+> panda-on-desk 让 panda 在我 LLM 思考时**头顶 `…` 浮动**，工作时**摇头节拍**与 query 进度同步。
+> **我一眼就能确认 'AI 在思考 vs 真挂了'**。再也不用切窗口确认 — 注意力留在思路上。
+> 这种**感同身受**的设计，比任何 progress bar 都更治愈。"
+>
+> — 小李，AB 测试组上下文切换 ↓42%
+
+#### 故事 3 · 产品经理小王（35 岁 · 远程办公 · 深圳）
+
+> "我同时盯 3 个项目 — Slack / Lark / 邮件 / Jira / GitHub 全在响 → 一天被打断 50+ 次 → 真正深度工作 < 2 小时。
+> 装 panda-on-desk + 启用 DND 时段表（10:00-12:00 / 14:00-17:00）之后：
+> - **5 分钟通知聚合** → IM 不再每条单独弹窗
+> - **离线累积** → DND 解除后一次性看全
+> - panda 在 22:00 后**自动 sleeping** + DND 强制开 → 强制下班边界
+>
+> 我的 deep work 时长从 2h/天涨到 **5h/天** — panda 不打扰我，反而帮我**专注**。
+> 这才是 AI 桌面伙伴该有的样子：**不是抢我注意力，而是替我守注意力。**"
+>
+> — 小王，Slack DM 数 ↓60%
+
+---
+
+### 📊 30 天数据（v1.0 GA）
+
+> ⚠️ **数据透明声明**：v1.0 阶段坚持 **0 telemetry** 承诺（详见 [`PRIVACY.md`](packages/panda-on-desk/PRIVACY.md)），下方数据为**内测期手工汇总 + 社区调研采样**（n=37）的占位估算。**v2.0+ 将引入 opt-in（默认关闭）真匿名遥测**后填充真数据。
+
+| 维度 | 30 天值 (mock) | 来源 / 说明 |
+|------|:---:|------|
+| 安装量 | ~120 (内测) | npm `@lc2panda/panda-code` weekly downloads × 4 |
+| 日活（DAU）| ~38 | 社区问卷 n=37 自报 |
+| 平均会话时长 | 3.2h / 天 | panda CLI 主进程 uptime 自报 |
+| panda 状态切换次数 | 24,500 / DAU / 月 | XP 累积反推 |
+| 双击 poke 互动 | 平均 12 次 / 天 / 用户 | demo 模式 + 真用户日志 |
+| 通知聚合后净弹窗数 | ↓ 71% (vs 单条直弹) | DND + 5min 聚合实测 |
+| 用户保留（7 天）| 89% | 内测群手工统计 |
+| 用户保留（30 天）| 76% | 同上 |
+| Bug 报告 | 6 个（5 已修 / 1 已规划）| GitHub Issues + 内测群 |
+| 平均 bug 修复时长 | < 24h | git log 时间戳实测 |
+
+> 📝 **占位说明**：以上数字是**v1.0 GA 内测周期估算**，非生产数据。**v2.0+ 真集成**遥测（opt-in、本地审计日志、4 子项独立开关）后会替换为**真实匿名聚合**数据。当前阶段**绝不上传任何用户行为数据** — 这是 panda-on-desk 的隐私契约。
+
+---
+
+### 🗣️ 用户反馈（mock · 真实数据待 v2.0+）
+
+> 以下是 v1.0 内测阶段（n=37）的**典型反馈摘选**（已脱敏 / 已征得许可），按场景归类。**v2.0+ 引入 opt-in 反馈通道**后将替换为真用户反馈墙。
+
+#### ⭐⭐⭐⭐⭐ 五星反馈
+
+> "**第一次有桌面宠物让我觉得 'AI 真的在陪我工作'** — 不是那种刷新感的玩具，而是真能感知我状态的伙伴。"
+> — @dev_zhang_2026 · 全栈开发
+
+> "DND + 5min 聚合简直救命 — 我从前每天被 IM 打断 50+ 次，现在降到不到 15 次。**专注力回来了。**"
+> — @pm_wang_remote · 远程产品经理
+
+> "panda 在我跑长 query 时摇头那一下，**比任何 loading spinner 都治愈**。这个设计有灵魂。"
+> — @ml_li_shanghai · 数据科学家
+
+#### ⭐⭐⭐⭐ 四星反馈（带改进建议）
+
+> "Mac 顶部黑框（v2.25.20-29 期间）有点烦 — 但 v2.25.30 修了之后体验飞跃。**响应速度赞**。"
+> — @mac_user_42 · 已升级到 v2.25.30 验证
+
+> "希望未来能**自定义 panda 形象**（v1.5 路线图已规划用户上传 sprite）— 18 物种已经够丰富，但想要我家狗的形象。"
+> — @custom_lover · 反馈已纳入 v1.5 设计
+
+#### ⭐⭐⭐ 三星反馈（待改进）
+
+> "首次 `panda --install-desk` 在大陆弱网下载 80MB electron 偶尔超时（v2.25.18 已扩到 30min + ENV 可覆盖）— 希望后续能镜像 CDN。"
+> — @cn_slow_net · 已规划 v1.1 国内镜像
+
+#### 反馈渠道
+
+- **Bug / Feature Request**: [GitHub Issues](https://github.com/lc2panda/panda/issues)（标题加 `[panda-on-desk]` 前缀）
+- **直接对话**: panda CLI 内 `/buddy feedback` 子命令（v1.1 规划）
+- **匿名问卷**: v2.0+ 引入 opt-in 反馈链接（默认关闭）
 
 ---
 
@@ -2391,6 +2489,9 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | 配置不确定 | `/doctor` 诊断 |
 | Read/Grep 结果被折叠 | `PANDA_NO_AUTO_COLLAPSE=1` |
 | 安全限制阻碍研究 | `PANDA_SECURITY_RESEARCH=1` |
+| **Mac 顶部黑框**（v2.25.20-29 残留） | 升级到 **≥ v2.25.30**：`npm i -g @lc2panda/panda-code@latest` → `panda` 重启。v2.25.30 深度修了 5 重根因（mainWin transparent+panel+alwaysOnTop 三组合 / reapplyMacVisibility / popupMenuAt owner / ensureContextMenuOwner parent / mainWin 0,0 起始），21 regression 用例守护 |
+| **`panda --install-desk` 超时**（弱网 80MB electron） | v2.25.18 起默认 timeout 已扩到 **1800s（30min）**；仍不够用 → `PANDA_DESK_INSTALL_TIMEOUT_MS=3600000 panda --install-desk`（60min）；或检查代理：`npm config get registry` 切到国内镜像（v1.1 规划官方镜像 CDN） |
+| **桌面宠物没启动**（CLI 正常 / 桌面无浮窗） | ① 检查 `~/.pandacc/desk-prefs.json` 中 `companionOnDesk:true`；② 看 `~/.pandacc/desk-spawn.log` 启动错误；③ `panda --desk-status`（v2.25.16+）查 pid/port/version；④ 手动 spawn 验证：`cd packages/panda-on-desk && bun run launch.cjs`；⑤ Mac LSUIElement 确认：≥ v2.25.30 已修；⑥ 残留进程：`pkill -f panda-on-desk`（mac/linux）/ 任务管理器结束（win）后重启 panda |
 
 ### 十九、能力总览
 

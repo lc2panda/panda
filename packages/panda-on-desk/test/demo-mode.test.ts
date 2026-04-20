@@ -10,14 +10,20 @@ import {
   DEFAULT_TIMING,
   DEMO_SPECIES_CYCLE,
   DEMO_STEPS,
+  DEMO_STEP_SOUND_CUES,
   DEMO_SUBTITLES,
   buildChromeCleanupScript,
   buildChromeInitScript,
+  buildCursorHintScript,
   buildProgressScript,
   buildSubtitleScript,
   buildTransitionFadeScript,
   buildWelcomeOverlayScript,
+  getSoundCuesForLevel,
+  getStepsForLevel,
+  getSubtitlesForLevel,
   markDemoComplete,
+  markDemoSkipped,
   runDemoSequence,
   shouldRunDemo,
 } from '../src/demo-mode.js'
@@ -409,5 +415,218 @@ describe('panda-on-desk · W17-T3 demo-mode 深化', () => {
   test('DoD7 · DEMO_SUBTITLES 长度必须 === DEMO_STEPS 长度（契约锁定）', () => {
     expect(DEMO_SUBTITLES.length).toBe(DEMO_STEPS.length)
     expect(DEMO_SUBTITLES.every(s => typeof s === 'string' && s.length > 0)).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// W21-T2 demo polish：sound cue / cursor hint / final card / demoSkipped / 等级个性化
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('panda-on-desk · W21-T2 demo polish', () => {
+  let rec: Recorder
+  beforeEach(() => { rec = newRecorder() })
+
+  test('W21-T2-1 · DEMO_STEP_SOUND_CUES 10 条 + 与 DEMO_STEPS 长度一致 + 仅 short/gentle/critical 三类', () => {
+    expect(DEMO_STEP_SOUND_CUES.length).toBe(DEMO_STEPS.length)
+    const allowed = new Set(['short', 'gentle', 'critical'])
+    for (const c of DEMO_STEP_SOUND_CUES) {
+      expect(allowed.has(c)).toBe(true)
+    }
+    // levelup（idx 6）+ overlay（idx 9）必须 critical（关键里程碑）
+    expect(DEMO_STEP_SOUND_CUES[6]).toBe('critical')
+    expect(DEMO_STEP_SOUND_CUES[9]).toBe('critical')
+  })
+
+  test('W21-T2-2 · runDemoSequence 触发 playSoundCue 每步 1 次（满级 = 10 次）', async () => {
+    const cues: string[] = []
+    const result = await runDemoSequence(fakeHitWin(), makeOpts(rec, {
+      userLevel: 99, // 满级 → 全部 10 步
+      playSoundCue: (cue: string) => cues.push(cue),
+    }))
+    expect(cues.length).toBe(10)
+    expect(result.soundCues).toBeDefined()
+    expect(result.soundCues!.length).toBe(10)
+    // result 的 soundCues 与回调收到的应完全一致
+    expect(result.soundCues).toEqual(cues as any)
+    // 顺序与 DEMO_STEP_SOUND_CUES 一致
+    expect(cues).toEqual([...DEMO_STEP_SOUND_CUES])
+  })
+
+  test('W21-T2-3 · cursor hint：show + click + hide 三相位（首个 state 步骤触发）+ DOM 脚本正确', async () => {
+    const hints: string[] = []
+    const result = await runDemoSequence(fakeHitWin(), makeOpts(rec, {
+      userLevel: 99,
+      onCursorHint: (a: string) => hints.push(a),
+    }))
+    expect(hints).toEqual(['show', 'click', 'hide'])
+    expect(result.cursorHints).toEqual(['show', 'click', 'hide'])
+    // exec 应注入 cursor 脚本（show/click/hide 各一次）
+    const cursorShow = rec.execs.find(s => s.includes('panda-demo-cursor') && s.includes('appendChild'))
+    expect(cursorShow).toBeDefined()
+    expect(cursorShow!).toContain('svg')
+    const cursorClick = rec.execs.find(s => s.includes('panda-demo-pulse'))
+    expect(cursorClick).toBeDefined()
+    const cursorHide = rec.execs.find(s => s.includes('panda-demo-cursor') && s.includes('opacity'))
+    expect(cursorHide).toBeDefined()
+    // cleanup 也应清理 cursor DOM
+    expect(buildChromeCleanupScript()).toContain('panda-demo-cursor')
+  })
+
+  test('W21-T2-4 · final card 包含 /buddy stats + /buddy desk + 不再显示 按钮', () => {
+    const html = buildWelcomeOverlayScript('test welcome')
+    expect(html).toContain('/buddy stats')
+    expect(html).toContain('/buddy desk')
+    expect(html).toContain('panda-demo-welcome-desk')
+    expect(html).toContain('panda-demo-welcome-never')
+    expect(html).toContain('不再显示')
+    expect(html).toContain('__pandaDemoNeverShow')
+    expect(html).toContain('__pandaDemoWelcomeDesk')
+  })
+
+  test('W21-T2-5 · neverShow 路径：exec 返回 true → 写 demoSkipped=true + result.neverShow=true', async () => {
+    let execCallCount = 0
+    const result = await runDemoSequence(fakeHitWin(), makeOpts(rec, {
+      userLevel: 99,
+      // 自定义 exec：仅当问到 __pandaDemoNeverShow 时返回 true
+      exec: (script: string) => {
+        execCallCount++
+        rec.execs.push(script)
+        if (script.includes('__pandaDemoNeverShow')) return Promise.resolve(true)
+        if (script.includes('__pandaDemoSkip')) return Promise.resolve(false)
+        return Promise.resolve(null)
+      },
+    }))
+    expect(result.neverShow).toBe(true)
+    expect(rec.saved.length).toBe(1)
+    // markDemoSkipped 写入 firstRun=false + demoSkipped=true
+    expect(rec.saved[0]).toEqual({ firstRun: false, demoSkipped: true })
+    expect(result.marked).toBe(true)
+    expect(execCallCount).toBeGreaterThan(0)
+  })
+
+  test('W21-T2-6 · shouldRunDemo 同时尊重 demoSkipped=true（永久跳过）', () => {
+    expect(shouldRunDemo({ firstRun: true, demoSkipped: true })).toBe(false)
+    expect(shouldRunDemo({ firstRun: false, demoSkipped: true })).toBe(false)
+    expect(shouldRunDemo({ firstRun: true, demoSkipped: false })).toBe(true)
+    expect(shouldRunDemo({ firstRun: true })).toBe(true) // 缺失 demoSkipped → 默认不跳
+    expect(shouldRunDemo({ demoSkipped: true })).toBe(false)
+  })
+
+  test('W21-T2-7 · markDemoSkipped 写入 firstRun=false + demoSkipped=true', () => {
+    let captured: Record<string, unknown> | null = null
+    const r = markDemoSkipped({
+      saveDeskPrefs: (patch: Record<string, unknown>) => {
+        captured = patch
+        return { status: 'ok' as const, data: patch as any }
+      },
+    })
+    expect(r.ok).toBe(true)
+    expect(captured).toEqual({ firstRun: false, demoSkipped: true })
+  })
+
+  test('W21-T2-8 · markDemoSkipped 异常 → ok:false + reason', () => {
+    const r = markDemoSkipped({
+      saveDeskPrefs: () => { throw new Error('disk full') },
+    })
+    expect(r.ok).toBe(false)
+    expect(r.reason).toContain('disk full')
+  })
+
+  test('W21-T2-9 · 等级个性化：lv 1 仅 idle/sleeping 两个 state（其他 state 全裁）', () => {
+    const steps = getStepsForLevel(1)
+    const stateOnly = steps.filter(s => s.kind === 'state').map(s => (s as any).state)
+    expect(stateOnly).toEqual(['idle', 'sleeping'])
+    // 元能力（levelup/species/badge/overlay）保留
+    expect(steps.some(s => s.kind === 'levelup')).toBe(true)
+    expect(steps.some(s => s.kind === 'species-cycle')).toBe(true)
+    expect(steps.some(s => s.kind === 'badge')).toBe(true)
+    expect(steps.some(s => s.kind === 'overlay')).toBe(true)
+  })
+
+  test('W21-T2-10 · 等级个性化：lv 5 → +thinking；lv 10 → +working/notification；lv 15 → 全部', () => {
+    const lv5 = getStepsForLevel(5).filter(s => s.kind === 'state').map(s => (s as any).state)
+    expect(lv5).toEqual(['idle', 'thinking', 'sleeping'])
+    const lv10 = getStepsForLevel(10).filter(s => s.kind === 'state').map(s => (s as any).state)
+    expect(lv10).toEqual(['idle', 'thinking', 'working', 'notification', 'sleeping'])
+    const lv15 = getStepsForLevel(15).filter(s => s.kind === 'state').map(s => (s as any).state)
+    expect(lv15).toEqual(['idle', 'thinking', 'working', 'attention', 'notification', 'sleeping'])
+    // 等价：等价 lv 99 行为
+    const lv99 = getStepsForLevel(99).filter(s => s.kind === 'state').map(s => (s as any).state)
+    expect(lv99).toEqual(lv15)
+  })
+
+  test('W21-T2-11 · runDemoSequence userLevel=1 → 仅播 idle+sleeping 两个 state（其他 state 跳过）', async () => {
+    const result = await runDemoSequence(fakeHitWin(), makeOpts(rec, { userLevel: 1 }))
+    // 主循环步骤数 = 2 state + 1 levelup + 1 species + 1 badge + 1 overlay = 6
+    expect(result.steps.length).toBe(6)
+    const stateRecords = result.steps.filter(s => s.kind === 'state').map(s => s.detail)
+    expect(stateRecords).toEqual(['idle', 'sleeping'])
+    // pet-state IPC 也应只发 2 条
+    const stateEvents = rec.sends.filter(
+      (s) => s.channel === 'panda-event' && (s.payload as any)?.type === 'pet-state',
+    )
+    expect(stateEvents.length).toBe(2)
+    expect(stateEvents.map(s => (s.payload as any).state)).toEqual(['idle', 'sleeping'])
+  })
+
+  test('W21-T2-12 · 等级个性化时 sound cue / subtitle 同步裁剪（与 step 数对齐）', async () => {
+    const cues: string[] = []
+    const subs: string[] = []
+    await runDemoSequence(fakeHitWin(), makeOpts(rec, {
+      userLevel: 1,
+      playSoundCue: (c: string) => cues.push(c),
+      onSubtitle: (t: string) => subs.push(t),
+    }))
+    // lv1 → 6 步骤；sound cue 6 次；subtitle 6 次
+    expect(cues.length).toBe(6)
+    expect(subs.length).toBe(6)
+    // helper 应返回相同长度
+    expect(getSoundCuesForLevel(1).length).toBe(6)
+    expect(getSubtitlesForLevel(1).length).toBe(6)
+  })
+
+  test('W21-T2-13 · buildCursorHintScript 三动作脚本契约（show/click/hide）', () => {
+    const show = buildCursorHintScript('show')
+    expect(show).toContain('panda-demo-cursor')
+    expect(show).toContain('svg')
+    expect(show).toContain('appendChild')
+    expect(show).toContain('getElementById(\'pet\')')
+
+    const click = buildCursorHintScript('click')
+    expect(click).toContain('panda-demo-pulse')
+    expect(click).toContain('@keyframes panda-demo-pulse')
+    expect(click).toContain('__pandaPoke')
+
+    const hide = buildCursorHintScript('hide')
+    expect(hide).toContain('panda-demo-cursor')
+    expect(hide).toContain("opacity='0'")
+
+    // 容错：未知 action 走 hide 路径（不抛）
+    const unknown = buildCursorHintScript('weird' as any)
+    expect(unknown).toContain('panda-demo-cursor')
+
+    // 全部脚本无 NaN/Infinity 注入
+    for (const s of [show, click, hide]) {
+      expect(s).not.toContain('NaN')
+      expect(s).not.toContain('Infinity')
+    }
+  })
+
+  test('W21-T2-14 · 默认 userLevel=undefined → 完整 10 步（向后兼容 W14-T4/W17-T3）', async () => {
+    const result = await runDemoSequence(fakeHitWin(), makeOpts(rec))
+    // 未注入 userLevel → 走完整 10 步（与 W14-T4 行为一致）
+    expect(result.steps.length).toBe(10)
+    // result.userLevel 仍报 1（默认值），但实际行为是"完整 demo"
+    expect(result.userLevel).toBe(1)
+  })
+
+  test('W21-T2-15 · userLevel=99 显式启用裁剪 → 完整 10 步 + sound cue 10 次', async () => {
+    const cues: string[] = []
+    const result = await runDemoSequence(fakeHitWin(), makeOpts(rec, {
+      userLevel: 99,
+      playSoundCue: (c: string) => cues.push(c),
+    }))
+    expect(result.steps.length).toBe(10)
+    expect(cues.length).toBe(10)
   })
 })

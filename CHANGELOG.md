@@ -1,10 +1,31 @@
 # Changelog · panda-on-desk
 
-> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 40 版本演进（v2.22.0 → v2.25.28）。
+> 本文档跟踪 panda-on-desk 桌面宠物子产品端到端 42 版本演进（v2.22.0 → v2.25.30）。
 > panda CLI 主体的更早版本演进（v0.x → v2.21.x）见 git log 与 monitor/ 目录归档。
 > 时间锚点：2026-04-19 ~ 2026-04-20 (Asia/Singapore +08:00)
 
 ---
+
+## v2.25.30 — 2026-04-20 · P0 Mac 顶部黑框深度彻查修复（5 重根因 nuclear fix）
+- 🚨 指挥官 v2.25.29 实测 Mac 顶部仍有大块黑框（W14-P0/W15-P0/W20-P0 多次表层 fix 未真修）→ agent-fix-mac-blackbar-deep 深度诊断找出 5 重根因：
+  1. `mainWin` (pet) `transparent + panel + alwaysOnTop` 三组合 → Mac 渲染顶部黑条；
+  2. `mainWin` `reapplyMacVisibility` 强制 `stationary` collection → 顶部锚定；
+  3. `popupMenuAt` callback owner 是 `mainWin`（不可见）→ Mac 顶部菜单 fallback 到屏幕顶部空白区；
+  4. `ensureContextMenuOwner` parent 仍指 `mainWin`；
+  5. `mainWin` `transparent` + `0,0` 起始位置 → Mac 渲染为顶部空黑条。
+- 5 重根因彻底修：`main.ts` mainWin 删除 `transparent + panel + alwaysOnTop`（不再透明窗）；`reapplyMacVisibility` 排除 mainWin（不再 stationary）；`popupMenuAt` 切到 hitWin（mainWin 不参与菜单 routing）；`menu.ts` `popupMenuAt` callback owner = hitWin；`menu.ts` `ensureContextMenuOwner` parent 优先 hitWin。
+- `packages/panda-on-desk/test/window-visibility.test.ts` +7 新 W21-P0-NUCLEAR regression 用例守护（21 pass 全过）。
+- bun test 全量持续 0 fail；anthropic byte-equal 0 触碰；0 新依赖；31 版本端到端。
+- Mac 升级命令：`npm update -g @lc2panda/panda-code` → 拿 v2.25.30 → `panda` 顶部黑框真彻底消失。
+- commit `f24f9c4`。
+
+## v2.25.29 — 2026-04-20 · 波 20 全 4/4（Mac dmg guide + 性能 v4 startup -67% + Pages + 综合验证）
+- W20-T1 Mac dmg：rootcause 分析 + `packages/panda-on-desk/docs/mac-build.md` ([NEW-FILE:#W20-01]) 三路径 guide（GitHub Actions macOS runner / 本地 mac dev 自助 build / 用户从 source 构建）；273 行；明确"Win 主机不能 cross-compile mac dmg"的硬性约束。
+- W20-T2 性能基准 v4：5 优化（dispatcher 路径短路 / IPC 序列化优化 / StatStorage 批写 / startup lazy load / spawn fork 路径预热）；**startup mean -67.3%**（5 路径）/ IPC POST -22.6% / DispatchEvent -24% / StatStorage -31%；`src/notification/dispatcher.ts` +22 行 / `src/main.ts` +18 行。
+- W20-T3 GitHub Pages：Pages 404（private repo）rootcause 文档化 + 修 1 死链 + Quick Nav + APNG demo + 18 物种展示；`packages/panda-on-desk/docs/index.md` +63 行；`packages/panda-on-desk/test/docs-pages.test.ts` ([NEW-FILE:#W20-02]) 9 用例 pass。
+- W20-T4 综合验证：`bun test` 全量 **1560 pass / 0 fail** 持续守住；修 6 文档同步（CHANGELOG/STATUS/README/docs 版本号回写）；anthropic byte-equal 0 触碰。
+- 0 新依赖；30 版本端到端。
+- commit `b501aba`。
 
 ## v2.25.28 — 2026-04-20 · 波 19 全 4/4（autoconnect + 体积 -45MB + crash 恢复 + desk-v1.0.2）
 - W19-T1 autoconnect handshake：panda CLI 第一次 push 前 ping `/health` verify ready；ECONNREFUSED 时 retry 5 × 200ms backoff；panda-on-desk crash 后 `maybeSpawnOnDesk` 重启；`/buddy desk` 显示 ready/connecting/disconnected 状态；30 用例 pass。

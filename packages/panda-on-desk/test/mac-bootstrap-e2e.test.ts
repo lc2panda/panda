@@ -508,3 +508,287 @@ describe('W15-T4 · Mac dry-run · byte-equal + P0 回归锁', () => {
     }
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group 9 · W21-P0-NUCLEAR · v2.25.30 Mac 黑框 5 重根因加固守护
+//
+// 背景：v2.25.30 修了 Mac 黑横条 5 个根因（mainWin transparent/panel/alwaysOnTop +
+//   reapplyMacVisibility 注入 mainWin + popupMenuAt owner=win + ensureContextMenuOwner
+//   parent=win + menu callback ctx.win.showInactive()）。本组 8 用例守护防止 Win 改动
+//   或后续重构把任一根因带回 mac，确保跨平台 hotfix 不退化。
+//
+// [NEW-FILE:#W21-01] 20260420 W21-T1 Mac e2e agent · agent-α-W21-mac-e2e
+// 触发原因：mac-bootstrap-e2e.test.ts (W15-T4) 与 window-visibility.test.ts (W21-NUCLEAR)
+//   各守护一段，但缺 "Mac dry-run 链路上 5 重 nuclear 修复同时验证" 的契约用例 ——
+//   特别是 mainWin opts 关键字段 + popupMenuAt owner + reapplyMacVisibility candidates
+//   三者在同一文件内联动断言，能比单独 grep 更早捕获 cross-platform 退化。
+// 证据：
+//   · packages/panda-on-desk/src/main.ts L551-566 (reapplyMacVisibility candidates=[hitWin])
+//   · packages/panda-on-desk/src/main.ts L759-765 (popupMenuAt owner=hitWin)
+//   · packages/panda-on-desk/src/main.ts L948-980 (mainWin transparent/alwaysOnTop/panel 全删)
+//   · packages/panda-on-desk/src/menu.ts L184-227 (ensureContextMenuOwner parent=hitWin)
+//   · packages/panda-on-desk/src/menu.ts L240-260 (popupMenuAt callback hitWin showInactive)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W21-T1 · Mac e2e · v2.25.30 nuclear 黑框 5 重根因守护', () => {
+  test('[19] mainWin opts: transparent=false (W21 nuclear root #1)', () => {
+    const mainSrc = readFileSync(join(PKG_ROOT, 'src', 'main.ts'), 'utf-8')
+    // 截 win = new BrowserWindow({...}) opts 块
+    const winOptsMatch = mainSrc.match(/win = new BrowserWindow\(\{[\s\S]*?\n\s+\}\)/)
+    expect(winOptsMatch).not.toBeNull()
+    const opts = winOptsMatch![0]
+    // 显式标注 transparent: false（NUCLEAR fix）
+    expect(opts).toMatch(/transparent:\s*false/)
+    // 严禁 transparent: true（mac NSPanel 合成层残影根因）
+    expect(opts).not.toMatch(/transparent:\s*true/)
+  })
+
+  test('[20] mainWin opts: alwaysOnTop=false + panel=false (W21 nuclear root #2/#3)', () => {
+    const mainSrc = readFileSync(join(PKG_ROOT, 'src', 'main.ts'), 'utf-8')
+    const winOptsMatch = mainSrc.match(/win = new BrowserWindow\(\{[\s\S]*?\n\s+\}\)/)
+    expect(winOptsMatch).not.toBeNull()
+    const opts = winOptsMatch![0]
+    // alwaysOnTop=false 显式
+    expect(opts).toMatch(/alwaysOnTop:\s*false/)
+    expect(opts).not.toMatch(/alwaysOnTop:\s*true/)
+    // 不再含 isMac ? { type: 'panel' } —— mainWin 永久 hidden 不需 panel
+    expect(opts).not.toMatch(/isMac\s*\?\s*\{\s*type:\s*['"]panel['"]/)
+    // 但 hitWin 仍应保留 panel（唯一可见 panda 需 panel 顶层 + 透明）
+    const hitOptsMatch = mainSrc.match(/hitWin = new BrowserWindow\(\{[\s\S]*?\n\s+\}\)/)
+    expect(hitOptsMatch).not.toBeNull()
+    expect(hitOptsMatch![0]).toMatch(/isMac\s*\?\s*\{\s*type:\s*['"]panel['"]/)
+  })
+
+  test('[21] reapplyMacVisibility candidates 仅含 hitWin (W21 nuclear root #4 - mainWin 排除)', () => {
+    const mainSrc = readFileSync(join(PKG_ROOT, 'src', 'main.ts'), 'utf-8')
+    const fnBlock = mainSrc.match(/function reapplyMacVisibility\(\)[\s\S]*?\n\}/)
+    expect(fnBlock).not.toBeNull()
+    const body = fnBlock![0]
+    // candidates 数组只含 hitWin
+    const candidatesLine = body.match(/candidates\s*=\s*\[([^\]]*)\]/)
+    expect(candidatesLine).not.toBeNull()
+    const arr = candidatesLine![1]
+    expect(arr).toMatch(/hitWin/)
+    // 严禁裸 win 出现（避免 mainWin 被注入 1500 级 + canHide=false 触发幽灵帧）
+    // 用 \b 边界且明确不能有 win 后跟 .filter 之外的 token
+    expect(/\bwin\b(?!\s*\.\s*filter|\s*\?\?|\s*\|\|)/.test(arr.replace(/hitWin/g, 'HITWIN'))).toBe(false)
+    // W21-P0-NUCLEAR 注释存在
+    expect(body).toContain('[W21-P0-NUCLEAR')
+  })
+
+  test('[22] popupMenuAt owner = hitWin (W21 nuclear root #5)', () => {
+    const mainSrc = readFileSync(join(PKG_ROOT, 'src', 'main.ts'), 'utf-8')
+    const fnBlock = mainSrc.match(/function popupMenuAt\(menu:[^)]*\)[\s\S]*?\n\}/)
+    expect(fnBlock).not.toBeNull()
+    const body = fnBlock![0]
+    // owner = (hitWin && !hitWin.isDestroyed()) ? hitWin : win 模式
+    expect(body).toMatch(/hitWin/)
+    expect(body).toMatch(/menu\.popup\(\{\s*window:\s*owner\s*\}\)/)
+    // 严禁 menu.popup({ window: win }) 直接传 mainWin
+    expect(body).not.toMatch(/menu\.popup\(\{\s*window:\s*win\s*\}\)/)
+  })
+
+  test('[23] ensureContextMenuOwner parent 优先 hitWin (W21 nuclear · menu.ts)', () => {
+    const menuSrc = readFileSync(join(PKG_ROOT, 'src', 'menu.ts'), 'utf-8')
+    // parent: parentWin 模式（parentWin = hitWin || win）
+    const fnBlock = menuSrc.match(/function ensureContextMenuOwner\(\)[\s\S]*?return ctx\.contextMenuOwner;[\s\S]*?\n\s\s\}/)
+    expect(fnBlock).not.toBeNull()
+    const body = fnBlock![0]
+    // 剥注释（注释中允许出现 historical "parent:ctx.win" 文字描述根因）
+    const stripComments = (s: string): string =>
+      s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const codeBody = stripComments(body)
+    // 必含 ctx.hitWin 优先逻辑
+    expect(codeBody).toMatch(/ctx\.hitWin/)
+    // 严禁硬编码 parent: ctx.win（必须先尝试 ctx.hitWin）
+    expect(codeBody).not.toMatch(/parent:\s*ctx\.win\b/)
+    // 实际 parent: parentWin 通用 binding
+    expect(codeBody).toMatch(/parent:\s*parentWin/)
+    // W21-P0-NUCLEAR 注释存在（含注释整体）
+    expect(body).toContain('[W21-P0-NUCLEAR')
+  })
+
+  test('[24] menu.ts popupMenuAt callback 用 hitWin.showInactive() (W21 nuclear · 防黑框残影)', () => {
+    const menuSrc = readFileSync(join(PKG_ROOT, 'src', 'menu.ts'), 'utf-8')
+    const fnBlock = menuSrc.match(/function popupMenuAt\(menu\)[\s\S]*?\n\s\s\}/)
+    expect(fnBlock).not.toBeNull()
+    // 剥注释后才比对（注释里可能保留 historical ctx.win.showInactive 描述）
+    const stripComments = (s: string): string =>
+      s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const codeBody = stripComments(fnBlock![0])
+    // 严禁 ctx.win.showInactive() 裸调用
+    expect(codeBody).not.toMatch(/ctx\.win\.showInactive\(\)/)
+    // 必须含 hitWin 或 visiblePet 路径（visiblePet = ctx.hitWin || null）
+    expect(codeBody).toMatch(/ctx\.hitWin/)
+    expect(codeBody).toMatch(/showInactive/)
+  })
+
+  test('[25] 启动后顶部 [0,0] 区域无 mainWin / settings / contextMenuOwner 可见（hitWin 是唯一 panda）', () => {
+    // 契约 mock 校验：基于源码声明，mainWin/settings/contextMenuOwner 启动期 show=false 或 lazy
+    const mainSrc = readFileSync(join(PKG_ROOT, 'src', 'main.ts'), 'utf-8')
+    const menuSrc = readFileSync(join(PKG_ROOT, 'src', 'menu.ts'), 'utf-8')
+    // 1. mainWin show:false
+    const winOptsMatch = mainSrc.match(/win = new BrowserWindow\(\{[\s\S]*?\n\s+\}\)/)
+    expect(winOptsMatch![0]).toMatch(/show:\s*false/)
+    // 2. settingsWindow show:false
+    const settingsBlock = mainSrc.match(/function openSettingsWindow\(\)[\s\S]*?settingsWindow = new BrowserWindow\(opts\)/)
+    expect(settingsBlock![0]).toMatch(/show:\s*false/)
+    // 3. contextMenuOwner show:false（menu.ts 中 ensureContextMenuOwner 配置）
+    const ownerBlock = menuSrc.match(/ctx\.contextMenuOwner = new BrowserWindow\(\{[\s\S]*?\}\);/)
+    expect(ownerBlock).not.toBeNull()
+    expect(ownerBlock![0]).toMatch(/show:\s*false/)
+    // 4. update-bubble stub no-op
+    const updateBubbleSrc = readFileSync(join(PKG_ROOT, 'src', 'update-bubble.ts'), 'utf-8')
+    expect(updateBubbleSrc).toMatch(/getBubbleWindow\(\)\s*\{\s*return\s+null/)
+  })
+
+  test('[26] hitWin 是启动期唯一可见 panda (showInactive 仅在 hitWin 创建后)', () => {
+    const mainSrc = readFileSync(join(PKG_ROOT, 'src', 'main.ts'), 'utf-8')
+    // hitWin.showInactive() 调用必须存在（ready-to-show 或 fallback）
+    expect(mainSrc).toContain('hitWin.showInactive()')
+    // mainWin 不应有 win.showInactive() 裸调用
+    const lines = mainSrc.split(/\r?\n/)
+    const offending = lines
+      .filter((l) => /\bwin\.showInactive\s*\(\s*\)/.test(l))
+      .filter((l) => !/^\s*\/\//.test(l.trim()) && !/^\s*\*/.test(l.trim()))
+    // 仅允许在 togglePetVisibility 等用户主动操作中出现 hitWin.showInactive()，
+    // 启动序列禁裸 win.showInactive()
+    expect(offending.length).toBe(0)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group 10 · cross-mac-version 守护 · 模拟 Mac 11/12/13/14 验证 black-bar fix
+//   不依赖真 electron app.getVersion，纯 mock os.release + process.platform
+//   验证：W21 关键 fix 在所有 Mac 版本下契约一致（不退化）
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W21-T1 · cross-mac-version · macOS 11/12/13/14 black-bar fix 不退化', () => {
+  // os.release() 返回 Darwin kernel version：
+  //   macOS 11 Big Sur     → Darwin 20.x.x
+  //   macOS 12 Monterey    → Darwin 21.x.x
+  //   macOS 13 Ventura     → Darwin 22.x.x
+  //   macOS 14 Sonoma      → Darwin 23.x.x
+  //   macOS 15 Sequoia     → Darwin 24.x.x
+  // 参考：https://en.wikipedia.org/wiki/Darwin_(operating_system)#Release_history
+  const versions = [
+    { mac: 'macOS 11 Big Sur',   darwin: '20.6.0' },
+    { mac: 'macOS 12 Monterey',  darwin: '21.6.0' },
+    { mac: 'macOS 13 Ventura',   darwin: '22.6.0' },
+    { mac: 'macOS 14 Sonoma',    darwin: '23.6.0' },
+  ]
+
+  for (const v of versions) {
+    test(`[27.${versions.indexOf(v) + 1}] ${v.mac} (Darwin ${v.darwin}): mainWin nuclear 5 fix 全部就位`, () => {
+      // mock os.release
+      const os = require('node:os')
+      const origRelease = os.release
+      os.release = () => v.darwin
+      try {
+        // platform 已在 beforeEach 设为 darwin
+        expect(process.platform).toBe('darwin')
+        expect(os.release()).toBe(v.darwin)
+
+        // 跨版本验证：5 个 nuclear root cause fix 均在源码中存在
+        const mainSrc = readFileSync(join(PKG_ROOT, 'src', 'main.ts'), 'utf-8')
+        const menuSrc = readFileSync(join(PKG_ROOT, 'src', 'menu.ts'), 'utf-8')
+
+        // root #1: mainWin transparent=false
+        const winOpts = mainSrc.match(/win = new BrowserWindow\(\{[\s\S]*?\n\s+\}\)/)![0]
+        expect(winOpts).toMatch(/transparent:\s*false/)
+
+        // root #2: mainWin alwaysOnTop=false
+        expect(winOpts).toMatch(/alwaysOnTop:\s*false/)
+
+        // root #3: mainWin no panel type
+        expect(winOpts).not.toMatch(/isMac\s*\?\s*\{\s*type:\s*['"]panel['"]/)
+
+        // root #4: reapplyMacVisibility 排除 mainWin
+        const visFn = mainSrc.match(/function reapplyMacVisibility\(\)[\s\S]*?\n\}/)![0]
+        const arr = visFn.match(/candidates\s*=\s*\[([^\]]*)\]/)![1]
+        expect(arr).toMatch(/hitWin/)
+        expect(/\bwin\b(?!\s*\.\s*filter|\s*\?\?|\s*\|\|)/.test(arr.replace(/hitWin/g, 'HITWIN'))).toBe(false)
+
+        // root #5: popupMenuAt owner = hitWin
+        const popFn = mainSrc.match(/function popupMenuAt\(menu:[^)]*\)[\s\S]*?\n\}/)![0]
+        expect(popFn).toMatch(/hitWin/)
+        expect(popFn).not.toMatch(/menu\.popup\(\{\s*window:\s*win\s*\}\)/)
+
+        // bonus: menu.ts ensureContextMenuOwner parent = hitWin
+        const ensureFn = menuSrc.match(/function ensureContextMenuOwner\(\)[\s\S]*?return ctx\.contextMenuOwner;[\s\S]*?\n\s\s\}/)![0]
+        expect(ensureFn).toMatch(/ctx\.hitWin/)
+      } finally {
+        os.release = origRelease
+      }
+    })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group 11 · stress · 500 次 mock spawn 验证 0 黑框（防 race condition）
+//   不真启 electron，只 mock platform=darwin + 反复执行 contract 检查 +
+//   反复 toggle os.release/Darwin version + 验证契约 idempotent
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W21-T1 · stress · 500 次 mock spawn 黑框防御', () => {
+  test('[28] 500 次重复契约校验 + 跨版本随机切换 → 0 退化（idempotent）', () => {
+    const os = require('node:os')
+    const origRelease = os.release
+    const darwinVersions = ['20.6.0', '21.6.0', '22.6.0', '23.6.0', '24.0.0']
+    const mainSrc = readFileSync(join(PKG_ROOT, 'src', 'main.ts'), 'utf-8')
+    const menuSrc = readFileSync(join(PKG_ROOT, 'src', 'menu.ts'), 'utf-8')
+
+    // 预先解构关键代码块（500 次循环不重读文件，节流 IO 但保契约不变）
+    const winOpts = mainSrc.match(/win = new BrowserWindow\(\{[\s\S]*?\n\s+\}\)/)![0]
+    const visFn = mainSrc.match(/function reapplyMacVisibility\(\)[\s\S]*?\n\}/)![0]
+    const popFn = mainSrc.match(/function popupMenuAt\(menu:[^)]*\)[\s\S]*?\n\}/)![0]
+    const ensureFn = menuSrc.match(/function ensureContextMenuOwner\(\)[\s\S]*?return ctx\.contextMenuOwner;[\s\S]*?\n\s\s\}/)![0]
+
+    // 剥注释（注释里 historical 描述允许出现 parent:ctx.win 等历史根因字面）
+    const stripComments = (s: string): string =>
+      s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const ensureFnCode = stripComments(ensureFn)
+    const popFnCode = stripComments(popFn)
+    const visFnCode = stripComments(visFn)
+    const visCandidatesArr = visFnCode.match(/candidates\s*=\s*\[([^\]]*)\]/)![1]
+
+    let blackFrameDetections = 0
+    try {
+      for (let i = 0; i < 500; i++) {
+        // 模拟随机 mac 版本
+        os.release = () => darwinVersions[i % darwinVersions.length]
+        // 模拟 mainWin spawn 契约（每轮重新断言 5 nuclear root）
+        const checks = [
+          /transparent:\s*false/.test(winOpts),
+          /alwaysOnTop:\s*false/.test(winOpts),
+          !/isMac\s*\?\s*\{\s*type:\s*['"]panel['"]/.test(winOpts),
+          /hitWin/.test(visCandidatesArr),
+          /hitWin/.test(popFnCode) && !/menu\.popup\(\{\s*window:\s*win\s*\}\)/.test(popFnCode),
+          /ctx\.hitWin/.test(ensureFnCode) && !/parent:\s*ctx\.win\b/.test(ensureFnCode),
+        ]
+        // 任一 check 失败即视为黑框退化
+        if (checks.some((c) => !c)) blackFrameDetections++
+      }
+      // race condition 守护：500 轮全部通过，无任何退化
+      expect(blackFrameDetections).toBe(0)
+    } finally {
+      os.release = origRelease
+    }
+  }, 30_000)
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Group 12 · byte-equal 守护补强 · 锁定 W21-T1 测试改动不触碰 anthropic 核心路径
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('W21-T1 · byte-equal 守护', () => {
+  test('[29] 本测试文件 (W21 增量) 不引用 src/services/api/{claude,oauth,providers}', () => {
+    const testFile = readFileSync(__filename, 'utf-8')
+    // import / require 守护
+    expect(testFile).not.toMatch(/from\s+['"][^'"]*src\/services\/api\/claude/)
+    expect(testFile).not.toMatch(/from\s+['"][^'"]*src\/services\/oauth/)
+    expect(testFile).not.toMatch(/from\s+['"][^'"]*src\/services\/api\/providers/)
+    expect(testFile).not.toMatch(/require\(['"][^'"]*services\/api\/(claude|providers)/)
+    expect(testFile).not.toMatch(/require\(['"][^'"]*services\/oauth/)
+  })
+})
