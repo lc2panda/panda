@@ -1357,7 +1357,7 @@ async function* queryLoop(
       // P0-4: raised from 2→4 to give agents more correction chances
       if (
         !stopHookActive &&
-        querySource.startsWith('repl_main_thread') &&
+        (querySource.startsWith('repl_main_thread') || querySource.startsWith('agent:') || querySource === 'hook_agent' || querySource === 'verification_agent') &&
         completionGuardCount < 4
       ) {
         const guardMessage = checkCompletionGuard(assistantMessages, messagesForQuery)
