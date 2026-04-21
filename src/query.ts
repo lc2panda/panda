@@ -1354,15 +1354,15 @@ async function* queryLoop(
       }
 
       // Completion Guard: detect premature completion claims without evidence
-      // P0-2: limit to 2 triggers to prevent infinite loops
+      // P0-4: raised from 2→4 to give agents more correction chances
       if (
         !stopHookActive &&
         querySource.startsWith('repl_main_thread') &&
-        completionGuardCount < 2
+        completionGuardCount < 4
       ) {
         const guardMessage = checkCompletionGuard(assistantMessages, messagesForQuery)
         if (guardMessage) {
-          logForDebugging(`Completion Guard triggered (${completionGuardCount + 1}/2) — requesting verification evidence`)
+          logForDebugging(`Completion Guard triggered (${completionGuardCount + 1}/4) — requesting verification evidence`)
           const next: State = {
             messages: [...messagesForQuery, ...assistantMessages, guardMessage],
             toolUseContext,
