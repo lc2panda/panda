@@ -6,7 +6,8 @@
 
 import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'node:path';
-import { registerIpcHandlers } from './ipc/handlers';
+import { registerIpcHandlers, setupMainWindow } from './ipc/handlers';
+import { cliManager } from './backend/cli-manager';
 
 // ---------------------------------------------------------------------------
 // Environment
@@ -70,6 +71,7 @@ app.whenReady().then(() => {
   registerIpcHandlers();
 
   mainWindow = createMainWindow();
+  setupMainWindow(mainWindow);
 
   // macOS: re-create window when dock icon clicked
   app.on('activate', () => {
@@ -77,6 +79,11 @@ app.whenReady().then(() => {
       mainWindow = createMainWindow();
     }
   });
+});
+
+// Cleanup CLI processes before quit
+app.on('before-quit', () => {
+  cliManager.destroyAll();
 });
 
 // Quit when all windows closed (except macOS)
