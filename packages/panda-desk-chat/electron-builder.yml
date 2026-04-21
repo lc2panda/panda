@@ -1,0 +1,58 @@
+# Input:  package.json "build" 基础 + 本文件扩展配置
+# Output: release/ 目录下的 dmg/nsis/AppImage 安装包
+# Pos:    electron-builder 打包配置 — W7-3
+#
+# 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
+
+appId: com.pandaai.panda-desk-chat
+productName: Panda Chat
+copyright: Copyright © 2026 PandaAI
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - "!node_modules/**/*"
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch: [universal]
+    - target: zip
+      arch: [universal]
+  icon: build/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+  icon: build/icon.ico
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64]
+  category: Development
+  icon: build/icons
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: true
+
+extraResources:
+  - from: ../../dist
+    to: dist
+    filter:
+      - "cli.js"
+      - "**/*"
+
+asar: true

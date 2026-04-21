@@ -60,12 +60,12 @@ const GeneralTab: React.FC = () => {
 
 const AppearanceTab: React.FC = () => {
   const { t } = useI18n();
-  const { theme, setTheme } = useTheme();
+  const { mode, setMode } = useTheme();
   const { fontSize, setFontSize } = useSettingsStore();
   return (
     <div>
       <SettingRow label={t('settings.theme')} description={t('settings.themeDesc')}>
-        <PdSelect value={theme} onChange={(v: string) => setTheme(v as any)} options={[
+        <PdSelect value={mode} onChange={(v: string) => setMode(v as any)} options={[
           { value: 'light', label: t('settings.themeLight') },
           { value: 'dark', label: t('settings.themeDark') },
           { value: 'system', label: t('settings.themeSystem') },
@@ -87,7 +87,7 @@ const AppearanceTab: React.FC = () => {
 
 const ProvidersTab: React.FC = () => {
   const { t } = useI18n();
-  const { providers, updateProvider } = useProviderStore();
+  const { providers, setProviders } = useProviderStore();
   return (
     <div>
       {(providers || []).map((p: any) => (
@@ -96,7 +96,12 @@ const ProvidersTab: React.FC = () => {
             type="password"
             placeholder={t('settings.apiKeyPlaceholder')}
             value={p.apiKey || ''}
-            onChange={(v: string) => updateProvider(p.id, { apiKey: v })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              const updated = (providers || []).map((pr: any) =>
+                pr.id === p.id ? { ...pr, apiKey: e.target.value } : pr
+              );
+              setProviders(updated);
+            }}
             style={{ width: 200 }}
           />
         </SettingRow>

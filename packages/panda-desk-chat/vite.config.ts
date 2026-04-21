@@ -5,12 +5,14 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "path";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
 
 const isElectron = process.env.ELECTRON === "true";
 
 const electronPlugins = isElectron
   ? (() => {
-      const electron = require("vite-plugin-electron/simple");
+      const electron = require("vite-plugin-electron/simple").default;
       return [
         electron({
           main: {
@@ -31,6 +33,10 @@ const electronPlugins = isElectron
                 outDir: "dist-electron/preload",
                 rollupOptions: {
                   external: ["electron"],
+                  output: {
+                    format: "cjs",
+                    entryFileNames: "[name].js",
+                  },
                 },
               },
             },

@@ -8,10 +8,10 @@
   "scripts": {
     "dev": "vite",
     "dev:electron": "ELECTRON=true vite",
-    "build": "vite build",
-    "build:electron": "ELECTRON=true vite build",
-    "pack": "electron-builder",
-    "dist": "ELECTRON=true vite build && electron-builder",
+    "build": "tsc -b && vite build",
+    "build:electron": "ELECTRON=true tsc -b && ELECTRON=true vite build",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
     "preview": "vite preview"
   },
   "build": {
