@@ -79,6 +79,9 @@ import initTick from './util/tick'
 import * as loginItemHelpers from './platform/login-item'
 // W8-T3：错误监控 + 用户可见诊断日志（替换部分 silent try/catch + console.warn 吞错）
 import { log as deskLog } from './util/logger'
+// M0-9：chat BrowserWindow 骨架 + IPC stub handler
+import { createChatWindow, toggleChatWindow, destroyChatWindow } from './windows/chat-window'
+import { registerChatIpcHandlers } from './ipc/chat-handler'
 
 // W19-T3：crash 自动恢复 — 退出码语义
 //   · 0   = 正常退出（before-quit 走完）
@@ -1638,6 +1641,9 @@ if (!gotTheLock) {
     } catch (err) {
       console.warn('[panda-on-desk] W22-T1 enumerate displays failed:', (err as Error)?.message)
     }
+    // M0-9：chat IPC stub handler（必须在 createChatWindow 之前注册）
+    registerChatIpcHandlers()
+
     createWindow()
     registerPersistentShortcutsFromSettings()
 
