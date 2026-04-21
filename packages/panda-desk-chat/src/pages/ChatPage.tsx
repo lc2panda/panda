@@ -23,8 +23,9 @@ export const ChatPage: React.FC = () => {
   /* -- Store selectors --------------------------------------------------- */
   const initSession = useChatStore((s) => s.initSession);
   const setActiveSession = useChatStore((s) => s.setActiveSession);
-  const addUserMessage = useChatStore((s) => s.addUserMessage);
-  const resolvePermission = useChatStore((s) => s.resolvePermission);
+  const sendMessage = useChatStore((s) => s.sendMessage);
+  const cancelStream = useChatStore((s) => s.cancelStream);
+  const respondPermission = useChatStore((s) => s.respondPermission);
   const session = useChatStore((s) => s.sessions.get(mockSessionId));
 
   /* -- Ensure session exists --------------------------------------------- */
@@ -47,23 +48,25 @@ export const ChatPage: React.FC = () => {
   /* -- Handlers ---------------------------------------------------------- */
   const handleSend = useCallback(
     (content: string) => {
-      addUserMessage(mockSessionId, content);
-      // M2: will dispatch to IPC bridge here
+      sendMessage(mockSessionId, content);
     },
-    [addUserMessage, mockSessionId],
+    [sendMessage, mockSessionId],
   );
 
   const handleStop = useCallback(() => {
-    // M2: will send stop signal via IPC
-  }, []);
+    cancelStream(mockSessionId);
+  }, [cancelStream, mockSessionId]);
 
   const handlePermission = useCallback(
     (decision: PermissionDecision) => {
-      // M2: will send permission decision via IPC
-      void decision;
-      resolvePermission(mockSessionId);
+      const toolUseId = session?.pendingPermission?.toolUseId ?? '';
+      respondPermission(
+        mockSessionId,
+        toolUseId,
+        decision === 'deny' ? 'deny' : decision === 'allow_session' ? 'allow_session' : 'allow',
+      );
     },
-    [resolvePermission, mockSessionId],
+    [respondPermission, mockSessionId, session?.pendingPermission?.toolUseId],
   );
 
   /* -- UIMessage mapping (chat store type -> MessageList type) ------------ */

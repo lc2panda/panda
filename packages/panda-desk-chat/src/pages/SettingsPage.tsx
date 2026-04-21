@@ -2,12 +2,25 @@
 // Output: Settings configuration UI
 // Pos: Page layer — accessible from sidebar
 
-import { useSettingsStore } from '../stores';
+import { useSettingsStore, type Theme, type PermissionMode, type Locale } from '../stores';
 import { PdButton } from '../components/atoms/PdButton';
 
-const themes = ['light', 'dark', 'system'] as const;
-const permissionModes = ['ask', 'auto-allow', 'auto-deny'] as const;
-const locales = ['en', 'zh'] as const;
+const themes: Theme[] = ['light', 'dark', 'system'];
+const permissionModes: PermissionMode[] = ['default', 'plan', 'auto', 'bypassPermissions'];
+const locales: Locale[] = ['en', 'zh', 'ko'];
+
+const permissionLabels: Record<PermissionMode, string> = {
+  default: 'Default (Ask)',
+  plan: 'Plan Mode',
+  auto: 'Auto Allow',
+  bypassPermissions: 'Bypass All',
+};
+
+const localeLabels: Record<Locale, string> = {
+  en: 'English',
+  zh: '中文',
+  ko: '한국어',
+};
 
 interface SettingsPageProps {
   onBack: () => void;
@@ -42,9 +55,9 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
           </div>
         </Row>
         <Row label="Language">
-          <select value={locale} onChange={(e) => setLocale(e.target.value as 'en' | 'zh')}
+          <select value={locale} onChange={(e) => setLocale(e.target.value as Locale)}
             style={{ padding: '6px 12px', borderRadius: 'var(--pd-radius-md)', border: '1px solid var(--pd-color-border)', background: 'var(--pd-color-bg-subtle)', color: 'var(--pd-color-fg)', fontSize: 'var(--pd-text-sm)' }}>
-            {locales.map((l) => <option key={l} value={l}>{l === 'en' ? 'English' : '中文'}</option>)}
+            {locales.map((l) => <option key={l} value={l}>{localeLabels[l]}</option>)}
           </select>
         </Row>
       </Section>
@@ -52,9 +65,9 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       {/* Permissions */}
       <Section title="Permissions">
         <Row label="Tool Permission Mode">
-          <select value={permissionMode} onChange={(e) => setPermissionMode(e.target.value as any)}
+          <select value={permissionMode} onChange={(e) => setPermissionMode(e.target.value as PermissionMode)}
             style={{ padding: '6px 12px', borderRadius: 'var(--pd-radius-md)', border: '1px solid var(--pd-color-border)', background: 'var(--pd-color-bg-subtle)', color: 'var(--pd-color-fg)', fontSize: 'var(--pd-text-sm)' }}>
-            {permissionModes.map((m) => <option key={m} value={m}>{m === 'ask' ? 'Ask Every Time' : m === 'auto-allow' ? 'Auto Allow' : 'Auto Deny'}</option>)}
+            {permissionModes.map((m) => <option key={m} value={m}>{permissionLabels[m]}</option>)}
           </select>
         </Row>
       </Section>
