@@ -21,3 +21,10 @@ export type { ThinkingBlockProps } from "./ThinkingBlock";
 
 export { ToolCallBlock } from "./ToolCallBlock";
 export type { ToolCallBlockProps, ToolCallStatus } from "./ToolCallBlock";
+
+export { PermissionDialog } from "./PermissionDialog";
+export type {
+  PermissionDialogProps,
+  PermissionTier,
+  PermissionDecision,
+} from "./PermissionDialog";

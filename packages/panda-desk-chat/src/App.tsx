@@ -2,6 +2,7 @@
 // Output: three-column layout shell — Sidebar | Content | Inspector
 // Pos:    React root — wraps ThemeProvider (placeholder) and layout skeleton
 import { cn } from "@/lib/cn";
+import { ChatPage } from "./pages/ChatPage";
 
 const VERSION = "0.1.0";
 
@@ -35,17 +36,7 @@ export function App() {
             v{VERSION}
           </span>
         </header>
-        <div className="flex flex-1 items-center justify-center">
-          <div className="text-center">
-            <div className="mb-2 text-4xl">🐼</div>
-            <h2 className="text-lg font-semibold text-[var(--pd-text)]">
-              Panda Chat
-            </h2>
-            <p className="mt-1 text-sm text-[var(--pd-text-muted)]">
-              M0 Scaffold — ready for development
-            </p>
-          </div>
-        </div>
+        <ChatPage />
       </main>
 
       {/* Inspector */}
