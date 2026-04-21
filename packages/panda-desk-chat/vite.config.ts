@@ -6,9 +6,43 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "path";
 
+const isElectron = process.env.ELECTRON === "true";
+
+const electronPlugins = isElectron
+  ? (() => {
+      const electron = require("vite-plugin-electron/simple");
+      return [
+        electron({
+          main: {
+            entry: "electron/main.ts",
+            vite: {
+              build: {
+                outDir: "dist-electron",
+                rollupOptions: {
+                  external: ["electron"],
+                },
+              },
+            },
+          },
+          preload: {
+            input: "electron/preload/chat.ts",
+            vite: {
+              build: {
+                outDir: "dist-electron/preload",
+                rollupOptions: {
+                  external: ["electron"],
+                },
+              },
+            },
+          },
+        }),
+      ];
+    })()
+  : [];
+
 export default defineConfig({
   base: "/",
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), ...electronPlugins],
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),

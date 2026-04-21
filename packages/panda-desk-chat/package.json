@@ -4,10 +4,38 @@
   "private": true,
   "type": "module",
   "description": "Panda Code desktop chat UI — React + Vite + Tailwind 4",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
+    "dev:electron": "ELECTRON=true vite",
     "build": "vite build",
+    "build:electron": "ELECTRON=true vite build",
+    "pack": "electron-builder",
+    "dist": "ELECTRON=true vite build && electron-builder",
     "preview": "vite preview"
+  },
+  "build": {
+    "appId": "com.pandaai.desk-chat",
+    "productName": "Panda Code",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "mac": {
+      "target": ["dmg", "zip"],
+      "icon": "public/icon.icns"
+    },
+    "win": {
+      "target": ["nsis", "zip"],
+      "icon": "public/icon.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "public/icon.png"
+    }
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -23,12 +51,16 @@
     "zustand": "^5.0.5"
   },
   "devDependencies": {
-    "vite": "^6.3.5",
-    "@vitejs/plugin-react": "^4.5.2",
-    "tailwindcss": "^4.1.7",
     "@tailwindcss/vite": "^4.1.7",
-    "typescript": "^5.8.3",
     "@types/react": "^18.3.23",
-    "@types/react-dom": "^18.3.7"
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.5.2",
+    "electron": "^41.2.2",
+    "electron-builder": "^26.8.1",
+    "tailwindcss": "^4.1.7",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-electron": "^0.29.1",
+    "vite-plugin-electron-renderer": "^0.14.6"
   }
 }
