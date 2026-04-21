@@ -1,8 +1,9 @@
-// Input: Chat events from WebSocket bridge (streaming deltas, tool calls, permissions)
+// Input: Chat events from IPC bridge (streaming deltas, tool calls, permissions)
 // Output: Per-session chat state (messages, streaming buffers, tool status, permissions)
 // Pos: Core state layer — drives message list, composer, permission dialogs, status bar
 
 import { create } from 'zustand';
+import * as bridge from '../ipc/bridge';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -212,6 +213,15 @@ export interface ChatStore {
 
   // Batch flush (call every ~16 ms from a RAF loop)
   flushStreamBuffer: (sessionId: string) => void;
+
+  // High-level actions — wired to IPC bridge
+  sendMessage: (sessionId: string, content: string) => void;
+  respondPermission: (
+    sessionId: string,
+    toolUseId: string,
+    decision: 'allow' | 'allow_session' | 'deny',
+  ) => void;
+  cancelStream: (sessionId: string) => void;
 }
 
 export const useChatStore = create<ChatStore>()((set, get) => ({
@@ -524,4 +534,152 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         sessions: putSession(state.sessions, { ...session, statusVerb: verb }),
       };
     }),
+
+  // -- High-level bridge actions -----------------------------------------------
+
+  sendMessage: (sessionId, content) => {
+    const { addUserMessage } = get();
+    addUserMessage(sessionId, content);
+    bridge.sendMessage(sessionId, content).catch((err) => {
+      console.error('[chatStore] sendMessage failed:', err);
+    });
+  },
+
+  respondPermission: (sessionId, toolUseId, decision) => {
+    const { resolvePermission } = get();
+    resolvePermission(sessionId);
+    bridge.respondToPermission(sessionId, toolUseId, decision).catch((err) => {
+      console.error('[chatStore] respondPermission failed:', err);
+    });
+  },
+
+  cancelStream: (sessionId) => {
+    bridge.stopGeneration(sessionId).catch((err) => {
+      console.error('[chatStore] cancelStream failed:', err);
+    });
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          chatState: 'idle',
+          streamingText: '',
+          streamingToolInput: '',
+          activeToolUseId: null,
+          activeToolName: null,
+          pendingPermission: null,
+        }),
+      };
+    });
+  },
 }));
+
+// ---------------------------------------------------------------------------
+// Bridge event wiring — connects IPC events to store actions
+// ---------------------------------------------------------------------------
+
+let bridgeListenersInitialized = false;
+let flushRAF: ReturnType<typeof requestAnimationFrame> | null = null;
+const activeSessions = new Set<string>();
+
+/**
+ * Setup IPC bridge listeners. Call once at app initialization.
+ * In dev mode this hooks into DevMockRelay events; in production it hooks into
+ * the Electron preload bridge.
+ */
+export function setupBridgeListeners(): void {
+  if (bridgeListenersInitialized) return;
+  bridgeListenersInitialized = true;
+
+  const store = useChatStore.getState;
+
+  // stream:start → create assistant message placeholder
+  bridge.onStreamStart((payload) => {
+    const { sessionId, messageId } = payload as { sessionId: string; messageId: string };
+    store().startStreaming(sessionId, messageId);
+    activeSessions.add(sessionId);
+    startFlushLoop();
+  });
+
+  // stream:delta → buffer deltas
+  bridge.onStreamDelta((payload) => {
+    const { sessionId, messageId, delta, type } = payload as {
+      sessionId: string;
+      messageId: string;
+      delta: string;
+      type: 'text' | 'thinking' | 'tool_input';
+    };
+    store().appendStreamDelta(sessionId, messageId, delta, type);
+  });
+
+  // stream:end → finalize message
+  bridge.onStreamEnd((payload) => {
+    const { sessionId, messageId, finishReason, tokenUsage } = payload as {
+      sessionId: string;
+      messageId: string;
+      finishReason: string;
+      tokenUsage?: TokenUsage;
+    };
+    store().endStreaming(sessionId, messageId, finishReason, tokenUsage);
+    activeSessions.delete(sessionId);
+    if (activeSessions.size === 0) stopFlushLoop();
+  });
+
+  // tool:start
+  bridge.onToolUseStart((payload) => {
+    const { sessionId, toolUseId, toolName, input } = payload as {
+      sessionId: string;
+      toolUseId: string;
+      toolName: string;
+      input: Record<string, unknown>;
+    };
+    store().startToolUse(sessionId, toolUseId, toolName, input);
+  });
+
+  // tool:end
+  bridge.onToolUseEnd((payload) => {
+    const { sessionId, toolUseId, result, isError } = payload as {
+      sessionId: string;
+      toolUseId: string;
+      result: string;
+      isError: boolean;
+    };
+    store().endToolUse(sessionId, toolUseId, result, isError);
+  });
+
+  // permission:request
+  bridge.onPermissionRequest((payload) => {
+    const { sessionId, toolUseId, toolName, input, tier } = payload as {
+      sessionId: string;
+      toolUseId: string;
+      toolName: string;
+      input: Record<string, unknown>;
+      tier: 'read' | 'write' | 'exec';
+    };
+    store().requestPermission(sessionId, { toolUseId, toolName, input, tier });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// RAF-based flush loop for streaming buffers (~16ms cadence)
+// ---------------------------------------------------------------------------
+
+function startFlushLoop(): void {
+  if (flushRAF != null) return;
+  const tick = () => {
+    const store = useChatStore.getState();
+    for (const sid of activeSessions) {
+      store.flushStreamBuffer(sid);
+    }
+    flushRAF = requestAnimationFrame(tick);
+  };
+  flushRAF = requestAnimationFrame(tick);
+}
+
+function stopFlushLoop(): void {
+  if (flushRAF != null) {
+    cancelAnimationFrame(flushRAF);
+    flushRAF = null;
+  }
+}

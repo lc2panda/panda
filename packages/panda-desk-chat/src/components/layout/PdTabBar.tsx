@@ -2,9 +2,21 @@
 // Output: Chrome-style horizontal tab bar with overflow scroll
 // Pos: Layout layer — sits above main content area, within the center column
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { type ComponentType, useRef, useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/cn';
-import { X, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  X as _X,
+  Plus as _Plus,
+  ChevronLeft as _ChevronLeft,
+  ChevronRight as _ChevronRight,
+} from 'lucide-react';
+
+// Re-type lucide icons for React 18 compat (hoisted @types/react@19 conflict)
+type IconFC = ComponentType<{ className?: string; size?: number }>;
+const X = _X as IconFC;
+const Plus = _Plus as IconFC;
+const ChevronLeft = _ChevronLeft as IconFC;
+const ChevronRight = _ChevronRight as IconFC;
 
 // ---------------------------------------------------------------------------
 // Types

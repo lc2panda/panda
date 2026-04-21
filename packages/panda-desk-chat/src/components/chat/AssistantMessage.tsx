@@ -4,6 +4,7 @@
 import React, { useState, useCallback } from "react";
 import { cn } from "../../lib/cn";
 import { PdBadge } from "../atoms/PdBadge";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 export interface ToolCallInfo {
   id: string;
@@ -18,41 +19,6 @@ export interface AssistantMessageProps {
   thinkingContent?: string;
   toolCalls?: ToolCallInfo[];
   isStreaming?: boolean;
-}
-
-/* ── Minimal Markdown-to-HTML ─────────────────────────────────────────── */
-
-function simpleMarkdownToHtml(md: string): string {
-  let html = md
-    // Escape HTML entities first
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  // Code blocks: ```lang\n...\n```
-  html = html.replace(
-    /```(\w*)\n([\s\S]*?)```/g,
-    (_match, _lang, code) =>
-      `<pre class="pd-code-block"><code>${code.trimEnd()}</code></pre>`,
-  );
-
-  // Inline code
-  html = html.replace(
-    /`([^`]+)`/g,
-    '<code class="pd-inline-code">$1</code>',
-  );
-
-  // Bold
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-
-  // Italic
-  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-
-  // Line breaks (double newline = paragraph break)
-  html = html.replace(/\n\n/g, "<br/><br/>");
-  html = html.replace(/\n/g, "<br/>");
-
-  return html;
 }
 
 /* ── Status → Badge variant mapping ───────────────────────────────────── */
@@ -181,25 +147,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
       )}
 
       {/* ── Content ────────────────────────────────────────────────────── */}
-      <div
-        className={cn(
-          "text-[var(--pd-text-base)] text-[var(--pd-color-fg)]",
-          "leading-[var(--pd-leading-body)]",
-          // Code block styles injected via class names used in simpleMarkdownToHtml
-          "[&_.pd-code-block]:bg-[var(--pd-code-bg)]",
-          "[&_.pd-code-block]:font-[var(--pd-font-mono)]",
-          "[&_.pd-code-block]:text-[var(--pd-code-base)]",
-          "[&_.pd-code-block]:rounded-[var(--pd-radius-sm)]",
-          "[&_.pd-code-block]:px-3 [&_.pd-code-block]:py-2",
-          "[&_.pd-code-block]:my-2 [&_.pd-code-block]:overflow-x-auto",
-          "[&_.pd-inline-code]:bg-[var(--pd-code-bg)]",
-          "[&_.pd-inline-code]:font-[var(--pd-font-mono)]",
-          "[&_.pd-inline-code]:text-[var(--pd-code-base)]",
-          "[&_.pd-inline-code]:rounded-[var(--pd-radius-xs)]",
-          "[&_.pd-inline-code]:px-1 [&_.pd-inline-code]:py-0.5",
-        )}
-        dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(content) }}
-      />
+      <MarkdownRenderer content={content} />
 
       {/* ── Streaming Cursor ───────────────────────────────────────────── */}
       {isStreaming && (

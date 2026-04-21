@@ -2,8 +2,19 @@
 // Output: Bottom status bar showing live session metadata
 // Pos: Layout layer — bottom edge of center column, above PetStrip
 
+import { type ComponentType } from 'react';
 import { cn } from '@/lib/cn';
-import { BellOff, Bell, Circle } from 'lucide-react';
+import {
+  BellOff as _BellOff,
+  Bell as _Bell,
+  Circle as _Circle,
+} from 'lucide-react';
+
+// Re-type lucide icons for React 18 compat (hoisted @types/react@19 conflict)
+type IconFC = ComponentType<{ className?: string; size?: number; fill?: string; stroke?: string }>;
+const BellOff = _BellOff as IconFC;
+const Bell = _Bell as IconFC;
+const Circle = _Circle as IconFC;
 
 // ---------------------------------------------------------------------------
 // Types

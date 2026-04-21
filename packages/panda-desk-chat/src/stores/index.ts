@@ -2,7 +2,7 @@
 // Output: Unified re-exports for all Zustand stores
 // Pos: State layer barrel — single import point for consumers
 
-export { useChatStore } from './chatStore';
+export { useChatStore, setupBridgeListeners } from './chatStore';
 export { useSessionStore } from './sessionStore';
 export { useTabStore } from './tabStore';
 export { useSettingsStore } from './settingsStore';

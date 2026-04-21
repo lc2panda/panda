@@ -28,3 +28,6 @@ export type {
   PermissionTier,
   PermissionDecision,
 } from "./PermissionDialog";
+
+export { MarkdownRenderer } from "./MarkdownRenderer";
+export type { MarkdownRendererProps } from "./MarkdownRenderer";

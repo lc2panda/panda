@@ -3,6 +3,7 @@
 // Pos: State layer — consumed by theme provider, i18n, model selector, layout components
 
 import { create } from 'zustand';
+import { storage } from '../lib/storage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -12,7 +13,9 @@ export type Theme = 'light' | 'dark' | 'system';
 export type PermissionMode = 'default' | 'plan' | 'auto' | 'bypassPermissions';
 export type Locale = 'zh' | 'en' | 'ko';
 
-export interface SettingsStore {
+const STORAGE_KEY = 'settings';
+
+interface PersistedSettings {
   theme: Theme;
   locale: Locale;
   permissionMode: PermissionMode;
@@ -20,7 +23,9 @@ export interface SettingsStore {
   fontSize: number;
   sidebarExpanded: boolean;
   inspectorVisible: boolean;
+}
 
+export interface SettingsStore extends PersistedSettings {
   // Actions
   setTheme: (theme: Theme) => void;
   setLocale: (locale: Locale) => void;
@@ -29,13 +34,15 @@ export interface SettingsStore {
   setFontSize: (size: number) => void;
   toggleSidebar: () => void;
   toggleInspector: () => void;
+  loadSettings: () => void;
+  saveSettings: () => void;
 }
 
 // ---------------------------------------------------------------------------
-// Store
+// Helpers
 // ---------------------------------------------------------------------------
 
-export const useSettingsStore = create<SettingsStore>()((set) => ({
+const defaults: PersistedSettings = {
   theme: 'system',
   locale: 'zh',
   permissionMode: 'default',
@@ -43,14 +50,65 @@ export const useSettingsStore = create<SettingsStore>()((set) => ({
   fontSize: 14,
   sidebarExpanded: true,
   inspectorVisible: false,
+};
 
-  setTheme: (theme) => set({ theme }),
-  setLocale: (locale) => set({ locale }),
-  setPermissionMode: (permissionMode) => set({ permissionMode }),
-  setModel: (model) => set({ model }),
-  setFontSize: (fontSize) => set({ fontSize }),
-  toggleSidebar: () =>
-    set((state) => ({ sidebarExpanded: !state.sidebarExpanded })),
-  toggleInspector: () =>
-    set((state) => ({ inspectorVisible: !state.inspectorVisible })),
+function pickPersisted(state: PersistedSettings): PersistedSettings {
+  return {
+    theme: state.theme,
+    locale: state.locale,
+    permissionMode: state.permissionMode,
+    model: state.model,
+    fontSize: state.fontSize,
+    sidebarExpanded: state.sidebarExpanded,
+    inspectorVisible: state.inspectorVisible,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
+
+export const useSettingsStore = create<SettingsStore>()((set, get) => ({
+  ...defaults,
+
+  setTheme: (theme) => {
+    set({ theme });
+    get().saveSettings();
+  },
+  setLocale: (locale) => {
+    set({ locale });
+    get().saveSettings();
+  },
+  setPermissionMode: (permissionMode) => {
+    set({ permissionMode });
+    get().saveSettings();
+  },
+  setModel: (model) => {
+    set({ model });
+    get().saveSettings();
+  },
+  setFontSize: (fontSize) => {
+    set({ fontSize });
+    get().saveSettings();
+  },
+  toggleSidebar: () => {
+    set((state) => ({ sidebarExpanded: !state.sidebarExpanded }));
+    get().saveSettings();
+  },
+  toggleInspector: () => {
+    set((state) => ({ inspectorVisible: !state.inspectorVisible }));
+    get().saveSettings();
+  },
+
+  loadSettings: () => {
+    const saved = storage.get<Partial<PersistedSettings>>(STORAGE_KEY, {});
+    set({ ...defaults, ...saved });
+  },
+
+  saveSettings: () => {
+    storage.set(STORAGE_KEY, pickPersisted(get()));
+  },
 }));
+
+// Auto-load on module init
+useSettingsStore.getState().loadSettings();

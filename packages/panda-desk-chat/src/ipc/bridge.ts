@@ -1,4 +1,5 @@
 // Input: window.pandaAPI injected by preload/chat.ts via contextBridge (named API)
+//        In dev mode: DevMockRelay provides simulated streaming backend
 // Output: Type-safe IPC client for chat renderer components
 // Pos: IPC bridge layer — sole entry point for renderer → main communication
 //
@@ -23,12 +24,41 @@ import type {
   SlashCommandsResponse,
   ModelListResponse,
 } from './types';
+import {
+  DevMockRelay,
+  type StreamStartEvent,
+  type StreamDeltaEvent,
+  type StreamEndEvent,
+  type ToolUseStartEvent,
+  type ToolUseEndEvent,
+  type PermissionRequestEvent,
+} from './dev-mock';
+
+// ─── Dev mode detection ──────────────────────────────────────────────────────
+
+const IS_DEV = !!(
+  typeof window !== 'undefined' &&
+  !window.pandaAPI &&
+  (import.meta as Record<string, unknown>).env &&
+  ((import.meta as unknown as { env: { DEV?: boolean } }).env.DEV ||
+    (import.meta as unknown as { env: { MODE?: string } }).env.MODE === 'development')
+);
+
+/** Singleton DevMockRelay — only instantiated in dev mode. */
+let devRelay: DevMockRelay | null = null;
+
+function getDevRelay(): DevMockRelay {
+  if (!devRelay) {
+    devRelay = new DevMockRelay();
+  }
+  return devRelay;
+}
 
 // ─── Core API accessor ──────────────────────────────────────────────────────
 
 /**
  * Returns the pandaAPI bridge injected by preload.
- * Throws if called outside Electron (e.g. in plain browser dev).
+ * Throws if called outside Electron (e.g. in plain browser dev) and not in dev mode.
  */
 export function getPandaAPI(): PandaChatAPI {
   if (!window.pandaAPI) {
@@ -44,6 +74,13 @@ export function hasPandaAPI(): boolean {
   return typeof window !== 'undefined' && window.pandaAPI != null;
 }
 
+/**
+ * Returns true when running in browser dev mode (no Electron, Vite dev server).
+ */
+export function isDevMode(): boolean {
+  return IS_DEV;
+}
+
 // ─── Chat messaging ────────────────────────────────────────────────────────
 
 /** Send a user message (optionally with attachments). */
@@ -52,11 +89,18 @@ export async function sendMessage(
   content: string,
   attachments?: ChatSendPayload['attachments'],
 ): Promise<void> {
+  if (IS_DEV) {
+    return getDevRelay().sendMessage(sessionId, content);
+  }
   return getPandaAPI().chat.send({ sessionId, content, attachments });
 }
 
 /** Abort the current streaming response. */
 export async function stopGeneration(sessionId: string): Promise<void> {
+  if (IS_DEV) {
+    getDevRelay().cancel();
+    return;
+  }
   return getPandaAPI().chat.stop({ sessionId });
 }
 
@@ -65,6 +109,7 @@ export async function pasteImage(
   sessionId: string,
   dataUrl: string,
 ): Promise<void> {
+  if (IS_DEV) return; // no-op in dev
   return getPandaAPI().chat.pasteImage({ sessionId, dataUrl });
 }
 
@@ -72,6 +117,12 @@ export async function pasteImage(
 export function onStreamStart(
   callback: (payload: ChatStreamStartPayload) => void,
 ): Unsubscribe {
+  if (IS_DEV) {
+    const relay = getDevRelay();
+    const wrapped = (e: unknown) => callback(e as ChatStreamStartPayload);
+    relay.on('stream:start', wrapped);
+    return () => relay.off('stream:start', wrapped);
+  }
   return getPandaAPI().chat.onStreamStart(callback);
 }
 
@@ -79,6 +130,12 @@ export function onStreamStart(
 export function onStreamDelta(
   callback: (payload: ChatStreamDeltaPayload) => void,
 ): Unsubscribe {
+  if (IS_DEV) {
+    const relay = getDevRelay();
+    const wrapped = (e: unknown) => callback(e as ChatStreamDeltaPayload);
+    relay.on('stream:delta', wrapped);
+    return () => relay.off('stream:delta', wrapped);
+  }
   return getPandaAPI().chat.onStreamDelta(callback);
 }
 
@@ -86,6 +143,12 @@ export function onStreamDelta(
 export function onStreamEnd(
   callback: (payload: ChatStreamEndPayload) => void,
 ): Unsubscribe {
+  if (IS_DEV) {
+    const relay = getDevRelay();
+    const wrapped = (e: unknown) => callback(e as ChatStreamEndPayload);
+    relay.on('stream:end', wrapped);
+    return () => relay.off('stream:end', wrapped);
+  }
   return getPandaAPI().chat.onStreamEnd(callback);
 }
 
@@ -93,6 +156,12 @@ export function onStreamEnd(
 export function onWindowToggle(
   callback: (payload: ChatWindowTogglePayload) => void,
 ): Unsubscribe {
+  if (IS_DEV) {
+    const relay = getDevRelay();
+    const wrapped = (e: unknown) => callback(e as ChatWindowTogglePayload);
+    relay.on('window:toggle', wrapped);
+    return () => relay.off('window:toggle', wrapped);
+  }
   return getPandaAPI().chat.onWindowToggle(callback);
 }
 
@@ -100,6 +169,7 @@ export function onWindowToggle(
 
 /** List all sessions. */
 export async function listSessions(): Promise<SessionListResponse> {
+  if (IS_DEV) return { sessions: [] };
   return getPandaAPI().session.list({});
 }
 
@@ -108,6 +178,7 @@ export async function createSession(
   cwd: string,
   name?: string,
 ): Promise<SessionCreateResponse> {
+  if (IS_DEV) return { sessionId: crypto.randomUUID(), name: name ?? 'Dev Session' };
   return getPandaAPI().session.create({ cwd, name });
 }
 
@@ -116,16 +187,19 @@ export async function renameSession(
   sessionId: string,
   name: string,
 ): Promise<void> {
+  if (IS_DEV) return;
   return getPandaAPI().session.rename({ sessionId, name });
 }
 
 /** Delete a session. */
 export async function deleteSession(sessionId: string): Promise<void> {
+  if (IS_DEV) return;
   return getPandaAPI().session.delete({ sessionId });
 }
 
 /** Focus/switch to a session. */
 export async function focusSession(sessionId: string): Promise<void> {
+  if (IS_DEV) return;
   return getPandaAPI().session.focus({ sessionId });
 }
 
@@ -133,6 +207,7 @@ export async function focusSession(sessionId: string): Promise<void> {
 export function onSessionUpdated(
   callback: (payload: SessionUpdatedPayload) => void,
 ): Unsubscribe {
+  if (IS_DEV) return () => {};
   return getPandaAPI().session.onUpdated(callback);
 }
 
@@ -142,6 +217,12 @@ export function onSessionUpdated(
 export function onToolUseStart(
   callback: (payload: ToolUseStartPayload) => void,
 ): Unsubscribe {
+  if (IS_DEV) {
+    const relay = getDevRelay();
+    const wrapped = (e: unknown) => callback(e as ToolUseStartPayload);
+    relay.on('tool:start', wrapped);
+    return () => relay.off('tool:start', wrapped);
+  }
   return getPandaAPI().tool.onUseStart(callback);
 }
 
@@ -149,6 +230,12 @@ export function onToolUseStart(
 export function onToolUseEnd(
   callback: (payload: ToolUseEndPayload) => void,
 ): Unsubscribe {
+  if (IS_DEV) {
+    const relay = getDevRelay();
+    const wrapped = (e: unknown) => callback(e as ToolUseEndPayload);
+    relay.on('tool:end', wrapped);
+    return () => relay.off('tool:end', wrapped);
+  }
   return getPandaAPI().tool.onUseEnd(callback);
 }
 
@@ -156,6 +243,12 @@ export function onToolUseEnd(
 export function onPermissionRequest(
   callback: (payload: ToolPermRequestPayload) => void,
 ): Unsubscribe {
+  if (IS_DEV) {
+    const relay = getDevRelay();
+    const wrapped = (e: unknown) => callback(e as ToolPermRequestPayload);
+    relay.on('permission:request', wrapped);
+    return () => relay.off('permission:request', wrapped);
+  }
   return getPandaAPI().tool.onPermissionRequest(callback);
 }
 
@@ -165,6 +258,10 @@ export async function respondToPermission(
   toolUseId: string,
   decision: 'allow' | 'allow_session' | 'deny',
 ): Promise<void> {
+  if (IS_DEV) {
+    getDevRelay().respondPermission();
+    return;
+  }
   return getPandaAPI().tool.respondPermission({ sessionId, toolUseId, decision });
 }
 
@@ -176,6 +273,7 @@ export async function searchFiles(
   query: string,
   maxResults?: number,
 ): Promise<FsSearchResponse> {
+  if (IS_DEV) return { results: [] };
   return getPandaAPI().fs.search({ sessionId, query, maxResults });
 }
 
@@ -184,6 +282,7 @@ export async function listDirectory(
   sessionId: string,
   dirPath: string,
 ): Promise<FsListResponse> {
+  if (IS_DEV) return { entries: [] };
   return getPandaAPI().fs.list({ sessionId, dirPath });
 }
 
@@ -196,16 +295,19 @@ export async function setWindowPosition(
   width: number,
   height: number,
 ): Promise<void> {
+  if (IS_DEV) return;
   return getPandaAPI().config.setWindowPosition({ x, y, width, height });
 }
 
 /** Get available slash commands. */
 export async function getSlashCommands(): Promise<SlashCommandsResponse> {
+  if (IS_DEV) return { commands: [] };
   return getPandaAPI().config.getSlashCommands({});
 }
 
 /** Get available models. */
 export async function getModels(): Promise<ModelListResponse> {
+  if (IS_DEV) return { models: [] };
   return getPandaAPI().config.getModels({});
 }
 
@@ -214,6 +316,7 @@ export async function setModel(
   sessionId: string,
   modelId: string,
 ): Promise<void> {
+  if (IS_DEV) return;
   return getPandaAPI().config.setModel({ sessionId, modelId });
 }
 
@@ -221,5 +324,6 @@ export async function setModel(
 export async function setPermissionMode(
   mode: 'default' | 'plan' | 'auto' | 'bypassPermissions',
 ): Promise<void> {
+  if (IS_DEV) return;
   return getPandaAPI().config.setPermissionMode({ mode });
 }

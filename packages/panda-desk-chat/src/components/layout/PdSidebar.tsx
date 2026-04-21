@@ -1,17 +1,14 @@
-// Input: expanded state + toggle callback
-// Output: Collapsible sidebar with 3-section navigation (main, workspace, bottom)
-// Pos: Layout layer — left panel navigation, reads settingsStore
+// Input: expanded state + toggle callback; reads sessionStore for session list
+// Output: Collapsible sidebar with session list, search, CRUD, and navigation sections
+// Pos: Layout layer — left panel navigation, wired to sessionStore + chatStore + tabStore
 
-import { type ComponentType, type ReactNode } from 'react';
+import { type ComponentType, type ReactNode, useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/cn';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useChatStore } from '@/stores/chatStore';
+import { useTabStore } from '@/stores/tabStore';
 import {
   MessageSquare as _MessageSquare,
-  History as _History,
-  Bot as _Bot,
-  Wand2 as _Wand2,
-  Wrench as _Wrench,
-  ListTodo as _ListTodo,
-  Heart as _Heart,
   Search as _Search,
   FolderOpen as _FolderOpen,
   Brain as _Brain,
@@ -20,17 +17,13 @@ import {
   User as _User,
   PanelLeftClose as _PanelLeftClose,
   PanelLeftOpen as _PanelLeftOpen,
+  Plus as _Plus,
+  Trash2 as _Trash2,
 } from 'lucide-react';
 
 // Re-type lucide icons for React 18 compat (hoisted @types/react@19 conflict)
 type IconFC = ComponentType<{ className?: string; size?: number }>;
 const MessageSquare = _MessageSquare as IconFC;
-const History = _History as IconFC;
-const Bot = _Bot as IconFC;
-const Wand2 = _Wand2 as IconFC;
-const Wrench = _Wrench as IconFC;
-const ListTodo = _ListTodo as IconFC;
-const Heart = _Heart as IconFC;
 const Search = _Search as IconFC;
 const FolderOpen = _FolderOpen as IconFC;
 const Brain = _Brain as IconFC;
@@ -39,6 +32,8 @@ const Settings = _Settings as IconFC;
 const User = _User as IconFC;
 const PanelLeftClose = _PanelLeftClose as IconFC;
 const PanelLeftOpen = _PanelLeftOpen as IconFC;
+const Plus = _Plus as IconFC;
+const Trash2 = _Trash2 as IconFC;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,16 +60,6 @@ interface NavEntry {
   label: string;
   shortcut?: string;
 }
-
-const mainNav: NavEntry[] = [
-  { icon: <MessageSquare size={20} />, label: '对话',       shortcut: '⌘1' },
-  { icon: <History size={20} />,       label: '会话历史',   shortcut: '⌘2' },
-  { icon: <Bot size={20} />,           label: 'Agents',     shortcut: '⌘3' },
-  { icon: <Wand2 size={20} />,         label: 'Skills',     shortcut: '⌘4' },
-  { icon: <Wrench size={20} />,        label: 'Tools & MCP',shortcut: '⌘5' },
-  { icon: <ListTodo size={20} />,      label: '任务计划',   shortcut: '⌘6' },
-  { icon: <Heart size={20} />,         label: 'Buddy 养成', shortcut: '⌘7' },
-];
 
 const workspaceNav: NavEntry[] = [
   { icon: <Search size={20} />,     label: '搜索',     shortcut: '⌘K' },
@@ -143,9 +128,199 @@ function SidebarDivider() {
 }
 
 // ---------------------------------------------------------------------------
+// Session list item (double-click rename + delete on hover)
+// ---------------------------------------------------------------------------
+interface SessionItemProps {
+  id: string;
+  name: string;
+  active: boolean;
+  expanded: boolean;
+  messageCount: number;
+  onSelect: () => void;
+  onDelete: () => void;
+  onRename: (name: string) => void;
+}
+
+function SessionItem({
+  name,
+  active,
+  expanded,
+  messageCount,
+  onSelect,
+  onDelete,
+  onRename,
+}: SessionItemProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const commitRename = useCallback(() => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== name) {
+      onRename(trimmed);
+    }
+    setIsEditing(false);
+  }, [editValue, name, onRename]);
+
+  const cancelRename = useCallback(() => {
+    setEditValue(name);
+    setIsEditing(false);
+  }, [name]);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onDoubleClick={() => {
+        if (expanded) {
+          setEditValue(name);
+          setIsEditing(true);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onSelect();
+      }}
+      className={cn(
+        'group flex w-full items-center gap-2 rounded-[var(--pd-radius-md)] px-3 py-1.5',
+        'text-[var(--pd-color-fg-muted)] transition-colors cursor-pointer',
+        'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
+        'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
+        active && 'bg-[var(--pd-color-accent-subtle)] text-[var(--pd-color-fg)]',
+      )}
+    >
+      <span className="shrink-0">
+        <MessageSquare size={16} />
+      </span>
+
+      {expanded && (
+        <>
+          {isEditing ? (
+            <div className="flex flex-1 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <input
+                ref={inputRef}
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitRename();
+                  if (e.key === 'Escape') cancelRename();
+                  e.stopPropagation();
+                }}
+                onBlur={commitRename}
+                className={cn(
+                  'flex-1 rounded-[var(--pd-radius-sm)] border border-[var(--pd-color-border)]',
+                  'bg-[var(--pd-color-bg)] px-1.5 py-0.5 text-sm',
+                  'text-[var(--pd-color-fg)] outline-none',
+                  'focus:border-[var(--pd-color-accent)]',
+                )}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-1 flex-col truncate">
+                <span className="truncate text-sm">{name}</span>
+                {messageCount > 0 && (
+                  <span className="text-[length:var(--pd-text-xs)] text-[var(--pd-color-fg-subtle)]">
+                    {messageCount} 条消息
+                  </span>
+                )}
+              </div>
+              {/* Delete — visible on hover */}
+              <span
+                role="button"
+                tabIndex={-1}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    onDelete();
+                  }
+                }}
+                className={cn(
+                  'shrink-0 rounded-[var(--pd-radius-xs)] p-0.5',
+                  'opacity-0 transition-opacity group-hover:opacity-100',
+                  'text-[var(--pd-color-fg-subtle)] hover:text-[var(--pd-color-danger)]',
+                )}
+              >
+                <Trash2 size={14} />
+              </span>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Session store
+  const sessions = useSessionStore((s) => s.sessions);
+  const activeId = useSessionStore((s) => s.activeId);
+  const setActive = useSessionStore((s) => s.setActive);
+  const createSession = useSessionStore((s) => s.createSession);
+  const deleteSession = useSessionStore((s) => s.deleteSession);
+  const renameSession = useSessionStore((s) => s.renameSession);
+
+  // Chat + Tab stores
+  const setChatActiveSession = useChatStore((s) => s.setActiveSession);
+  const addTab = useTabStore((s) => s.addTab);
+
+  // ── Handlers ──
+  const handleSelectSession = useCallback(
+    (sessionId: string) => {
+      setActive(sessionId);
+      setChatActiveSession(sessionId);
+    },
+    [setActive, setChatActiveSession],
+  );
+
+  const handleNewSession = useCallback(() => {
+    const session = createSession();
+    addTab(session.id, session.name);
+    setChatActiveSession(session.id);
+  }, [createSession, addTab, setChatActiveSession]);
+
+  const handleDeleteSession = useCallback(
+    (sessionId: string) => {
+      deleteSession(sessionId);
+      // After delete, activeId is updated by the store — sync chatStore
+      const remaining = sessions.filter((s) => s.id !== sessionId);
+      if (remaining.length > 0 && activeId === sessionId) {
+        setChatActiveSession(remaining[0].id);
+      }
+    },
+    [deleteSession, sessions, activeId, setChatActiveSession],
+  );
+
+  const handleRenameSession = useCallback(
+    (sessionId: string, name: string) => {
+      renameSession(sessionId, name);
+    },
+    [renameSession],
+  );
+
+  // ── Filter by search ──
+  const filteredSessions = searchQuery.trim()
+    ? sessions.filter((s) =>
+        s.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+    : sessions;
+
   return (
     <aside
       className={cn(
@@ -157,8 +332,7 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         width: expanded
           ? 'var(--pd-layout-sidebar-width)'
           : 'var(--pd-layout-sidebar-rail)',
-        // macOS traffic-light avoidance
-        paddingTop: 44,
+        paddingTop: 44, // macOS traffic-light avoidance
       }}
     >
       {/* ── Toggle button ── */}
@@ -177,22 +351,84 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         </button>
       </div>
 
-      {/* ── Main navigation ── */}
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2">
-        {mainNav.map((item, idx) => (
-          <SidebarItem
-            key={item.label}
-            icon={item.icon}
-            label={item.label}
-            shortcut={item.shortcut}
-            active={idx === 0}
+      {/* ── New Chat + Search (expanded only) ── */}
+      {expanded && (
+        <div className="shrink-0 px-3 pb-2">
+          <button
+            type="button"
+            onClick={handleNewSession}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-[var(--pd-radius-md)] px-3 py-2 mb-2',
+              'bg-[var(--pd-color-accent)] text-[var(--pd-color-fg-on-accent)]',
+              'text-sm font-medium transition-colors',
+              'hover:opacity-90',
+            )}
+          >
+            <Plus size={16} />
+            <span>新建会话</span>
+          </button>
+
+          <div className="relative">
+            <Search
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--pd-color-fg-subtle)]"
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜索会话..."
+              className={cn(
+                'w-full rounded-[var(--pd-radius-md)] border border-[var(--pd-color-border)]',
+                'bg-[var(--pd-color-bg)] py-1.5 pl-8 pr-3 text-sm',
+                'text-[var(--pd-color-fg)] placeholder:text-[var(--pd-color-fg-subtle)]',
+                'outline-none focus:border-[var(--pd-color-accent)]',
+              )}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Session list + workspace nav ── */}
+      <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2">
+        {expanded && filteredSessions.length === 0 && (
+          <div className="px-3 py-4 text-center text-[length:var(--pd-text-xs)] text-[var(--pd-color-fg-subtle)]">
+            {searchQuery ? '无匹配会话' : '暂无会话，点击上方创建'}
+          </div>
+        )}
+
+        {filteredSessions.map((session) => (
+          <SessionItem
+            key={session.id}
+            id={session.id}
+            name={session.name}
+            active={session.id === activeId}
             expanded={expanded}
+            messageCount={session.messageCount}
+            onSelect={() => handleSelectSession(session.id)}
+            onDelete={() => handleDeleteSession(session.id)}
+            onRename={(name) => handleRenameSession(session.id, name)}
           />
         ))}
 
+        {/* Collapsed: icon-only new-session button */}
+        {!expanded && (
+          <button
+            type="button"
+            onClick={handleNewSession}
+            title="新建会话"
+            className={cn(
+              'flex items-center justify-center rounded-[var(--pd-radius-md)] p-2 mt-1',
+              'text-[var(--pd-color-fg-muted)] transition-colors',
+              'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
+            )}
+          >
+            <Plus size={20} />
+          </button>
+        )}
+
         <SidebarDivider />
 
-        {/* ── Workspace section ── */}
         {workspaceNav.map((item) => (
           <SidebarItem
             key={item.label}
@@ -202,9 +438,9 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
             expanded={expanded}
           />
         ))}
-      </nav>
+      </div>
 
-      {/* ── Bottom section (settings + account) ── */}
+      {/* ── Bottom (settings + account) ── */}
       <div className="shrink-0 border-t border-[var(--pd-color-border-subtle)] px-2 py-2">
         {bottomNav.map((item) => (
           <SidebarItem

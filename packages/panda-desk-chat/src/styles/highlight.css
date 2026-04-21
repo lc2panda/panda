@@ -1,0 +1,125 @@
+/**
+ * Panda Desk Chat — Syntax Highlighting Theme
+ * Input: highlight.js token classes from rehype-highlight
+ * Output: Themed syntax colors mapped to --pd-code-* CSS variables
+ * Pos: Style layer — imported by global.css, consumed by MarkdownRenderer code blocks
+ *
+ * Uses tokens.css variables so light/dark switching is automatic.
+ * Classes follow highlight.js convention: .hljs-keyword, .hljs-string, etc.
+ */
+
+/* ── Base code block ──────────────────────────────────────────────────── */
+.hljs {
+  background: var(--pd-code-bg);
+  color: var(--pd-code-fg);
+  font-family: var(--pd-font-mono);
+  font-size: var(--pd-code-base);
+  line-height: var(--pd-leading-code);
+}
+
+/* ── Keywords & control flow ──────────────────────────────────────────── */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-meta .hljs-keyword {
+  color: var(--pd-code-keyword);
+}
+
+/* ── Strings & template literals ──────────────────────────────────────── */
+.hljs-string,
+.hljs-attr,
+.hljs-template-tag,
+.hljs-template-variable {
+  color: var(--pd-code-string);
+}
+
+/* ── Numbers & literals ───────────────────────────────────────────────── */
+.hljs-number,
+.hljs-literal {
+  color: var(--pd-code-number);
+}
+
+/* ── Comments & docs ──────────────────────────────────────────────────── */
+.hljs-comment,
+.hljs-doctag,
+.hljs-quote {
+  color: var(--pd-code-comment);
+  font-style: italic;
+}
+
+/* ── Functions & methods ──────────────────────────────────────────────── */
+.hljs-title,
+.hljs-title.function_,
+.hljs-section {
+  color: var(--pd-code-function);
+}
+
+/* ── Variables & params ───────────────────────────────────────────────── */
+.hljs-variable,
+.hljs-params {
+  color: var(--pd-code-variable);
+}
+
+/* ── Types & classes ──────────────────────────────────────────────────── */
+.hljs-type,
+.hljs-title.class_,
+.hljs-class .hljs-title {
+  color: var(--pd-code-type);
+}
+
+/* ── Operators & punctuation ──────────────────────────────────────────── */
+.hljs-operator,
+.hljs-punctuation {
+  color: var(--pd-code-operator);
+}
+
+/* ── Misc: tags, attributes, regex ────────────────────────────────────── */
+.hljs-name,
+.hljs-tag {
+  color: var(--pd-code-keyword);
+}
+
+.hljs-attribute {
+  color: var(--pd-code-function);
+}
+
+.hljs-regexp,
+.hljs-link {
+  color: var(--pd-code-string);
+}
+
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--pd-code-number);
+}
+
+/* ── Emphasis inside code (rare) ──────────────────────────────────────── */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: var(--pd-font-bold);
+}
+
+/* ── Additions/deletions (diff language) ──────────────────────────────── */
+.hljs-addition {
+  color: var(--pd-diff-added-fg);
+  background: var(--pd-diff-added-bg);
+}
+
+.hljs-deletion {
+  color: var(--pd-diff-removed-fg);
+  background: var(--pd-diff-removed-bg);
+}
+
+/* ── Meta & preprocessor ──────────────────────────────────────────────── */
+.hljs-meta,
+.hljs-meta .hljs-string {
+  color: var(--pd-code-comment);
+}
+
+/* ── Subst (interpolation) ────────────────────────────────────────────── */
+.hljs-subst {
+  color: var(--pd-code-fg);
+}
