@@ -18,3 +18,5 @@ export type { TabContextMenuProps } from './TabContextMenu';
 
 export { PdStatusBar } from './PdStatusBar';
 export type { PdStatusBarProps, ConnectionState } from './PdStatusBar';
+
+export { StatusBarChips } from './StatusBarChips';
