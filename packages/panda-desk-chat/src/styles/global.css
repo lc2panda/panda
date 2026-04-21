@@ -74,3 +74,15 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--pd-text-muted);
 }
+
+/* ── Reduce-motion: disable animations for accessibility ────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

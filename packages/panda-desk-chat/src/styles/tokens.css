@@ -147,7 +147,8 @@
   --pd-palette-terra-400: #E38B6E;
   --pd-palette-terra-500: #D97757;
   --pd-palette-terra-600: #C15F3C;
-  --pd-palette-terra-700: #9C4B2E;
+  --pd-palette-terra-700: #B85A38;
+  --pd-palette-terra-800: #9C4B2E;
 
   /* ── Palette: Bamboo / Sky / Amber / Ruby ────────────────────────────── */
   --pd-palette-bamboo-300: #A8BC8A;
@@ -163,7 +164,7 @@
   --pd-color-bg: var(--pd-palette-cream-100);
   --pd-color-bg-elevated: var(--pd-palette-cream-50);
   --pd-color-bg-subtle: var(--pd-palette-cream-200);
-  --pd-color-bg-hover: var(--pd-palette-cream-200);
+  --pd-color-bg-hover: var(--pd-palette-cream-300);
   --pd-color-bg-selected: var(--pd-palette-cream-300);
   --pd-color-bg-disabled: var(--pd-palette-cream-200);
 
@@ -480,6 +481,8 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
