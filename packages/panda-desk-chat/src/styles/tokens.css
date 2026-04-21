@@ -88,8 +88,8 @@
   --pd-z-max: 9999;
 
   /* ── Layout Dimensions ───────────────────────────────────────────────── */
-  --pd-layout-sidebar-width: 264px;
-  --pd-layout-sidebar-rail: 64px;
+  --pd-layout-sidebar-width: 280px;
+  --pd-layout-sidebar-rail: 72px;
   --pd-layout-tabbar-height: 40px;
   --pd-layout-statusbar-height: 32px;
   --pd-layout-titlebar-mac: 28px;
@@ -184,10 +184,11 @@
 
   /* ── Semantic: Accent ────────────────────────────────────────────────── */
   --pd-color-accent: var(--pd-palette-terra-500);
-  --pd-color-accent-hover: var(--pd-palette-terra-400);
+  --pd-color-accent-hover: var(--pd-palette-terra-600);
   --pd-color-accent-active: var(--pd-palette-terra-600);
   --pd-color-accent-subtle: rgba(217, 119, 87, 0.1);
   --pd-color-accent-fg: var(--pd-palette-terra-700);
+  --pd-color-link: var(--pd-palette-terra-700);
 
   /* ── Semantic: Status ────────────────────────────────────────────────── */
   --pd-color-success: var(--pd-palette-bamboo-500);
@@ -333,7 +334,8 @@
   --pd-color-accent-hover: var(--pd-palette-terra-300);
   --pd-color-accent-active: var(--pd-palette-terra-500);
   --pd-color-accent-subtle: rgba(227, 139, 110, 0.12);
-  --pd-color-accent-fg: var(--pd-palette-terra-300);
+  --pd-color-accent-fg: var(--pd-palette-ink-900);
+  --pd-color-link: var(--pd-palette-terra-300);
 
   /* ── Semantic: Status ────────────────────────────────────────────────── */
   --pd-color-success: var(--pd-palette-bamboo-400);
@@ -420,6 +422,30 @@
   --pd-pet-level-badge: var(--pd-palette-amber-400);
   --pd-pet-species-border: var(--pd-palette-ink-500);
   --pd-pet-mood-glow: rgba(227, 139, 110, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   3b. Matrix Variant (dark + matrix)
+   -------------------------------------------------------------------------- */
+[data-pd-theme="dark"][data-pd-variant="matrix"] {
+  --pd-color-bg: #0A0F0A;
+  --pd-color-bg-elevated: #0F1A0F;
+  --pd-color-bg-subtle: #142014;
+  --pd-color-bg-hover: #1A2E1A;
+  --pd-color-fg: #33FF33;
+  --pd-color-fg-muted: #1A8C1A;
+  --pd-color-fg-on-accent: #0A0F0A;
+  --pd-color-accent: #33FF33;
+  --pd-color-accent-hover: #5CFF5C;
+  --pd-color-accent-fg: #0A0F0A;
+  --pd-color-link: #5CFF5C;
+  --pd-color-border: rgba(51, 255, 51, 0.15);
+  --pd-color-border-subtle: rgba(51, 255, 51, 0.08);
+  --pd-color-border-focus: #33FF33;
+  --pd-color-success: #33FF33;
+  --pd-color-warning: #CCFF33;
+  --pd-color-error: #FF3333;
+  --pd-color-info: #33CCFF;
 }
 
 /* ==========================================================================
