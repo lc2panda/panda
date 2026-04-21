@@ -19,3 +19,9 @@ export type { PdDropdownProps, PdDropdownItemProps } from "./PdDropdown";
 
 export { PdTabs, PdTabList, PdTab, PdTabPanel } from "./PdTabs";
 export type { PdTabsProps, PdTabProps, PdTabPanelProps } from "./PdTabs";
+
+export { PdDrawer } from "./PdDrawer";
+export type { PdDrawerProps } from "./PdDrawer";
+
+export { PdMenu } from "./PdMenu";
+export type { PdMenuProps, PdMenuItem } from "./PdMenu";
