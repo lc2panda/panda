@@ -15,3 +15,9 @@ export type { ChatInputProps, ChatInputHandle, Attachment } from "./ChatInput";
 
 export { StreamingIndicator } from "./StreamingIndicator";
 export type { StreamingIndicatorProps } from "./StreamingIndicator";
+
+export { ThinkingBlock } from "./ThinkingBlock";
+export type { ThinkingBlockProps } from "./ThinkingBlock";
+
+export { ToolCallBlock } from "./ToolCallBlock";
+export type { ToolCallBlockProps, ToolCallStatus } from "./ToolCallBlock";
