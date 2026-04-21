@@ -39,7 +39,7 @@ import {
 const IS_DEV = !!(
   typeof window !== 'undefined' &&
   !window.pandaAPI &&
-  (import.meta as Record<string, unknown>).env &&
+  (import.meta as unknown as Record<string, unknown>).env &&
   ((import.meta as unknown as { env: { DEV?: boolean } }).env.DEV ||
     (import.meta as unknown as { env: { MODE?: string } }).env.MODE === 'development')
 );
@@ -169,7 +169,7 @@ export function onWindowToggle(
 
 /** List all sessions. */
 export async function listSessions(): Promise<SessionListResponse> {
-  if (IS_DEV) return { sessions: [] };
+  if (IS_DEV) return [];
   return getPandaAPI().session.list({});
 }
 
@@ -178,7 +178,7 @@ export async function createSession(
   cwd: string,
   name?: string,
 ): Promise<SessionCreateResponse> {
-  if (IS_DEV) return { sessionId: crypto.randomUUID(), name: name ?? 'Dev Session' };
+  if (IS_DEV) return { id: crypto.randomUUID() };
   return getPandaAPI().session.create({ cwd, name });
 }
 
@@ -273,7 +273,7 @@ export async function searchFiles(
   query: string,
   maxResults?: number,
 ): Promise<FsSearchResponse> {
-  if (IS_DEV) return { results: [] };
+  if (IS_DEV) return [];
   return getPandaAPI().fs.search({ sessionId, query, maxResults });
 }
 
@@ -282,7 +282,7 @@ export async function listDirectory(
   sessionId: string,
   dirPath: string,
 ): Promise<FsListResponse> {
-  if (IS_DEV) return { entries: [] };
+  if (IS_DEV) return [];
   return getPandaAPI().fs.list({ sessionId, dirPath });
 }
 
@@ -301,13 +301,13 @@ export async function setWindowPosition(
 
 /** Get available slash commands. */
 export async function getSlashCommands(): Promise<SlashCommandsResponse> {
-  if (IS_DEV) return { commands: [] };
+  if (IS_DEV) return [];
   return getPandaAPI().config.getSlashCommands({});
 }
 
 /** Get available models. */
 export async function getModels(): Promise<ModelListResponse> {
-  if (IS_DEV) return { models: [] };
+  if (IS_DEV) return [];
   return getPandaAPI().config.getModels({});
 }
 
