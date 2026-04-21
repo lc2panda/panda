@@ -600,6 +600,36 @@ export async function installOAuthTokens(tokens: OAuthTokens): Promise<void> {
     return updated
   })
 
+  // 清掉 settings.json 里残留的 ANTHROPIC_* —— 第三方登录时曾写入
+  // (thirdPartyLogin 已处理，但 Anthropic OAuth 这条路之前漏了)
+  // 不清会被 applySafeConfigEnvironmentVariables 重新注入 process.env，
+  // 导致 Bearer token 被送到错的 host，触发 403 no body。
+  try {
+    const { readFileSync, writeFileSync } = await import('fs')
+    const { join } = await import('path')
+    const { homedir } = await import('os')
+    const settingsPath = join(
+      process.env.PANDA_CONFIG_DIR ??
+        process.env.CLAUDE_CONFIG_DIR ??
+        join(homedir(), '.pandacc'),
+      'settings.json',
+    )
+    const raw = readFileSync(settingsPath, 'utf-8')
+    const settings = JSON.parse(raw)
+    if (settings.env) {
+      delete settings.env.ANTHROPIC_BASE_URL
+      delete settings.env.ANTHROPIC_AUTH_TOKEN
+      delete settings.env.ANTHROPIC_MODEL
+      if (Object.keys(settings.env).length === 0) delete settings.env
+      writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
+    }
+  } catch {}
+
+  // 当前进程立即清掉同样的 env，避免本次会话继续用旧值
+  delete process.env.ANTHROPIC_BASE_URL
+  delete process.env.ANTHROPIC_AUTH_TOKEN
+  delete process.env.ANTHROPIC_MODEL
+
   // Reuse pre-fetched profile if available, otherwise fetch fresh
   const profile =
     tokens.profile ?? (await getOauthProfileFromOauthToken(tokens.accessToken))
