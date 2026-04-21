@@ -808,6 +808,7 @@ export async function* runAgent({
       // env PANDA_AGENT_MAX_TURNS 可覆盖（降回 10/30 等）。
       // Runaway 防御实际依赖：per-turn fork 限额 + uuid dedup + 上下文压缩。
       maxTurns: maxTurns ?? agentDefinition.maxTurns ?? parseInt(process.env.PANDA_AGENT_MAX_TURNS || '999', 10),
+      maxOutputTokensOverride: parseInt(process.env.PANDA_AGENT_MAX_OUTPUT_TOKENS || '65536', 10),
     })) {
       onQueryProgress?.()
       // Forward subagent API request starts to parent's metrics display
