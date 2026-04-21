@@ -105,18 +105,6 @@ export function PdStatusBar({
           <span>{conn.label}</span>
         </span>
 
-        {/* Permission mode */}
-        {permissionMode && (
-          <span
-            className={cn(
-              'rounded-[var(--pd-radius-sm)] border border-[var(--pd-color-border-subtle)]',
-              'px-1.5 py-0.5',
-            )}
-          >
-            {permissionMode}
-          </span>
-        )}
-
         {/* DND toggle */}
         <button
           type="button"

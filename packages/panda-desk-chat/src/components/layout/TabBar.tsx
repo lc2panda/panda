@@ -45,7 +45,16 @@ export function TabBar() {
   const createSession = useSessionStore((s) => s.createSession);
 
   const setChatActiveSession = useChatStore((s) => s.setActiveSession);
-  const getSession = useChatStore((s) => s.getSession);
+
+  // ── Helper: check if a session is actively streaming ──
+  const isSessionStreaming = useCallback(
+    (sessionId: string): boolean => {
+      const session = useChatStore.getState().sessions.get(sessionId);
+      if (!session) return false;
+      return session.chatState === 'streaming' || session.chatState === 'thinking';
+    },
+    [],
+  );
 
   // ── Drag state ──
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -76,7 +85,7 @@ export function TabBar() {
       if (!tab) return;
 
       // Close protection: confirm if session is streaming
-      if (isStreaming) {
+      if (isSessionStreaming(tab.sessionId)) {
         const confirmed = window.confirm(
           'This tab has an active response in progress. Close anyway?',
         );
@@ -91,7 +100,7 @@ export function TabBar() {
         setChatActiveSession(next.sessionId);
       }
     },
-    [tabs, activeTabId, removeTab, setActiveSession, setChatActiveSession, isStreaming],
+    [tabs, activeTabId, removeTab, setActiveSession, setChatActiveSession, isSessionStreaming],
   );
 
   // ── New tab ──
