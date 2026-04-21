@@ -6,6 +6,7 @@ export { AppShell } from './AppShell';
 export type { AppShellProps } from './AppShell';
 
 export { PdNavItem } from './PdNavItem';
+export type { PdNavItemProps } from './PdNavItem';
 
 export { PdSidebar } from './PdSidebar';
 export type { PdSidebarProps, PdSidebarItemProps } from './PdSidebar';

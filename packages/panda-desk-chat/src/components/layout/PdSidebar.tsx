@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useTabStore } from '@/stores/tabStore';
+import { PdNavItem } from './PdNavItem';
 import {
   MessageSquare as _MessageSquare,
   Search as _Search,
@@ -43,6 +44,7 @@ export interface PdSidebarProps {
   onToggle: () => void;
 }
 
+/** @deprecated Use PdNavItemProps from PdNavItem instead */
 export interface PdSidebarItemProps {
   icon: ReactNode;
   label: string;
@@ -72,51 +74,6 @@ const bottomNav: NavEntry[] = [
   { icon: <Settings size={20} />, label: '设置' },
   { icon: <User size={20} />,    label: '账户' },
 ];
-
-// ---------------------------------------------------------------------------
-// Sidebar Item
-// ---------------------------------------------------------------------------
-function SidebarItem({
-  icon,
-  label,
-  active = false,
-  badge,
-  onClick,
-  expanded,
-}: PdSidebarItemProps & { expanded: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={expanded ? undefined : label}
-      className={cn(
-        'group flex w-full items-center gap-3 rounded-[var(--pd-radius-md)] px-3 py-2',
-        'text-[var(--pd-color-fg-muted)] transition-colors',
-        'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
-        'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
-        active && 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)]',
-      )}
-    >
-      <span className="shrink-0">{icon}</span>
-      {expanded && (
-        <>
-          <span className="truncate text-sm">{label}</span>
-          {badge != null && badge > 0 && (
-            <span
-              className={cn(
-                'ml-auto inline-flex h-5 min-w-5 items-center justify-center',
-                'rounded-[var(--pd-radius-full)] bg-[var(--pd-color-accent)] px-1.5',
-                'text-[length:var(--pd-text-xs)] font-medium text-[var(--pd-color-fg-on-accent)]',
-              )}
-            >
-              {badge > 99 ? '99+' : badge}
-            </span>
-          )}
-        </>
-      )}
-    </button>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Section divider
@@ -430,12 +387,12 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         <SidebarDivider />
 
         {workspaceNav.map((item) => (
-          <SidebarItem
+          <PdNavItem
             key={item.label}
             icon={item.icon}
             label={item.label}
             shortcut={item.shortcut}
-            expanded={expanded}
+            collapsed={!expanded}
           />
         ))}
       </div>
@@ -443,11 +400,11 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
       {/* ── Bottom (settings + account) ── */}
       <div className="shrink-0 border-t border-[var(--pd-color-border-subtle)] px-2 py-2">
         {bottomNav.map((item) => (
-          <SidebarItem
+          <PdNavItem
             key={item.label}
             icon={item.icon}
             label={item.label}
-            expanded={expanded}
+            collapsed={!expanded}
           />
         ))}
       </div>
