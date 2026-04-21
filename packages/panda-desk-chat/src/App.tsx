@@ -5,7 +5,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/cn';
 import { PdSidebar } from './components/layout/PdSidebar';
-import { PdTabBar } from './components/layout/PdTabBar';
+import { PdTabBarConnected } from './components/layout/PdTabBarConnected';
 import { PdStatusBar } from './components/layout/PdStatusBar';
 import { PdInspector } from './components/layout/PdInspector';
 import { ChatPage } from './pages/ChatPage';
@@ -68,12 +68,7 @@ export function App() {
         style={{ maxWidth: 'var(--pd-main-max-width, 1200px)', minWidth: 0 }}
       >
         {/* TabBar - 40px */}
-        <PdTabBar
-          tabs={[]}
-          onSelect={() => {}}
-          onClose={() => {}}
-          onNewTab={() => {}}
-        />
+        <PdTabBarConnected />
 
         {/* Content - flex */}
         <div className="relative flex-1 overflow-hidden">

@@ -22,3 +22,6 @@ export type { PdDirectoryPickerProps } from "./PdDirectoryPicker";
 
 export { PdPetAvatar } from "./PdPetAvatar";
 export type { PdPetAvatarProps, PetSpecies, PetMood } from "./PdPetAvatar";
+
+export { PdCommandPalette } from "./PdCommandPalette";
+export type { PdCommandPaletteProps, Command } from "./PdCommandPalette";

@@ -5,6 +5,8 @@
 export { AppShell } from './AppShell';
 export type { AppShellProps } from './AppShell';
 
+export { PdNavItem } from './PdNavItem';
+
 export { PdSidebar } from './PdSidebar';
 export type { PdSidebarProps, PdSidebarItemProps } from './PdSidebar';
 
@@ -13,8 +15,8 @@ export type { PdTabBarProps, PdTabBarTab } from './PdTabBar';
 
 export { PdTabBarConnected } from './PdTabBarConnected';
 
-export { TabContextMenu } from './PdTabContextMenu';
-export type { TabContextMenuProps } from './PdTabContextMenu';
+export { TabContextMenu as PdTabContextMenu } from './PdTabContextMenu';
+export type { TabContextMenuProps as PdTabContextMenuProps } from './PdTabContextMenu';
 
 export { PdStatusBar } from './PdStatusBar';
 export type { PdStatusBarProps, ConnectionState } from './PdStatusBar';
