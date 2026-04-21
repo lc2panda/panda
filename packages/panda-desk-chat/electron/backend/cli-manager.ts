@@ -46,6 +46,9 @@ export class CLISession extends EventEmitter {
   private rl: ReadlineInterface | null = null;
   private stderrBuffer: string[] = [];
 
+  // Current assistant message ID (from message_start, used in stream events)
+  private currentMessageId: string = '';
+
   // Tool input accumulation (for streaming tool_use via content_block_delta)
   private currentToolName: string | null = null;
   private currentToolInput: string = '';
@@ -198,7 +201,11 @@ export class CLISession extends EventEmitter {
     switch (event.type) {
       case 'message_start':
         this.state = 'streaming';
-        this.emit('stream:start', { sessionId: this.id });
+        this.currentMessageId = event.message?.id || randomUUID();
+        this.emit('stream:start', {
+          sessionId: this.id,
+          messageId: this.currentMessageId,
+        });
         break;
 
       case 'content_block_start':
@@ -222,23 +229,26 @@ export class CLISession extends EventEmitter {
           case 'text_delta':
             this.emit('stream:delta', {
               sessionId: this.id,
+              messageId: this.currentMessageId,
               type: 'text',
-              content: delta.text,
+              delta: delta.text,
             });
             break;
           case 'thinking_delta':
             this.emit('stream:delta', {
               sessionId: this.id,
+              messageId: this.currentMessageId,
               type: 'thinking',
-              content: delta.thinking,
+              delta: delta.thinking,
             });
             break;
           case 'input_json_delta':
             this.currentToolInput += delta.partial_json;
             this.emit('stream:delta', {
               sessionId: this.id,
+              messageId: this.currentMessageId,
               type: 'tool_input',
-              content: delta.partial_json,
+              delta: delta.partial_json,
             });
             break;
         }
@@ -272,15 +282,14 @@ export class CLISession extends EventEmitter {
     this.state = 'idle';
     this.emit('stream:end', {
       sessionId: this.id,
+      messageId: this.currentMessageId,
       finishReason: 'end_turn',
       tokenUsage: msg.usage ? {
         input: msg.usage.input_tokens,
         output: msg.usage.output_tokens,
         cacheRead: msg.usage.cache_read_input_tokens,
-        cacheCreation: msg.usage.cache_creation_input_tokens,
+        cacheWrite: msg.usage.cache_creation_input_tokens,
       } : undefined,
-      costUsd: msg.cost_usd,
-      durationMs: msg.duration_ms,
     });
   }
 
