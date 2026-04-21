@@ -1,0 +1,527 @@
+// Input: Chat events from WebSocket bridge (streaming deltas, tool calls, permissions)
+// Output: Per-session chat state (messages, streaming buffers, tool status, permissions)
+// Pos: Core state layer — drives message list, composer, permission dialogs, status bar
+
+import { create } from 'zustand';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface TokenUsage {
+  input: number;
+  output: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+}
+
+export interface UIToolCall {
+  id: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  result?: string;
+  isError?: boolean;
+  status: 'pending' | 'running' | 'success' | 'error';
+}
+
+export interface UIMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  // assistant extensions
+  thinkingContent?: string;
+  toolCalls?: UIToolCall[];
+  tokenUsage?: TokenUsage;
+  finishReason?: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use';
+}
+
+export type ChatState =
+  | 'idle'
+  | 'thinking'
+  | 'streaming'
+  | 'tool_executing'
+  | 'permission_pending';
+
+export type ConnectionState =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'error';
+
+export interface PendingPermission {
+  toolUseId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  tier: 'read' | 'write' | 'exec';
+}
+
+export interface PerSessionState {
+  sessionId: string;
+  messages: UIMessage[];
+  chatState: ChatState;
+  connectionState: ConnectionState;
+  streamingText: string;
+  streamingToolInput: string;
+  activeToolUseId: string | null;
+  activeToolName: string | null;
+  activeThinkingId: string | null;
+  pendingPermission: PendingPermission | null;
+  tokenUsage: TokenUsage;
+  elapsedSeconds: number;
+  statusVerb: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function createEmptySession(sessionId: string): PerSessionState {
+  return {
+    sessionId,
+    messages: [],
+    chatState: 'idle',
+    connectionState: 'disconnected',
+    streamingText: '',
+    streamingToolInput: '',
+    activeToolUseId: null,
+    activeToolName: null,
+    activeThinkingId: null,
+    pendingPermission: null,
+    tokenUsage: { input: 0, output: 0 },
+    elapsedSeconds: 0,
+    statusVerb: '',
+  };
+}
+
+/** Shallow-clone a session from the map, returning null if missing. */
+function getSession(
+  sessions: Map<string, PerSessionState>,
+  sessionId: string,
+): PerSessionState | null {
+  return sessions.get(sessionId) ?? null;
+}
+
+/** Return a new Map with an updated session entry. */
+function putSession(
+  sessions: Map<string, PerSessionState>,
+  session: PerSessionState,
+): Map<string, PerSessionState> {
+  const next = new Map(sessions);
+  next.set(session.sessionId, session);
+  return next;
+}
+
+/**
+ * Locate a message inside a session's message list and return a shallow copy
+ * of the array with the updated message. Returns null if the message is not
+ * found.
+ */
+function updateMessage(
+  messages: UIMessage[],
+  messageId: string,
+  updater: (msg: UIMessage) => UIMessage,
+): UIMessage[] | null {
+  const idx = messages.findIndex((m) => m.id === messageId);
+  if (idx === -1) return null;
+  const updated = [...messages];
+  updated[idx] = updater({ ...messages[idx] });
+  return updated;
+}
+
+// ---------------------------------------------------------------------------
+// Stream buffer — accumulates deltas between flushes (16 ms cadence)
+// ---------------------------------------------------------------------------
+
+interface StreamBuffer {
+  text: string;
+  thinking: string;
+  toolInput: string;
+}
+
+const streamBuffers = new Map<string, StreamBuffer>();
+
+function getBuffer(sessionId: string): StreamBuffer {
+  let buf = streamBuffers.get(sessionId);
+  if (!buf) {
+    buf = { text: '', thinking: '', toolInput: '' };
+    streamBuffers.set(sessionId, buf);
+  }
+  return buf;
+}
+
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
+
+export interface ChatStore {
+  sessions: Map<string, PerSessionState>;
+  activeSessionId: string | null;
+
+  // Getters
+  getActiveSession: () => PerSessionState | null;
+
+  // Session lifecycle
+  initSession: (sessionId: string) => void;
+  removeSession: (sessionId: string) => void;
+  setActiveSession: (sessionId: string) => void;
+
+  // Message actions
+  addUserMessage: (sessionId: string, content: string) => void;
+  startStreaming: (sessionId: string, messageId: string) => void;
+  appendStreamDelta: (
+    sessionId: string,
+    messageId: string,
+    delta: string,
+    type: 'text' | 'thinking' | 'tool_input',
+  ) => void;
+  endStreaming: (
+    sessionId: string,
+    messageId: string,
+    finishReason: string,
+    tokenUsage?: TokenUsage,
+  ) => void;
+
+  // Tool actions
+  startToolUse: (
+    sessionId: string,
+    toolUseId: string,
+    toolName: string,
+    input: Record<string, unknown>,
+  ) => void;
+  endToolUse: (
+    sessionId: string,
+    toolUseId: string,
+    result: string,
+    isError: boolean,
+  ) => void;
+
+  // Permission actions
+  requestPermission: (
+    sessionId: string,
+    permission: PendingPermission,
+  ) => void;
+  resolvePermission: (sessionId: string) => void;
+
+  // Connection
+  setConnectionState: (sessionId: string, state: ConnectionState) => void;
+
+  // Timer / status
+  setElapsed: (sessionId: string, seconds: number) => void;
+  setStatusVerb: (sessionId: string, verb: string) => void;
+
+  // Batch flush (call every ~16 ms from a RAF loop)
+  flushStreamBuffer: (sessionId: string) => void;
+}
+
+export const useChatStore = create<ChatStore>()((set, get) => ({
+  sessions: new Map<string, PerSessionState>(),
+  activeSessionId: null,
+
+  // -- Getters ---------------------------------------------------------------
+
+  getActiveSession: () => {
+    const { sessions, activeSessionId } = get();
+    if (!activeSessionId) return null;
+    return sessions.get(activeSessionId) ?? null;
+  },
+
+  // -- Session lifecycle -----------------------------------------------------
+
+  initSession: (sessionId) =>
+    set((state) => {
+      if (state.sessions.has(sessionId)) return state;
+      return { sessions: putSession(state.sessions, createEmptySession(sessionId)) };
+    }),
+
+  removeSession: (sessionId) =>
+    set((state) => {
+      const next = new Map(state.sessions);
+      next.delete(sessionId);
+      streamBuffers.delete(sessionId);
+      return {
+        sessions: next,
+        activeSessionId:
+          state.activeSessionId === sessionId ? null : state.activeSessionId,
+      };
+    }),
+
+  setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
+
+  // -- Message actions -------------------------------------------------------
+
+  addUserMessage: (sessionId, content) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      const msg: UIMessage = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content,
+        timestamp: Date.now(),
+      };
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          messages: [...session.messages, msg],
+          chatState: 'thinking',
+        }),
+      };
+    }),
+
+  startStreaming: (sessionId, messageId) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      // Create a placeholder assistant message
+      const msg: UIMessage = {
+        id: messageId,
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+      };
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          messages: [...session.messages, msg],
+          chatState: 'streaming',
+          streamingText: '',
+          streamingToolInput: '',
+        }),
+      };
+    }),
+
+  appendStreamDelta: (sessionId, _messageId, delta, type) => {
+    // Hot path — buffer only, no React re-render.
+    const buf = getBuffer(sessionId);
+    switch (type) {
+      case 'text':
+        buf.text += delta;
+        break;
+      case 'thinking':
+        buf.thinking += delta;
+        break;
+      case 'tool_input':
+        buf.toolInput += delta;
+        break;
+    }
+  },
+
+  flushStreamBuffer: (sessionId) =>
+    set((state) => {
+      const buf = streamBuffers.get(sessionId);
+      if (!buf || (buf.text === '' && buf.thinking === '' && buf.toolInput === '')) {
+        return state;
+      }
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+
+      const textDelta = buf.text;
+      const thinkingDelta = buf.thinking;
+      const toolInputDelta = buf.toolInput;
+
+      // Reset buffer
+      buf.text = '';
+      buf.thinking = '';
+      buf.toolInput = '';
+
+      // Apply deltas to the last assistant message
+      const messages = [...session.messages];
+      const lastIdx = messages.length - 1;
+      if (lastIdx < 0 || messages[lastIdx].role !== 'assistant') return state;
+
+      const lastMsg = { ...messages[lastIdx] };
+      if (textDelta) lastMsg.content += textDelta;
+      if (thinkingDelta)
+        lastMsg.thinkingContent = (lastMsg.thinkingContent ?? '') + thinkingDelta;
+      messages[lastIdx] = lastMsg;
+
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          messages,
+          streamingText: session.streamingText + textDelta,
+          streamingToolInput: session.streamingToolInput + toolInputDelta,
+        }),
+      };
+    }),
+
+  endStreaming: (sessionId, messageId, finishReason, tokenUsage) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+
+      // Flush any remaining buffered data first
+      const buf = streamBuffers.get(sessionId);
+      let messages = session.messages;
+      if (buf && (buf.text || buf.thinking || buf.toolInput)) {
+        messages = [...messages];
+        const lastIdx = messages.length - 1;
+        if (lastIdx >= 0 && messages[lastIdx].role === 'assistant') {
+          const m = { ...messages[lastIdx] };
+          if (buf.text) m.content += buf.text;
+          if (buf.thinking)
+            m.thinkingContent = (m.thinkingContent ?? '') + buf.thinking;
+          messages[lastIdx] = m;
+        }
+        buf.text = '';
+        buf.thinking = '';
+        buf.toolInput = '';
+      }
+
+      const updated = updateMessage(messages, messageId, (msg) => ({
+        ...msg,
+        finishReason: finishReason as UIMessage['finishReason'],
+        tokenUsage,
+      }));
+
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          messages: updated ?? messages,
+          chatState: 'idle',
+          streamingText: '',
+          streamingToolInput: '',
+          tokenUsage: tokenUsage
+            ? {
+                input: session.tokenUsage.input + tokenUsage.input,
+                output: session.tokenUsage.output + tokenUsage.output,
+                cacheRead:
+                  (session.tokenUsage.cacheRead ?? 0) +
+                  (tokenUsage.cacheRead ?? 0),
+                cacheWrite:
+                  (session.tokenUsage.cacheWrite ?? 0) +
+                  (tokenUsage.cacheWrite ?? 0),
+              }
+            : session.tokenUsage,
+        }),
+      };
+    }),
+
+  // -- Tool actions ----------------------------------------------------------
+
+  startToolUse: (sessionId, toolUseId, toolName, input) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+
+      // Append tool call to the last assistant message
+      const messages = [...session.messages];
+      const lastIdx = messages.length - 1;
+      if (lastIdx < 0 || messages[lastIdx].role !== 'assistant') return state;
+
+      const lastMsg = { ...messages[lastIdx] };
+      const toolCall: UIToolCall = {
+        id: toolUseId,
+        toolName,
+        input,
+        status: 'running',
+      };
+      lastMsg.toolCalls = [...(lastMsg.toolCalls ?? []), toolCall];
+      messages[lastIdx] = lastMsg;
+
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          messages,
+          chatState: 'tool_executing',
+          activeToolUseId: toolUseId,
+          activeToolName: toolName,
+          streamingToolInput: '',
+        }),
+      };
+    }),
+
+  endToolUse: (sessionId, toolUseId, result, isError) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+
+      const messages = [...session.messages];
+      const lastIdx = messages.length - 1;
+      if (lastIdx < 0 || messages[lastIdx].role !== 'assistant') return state;
+
+      const lastMsg = { ...messages[lastIdx] };
+      if (lastMsg.toolCalls) {
+        lastMsg.toolCalls = lastMsg.toolCalls.map((tc) =>
+          tc.id === toolUseId
+            ? { ...tc, result, isError, status: isError ? 'error' : 'success' as const }
+            : tc,
+        );
+      }
+      messages[lastIdx] = lastMsg;
+
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          messages,
+          chatState: 'streaming',
+          activeToolUseId: null,
+          activeToolName: null,
+          streamingToolInput: '',
+        }),
+      };
+    }),
+
+  // -- Permission actions ----------------------------------------------------
+
+  requestPermission: (sessionId, permission) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          chatState: 'permission_pending',
+          pendingPermission: permission,
+        }),
+      };
+    }),
+
+  resolvePermission: (sessionId) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          chatState: 'streaming',
+          pendingPermission: null,
+        }),
+      };
+    }),
+
+  // -- Connection ------------------------------------------------------------
+
+  setConnectionState: (sessionId, connectionState) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      return {
+        sessions: putSession(state.sessions, { ...session, connectionState }),
+      };
+    }),
+
+  // -- Timer / status --------------------------------------------------------
+
+  setElapsed: (sessionId, seconds) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          elapsedSeconds: seconds,
+        }),
+      };
+    }),
+
+  setStatusVerb: (sessionId, verb) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      return {
+        sessions: putSession(state.sessions, { ...session, statusVerb: verb }),
+      };
+    }),
+}));
