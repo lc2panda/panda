@@ -1,10 +1,10 @@
 // Input: Array of UIMessage from chatStore, isStreaming flag, streamingText
 // Output: Scrollable message list with auto-scroll and a11y live region
-// Pos: Chat layer — main conversation display area wrapping UserMessage + AssistantMessage
+// Pos: Chat layer — main conversation display area wrapping PdUserBubble + PdMessageBubble
 import React, { useEffect, useRef, useCallback } from "react";
 import { cn } from "../../lib/cn";
-import { UserMessage } from "./UserMessage";
-import { AssistantMessage, type ToolCallInfo } from "./AssistantMessage";
+import { PdUserBubble } from "./PdUserBubble";
+import { PdMessageBubble, type ToolCallInfo } from "./PdMessageBubble";
 import { useChatStore, type TranscriptMode } from "../../stores/chatStore";
 
 export interface UIMessage {
@@ -16,13 +16,13 @@ export interface UIMessage {
   toolCalls?: ToolCallInfo[];
 }
 
-export interface MessageListProps {
+export interface PdMessageListProps {
   messages: UIMessage[];
   isStreaming: boolean;
   streamingText: string;
 }
 
-export const MessageList: React.FC<MessageListProps> = ({
+export const PdMessageList: React.FC<PdMessageListProps> = ({
   messages,
   isStreaming,
   streamingText,
@@ -68,7 +68,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
         if (msg.role === "user") {
           return (
-            <UserMessage
+            <PdUserBubble
               key={msg.id}
               content={msg.content}
               timestamp={msg.timestamp}
@@ -83,7 +83,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             : msg.content;
 
         return (
-          <AssistantMessage
+          <PdMessageBubble
             key={msg.id}
             content={displayContent}
             timestamp={msg.timestamp}
@@ -97,7 +97,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
       {/* Streaming placeholder when no assistant message exists yet */}
       {isStreaming && (messages.length === 0 || messages[messages.length - 1].role !== "assistant") && streamingText && (
-        <AssistantMessage
+        <PdMessageBubble
           content={streamingText}
           timestamp={Date.now()}
           isStreaming
@@ -108,4 +108,4 @@ export const MessageList: React.FC<MessageListProps> = ({
   );
 };
 
-MessageList.displayName = "MessageList";
+PdMessageList.displayName = "PdMessageList";

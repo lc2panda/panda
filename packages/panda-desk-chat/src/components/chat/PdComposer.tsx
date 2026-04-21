@@ -21,7 +21,7 @@ export interface Attachment {
   name: string;
 }
 
-export interface ChatInputProps {
+export interface PdComposerProps {
   sessionId: string;
   onSend: (content: string, attachments?: Attachment[]) => void;
   onStop: () => void;
@@ -30,7 +30,7 @@ export interface ChatInputProps {
   placeholder?: string;
 }
 
-export interface ChatInputHandle {
+export interface PdComposerHandle {
   focus: () => void;
   clear: () => void;
 }
@@ -60,10 +60,10 @@ const MAX_TEXTAREA_HEIGHT = 200;
 const MIN_TEXTAREA_HEIGHT = 36;
 
 /* -------------------------------------------------------------------------- */
-/*  ChatInput                                                                 */
+/*  PdComposer                                                                */
 /* -------------------------------------------------------------------------- */
 
-export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
+export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
   (
     {
       sessionId: _sessionId,
@@ -350,7 +350,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
   },
 );
 
-ChatInput.displayName = "ChatInput";
+PdComposer.displayName = "PdComposer";
 
 /* -------------------------------------------------------------------------- */
 /*  Inline SVG Icons (14x14, keeps bundle self-contained)                     */
