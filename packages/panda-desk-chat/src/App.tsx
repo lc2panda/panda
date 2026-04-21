@@ -8,7 +8,7 @@ import { TabBar } from './components/layout/TabBar';
 import { ChatPage } from './pages/ChatPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useSettingsStore, useChatStore } from './stores';
-import { SideChat } from './components/chat';
+import { PdSideChat } from './components/chat';
 
 const VERSION = '0.1.0';
 
@@ -68,7 +68,7 @@ export function App() {
 
       {/* Side Chat panel */}
       {sideChatOpen && activeSessionId && (
-        <SideChat
+        <PdSideChat
           parentSessionId={activeSessionId}
           onClose={() => setSideChatOpen(false)}
         />

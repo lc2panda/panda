@@ -102,7 +102,7 @@ export const ChatPage: React.FC = () => {
       {isEmpty ? (
         <EmptyState onFocusInput={() => inputRef.current?.focus()} />
       ) : (
-        <MessageList
+        <PdMessageList
           messages={uiMessages}
           isStreaming={isStreaming}
           streamingText={streamingText}
@@ -118,7 +118,7 @@ export const ChatPage: React.FC = () => {
             "border-t border-[var(--pd-color-border-subtle)]",
           )}
         >
-          <StreamingIndicator verb={statusVerb} elapsed={elapsedSeconds} />
+          <PdStreamingIndicator verb={statusVerb} elapsed={elapsedSeconds} />
         </div>
       )}
 
@@ -132,7 +132,7 @@ export const ChatPage: React.FC = () => {
           "bg-[var(--pd-color-bg)]",
         )}
       >
-        <ChatInput
+        <PdComposer
           ref={inputRef}
           sessionId={mockSessionId}
           onSend={handleSend}
@@ -143,7 +143,7 @@ export const ChatPage: React.FC = () => {
 
       {/* ── Permission dialog (modal overlay) ────────────────────────── */}
       {pendingPermission && (
-        <PermissionDialog
+        <PdPermissionDialog
           visible={!!pendingPermission}
           toolName={pendingPermission.toolName}
           input={pendingPermission.input}
@@ -173,7 +173,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onFocusInput }) => (
       "select-none",
     )}
   >
-    <PetCameo occasion="empty_state" />
+    <PdPetCameo occasion="empty_state" />
     <button
       type="button"
       onClick={onFocusInput}
