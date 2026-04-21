@@ -45,7 +45,7 @@ export function TabBar() {
   const createSession = useSessionStore((s) => s.createSession);
 
   const setChatActiveSession = useChatStore((s) => s.setActiveSession);
-  const isStreaming = useChatStore((s) => s.isStreaming);
+  const getSession = useChatStore((s) => s.getSession);
 
   // ── Drag state ──
   const [drag, setDrag] = useState<DragState | null>(null);

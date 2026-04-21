@@ -22,6 +22,6 @@ export type {
 
 export type { SessionMeta } from './sessionStore';
 export type { Tab } from './tabStore';
-export type { Theme, PermissionMode, Locale } from './settingsStore';
+export type { Theme, PermissionMode, Locale, EffortLevel } from './settingsStore';
 export type { ModalType, Toast } from './uiStore';
 export type { Provider, ModelInfo } from './providerStore';

@@ -122,60 +122,97 @@ export function PdTabBar({
         ref={scrollRef}
         className="flex flex-1 items-stretch overflow-x-auto scrollbar-none"
       >
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onSelect(tab.id)}
-            className={cn(
-              'group relative flex shrink-0 items-center gap-2 px-3',
-              'min-w-[120px] max-w-[240px]',
-              'text-sm transition-colors',
-              'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
-              tab.isActive
-                ? 'bg-[var(--pd-color-bg)] text-[var(--pd-color-fg)]'
-                : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)]',
-            )}
-          >
-            {/* Active indicator */}
-            {tab.isActive && (
-              <span className="absolute inset-x-0 bottom-0 h-0.5 bg-[var(--pd-color-accent)]" />
-            )}
-
-            {/* Unsaved-changes dot */}
-            {tab.hasChanges && (
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--pd-color-accent)]" />
-            )}
-
-            {/* Title */}
-            <span className="truncate">{tab.title}</span>
-
-            {/* Close button (hidden for pinned tabs) */}
-            {!tab.isPinned && (
+        {tabs.map((tab, index) => (
+          <div key={tab.id} className="relative flex items-stretch">
+            {/* ── Drop indicator (left edge) ── */}
+            {dropTargetIndex === index && dragFromIndex !== null && dragFromIndex !== index && (
               <span
-                role="button"
-                tabIndex={-1}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose(tab.id);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                className="absolute left-0 top-1 bottom-1 z-20 w-0.5"
+                style={{ background: 'var(--pd-color-accent)' }}
+              />
+            )}
+
+            <button
+              type="button"
+              draggable
+              onClick={() => onSelect(tab.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onContextMenu?.(tab.id, e.clientX, e.clientY);
+              }}
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                onDragStart?.(index);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                onDragOver?.(index);
+              }}
+              onDragLeave={() => onDragLeave?.()}
+              onDrop={(e) => {
+                e.preventDefault();
+                onDragEnd?.();
+              }}
+              onDragEnd={() => onDragEnd?.()}
+              className={cn(
+                'group relative flex shrink-0 items-center gap-2 px-3',
+                'min-w-[120px] max-w-[240px]',
+                'transition-colors',
+                'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
+                tab.isActive
+                  ? 'bg-[var(--pd-color-bg)] text-[var(--pd-color-fg)]'
+                  : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)]',
+              )}
+              style={{
+                height: '36px',
+                fontSize: 'var(--pd-text-sm)',
+                opacity: dragFromIndex === index ? 0.5 : 1,
+              }}
+            >
+              {/* Active indicator — 2px accent bottom border */}
+              {tab.isActive && (
+                <span
+                  className="absolute inset-x-0 bottom-0"
+                  style={{ height: '2px', background: 'var(--pd-color-accent)' }}
+                />
+              )}
+
+              {/* Unsaved-changes dot */}
+              {tab.hasChanges && (
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--pd-color-accent)]" />
+              )}
+
+              {/* Title */}
+              <span className="truncate">{tab.title}</span>
+
+              {/* Close button (hidden for pinned tabs) */}
+              {!tab.isPinned && (
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  onClick={(e) => {
                     e.stopPropagation();
                     onClose(tab.id);
-                  }
-                }}
-                className={cn(
-                  'ml-auto shrink-0 rounded-[var(--pd-radius-xs)] p-0.5',
-                  'opacity-0 transition-opacity group-hover:opacity-100',
-                  'text-[var(--pd-color-fg-subtle)] hover:bg-[var(--pd-color-bg-hover)]',
-                  'hover:text-[var(--pd-color-fg)]',
-                )}
-              >
-                <X size={12} />
-              </span>
-            )}
-          </button>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.stopPropagation();
+                      onClose(tab.id);
+                    }
+                  }}
+                  className={cn(
+                    'ml-auto shrink-0 rounded-[var(--pd-radius-xs)] p-0.5',
+                    'opacity-0 transition-opacity group-hover:opacity-100',
+                    'text-[var(--pd-color-fg-subtle)] hover:bg-[var(--pd-color-bg-hover)]',
+                    'hover:text-[var(--pd-color-fg)]',
+                  )}
+                >
+                  <X size={12} />
+                </span>
+              )}
+            </button>
+          </div>
         ))}
       </div>
 

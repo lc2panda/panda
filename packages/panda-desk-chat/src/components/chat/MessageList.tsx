@@ -90,6 +90,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             thinkingContent={msg.thinkingContent}
             toolCalls={msg.toolCalls}
             isStreaming={isLastAssistant && isStreaming}
+            transcriptMode={transcriptMode}
           />
         );
       })}
@@ -100,6 +101,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           content={streamingText}
           timestamp={Date.now()}
           isStreaming
+          transcriptMode={transcriptMode}
         />
       )}
     </div>

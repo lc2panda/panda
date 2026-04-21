@@ -1,7 +1,7 @@
 // Input: Session ID and chat store state
 // Output: Complete chat interface page
 // Pos: Page layer — orchestrates all chat components
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { useChatStore } from "../stores";
 import { MessageList } from "../components/chat/MessageList";
@@ -45,6 +45,18 @@ export const ChatPage: React.FC = () => {
 
   const isStreaming = chatState === "streaming" || chatState === "thinking";
   const isEmpty = messages.length === 0 && !isStreaming;
+
+  /* -- Ctrl+O: cycle transcript mode ------------------------------------- */
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'o') {
+        e.preventDefault();
+        useChatStore.getState().cycleTranscriptMode();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   /* -- Handlers ---------------------------------------------------------- */
   const handleSend = useCallback(

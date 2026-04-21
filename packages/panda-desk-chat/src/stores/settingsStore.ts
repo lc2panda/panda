@@ -96,6 +96,10 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
     set({ fontSize });
     get().saveSettings();
   },
+  setEffortLevel: (effortLevel) => {
+    set({ effortLevel });
+    get().saveSettings();
+  },
   toggleSidebar: () => {
     set((state) => ({ sidebarExpanded: !state.sidebarExpanded }));
     get().saveSettings();

@@ -4,6 +4,7 @@
 
 import { type ComponentType } from 'react';
 import { cn } from '@/lib/cn';
+import { StatusBarChips } from './StatusBarChips';
 import {
   BellOff as _BellOff,
   Bell as _Bell,
@@ -67,20 +68,19 @@ export function PdStatusBar({
       )}
       style={{ height: 'var(--pd-layout-statusbar-height)' }}
     >
-      {/* ── Left: model + tokens ── */}
+      {/* -- Left: chips + model + tokens -- */}
       <div className="flex items-center gap-3">
+        <StatusBarChips />
+
         {model && (
-          <button
-            type="button"
+          <span
             className={cn(
               'rounded-[var(--pd-radius-sm)] px-1.5 py-0.5',
-              'transition-colors hover:bg-[var(--pd-color-bg-hover)]',
-              'hover:text-[var(--pd-color-fg)]',
+              'text-[var(--pd-color-fg-muted)]',
             )}
-            title="Switch model"
           >
             {model}
-          </button>
+          </span>
         )}
 
         {tokenCount && (
@@ -90,7 +90,7 @@ export function PdStatusBar({
         )}
       </div>
 
-      {/* ── Right: connection + permission + DND ── */}
+      {/* -- Right: connection + DND -- */}
       <div className="flex items-center gap-3">
         {/* Connection indicator */}
         <span className="flex items-center gap-1.5" title={conn.label}>
