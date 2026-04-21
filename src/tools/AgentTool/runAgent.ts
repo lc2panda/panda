@@ -793,6 +793,16 @@ export async function* runAgent({
   let lastRecordedUuid: UUID | null = initialMessages.at(-1)?.uuid ?? null
 
   try {
+    // P0-Fix5: Auto-continue wrapper for incomplete agent responses
+    let _p0AutoRetry = 0;
+    const _P0_MAX_RETRIES = 2;
+    let _p0LastText = '';
+    let _p0ToolCalls = 0;
+
+    while (_p0AutoRetry <= _P0_MAX_RETRIES) {
+    _p0LastText = '';
+    _p0ToolCalls = 0;
+
     for await (const message of query({
       messages: initialMessages,
       systemPrompt: agentSystemPrompt,
@@ -840,6 +850,14 @@ export async function* runAgent({
           )
           break
         }
+        // P0-Fix5: Track agent output for completeness check
+        if ((message as any)?.message?.content) {
+          const _p0blocks = (message as any).message.content;
+          for (const _p0b of Array.isArray(_p0blocks) ? _p0blocks : []) {
+            if (_p0b.type === 'text') _p0LastText = _p0b.text || '';
+            if (_p0b.type === 'tool_use') _p0ToolCalls++;
+          }
+        }
         yield message as Message
         continue
       }
@@ -856,9 +874,37 @@ export async function* runAgent({
         if (message.type !== 'progress') {
           lastRecordedUuid = message.uuid
         }
+        // P0-Fix5: Track agent output for completeness check
+        if ((message as any)?.message?.content) {
+          const _p0blocks = (message as any).message.content;
+          for (const _p0b of Array.isArray(_p0blocks) ? _p0blocks : []) {
+            if (_p0b.type === 'text') _p0LastText = _p0b.text || '';
+            if (_p0b.type === 'tool_use') _p0ToolCalls++;
+          }
+        }
         yield message
       }
     }
+
+    // P0-Fix5: Check if response looks incomplete
+    const _p0Incomplete = _p0LastText.length > 0
+      && _p0LastText.length < 200
+      && _p0ToolCalls > 3
+      && !/(commit|hash|完成|done|finished|报告|result|error|failed|success|✅)/i.test(_p0LastText);
+
+    if (_p0Incomplete && _p0AutoRetry < _P0_MAX_RETRIES) {
+      _p0AutoRetry++;
+      logForDebugging(
+        `[P0-Fix5] Agent response looks incomplete (text=${_p0LastText.length}ch, tools=${_p0ToolCalls}), auto-retry #${_p0AutoRetry}`,
+      );
+      initialMessages.push({
+        role: 'user' as const,
+        content: [{ type: 'text' as const, text: 'Your task is not yet complete. Continue executing the remaining steps. Do not summarize — keep working until ALL steps are done.' }],
+      } as any);
+      continue;
+    }
+    break;
+    } // end P0-Fix5 while loop
 
     if (agentAbortController.signal.aborted) {
       throw new AbortError()
