@@ -282,5 +282,7 @@ CRITICAL: Agents MUST complete ALL steps in their task before responding without
         : ''
   }${whenToForkSection}${writingThePromptSection}
 
-${forkEnabled ? forkExamples : currentExamples}`
+${forkEnabled ? forkExamples : currentExamples}
+
+CRITICAL COMPLETION RULE: You MUST complete ALL steps in your assigned task before giving your final response. Do NOT stop after intermediate steps. Do NOT provide progress reports as final responses. If you still have remaining work, continue executing with tool calls. Only respond without a tool call when EVERY step is fully done and you can report the complete final result.`
 }
