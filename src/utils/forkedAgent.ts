@@ -576,8 +576,10 @@ function smartCompactContent(
   const keySection = keyLines.slice(0, 30).join('\n')
 
   // L2: Time-decay factor — older results get truncated more aggressively
-  // age=0 → keep 100%, age=1 → 85%, age=2 → 70%, ... age≥6 → 20% minimum
-  const decayFactor = Math.max(0.2, 1 - age * 0.15)
+  // age=0 → keep 100%, age=1 → 90%, age=2 → 80%, ... age≥6 → 40% minimum
+  // (P0 fix: reduced aggressiveness from 0.15/0.2 to 0.10/0.4 to preserve
+  //  task memory — previous 20% floor caused agents to lose critical context)
+  const decayFactor = Math.max(0.4, 1 - age * 0.10)
   const budget = Math.floor(maxLen * decayFactor)
 
   const assembled = [
