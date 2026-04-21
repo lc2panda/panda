@@ -3,6 +3,7 @@
 // Pos: State layer — consumed by model selector dropdown, provider settings panel
 
 import { create } from 'zustand';
+import * as bridge from '../ipc/bridge';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -104,3 +105,52 @@ export const useProviderStore = create<ProviderStore>()((set, get) => ({
       .flatMap((p) => p.models);
   },
 }));
+
+// ---------------------------------------------------------------------------
+// Bridge event wiring — loads models from backend at startup
+// ---------------------------------------------------------------------------
+
+let providerBridgeInitialized = false;
+
+/**
+ * Setup IPC bridge sync for providers/models.
+ * Call once at app initialization (after setupBridgeListeners).
+ */
+export function setupProviderBridge(): void {
+  if (providerBridgeInitialized) return;
+  providerBridgeInitialized = true;
+
+  // In production, fetch model list from backend
+  if (!bridge.isDevMode()) {
+    bridge.getModels()
+      .then((models) => {
+        if (models.length > 0) {
+          const store = useProviderStore.getState();
+          const byProvider = new Map<string, typeof models>();
+          for (const m of models) {
+            const list = byProvider.get(m.provider) || [];
+            list.push(m);
+            byProvider.set(m.provider, list);
+          }
+          const providers = store.providers.map((p) => {
+            const bm = byProvider.get(p.id);
+            return bm
+              ? {
+                  ...p,
+                  models: bm.map((m) => ({
+                    id: m.id,
+                    name: m.name,
+                    provider: m.provider,
+                    maxTokens: m.maxTokens,
+                    supportsVision: true,
+                    supportsThinking: true,
+                  })),
+                }
+              : p;
+          });
+          store.setProviders(providers);
+        }
+      })
+      .catch((err: unknown) => console.error('[providerStore] getModels failed:', err));
+  }
+}

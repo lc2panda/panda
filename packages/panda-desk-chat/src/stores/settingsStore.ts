@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import { storage } from '../lib/storage';
+import * as bridge from '../ipc/bridge';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -87,6 +88,9 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
   setPermissionMode: (permissionMode) => {
     set({ permissionMode });
     get().saveSettings();
+    bridge.setPermissionMode(permissionMode).catch((err: unknown) => {
+      console.error('[settingsStore] setPermissionMode failed:', err);
+    });
   },
   setModel: (model) => {
     set({ model });
@@ -118,6 +122,29 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
     storage.set(STORAGE_KEY, pickPersisted(get()));
   },
 }));
+
+// ---------------------------------------------------------------------------
+// Bridge event wiring — pushes permission mode to backend on startup
+// ---------------------------------------------------------------------------
+
+let settingsBridgeInitialized = false;
+
+/**
+ * Setup IPC bridge sync for settings.
+ * Call once at app initialization (after setupBridgeListeners).
+ */
+export function setupSettingsBridge(): void {
+  if (settingsBridgeInitialized) return;
+  settingsBridgeInitialized = true;
+
+  // In production, push initial permission mode to backend
+  if (!bridge.isDevMode()) {
+    const { permissionMode } = useSettingsStore.getState();
+    bridge.setPermissionMode(permissionMode).catch((err: unknown) => {
+      console.error('[settingsStore] initial setPermissionMode failed:', err);
+    });
+  }
+}
 
 // Auto-load on module init
 useSettingsStore.getState().loadSettings();

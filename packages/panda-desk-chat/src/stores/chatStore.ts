@@ -229,6 +229,7 @@ export interface ChatStore {
     decision: 'allow' | 'allow_session' | 'deny',
   ) => void;
   cancelStream: (sessionId: string) => void;
+  pasteImage: (sessionId: string, dataUrl: string) => void;
 }
 
 export const useChatStore = create<ChatStore>()((set, get) => ({
@@ -593,6 +594,12 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       };
     });
   },
+
+  pasteImage: (sessionId, dataUrl) => {
+    bridge.pasteImage(sessionId, dataUrl).catch((err) => {
+      console.error('[chatStore] pasteImage failed:', err);
+    });
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -678,6 +685,11 @@ export function setupBridgeListeners(): void {
       tier: 'read' | 'write' | 'exec';
     };
     store().requestPermission(sessionId, { toolUseId, toolName, input, tier });
+  });
+
+  // window:toggle → dispatch custom DOM event for UI components
+  bridge.onWindowToggle(() => {
+    window.dispatchEvent(new CustomEvent('pd-window-toggle'));
   });
 }
 

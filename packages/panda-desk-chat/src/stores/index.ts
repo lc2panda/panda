@@ -1,13 +1,13 @@
 // Input: Individual store modules
-// Output: Unified re-exports for all Zustand stores
+// Output: Unified re-exports for all Zustand stores + bridge initialization
 // Pos: State layer barrel — single import point for consumers
 
 export { useChatStore, setupBridgeListeners } from './chatStore';
-export { useSessionStore } from './sessionStore';
+export { useSessionStore, setupSessionBridge } from './sessionStore';
 export { useTabStore } from './tabStore';
-export { useSettingsStore } from './settingsStore';
+export { useSettingsStore, setupSettingsBridge } from './settingsStore';
 export { useUIStore } from './uiStore';
-export { useProviderStore } from './providerStore';
+export { useProviderStore, setupProviderBridge } from './providerStore';
 
 // Re-export commonly used types
 export type {
@@ -25,3 +25,23 @@ export type { Tab } from './tabStore';
 export type { Theme, PermissionMode, Locale, EffortLevel } from './settingsStore';
 export type { ModalType, Toast } from './uiStore';
 export type { Provider, ModelInfo } from './providerStore';
+
+// ---------------------------------------------------------------------------
+// Unified bridge initialization
+// ---------------------------------------------------------------------------
+
+import { setupBridgeListeners } from './chatStore';
+import { setupSessionBridge } from './sessionStore';
+import { setupSettingsBridge } from './settingsStore';
+import { setupProviderBridge } from './providerStore';
+
+/**
+ * Wire all IPC bridge listeners and sync initial state.
+ * Call once at app startup (main.tsx).
+ */
+export function setupAllBridges(): void {
+  setupBridgeListeners();
+  setupSessionBridge();
+  setupSettingsBridge();
+  setupProviderBridge();
+}
