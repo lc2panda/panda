@@ -11,6 +11,7 @@ import {
   PermissionDialog,
   type PermissionDecision,
 } from "../components/chat/PermissionDialog";
+import { PetCameo } from "../components/chat/PetCameo";
 
 /* -------------------------------------------------------------------------- */
 /*  ChatPage                                                                  */
@@ -160,36 +161,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onFocusInput }) => (
       "select-none",
     )}
   >
-    {/* Panda logo placeholder */}
-    <div
-      className={cn(
-        "w-16 h-16 flex items-center justify-center",
-        "rounded-[var(--pd-radius-xl)]",
-        "bg-[var(--pd-color-bg-subtle)]",
-        "text-[2rem]",
-      )}
-      aria-hidden="true"
-    >
-      &#x1F43C;
-    </div>
-    <h2
-      className={cn(
-        "text-[var(--pd-text-lg)]",
-        "font-[var(--pd-font-semibold)]",
-        "text-[var(--pd-color-fg)]",
-      )}
-    >
-      Start a conversation
-    </h2>
-    <p
-      className={cn(
-        "text-[var(--pd-text-sm)]",
-        "text-[var(--pd-color-fg-muted)]",
-        "max-w-xs text-center",
-      )}
-    >
-      Ask Panda Code to write, refactor, debug, or explain code.
-    </p>
+    <PetCameo occasion="empty_state" />
     <button
       type="button"
       onClick={onFocusInput}

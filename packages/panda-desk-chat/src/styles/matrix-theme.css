@@ -1,0 +1,56 @@
+/* ──────────────────────────────────────────────────────────────────────────── */
+/*  Matrix Theme Variant                                                      */
+/*  Applies phosphor-green terminal aesthetics on top of the dark theme.      */
+/*  Activate with: <html data-theme="dark" data-variant="matrix">             */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+[data-theme="dark"][data-variant="matrix"] {
+  /* Accent overrides — phosphor green */
+  --pd-color-accent:        #00ff41;
+  --pd-color-accent-hover:  #33ff66;
+  --pd-color-accent-active: #00cc34;
+  --pd-color-accent-subtle: rgba(0, 255, 65, 0.08);
+
+  /* Backgrounds — near-black with green undertone */
+  --pd-code-block-bg:  #0a0f0a;
+  --pd-code-inline-bg: #0d1a0d;
+
+  /* Foreground tints */
+  --pd-color-fg:        #d0ffd6;
+  --pd-color-fg-muted:  #80cc88;
+  --pd-color-fg-subtle: #4d9955;
+
+  /* Borders */
+  --pd-color-border:        rgba(0, 255, 65, 0.15);
+  --pd-color-border-subtle: rgba(0, 255, 65, 0.08);
+
+  /* On-accent (dark text on green buttons) */
+  --pd-color-fg-on-accent: #001a00;
+}
+
+/* Code blocks — phosphor glow effect */
+[data-theme="dark"][data-variant="matrix"] pre,
+[data-theme="dark"][data-variant="matrix"] code {
+  color: #00ff41;
+  text-shadow: 0 0 5px rgba(0, 255, 65, 0.4);
+}
+
+/* Inline code subtle bg */
+[data-theme="dark"][data-variant="matrix"] :not(pre) > code {
+  background-color: var(--pd-code-inline-bg);
+}
+
+/* Scrollbar theming */
+[data-theme="dark"][data-variant="matrix"] ::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 255, 65, 0.2);
+}
+
+[data-theme="dark"][data-variant="matrix"] ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 255, 65, 0.35);
+}
+
+/* Selection highlight */
+[data-theme="dark"][data-variant="matrix"] ::selection {
+  background-color: rgba(0, 255, 65, 0.25);
+  color: #d0ffd6;
+}

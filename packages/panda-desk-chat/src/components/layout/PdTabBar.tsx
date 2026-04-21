@@ -34,12 +34,33 @@ export interface PdTabBarProps {
   onSelect: (tabId: string) => void;
   onClose: (tabId: string) => void;
   onNewTab: () => void;
+  // Drag-reorder
+  onDragStart?: (index: number) => void;
+  onDragOver?: (index: number) => void;
+  onDragEnd?: () => void;
+  onDragLeave?: () => void;
+  dragFromIndex?: number | null;
+  dropTargetIndex?: number | null;
+  // Context menu
+  onContextMenu?: (tabId: string, x: number, y: number) => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export function PdTabBar({ tabs, onSelect, onClose, onNewTab }: PdTabBarProps) {
+export function PdTabBar({
+  tabs,
+  onSelect,
+  onClose,
+  onNewTab,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  onDragLeave,
+  dragFromIndex,
+  dropTargetIndex,
+  onContextMenu,
+}: PdTabBarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);

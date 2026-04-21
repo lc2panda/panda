@@ -7,19 +7,34 @@ import { PdSidebar } from './components/layout/PdSidebar';
 import { TabBar } from './components/layout/TabBar';
 import { ChatPage } from './pages/ChatPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { useSettingsStore } from './stores';
+import { useSettingsStore, useChatStore } from './stores';
+import { SideChat } from './components/chat';
 
 const VERSION = '0.1.0';
 
 export function App() {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [sideChatOpen, setSideChatOpen] = useState(false);
   const [page, setPage] = useState<'chat' | 'settings'>('chat');
   const theme = useSettingsStore((s) => s.theme);
+  const activeSessionId = useChatStore((s) => s.activeSessionId);
 
   const handleToggleSidebar = useCallback(
     () => setSidebarExpanded((prev) => !prev),
     [],
   );
+
+  // Cmd+; toggle side chat
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ';') {
+        e.preventDefault();
+        setSideChatOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // System theme follower
   useEffect(() => {
@@ -50,6 +65,14 @@ export function App() {
           <ChatPage />
         )}
       </div>
+
+      {/* Side Chat panel */}
+      {sideChatOpen && activeSessionId && (
+        <SideChat
+          parentSessionId={activeSessionId}
+          onClose={() => setSideChatOpen(false)}
+        />
+      )}
 
       {/* Inspector panel (placeholder) */}
       <aside

@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useCallback } from "react";
 import { cn } from "../../lib/cn";
 import { UserMessage } from "./UserMessage";
 import { AssistantMessage, type ToolCallInfo } from "./AssistantMessage";
+import { useChatStore, type TranscriptMode } from "../../stores/chatStore";
 
 export interface UIMessage {
   id: string;
@@ -28,6 +29,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const transcriptMode = useChatStore((s) => s.transcriptMode);
 
   /* ── Detect manual scroll-up ───────────────────────────────────────── */
   const handleScroll = useCallback(() => {

@@ -13,5 +13,8 @@ export type { PdTabBarProps, PdTabBarTab } from './PdTabBar';
 
 export { TabBar } from './TabBar';
 
+export { TabContextMenu } from './TabContextMenu';
+export type { TabContextMenuProps } from './TabContextMenu';
+
 export { PdStatusBar } from './PdStatusBar';
 export type { PdStatusBarProps, ConnectionState } from './PdStatusBar';

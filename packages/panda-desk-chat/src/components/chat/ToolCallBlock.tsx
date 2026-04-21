@@ -17,6 +17,8 @@ export interface ToolCallBlockProps {
   result?: string;
   isError?: boolean;
   defaultExpanded?: boolean;
+  /** When true, collapse to a single-line icon + tool name (summary mode). */
+  forceCollapsed?: boolean;
   className?: string;
 }
 
@@ -64,6 +66,7 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
   result,
   isError = false,
   defaultExpanded = false,
+  forceCollapsed = false,
   className,
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -73,6 +76,39 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
     () => JSON.stringify(input, null, 2),
     [input],
   );
+
+  /* Summary mode — single-line compact representation */
+  if (forceCollapsed) {
+    return (
+      <div
+        className={cn(
+          "inline-flex items-center gap-1.5",
+          "rounded-[var(--pd-radius-sm)]",
+          "bg-[var(--pd-tool-use-bg)]",
+          "border border-[var(--pd-tool-use-border)]",
+          "px-2.5 py-1",
+          "text-[var(--pd-text-xs)]",
+          className,
+        )}
+      >
+        <span aria-hidden="true">🔧</span>
+        <span className="font-[var(--pd-font-medium)] font-[var(--pd-font-mono)]">
+          {toolName}
+        </span>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1",
+            "px-[var(--pd-space-1\\.5)] py-0.5",
+            "rounded-[var(--pd-radius-full)]",
+            "text-[var(--pd-text-xs)]",
+            badge.bg,
+          )}
+        >
+          {badge.icon}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -12,6 +12,7 @@ import { storage } from '../lib/storage';
 export type Theme = 'light' | 'dark' | 'system';
 export type PermissionMode = 'default' | 'plan' | 'auto' | 'bypassPermissions';
 export type Locale = 'zh' | 'en' | 'ko';
+export type EffortLevel = 'auto' | 'low' | 'medium' | 'high';
 
 const STORAGE_KEY = 'settings';
 
@@ -23,6 +24,7 @@ interface PersistedSettings {
   fontSize: number;
   sidebarExpanded: boolean;
   inspectorVisible: boolean;
+  effortLevel: EffortLevel;
 }
 
 export interface SettingsStore extends PersistedSettings {
@@ -32,6 +34,7 @@ export interface SettingsStore extends PersistedSettings {
   setPermissionMode: (mode: PermissionMode) => void;
   setModel: (modelId: string) => void;
   setFontSize: (size: number) => void;
+  setEffortLevel: (level: EffortLevel) => void;
   toggleSidebar: () => void;
   toggleInspector: () => void;
   loadSettings: () => void;
@@ -50,6 +53,7 @@ const defaults: PersistedSettings = {
   fontSize: 14,
   sidebarExpanded: true,
   inspectorVisible: false,
+  effortLevel: 'auto',
 };
 
 function pickPersisted(state: PersistedSettings): PersistedSettings {
@@ -61,6 +65,7 @@ function pickPersisted(state: PersistedSettings): PersistedSettings {
     fontSize: state.fontSize,
     sidebarExpanded: state.sidebarExpanded,
     inspectorVisible: state.inspectorVisible,
+    effortLevel: state.effortLevel,
   };
 }
 

@@ -31,3 +31,15 @@ export type {
 
 export { MarkdownRenderer } from "./MarkdownRenderer";
 export type { MarkdownRendererProps } from "./MarkdownRenderer";
+
+export { SideChat } from "./SideChat";
+export type { SideChatProps } from "./SideChat";
+
+export { BuddyEventCard } from "./BuddyEventCard";
+export type { BuddyEventCardProps, BuddyEventType } from "./BuddyEventCard";
+
+export { RoutingBanner } from "./RoutingBanner";
+export type { RoutingBannerProps } from "./RoutingBanner";
+
+export { PetCameo } from "./PetCameo";
+export type { PetCameoProps, PetCameoOccasion } from "./PetCameo";

@@ -37,6 +37,8 @@ export interface UIMessage {
   finishReason?: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use';
 }
 
+export type TranscriptMode = 'normal' | 'verbose' | 'summary';
+
 export type ChatState =
   | 'idle'
   | 'thinking'
@@ -158,9 +160,14 @@ function getBuffer(sessionId: string): StreamBuffer {
 export interface ChatStore {
   sessions: Map<string, PerSessionState>;
   activeSessionId: string | null;
+  transcriptMode: TranscriptMode;
 
   // Getters
   getActiveSession: () => PerSessionState | null;
+
+  // Transcript mode
+  cycleTranscriptMode: () => void;
+  setTranscriptMode: (mode: TranscriptMode) => void;
 
   // Session lifecycle
   initSession: (sessionId: string) => void;
@@ -227,6 +234,7 @@ export interface ChatStore {
 export const useChatStore = create<ChatStore>()((set, get) => ({
   sessions: new Map<string, PerSessionState>(),
   activeSessionId: null,
+  transcriptMode: 'normal' as TranscriptMode,
 
   // -- Getters ---------------------------------------------------------------
 
@@ -235,6 +243,18 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     if (!activeSessionId) return null;
     return sessions.get(activeSessionId) ?? null;
   },
+
+  // -- Transcript mode -------------------------------------------------------
+
+  cycleTranscriptMode: () =>
+    set((state) => {
+      const order: TranscriptMode[] = ['normal', 'verbose', 'summary'];
+      const idx = order.indexOf(state.transcriptMode);
+      const next = order[(idx + 1) % order.length];
+      return { transcriptMode: next };
+    }),
+
+  setTranscriptMode: (mode: TranscriptMode) => set({ transcriptMode: mode }),
 
   // -- Session lifecycle -----------------------------------------------------
 

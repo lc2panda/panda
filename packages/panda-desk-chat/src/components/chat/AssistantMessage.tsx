@@ -1,10 +1,11 @@
-// Input: content, timestamp, thinkingContent, toolCalls, isStreaming from UIMessage
+// Input: content, timestamp, thinkingContent, toolCalls, isStreaming, transcriptMode from UIMessage
 // Output: Styled assistant message with markdown, thinking fold, tool cards, copy action
 // Pos: Chat layer — renders individual assistant turns inside MessageList
 import React, { useState, useCallback } from "react";
 import { cn } from "../../lib/cn";
 import { PdBadge } from "../atoms/PdBadge";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import type { TranscriptMode } from "../../stores/chatStore";
 
 export interface ToolCallInfo {
   id: string;
@@ -19,6 +20,7 @@ export interface AssistantMessageProps {
   thinkingContent?: string;
   toolCalls?: ToolCallInfo[];
   isStreaming?: boolean;
+  transcriptMode?: TranscriptMode;
 }
 
 /* ── Status → Badge variant mapping ───────────────────────────────────── */
@@ -38,8 +40,11 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
   thinkingContent,
   toolCalls,
   isStreaming = false,
+  transcriptMode = 'normal',
 }) => {
-  const [thinkingOpen, setThinkingOpen] = useState(false);
+  const isSummary = transcriptMode === 'summary';
+  const isVerbose = transcriptMode === 'verbose';
+  const [thinkingOpen, setThinkingOpen] = useState(isVerbose);
   const [copied, setCopied] = useState(false);
   const [hovered, setHovered] = useState(false);
 
@@ -68,7 +73,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
       onMouseLeave={() => setHovered(false)}
     >
       {/* ── Thinking Block ─────────────────────────────────────────────── */}
-      {thinkingContent && (
+      {thinkingContent && !isSummary && (
         <div className="mb-2">
           <button
             type="button"
@@ -120,9 +125,9 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
       {/* ── Tool Calls ─────────────────────────────────────────────────── */}
       {toolCalls && toolCalls.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
-          {toolCalls.map((tc) => (
+          {isSummary ? (
+            /* Summary mode — single-line count */
             <div
-              key={tc.id}
               className={cn(
                 "inline-flex items-center gap-1.5",
                 "bg-[var(--pd-tool-use-bg)]",
@@ -130,19 +135,38 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
                 "rounded-[var(--pd-radius-sm)]",
                 "px-2.5 py-1",
                 "text-[var(--pd-text-xs)]",
+                "text-[var(--pd-color-fg-muted)]",
               )}
             >
-              <span className="text-[var(--pd-tool-use-icon)] font-medium">
-                {tc.toolName}
-              </span>
-              <PdBadge
-                variant={statusVariant[tc.status] ?? "neutral"}
-                size="xs"
-              >
-                {tc.status}
-              </PdBadge>
+              <span aria-hidden="true">🔧</span>
+              <span>{toolCalls.length} tool call{toolCalls.length !== 1 ? 's' : ''}</span>
             </div>
-          ))}
+          ) : (
+            /* Normal / Verbose mode — individual chips */
+            toolCalls.map((tc) => (
+              <div
+                key={tc.id}
+                className={cn(
+                  "inline-flex items-center gap-1.5",
+                  "bg-[var(--pd-tool-use-bg)]",
+                  "border border-[var(--pd-tool-use-border)]",
+                  "rounded-[var(--pd-radius-sm)]",
+                  "px-2.5 py-1",
+                  "text-[var(--pd-text-xs)]",
+                )}
+              >
+                <span className="text-[var(--pd-tool-use-icon)] font-medium">
+                  {tc.toolName}
+                </span>
+                <PdBadge
+                  variant={statusVariant[tc.status] ?? "neutral"}
+                  size="xs"
+                >
+                  {tc.status}
+                </PdBadge>
+              </div>
+            ))
+          )}
         </div>
       )}
 

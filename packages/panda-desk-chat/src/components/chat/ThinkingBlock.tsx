@@ -12,6 +12,8 @@ export interface ThinkingBlockProps {
   content: string;
   isStreaming?: boolean;
   defaultExpanded?: boolean;
+  /** When true, the block is not rendered at all (summary mode). */
+  forceCollapsed?: boolean;
   className?: string;
 }
 
@@ -34,9 +36,13 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({
   content,
   isStreaming = false,
   defaultExpanded = false,
+  forceCollapsed = false,
   className,
 }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
+
+  // Summary mode — render nothing
+  if (forceCollapsed) return null;
 
   return (
     <div

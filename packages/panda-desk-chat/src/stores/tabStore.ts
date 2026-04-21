@@ -29,6 +29,8 @@ export interface TabStore {
   renameTab: (tabId: string, title: string) => void;
   pinTab: (tabId: string) => void;
   unpinTab: (tabId: string) => void;
+  closeOthers: (tabId: string) => void;
+  closeAll: () => void;
   getTabBySessionId: (sessionId: string) => Tab | undefined;
 }
 
@@ -122,6 +124,35 @@ export const useTabStore = create<TabStore>()((set, get) => ({
         t.id === tabId ? { ...t, isPinned: false } : t,
       ),
     })),
+
+  closeOthers: (tabId) =>
+    set((state) => {
+      const target = state.tabs.find((t) => t.id === tabId);
+      if (!target) return state;
+      // Keep only the target tab (and pinned tabs)
+      const kept = state.tabs.filter((t) => t.id === tabId || t.isPinned);
+      const reordered = kept.map((t, i) => ({
+        ...t,
+        order: i,
+        isActive: t.id === tabId,
+      }));
+      return { tabs: reordered, activeTabId: tabId };
+    }),
+
+  closeAll: () =>
+    set((state) => {
+      // Keep only pinned tabs
+      const pinned = state.tabs.filter((t) => t.isPinned);
+      if (pinned.length === 0) {
+        return { tabs: [], activeTabId: null };
+      }
+      const reordered = pinned.map((t, i) => ({
+        ...t,
+        order: i,
+        isActive: i === 0,
+      }));
+      return { tabs: reordered, activeTabId: reordered[0].id };
+    }),
 
   getTabBySessionId: (sessionId) => {
     return get().tabs.find((t) => t.sessionId === sessionId);
