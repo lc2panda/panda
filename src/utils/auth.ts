@@ -1572,7 +1572,13 @@ async function checkAndRefreshOAuthTokenIfNeededImpl(
 }
 
 export function isClaudeAISubscriber(): boolean {
-  return true
+  // 回滚 a98ec17 的 hardcoded true —— 它会让 Console-OAuth 用户把原始 accessToken 当
+  // Bearer 发给 api.anthropic.com 触发 403；同时覆盖 ANTHROPIC_AUTH_TOKEN 污染兜底。
+  // cab02dc (v2.1.116) 的原版：按 OAuth scope 真实判定。
+  if (!isAnthropicAuthEnabled()) {
+    return false
+  }
+  return shouldUseClaudeAIAuth(getClaudeAIOAuthTokens()?.scopes)
 }
 
 /**
