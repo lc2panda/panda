@@ -18,6 +18,7 @@ import { dispatchDragTarget } from '../dnd/target.js'
 import { dispatchNotification } from '../notification/dispatcher.js'
 // W8-T3：bridge 内部 dispatch / event 处理失败 → log.warn 而非静默吞
 import { log as deskLog } from '../util/logger.js'
+import { handleChatRoute, closeChatSseHub } from './chat-endpoints.js'
 import {
   APP_IDENTITY,
   type EventAck,
@@ -424,6 +425,10 @@ export async function startBridgeServer(
       return
     }
 
+    // ── /chat/* — chat window endpoints (M0-10)
+    // handleChatRoute returns true if the route was matched & handled
+    if (await handleChatRoute(req, res)) return
+
     // ── 未知路径
     jsonResponse(res, 404, { ok: false, error: 'not-found' })
   })
@@ -452,6 +457,7 @@ export async function startBridgeServer(
     close: () =>
       new Promise<void>(resolve => {
         hub.closeAll()
+        closeChatSseHub()
         safeUnlinkRuntimeJson()
         server.close(() => resolve())
       }),
