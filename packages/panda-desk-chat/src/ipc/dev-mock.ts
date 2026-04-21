@@ -1,6 +1,6 @@
-// Input: User messages via IPC bridge
-// Output: Simulated streaming responses (thinking + text + tool calls)
-// Pos: IPC layer — dev-only mock backend for UI testing
+// Input: User messages via IPC bridge + session/config/fs queries
+// Output: Simulated streaming responses + mock session/model/command/fs data
+// Pos: IPC layer — dev-only mock backend for full UI testing without Electron
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
@@ -52,6 +52,62 @@ export interface PermissionRequestEvent {
 }
 
 // ---------------------------------------------------------------------------
+// Mock data — session, model, command, filesystem
+// ---------------------------------------------------------------------------
+
+interface MockSession {
+  id: string;
+  name: string;
+  cwd: string;
+  createdAt: string;
+  lastActive: string;
+  messageCount: number;
+}
+
+const MOCK_SESSIONS_SEED: MockSession[] = [
+  { id: 'session-mock-1', name: 'Panda Code 项目', cwd: '/Users/panda/project', createdAt: '2026-04-21T10:00:00Z', lastActive: '2026-04-21T15:00:00Z', messageCount: 12 },
+  { id: 'session-mock-2', name: 'API 集成开发', cwd: '/Users/panda/api-work', createdAt: '2026-04-20T09:00:00Z', lastActive: '2026-04-20T18:00:00Z', messageCount: 8 },
+  { id: 'session-mock-3', name: 'Bug 修复冲刺', cwd: '/Users/panda/bugfix', createdAt: '2026-04-19T14:00:00Z', lastActive: '2026-04-19T17:30:00Z', messageCount: 5 },
+];
+
+const MOCK_MODELS = [
+  { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'anthropic', maxTokens: 64000 },
+  { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'anthropic', maxTokens: 32000 },
+  { id: 'claude-haiku-3-20250307', name: 'Claude Haiku 3', provider: 'anthropic', maxTokens: 16000 },
+  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', maxTokens: 128000 },
+];
+
+const MOCK_SLASH_COMMANDS = [
+  { name: '/help', description: 'Show available commands', category: 'general' },
+  { name: '/clear', description: 'Clear conversation history', category: 'general' },
+  { name: '/compact', description: 'Compact context window', category: 'context' },
+  { name: '/model', description: 'Switch AI model', category: 'config' },
+  { name: '/permission', description: 'Set permission mode', category: 'config' },
+  { name: '/dream', description: 'Run memory consolidation', category: 'assistant' },
+  { name: '/status', description: 'Show session status', category: 'info' },
+  { name: '/cost', description: 'Show token usage and cost', category: 'info' },
+];
+
+const MOCK_FS_ENTRIES = [
+  { path: 'src/main.ts', name: 'main.ts', isDir: false },
+  { path: 'src/App.tsx', name: 'App.tsx', isDir: false },
+  { path: 'src/stores/', name: 'stores', isDir: true },
+  { path: 'src/ipc/', name: 'ipc', isDir: true },
+  { path: 'src/components/', name: 'components', isDir: true },
+  { path: 'package.json', name: 'package.json', isDir: false },
+];
+
+const MOCK_DIR_ENTRIES = [
+  { name: 'main.ts', isDir: false, size: 1024 },
+  { name: 'App.tsx', isDir: false, size: 3456 },
+  { name: 'stores', isDir: true, size: 0 },
+  { name: 'ipc', isDir: true, size: 0 },
+  { name: 'components', isDir: true, size: 0 },
+  { name: 'hooks', isDir: true, size: 0 },
+  { name: 'styles', isDir: true, size: 0 },
+];
+
+// ---------------------------------------------------------------------------
 // Reply templates
 // ---------------------------------------------------------------------------
 
@@ -101,6 +157,7 @@ const TOOL_TEMPLATES = [
 
 export class DevMockRelay {
   private listeners = new Map<string, Set<EventCallback>>();
+  private sessions: MockSession[] = [...MOCK_SESSIONS_SEED];
   private timers: ReturnType<typeof setTimeout>[] = [];
   private cancelled = false;
   private permissionResolver: (() => void) | null = null;
@@ -257,6 +314,90 @@ export class DevMockRelay {
     }
   }
 
+  // ── Session management ───────────────────────────────────────────────
+
+  listSessions(): MockSession[] {
+    return [...this.sessions];
+  }
+
+  createSession(cwd: string, name?: string): { id: string } {
+    const id = `session-mock-${Date.now()}`;
+    const now = new Date().toISOString();
+    const session: MockSession = {
+      id,
+      name: name ?? 'New Chat',
+      cwd: cwd || '/Users/panda/project',
+      createdAt: now,
+      lastActive: now,
+      messageCount: 0,
+    };
+    this.sessions.unshift(session);
+    this.emitSessionUpdated();
+    return { id };
+  }
+
+  deleteSession(sessionId: string): void {
+    this.sessions = this.sessions.filter((s) => s.id !== sessionId);
+    this.emitSessionUpdated();
+  }
+
+  renameSession(sessionId: string, name: string): void {
+    const session = this.sessions.find((s) => s.id === sessionId);
+    if (session) {
+      session.name = name;
+      this.emitSessionUpdated();
+    }
+  }
+
+  focusSession(sessionId: string): void {
+    const session = this.sessions.find((s) => s.id === sessionId);
+    if (session) {
+      session.lastActive = new Date().toISOString();
+      this.emitSessionUpdated();
+    }
+  }
+
+  // ── Config queries ───────────────────────────────────────────────────
+
+  getModels(): typeof MOCK_MODELS {
+    return [...MOCK_MODELS];
+  }
+
+  getSlashCommands(): typeof MOCK_SLASH_COMMANDS {
+    return [...MOCK_SLASH_COMMANDS];
+  }
+
+  // ── File system ──────────────────────────────────────────────────────
+
+  searchFiles(query: string): typeof MOCK_FS_ENTRIES {
+    const lower = query.toLowerCase();
+    return MOCK_FS_ENTRIES.filter((e) =>
+      e.name.toLowerCase().includes(lower) || e.path.toLowerCase().includes(lower),
+    );
+  }
+
+  listDirectory(_dirPath: string): typeof MOCK_DIR_ENTRIES {
+    return [...MOCK_DIR_ENTRIES];
+  }
+
+  // ── Misc ─────────────────────────────────────────────────────────────
+
+  pasteImage(sessionId: string, _dataUrl: string): void {
+    console.log(`[DevMock] pasteImage received for session ${sessionId} (${Math.round(_dataUrl.length / 1024)}KB)`);
+  }
+
+  setModel(sessionId: string, modelId: string): void {
+    console.log(`[DevMock] setModel: session=${sessionId}, model=${modelId}`);
+  }
+
+  setPermissionMode(mode: string): void {
+    console.log(`[DevMock] setPermissionMode: ${mode}`);
+  }
+
+  setWindowPosition(x: number, y: number, w: number, h: number): void {
+    console.log(`[DevMock] setWindowPosition: ${x},${y} ${w}x${h}`);
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────
 
   private emit(event: string, payload: unknown): void {
@@ -265,6 +406,10 @@ export class DevMockRelay {
     for (const cb of callbacks) {
       try { cb(payload); } catch { /* dev mock — swallow */ }
     }
+  }
+
+  private emitSessionUpdated(): void {
+    this.emit('session:updated', { sessions: [...this.sessions] });
   }
 
   private schedule(ms: number, fn: () => void): void {

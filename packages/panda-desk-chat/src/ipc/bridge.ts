@@ -1,5 +1,5 @@
 // Input: window.pandaAPI injected by preload/chat.ts via contextBridge (named API)
-//        In dev mode: DevMockRelay provides simulated streaming backend
+//        In dev mode: DevMockRelay provides full simulated backend (chat + session + config + fs)
 // Output: Type-safe IPC client for chat renderer components
 // Pos: IPC bridge layer — sole entry point for renderer → main communication
 //
@@ -109,7 +109,7 @@ export async function pasteImage(
   sessionId: string,
   dataUrl: string,
 ): Promise<void> {
-  if (IS_DEV) return; // no-op in dev
+  if (IS_DEV) return getDevRelay().pasteImage(sessionId, dataUrl);
   return getPandaAPI().chat.pasteImage({ sessionId, dataUrl });
 }
 
@@ -169,7 +169,7 @@ export function onWindowToggle(
 
 /** List all sessions. */
 export async function listSessions(): Promise<SessionListResponse> {
-  if (IS_DEV) return [];
+  if (IS_DEV) return getDevRelay().listSessions() as unknown as SessionListResponse;
   return getPandaAPI().session.list({});
 }
 
@@ -178,7 +178,7 @@ export async function createSession(
   cwd: string,
   name?: string,
 ): Promise<SessionCreateResponse> {
-  if (IS_DEV) return { id: crypto.randomUUID() };
+  if (IS_DEV) return getDevRelay().createSession(cwd, name);
   return getPandaAPI().session.create({ cwd, name });
 }
 
@@ -187,19 +187,19 @@ export async function renameSession(
   sessionId: string,
   name: string,
 ): Promise<void> {
-  if (IS_DEV) return;
+  if (IS_DEV) return getDevRelay().renameSession(sessionId, name);
   return getPandaAPI().session.rename({ sessionId, name });
 }
 
 /** Delete a session. */
 export async function deleteSession(sessionId: string): Promise<void> {
-  if (IS_DEV) return;
+  if (IS_DEV) return getDevRelay().deleteSession(sessionId);
   return getPandaAPI().session.delete({ sessionId });
 }
 
 /** Focus/switch to a session. */
 export async function focusSession(sessionId: string): Promise<void> {
-  if (IS_DEV) return;
+  if (IS_DEV) return getDevRelay().focusSession(sessionId);
   return getPandaAPI().session.focus({ sessionId });
 }
 
@@ -207,7 +207,12 @@ export async function focusSession(sessionId: string): Promise<void> {
 export function onSessionUpdated(
   callback: (payload: SessionUpdatedPayload) => void,
 ): Unsubscribe {
-  if (IS_DEV) return () => {};
+  if (IS_DEV) {
+    const relay = getDevRelay();
+    const wrapped = (e: unknown) => callback(e as SessionUpdatedPayload);
+    relay.on('session:updated', wrapped);
+    return () => relay.off('session:updated', wrapped);
+  }
   return getPandaAPI().session.onUpdated(callback);
 }
 
@@ -273,7 +278,7 @@ export async function searchFiles(
   query: string,
   maxResults?: number,
 ): Promise<FsSearchResponse> {
-  if (IS_DEV) return [];
+  if (IS_DEV) return getDevRelay().searchFiles(query) as unknown as FsSearchResponse;
   return getPandaAPI().fs.search({ sessionId, query, maxResults });
 }
 
@@ -282,7 +287,7 @@ export async function listDirectory(
   sessionId: string,
   dirPath: string,
 ): Promise<FsListResponse> {
-  if (IS_DEV) return [];
+  if (IS_DEV) return getDevRelay().listDirectory(dirPath) as unknown as FsListResponse;
   return getPandaAPI().fs.list({ sessionId, dirPath });
 }
 
@@ -295,19 +300,19 @@ export async function setWindowPosition(
   width: number,
   height: number,
 ): Promise<void> {
-  if (IS_DEV) return;
+  if (IS_DEV) return getDevRelay().setWindowPosition(x, y, width, height);
   return getPandaAPI().config.setWindowPosition({ x, y, width, height });
 }
 
 /** Get available slash commands. */
 export async function getSlashCommands(): Promise<SlashCommandsResponse> {
-  if (IS_DEV) return [];
+  if (IS_DEV) return getDevRelay().getSlashCommands() as unknown as SlashCommandsResponse;
   return getPandaAPI().config.getSlashCommands({});
 }
 
 /** Get available models. */
 export async function getModels(): Promise<ModelListResponse> {
-  if (IS_DEV) return [];
+  if (IS_DEV) return getDevRelay().getModels() as unknown as ModelListResponse;
   return getPandaAPI().config.getModels({});
 }
 
@@ -316,7 +321,7 @@ export async function setModel(
   sessionId: string,
   modelId: string,
 ): Promise<void> {
-  if (IS_DEV) return;
+  if (IS_DEV) return getDevRelay().setModel(sessionId, modelId);
   return getPandaAPI().config.setModel({ sessionId, modelId });
 }
 
@@ -324,6 +329,6 @@ export async function setModel(
 export async function setPermissionMode(
   mode: 'default' | 'plan' | 'auto' | 'bypassPermissions',
 ): Promise<void> {
-  if (IS_DEV) return;
+  if (IS_DEV) return getDevRelay().setPermissionMode(mode);
   return getPandaAPI().config.setPermissionMode({ mode });
 }
