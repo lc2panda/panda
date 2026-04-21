@@ -2,7 +2,7 @@
 // Output: CSS Grid three-column layout with titlebar, responsive sidebar/inspector
 // Pos: Layout layer — top-level shell that orchestrates the overall UI structure
 
-import { type ReactNode, useMemo } from 'react';
+import { type CSSProperties, type ReactNode, useMemo } from 'react';
 import { cn } from '@/lib/cn';
 import { useSettingsStore } from '@/stores';
 
@@ -47,8 +47,8 @@ export function AppShell({ children }: AppShellProps) {
         className="w-full shrink-0 select-none"
         style={{
           height: titlebarHeight,
-          WebkitAppRegion: 'drag' as unknown as string,
-        }}
+          WebkitAppRegion: 'drag',
+        } as CSSProperties}
       />
 
       {/* ── Main grid (sidebar | content | inspector) ── */}

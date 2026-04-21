@@ -2,25 +2,43 @@
 // Output: Collapsible sidebar with 3-section navigation (main, workspace, bottom)
 // Pos: Layout layer — left panel navigation, reads settingsStore
 
-import { type ReactNode } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import {
-  MessageSquare,
-  History,
-  Bot,
-  Wand2,
-  Wrench,
-  ListTodo,
-  Heart,
-  Search,
-  FolderOpen,
-  Brain,
-  GitBranch,
-  Settings,
-  User,
-  PanelLeftClose,
-  PanelLeftOpen,
+  MessageSquare as _MessageSquare,
+  History as _History,
+  Bot as _Bot,
+  Wand2 as _Wand2,
+  Wrench as _Wrench,
+  ListTodo as _ListTodo,
+  Heart as _Heart,
+  Search as _Search,
+  FolderOpen as _FolderOpen,
+  Brain as _Brain,
+  GitBranch as _GitBranch,
+  Settings as _Settings,
+  User as _User,
+  PanelLeftClose as _PanelLeftClose,
+  PanelLeftOpen as _PanelLeftOpen,
 } from 'lucide-react';
+
+// Re-type lucide icons for React 18 compat (hoisted @types/react@19 conflict)
+type IconFC = ComponentType<{ className?: string; size?: number }>;
+const MessageSquare = _MessageSquare as IconFC;
+const History = _History as IconFC;
+const Bot = _Bot as IconFC;
+const Wand2 = _Wand2 as IconFC;
+const Wrench = _Wrench as IconFC;
+const ListTodo = _ListTodo as IconFC;
+const Heart = _Heart as IconFC;
+const Search = _Search as IconFC;
+const FolderOpen = _FolderOpen as IconFC;
+const Brain = _Brain as IconFC;
+const GitBranch = _GitBranch as IconFC;
+const Settings = _Settings as IconFC;
+const User = _User as IconFC;
+const PanelLeftClose = _PanelLeftClose as IconFC;
+const PanelLeftOpen = _PanelLeftOpen as IconFC;
 
 // ---------------------------------------------------------------------------
 // Types
