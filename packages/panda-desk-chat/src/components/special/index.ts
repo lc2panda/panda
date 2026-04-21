@@ -25,3 +25,6 @@ export type { PdPetAvatarProps, PetSpecies, PetMood } from "./PdPetAvatar";
 
 export { PdCommandPalette } from "./PdCommandPalette";
 export type { PdCommandPaletteProps, Command } from "./PdCommandPalette";
+
+export { PdSessionSwitcher } from "./PdSessionSwitcher";
+export type { PdSessionSwitcherProps, SessionItem } from "./PdSessionSwitcher";

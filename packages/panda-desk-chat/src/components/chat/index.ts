@@ -43,3 +43,6 @@ export type { PdRoutingBannerProps } from "./PdRoutingBanner";
 
 export { PdPetCameo } from "./PdPetCameo";
 export type { PdPetCameoProps, PetCameoOccasion } from "./PdPetCameo";
+
+export { PdHeroComposer } from "./PdHeroComposer";
+export type { PdHeroComposerProps } from "./PdHeroComposer";
