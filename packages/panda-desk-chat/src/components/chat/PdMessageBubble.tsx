@@ -4,7 +4,7 @@
 import React, { useState, useCallback } from "react";
 import { cn } from "../../lib/cn";
 import { PdBadge } from "../atoms/PdBadge";
-import { MarkdownRenderer } from "./MarkdownRenderer";
+import { PdMarkdownRenderer } from "./PdMarkdownRenderer";
 import type { TranscriptMode } from "../../stores/chatStore";
 
 export interface ToolCallInfo {
@@ -14,7 +14,7 @@ export interface ToolCallInfo {
   result?: string;
 }
 
-export interface AssistantMessageProps {
+export interface PdMessageBubbleProps {
   content: string;
   timestamp: number;
   thinkingContent?: string;
@@ -34,7 +34,7 @@ const statusVariant: Record<string, "success" | "warning" | "error" | "info" | "
 
 /* ── Component ────────────────────────────────────────────────────────── */
 
-export const AssistantMessage: React.FC<AssistantMessageProps> = ({
+export const PdMessageBubble: React.FC<PdMessageBubbleProps> = ({
   content,
   timestamp: _timestamp,
   thinkingContent,
@@ -171,7 +171,7 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
       )}
 
       {/* ── Content ────────────────────────────────────────────────────── */}
-      <MarkdownRenderer content={content} />
+      <PdMarkdownRenderer content={content} />
 
       {/* ── Streaming Cursor ───────────────────────────────────────────── */}
       {isStreaming && (
@@ -225,4 +225,4 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
   );
 };
 
-AssistantMessage.displayName = "AssistantMessage";
+PdMessageBubble.displayName = "PdMessageBubble";

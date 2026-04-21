@@ -4,7 +4,7 @@
 import React, { useState } from "react";
 import { cn } from "../../lib/cn";
 
-export interface UserMessageProps {
+export interface PdUserBubbleProps {
   content: string;
   timestamp: number;
 }
@@ -22,7 +22,7 @@ function formatRelativeTime(ts: number): string {
   });
 }
 
-export const UserMessage: React.FC<UserMessageProps> = ({
+export const PdUserBubble: React.FC<PdUserBubbleProps> = ({
   content,
   timestamp,
 }) => {
@@ -66,4 +66,4 @@ export const UserMessage: React.FC<UserMessageProps> = ({
   );
 };
 
-UserMessage.displayName = "UserMessage";
+PdUserBubble.displayName = "PdUserBubble";

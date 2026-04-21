@@ -2,44 +2,44 @@
 // Output: All chat-layer message display components
 // Pos: Chat layer — unified export for message stream components
 
-export { MessageList, type MessageListProps, type UIMessage } from "./MessageList";
-export { UserMessage, type UserMessageProps } from "./UserMessage";
+export { PdMessageList, type PdMessageListProps, type UIMessage } from "./PdMessageList";
+export { PdUserBubble, type PdUserBubbleProps } from "./PdUserBubble";
 export {
-  AssistantMessage,
-  type AssistantMessageProps,
+  PdMessageBubble,
+  type PdMessageBubbleProps,
   type ToolCallInfo,
-} from "./AssistantMessage";
+} from "./PdMessageBubble";
 
-export { ChatInput } from "./ChatInput";
-export type { ChatInputProps, ChatInputHandle, Attachment } from "./ChatInput";
+export { PdComposer } from "./PdComposer";
+export type { PdComposerProps, PdComposerHandle, Attachment } from "./PdComposer";
 
-export { StreamingIndicator } from "./StreamingIndicator";
-export type { StreamingIndicatorProps } from "./StreamingIndicator";
+export { PdStreamingIndicator } from "./PdStreamingIndicator";
+export type { PdStreamingIndicatorProps } from "./PdStreamingIndicator";
 
-export { ThinkingBlock } from "./ThinkingBlock";
-export type { ThinkingBlockProps } from "./ThinkingBlock";
+export { PdThinkingBlock } from "./PdThinkingBlock";
+export type { PdThinkingBlockProps } from "./PdThinkingBlock";
 
-export { ToolCallBlock } from "./ToolCallBlock";
-export type { ToolCallBlockProps, ToolCallStatus } from "./ToolCallBlock";
+export { PdToolCallCard } from "./PdToolCallCard";
+export type { PdToolCallCardProps, ToolCallStatus } from "./PdToolCallCard";
 
-export { PermissionDialog } from "./PermissionDialog";
+export { PdPermissionDialog } from "./PdPermissionDialog";
 export type {
-  PermissionDialogProps,
+  PdPermissionDialogProps,
   PermissionTier,
   PermissionDecision,
-} from "./PermissionDialog";
+} from "./PdPermissionDialog";
 
-export { MarkdownRenderer } from "./MarkdownRenderer";
-export type { MarkdownRendererProps } from "./MarkdownRenderer";
+export { PdMarkdownRenderer } from "./PdMarkdownRenderer";
+export type { PdMarkdownRendererProps } from "./PdMarkdownRenderer";
 
-export { SideChat } from "./SideChat";
-export type { SideChatProps } from "./SideChat";
+export { PdSideChat } from "./PdSideChat";
+export type { PdSideChatProps } from "./PdSideChat";
 
-export { BuddyEventCard } from "./BuddyEventCard";
-export type { BuddyEventCardProps, BuddyEventType } from "./BuddyEventCard";
+export { PdBuddyEventCard } from "./PdBuddyEventCard";
+export type { PdBuddyEventCardProps, BuddyEventType } from "./PdBuddyEventCard";
 
-export { RoutingBanner } from "./RoutingBanner";
-export type { RoutingBannerProps } from "./RoutingBanner";
+export { PdRoutingBanner } from "./PdRoutingBanner";
+export type { PdRoutingBannerProps } from "./PdRoutingBanner";
 
-export { PetCameo } from "./PetCameo";
-export type { PetCameoProps, PetCameoOccasion } from "./PetCameo";
+export { PdPetCameo } from "./PdPetCameo";
+export type { PdPetCameoProps, PetCameoOccasion } from "./PdPetCameo";

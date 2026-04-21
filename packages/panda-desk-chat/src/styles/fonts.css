@@ -1,0 +1,149 @@
+/* ==========================================================================
+ * Input:  font files from /fonts/*
+ * Output: @font-face declarations for 6 font families
+ * Pos:    typography foundation — imported before tokens.css
+ *
+ * Self-hosted font system for Panda Desk Chat.
+ * All fonts licensed under SIL Open Font License (OFL).
+ * CDN usage prohibited — all assets served from /fonts/.
+ * ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+ * 1. Inter Variable — English Sans / UI primary
+ *    Source: https://github.com/rsms/inter (v4.1, OFL)
+ *    Subset: latin (variable weight 100-900)
+ * --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+/* ---------------------------------------------------------------------------
+ * 2. Noto Sans SC — Chinese Sans / UI CJK
+ *    Source: Google Noto Fonts (OFL)
+ *    Subset: chinese-simplified (~1.1 MB per weight)
+ * --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: url('/fonts/noto-sans-sc/NotoSansSC-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: url('/fonts/noto-sans-sc/NotoSansSC-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: url('/fonts/noto-sans-sc/NotoSansSC-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+  font-style: normal;
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. Source Serif 4 — English Serif / narrative paragraphs
+ *    Source: https://github.com/adobe-fonts/source-serif (OFL)
+ *    Subset: latin
+ * --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url('/fonts/source-serif/SourceSerif4-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url('/fonts/source-serif/SourceSerif4-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+  font-style: normal;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4. Noto Serif SC — Chinese Serif / CJK narrative
+ *    Source: Google Noto Fonts (OFL)
+ *    Subset: chinese-simplified (~1.5 MB per weight)
+ * --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: url('/fonts/noto-serif-sc/NotoSerifSC-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: url('/fonts/noto-serif-sc/NotoSerifSC-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+  font-style: normal;
+}
+
+/* ---------------------------------------------------------------------------
+ * 5. JetBrains Mono — Monospace / code
+ *    Source: https://github.com/JetBrains/JetBrainsMono (v2.304, OFL)
+ *    Ligatures disabled by default (font-feature-settings: 'liga' 0)
+ * --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+  font-feature-settings: 'liga' 0;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+  font-style: normal;
+  font-feature-settings: 'liga' 0;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono/JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+  font-style: normal;
+  font-feature-settings: 'liga' 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * 6. Sarasa Mono SC — CJK Monospace / CJK code
+ *    Source: https://github.com/be5invis/Sarasa-Gothic (OFL)
+ *    Status: PLACEHOLDER — woff2 files must be manually downloaded.
+ *    Fallback: JetBrains Mono → system monospace
+ * --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Sarasa Mono SC';
+  src: url('/fonts/sarasa-mono-sc/SarasaMonoSC-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+  font-feature-settings: 'liga' 0;
+}
+
+@font-face {
+  font-family: 'Sarasa Mono SC';
+  src: url('/fonts/sarasa-mono-sc/SarasaMonoSC-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+  font-style: normal;
+  font-feature-settings: 'liga' 0;
+}

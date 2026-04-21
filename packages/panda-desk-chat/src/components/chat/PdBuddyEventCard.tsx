@@ -18,7 +18,7 @@ export type BuddyEventType =
   | "upgrade"
   | "achievement";
 
-export interface BuddyEventCardProps {
+export interface PdBuddyEventCardProps {
   type: BuddyEventType;
   title: string;
   description: string;
@@ -68,7 +68,7 @@ const TYPE_CONFIG: Record<BuddyEventType, TypeConfig> = {
 /*  Component                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export const BuddyEventCard: React.FC<BuddyEventCardProps> = ({
+export const PdBuddyEventCard: React.FC<PdBuddyEventCardProps> = ({
   type,
   title,
   description,
@@ -157,4 +157,4 @@ export const BuddyEventCard: React.FC<BuddyEventCardProps> = ({
   );
 };
 
-BuddyEventCard.displayName = "BuddyEventCard";
+PdBuddyEventCard.displayName = "PdBuddyEventCard";

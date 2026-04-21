@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { cn } from "../../lib/cn";
 
-export interface MarkdownRendererProps {
+export interface PdMarkdownRendererProps {
   content: string;
   className?: string;
 }
@@ -363,12 +363,12 @@ function extractTextContent(node: React.ReactNode): string {
   return "";
 }
 
-/* ── MarkdownRenderer ─────────────────────────────────────────────────── */
+/* ── PdMarkdownRenderer ──────────────────────────────────────────────── */
 
 const remarkPlugins = [remarkGfm];
 const rehypePlugins = [rehypeHighlight];
 
-export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
+export const PdMarkdownRenderer: React.FC<PdMarkdownRendererProps> = ({
   content,
   className,
 }) => {
@@ -396,4 +396,4 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   );
 };
 
-MarkdownRenderer.displayName = "MarkdownRenderer";
+PdMarkdownRenderer.displayName = "PdMarkdownRenderer";

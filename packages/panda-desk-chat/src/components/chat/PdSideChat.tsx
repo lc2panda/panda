@@ -5,22 +5,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '../../lib/cn';
 import { useChatStore } from '../../stores';
-import type { UIMessage } from './MessageList';
+import type { UIMessage } from './PdMessageList';
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export interface SideChatProps {
+export interface PdSideChatProps {
   parentSessionId: string;
   onClose: () => void;
 }
 
 /* -------------------------------------------------------------------------- */
-/*  SideChat                                                                  */
+/*  PdSideChat                                                               */
 /* -------------------------------------------------------------------------- */
 
-export const SideChat: React.FC<SideChatProps> = ({ parentSessionId, onClose }) => {
+export const PdSideChat: React.FC<PdSideChatProps> = ({ parentSessionId, onClose }) => {
   const sideSessionId = `side-${parentSessionId}`;
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -277,4 +277,4 @@ export const SideChat: React.FC<SideChatProps> = ({ parentSessionId, onClose }) 
   );
 };
 
-SideChat.displayName = 'SideChat';
+PdSideChat.displayName = 'PdSideChat';

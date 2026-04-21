@@ -4,21 +4,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { useChatStore } from "../stores";
-import { MessageList } from "../components/chat/MessageList";
-import { ChatInput, type ChatInputHandle } from "../components/chat/ChatInput";
-import { StreamingIndicator } from "../components/chat/StreamingIndicator";
+import { PdMessageList } from "../components/chat/PdMessageList";
+import { PdComposer, type PdComposerHandle } from "../components/chat/PdComposer";
+import { PdStreamingIndicator } from "../components/chat/PdStreamingIndicator";
 import {
-  PermissionDialog,
+  PdPermissionDialog,
   type PermissionDecision,
-} from "../components/chat/PermissionDialog";
-import { PetCameo } from "../components/chat/PetCameo";
+} from "../components/chat/PdPermissionDialog";
+import { PdPetCameo } from "../components/chat/PdPetCameo";
 
 /* -------------------------------------------------------------------------- */
 /*  ChatPage                                                                  */
 /* -------------------------------------------------------------------------- */
 
 export const ChatPage: React.FC = () => {
-  const inputRef = useRef<ChatInputHandle>(null);
+  const inputRef = useRef<PdComposerHandle>(null);
   const [mockSessionId] = useState(() => "session-default");
 
   /* -- Store selectors --------------------------------------------------- */

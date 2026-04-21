@@ -11,7 +11,7 @@ import { cn } from "@/lib/cn";
 /*  Types                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export interface RoutingBannerProps {
+export interface PdRoutingBannerProps {
   fromModel?: string;
   toModel: string;
   reason?: string;
@@ -22,7 +22,7 @@ export interface RoutingBannerProps {
 /*  Component                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export const RoutingBanner: React.FC<RoutingBannerProps> = ({
+export const PdRoutingBanner: React.FC<PdRoutingBannerProps> = ({
   fromModel,
   toModel,
   reason,
@@ -108,4 +108,4 @@ export const RoutingBanner: React.FC<RoutingBannerProps> = ({
   );
 };
 
-RoutingBanner.displayName = "RoutingBanner";
+PdRoutingBanner.displayName = "PdRoutingBanner";

@@ -17,7 +17,7 @@ export type PetCameoOccasion =
   | "holiday"
   | "random";
 
-export interface PetCameoProps {
+export interface PdPetCameoProps {
   occasion: PetCameoOccasion;
   message?: string;
 }
@@ -87,7 +87,7 @@ function pickRandom<T>(arr: readonly T[]): T {
 /*  Component                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export const PetCameo: React.FC<PetCameoProps> = ({ occasion, message }) => {
+export const PdPetCameo: React.FC<PdPetCameoProps> = ({ occasion, message }) => {
   // Pick species + fallback message once on mount (useMemo with empty deps
   // is intentional — we want stable picks per mount, not per render).
   const species = useMemo(() => pickRandom(SPECIES_POOL), []);
@@ -130,4 +130,4 @@ export const PetCameo: React.FC<PetCameoProps> = ({ occasion, message }) => {
   );
 };
 
-PetCameo.displayName = "PetCameo";
+PdPetCameo.displayName = "PdPetCameo";

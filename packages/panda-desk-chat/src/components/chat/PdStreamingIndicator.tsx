@@ -8,7 +8,7 @@ import { cn } from "../../lib/cn";
 /*  Types                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export interface StreamingIndicatorProps {
+export interface PdStreamingIndicatorProps {
   verb: string;       // "Thinking" | "Writing" | "Running bash"
   elapsed: number;    // seconds
   tokens?: number;    // generated token count
@@ -16,10 +16,10 @@ export interface StreamingIndicatorProps {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  StreamingIndicator                                                        */
+/*  PdStreamingIndicator                                                     */
 /* -------------------------------------------------------------------------- */
 
-export const StreamingIndicator: React.FC<StreamingIndicatorProps> = ({
+export const PdStreamingIndicator: React.FC<PdStreamingIndicatorProps> = ({
   verb,
   elapsed,
   tokens,
@@ -63,4 +63,4 @@ export const StreamingIndicator: React.FC<StreamingIndicatorProps> = ({
   );
 };
 
-StreamingIndicator.displayName = "StreamingIndicator";
+PdStreamingIndicator.displayName = "PdStreamingIndicator";

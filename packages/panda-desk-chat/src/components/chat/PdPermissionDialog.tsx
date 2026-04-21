@@ -12,7 +12,7 @@ import { PdDialog } from "../containers/PdDialog";
 export type PermissionTier = "read" | "write" | "exec";
 export type PermissionDecision = "allow" | "allow_session" | "deny";
 
-export interface PermissionDialogProps {
+export interface PdPermissionDialogProps {
   visible: boolean;
   toolName: string;
   input: Record<string, unknown>;
@@ -51,10 +51,10 @@ const TIER_CONFIG: Record<
 const INPUT_COLLAPSE_THRESHOLD = 300;
 
 /* -------------------------------------------------------------------------- */
-/*  PermissionDialog                                                          */
+/*  PdPermissionDialog                                                       */
 /* -------------------------------------------------------------------------- */
 
-export const PermissionDialog: React.FC<PermissionDialogProps> = ({
+export const PdPermissionDialog: React.FC<PdPermissionDialogProps> = ({
   visible,
   toolName,
   input,
@@ -257,4 +257,4 @@ export const PermissionDialog: React.FC<PermissionDialogProps> = ({
   );
 };
 
-PermissionDialog.displayName = "PermissionDialog";
+PdPermissionDialog.displayName = "PdPermissionDialog";

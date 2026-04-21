@@ -8,7 +8,7 @@ import { cn } from "../../lib/cn";
 /*  Types                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export interface ThinkingBlockProps {
+export interface PdThinkingBlockProps {
   content: string;
   isStreaming?: boolean;
   defaultExpanded?: boolean;
@@ -29,10 +29,10 @@ function preview(text: string): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  ThinkingBlock                                                             */
+/*  PdThinkingBlock                                                          */
 /* -------------------------------------------------------------------------- */
 
-export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({
+export const PdThinkingBlock: React.FC<PdThinkingBlockProps> = ({
   content,
   isStreaming = false,
   defaultExpanded = false,
@@ -95,4 +95,4 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({
   );
 };
 
-ThinkingBlock.displayName = "ThinkingBlock";
+PdThinkingBlock.displayName = "PdThinkingBlock";

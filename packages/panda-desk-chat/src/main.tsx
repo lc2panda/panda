@@ -5,6 +5,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { setupBridgeListeners } from "./stores";
+import './styles/fonts.css';
 import './styles/tokens.css';
 import './styles/global.css';
 import './styles/highlight.css';

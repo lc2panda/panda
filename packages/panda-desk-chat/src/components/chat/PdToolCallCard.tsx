@@ -10,7 +10,7 @@ import { cn } from "../../lib/cn";
 
 export type ToolCallStatus = "pending" | "running" | "success" | "error";
 
-export interface ToolCallBlockProps {
+export interface PdToolCallCardProps {
   toolName: string;
   input: Record<string, unknown>;
   status: ToolCallStatus;
@@ -56,10 +56,10 @@ const BADGE: Record<ToolCallStatus, BadgeConfig> = {
 };
 
 /* -------------------------------------------------------------------------- */
-/*  ToolCallBlock                                                             */
+/*  PdToolCallCard                                                           */
 /* -------------------------------------------------------------------------- */
 
-export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
+export const PdToolCallCard: React.FC<PdToolCallCardProps> = ({
   toolName,
   input,
   status,
@@ -222,4 +222,4 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({
   );
 };
 
-ToolCallBlock.displayName = "ToolCallBlock";
+PdToolCallCard.displayName = "PdToolCallCard";
