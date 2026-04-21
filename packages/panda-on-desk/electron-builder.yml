@@ -27,6 +27,7 @@ directories:
 # — compression: maximum → installer/AppImage 内部用 maximum xz 压缩
 # — electronLanguages → 只保留 en-US + zh-CN + zh-TW（其余 52 个 .pak 删除，省 ~44MB）
 asar: true
+asarIntegrity: true
 compression: maximum
 electronLanguages:
   - en-US
