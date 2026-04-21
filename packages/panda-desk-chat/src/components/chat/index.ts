@@ -9,3 +9,9 @@ export {
   type AssistantMessageProps,
   type ToolCallInfo,
 } from "./AssistantMessage";
+
+export { ChatInput } from "./ChatInput";
+export type { ChatInputProps, ChatInputHandle, Attachment } from "./ChatInput";
+
+export { StreamingIndicator } from "./StreamingIndicator";
+export type { StreamingIndicatorProps } from "./StreamingIndicator";
