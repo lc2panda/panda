@@ -1,0 +1,74 @@
+/*
+ * Input:  Tailwind v4 directives + tokens.css
+ * Output: compiled utility CSS + global resets
+ * Pos:    stylesheet root — imported by main.tsx
+ */
+
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* Global resets */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  background-color: var(--pd-bg);
+  color: var(--pd-text);
+}
+
+/* Electron: disable text selection on non-content areas */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Electron: draggable title bar region */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--pd-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pd-text-muted);
+}

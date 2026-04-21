@@ -1,0 +1,30 @@
+{
+  "name": "@panda/desk-chat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Panda Code desktop chat UI — React + Vite + Tailwind 4",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.511.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^3.3.0",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5",
+    "@vitejs/plugin-react": "^4.5.2",
+    "tailwindcss": "^4.1.7",
+    "@tailwindcss/vite": "^4.1.7",
+    "typescript": "^5.8.3",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7"
+  }
+}
