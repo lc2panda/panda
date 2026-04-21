@@ -11,10 +11,10 @@ export type { PdSidebarProps, PdSidebarItemProps } from './PdSidebar';
 export { PdTabBar } from './PdTabBar';
 export type { PdTabBarProps, PdTabBarTab } from './PdTabBar';
 
-export { TabBar } from './TabBar';
+export { PdTabBarConnected } from './PdTabBarConnected';
 
-export { TabContextMenu } from './TabContextMenu';
-export type { TabContextMenuProps } from './TabContextMenu';
+export { TabContextMenu } from './PdTabContextMenu';
+export type { TabContextMenuProps } from './PdTabContextMenu';
 
 export { PdStatusBar } from './PdStatusBar';
 export type { PdStatusBarProps, ConnectionState } from './PdStatusBar';

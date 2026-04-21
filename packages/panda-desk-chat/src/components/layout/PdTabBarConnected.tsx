@@ -1,13 +1,13 @@
-// Input: Tab list from tabStore + sessionStore/chatStore coordination
-// Output: Horizontal tab bar with drag-reorder, context menu, close protection
-// Pos: Layout layer — sits between TitleBar and ChatPage
+// Input: tabStore + sessionStore + chatStore state
+// Output: Store-connected tab bar with drag-reorder, context menu, close protection
+// Pos: Layout layer — connected wrapper around PdTabBar, sits between TitleBar and ChatPage
 
 import { useCallback, useState } from 'react';
 import { useTabStore } from '@/stores/tabStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useChatStore } from '@/stores/chatStore';
 import { PdTabBar, type PdTabBarTab } from './PdTabBar';
-import { TabContextMenu } from './TabContextMenu';
+import { TabContextMenu } from './PdTabContextMenu';
 
 // ---------------------------------------------------------------------------
 // Drag state
@@ -29,7 +29,7 @@ interface CtxMenuState {
 // ---------------------------------------------------------------------------
 // Connected TabBar — bridges stores to presentational PdTabBar
 // ---------------------------------------------------------------------------
-export function TabBar() {
+export function PdTabBarConnected() {
   const tabs = useTabStore((s) => s.tabs);
   const activeTabId = useTabStore((s) => s.activeTabId);
   const setActiveTab = useTabStore((s) => s.setActiveTab);
