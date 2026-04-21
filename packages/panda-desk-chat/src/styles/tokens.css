@@ -1,0 +1,485 @@
+/**
+ * Panda Desk Chat — Design Tokens
+ * Input: Design system spec (B1-design-system.md)
+ * Output: ~260 CSS custom properties for theming
+ * Pos: Foundation layer — imported by global.css, consumed by all components
+ *
+ * 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
+ */
+
+/* ==========================================================================
+   1. :root — Universal Tokens (font, spacing, radius, z-index, layout,
+      breakpoints, duration, easing)
+   ========================================================================== */
+
+:root {
+  /* ── Font Family ─────────────────────────────────────────────────────── */
+  --pd-font-sans: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  --pd-font-serif: 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
+  --pd-font-mono: 'JetBrains Mono', 'Sarasa Mono SC', 'Fira Code', monospace;
+
+  /* ── Font Size Scale (12-step, base 14px) ────────────────────────────── */
+  --pd-text-2xs: 0.625rem;   /* 10px */
+  --pd-text-xs: 0.75rem;     /* 12px */
+  --pd-text-sm: 0.8125rem;   /* 13px */
+  --pd-text-base: 0.875rem;  /* 14px */
+  --pd-text-md: 0.9375rem;   /* 15px */
+  --pd-text-lg: 1rem;        /* 16px */
+  --pd-text-xl: 1.125rem;    /* 18px */
+  --pd-text-2xl: 1.25rem;    /* 20px */
+  --pd-text-3xl: 1.5rem;     /* 24px */
+  --pd-text-4xl: 1.875rem;   /* 30px */
+  --pd-text-5xl: 2.25rem;    /* 36px */
+  --pd-text-6xl: 3rem;       /* 48px */
+
+  --pd-code-sm: 0.75rem;     /* 12px */
+  --pd-code-base: 0.8125rem; /* 13px */
+  --pd-code-lg: 0.875rem;    /* 14px */
+
+  /* ── Font Weight ─────────────────────────────────────────────────────── */
+  --pd-font-regular: 400;
+  --pd-font-medium: 500;
+  --pd-font-semibold: 600;
+  --pd-font-bold: 700;
+
+  /* ── Line Height ─────────────────────────────────────────────────────── */
+  --pd-leading-body: 1.6;
+  --pd-leading-heading: 1.25;
+  --pd-leading-code: 1.5;
+  --pd-leading-list: 1.4;
+  --pd-leading-tight: 1.2;
+
+  /* ── Spacing Scale (4-point grid, 16 steps) ──────────────────────────── */
+  --pd-space-0: 0;
+  --pd-space-0\.5: 2px;
+  --pd-space-1: 4px;
+  --pd-space-1\.5: 6px;
+  --pd-space-2: 8px;
+  --pd-space-3: 12px;
+  --pd-space-4: 16px;
+  --pd-space-5: 20px;
+  --pd-space-6: 24px;
+  --pd-space-8: 32px;
+  --pd-space-10: 40px;
+  --pd-space-12: 48px;
+  --pd-space-16: 64px;
+  --pd-space-20: 80px;
+  --pd-space-24: 96px;
+  --pd-space-32: 128px;
+  --pd-space-48: 192px;
+
+  /* ── Border Radius ───────────────────────────────────────────────────── */
+  --pd-radius-none: 0;
+  --pd-radius-xs: 2px;
+  --pd-radius-sm: 4px;
+  --pd-radius-md: 6px;
+  --pd-radius-lg: 8px;
+  --pd-radius-xl: 12px;
+  --pd-radius-2xl: 16px;
+  --pd-radius-full: 9999px;
+
+  /* ── Z-Index Scale ───────────────────────────────────────────────────── */
+  --pd-z-base: 0;
+  --pd-z-sticky: 10;
+  --pd-z-dropdown: 100;
+  --pd-z-overlay: 500;
+  --pd-z-modal: 1000;
+  --pd-z-popover: 1500;
+  --pd-z-max: 9999;
+
+  /* ── Layout Dimensions ───────────────────────────────────────────────── */
+  --pd-layout-sidebar-width: 264px;
+  --pd-layout-sidebar-rail: 64px;
+  --pd-layout-tabbar-height: 40px;
+  --pd-layout-statusbar-height: 32px;
+  --pd-layout-titlebar-mac: 28px;
+  --pd-layout-titlebar-win: 32px;
+  --pd-layout-main-max-width: 1200px;
+  --pd-layout-main-padding-x: 24px;
+  --pd-layout-composer-max-width: 840px;
+  --pd-layout-right-panel: 320px;
+  --pd-layout-pet-strip: 56px;
+  --pd-layout-pet-rail: 48px;
+
+  /* ── Breakpoints ─────────────────────────────────────────────────────── */
+  --pd-breakpoint-xs: 640px;
+  --pd-breakpoint-sm: 960px;
+  --pd-breakpoint-md: 1280px;
+  --pd-breakpoint-lg: 1600px;
+  --pd-breakpoint-xl: 1920px;
+
+  /* ── Duration ────────────────────────────────────────────────────────── */
+  --pd-duration-instant: 0ms;
+  --pd-duration-fast: 75ms;
+  --pd-duration-quick: 150ms;
+  --pd-duration-normal: 200ms;
+  --pd-duration-slow: 300ms;
+  --pd-duration-slower: 500ms;
+  --pd-duration-pet: 600ms;
+
+  /* ── Easing ──────────────────────────────────────────────────────────── */
+  --pd-ease-linear: linear;
+  --pd-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --pd-ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --pd-ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  --pd-ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+  --pd-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ==========================================================================
+   2. [data-pd-theme="light"] — Light Theme
+      Palette + Semantic + Domain Color Systems
+   ========================================================================== */
+
+[data-pd-theme="light"] {
+  /* ── Palette: Cream / Stone / Ink ────────────────────────────────────── */
+  --pd-palette-cream-50: #FDFCF8;
+  --pd-palette-cream-100: #FAF9F5;
+  --pd-palette-cream-200: #F4F3EE;
+  --pd-palette-cream-300: #E8E6DC;
+  --pd-palette-cream-400: #D7D4C8;
+  --pd-palette-stone-500: #B0AEA5;
+  --pd-palette-stone-600: #8A8880;
+  --pd-palette-stone-800: #2F2E2C;
+  --pd-palette-ink-900: #141413;
+
+  /* ── Palette: Terra Cotta ────────────────────────────────────────────── */
+  --pd-palette-terra-400: #E38B6E;
+  --pd-palette-terra-500: #D97757;
+  --pd-palette-terra-600: #C15F3C;
+  --pd-palette-terra-700: #9C4B2E;
+
+  /* ── Palette: Bamboo / Sky / Amber / Ruby ────────────────────────────── */
+  --pd-palette-bamboo-300: #A8BC8A;
+  --pd-palette-bamboo-500: #6B8A47;
+  --pd-palette-sky-300: #A8C4DC;
+  --pd-palette-sky-500: #6A9BCC;
+  --pd-palette-amber-200: #F4DFB8;
+  --pd-palette-amber-500: #D9A05B;
+  --pd-palette-ruby-200: #F0CCCC;
+  --pd-palette-ruby-500: #BA3D3D;
+
+  /* ── Semantic: Surface ───────────────────────────────────────────────── */
+  --pd-color-bg: var(--pd-palette-cream-100);
+  --pd-color-bg-elevated: var(--pd-palette-cream-50);
+  --pd-color-bg-subtle: var(--pd-palette-cream-200);
+  --pd-color-bg-hover: var(--pd-palette-cream-200);
+  --pd-color-bg-selected: var(--pd-palette-cream-300);
+  --pd-color-bg-disabled: var(--pd-palette-cream-200);
+
+  /* ── Semantic: Foreground ────────────────────────────────────────────── */
+  --pd-color-fg: var(--pd-palette-ink-900);
+  --pd-color-fg-muted: var(--pd-palette-stone-600);
+  --pd-color-fg-subtle: var(--pd-palette-stone-500);
+  --pd-color-fg-on-accent: #FFFFFF;
+  --pd-color-fg-inverse: var(--pd-palette-cream-100);
+  --pd-color-fg-disabled: var(--pd-palette-cream-400);
+
+  /* ── Semantic: Border ────────────────────────────────────────────────── */
+  --pd-color-border: var(--pd-palette-cream-300);
+  --pd-color-border-strong: var(--pd-palette-cream-400);
+  --pd-color-border-focus: var(--pd-palette-terra-500);
+  --pd-color-border-subtle: var(--pd-palette-cream-200);
+
+  /* ── Semantic: Accent ────────────────────────────────────────────────── */
+  --pd-color-accent: var(--pd-palette-terra-500);
+  --pd-color-accent-hover: var(--pd-palette-terra-400);
+  --pd-color-accent-active: var(--pd-palette-terra-600);
+  --pd-color-accent-subtle: rgba(217, 119, 87, 0.1);
+  --pd-color-accent-fg: var(--pd-palette-terra-700);
+
+  /* ── Semantic: Status ────────────────────────────────────────────────── */
+  --pd-color-success: var(--pd-palette-bamboo-500);
+  --pd-color-success-bg: var(--pd-palette-bamboo-300);
+  --pd-color-warning: var(--pd-palette-amber-500);
+  --pd-color-warning-bg: var(--pd-palette-amber-200);
+  --pd-color-error: var(--pd-palette-ruby-500);
+  --pd-color-error-bg: var(--pd-palette-ruby-200);
+  --pd-color-info: var(--pd-palette-sky-500);
+  --pd-color-info-bg: var(--pd-palette-sky-300);
+
+  /* ── Semantic: Shadow / Scrim ────────────────────────────────────────── */
+  --pd-color-scrim: rgba(20, 20, 19, 0.4);
+  --pd-color-selection: rgba(217, 119, 87, 0.15);
+
+  /* ── Shadow Scale ────────────────────────────────────────────────────── */
+  --pd-shadow-xs: 0 1px 2px rgba(20, 20, 19, 0.05);
+  --pd-shadow-sm: 0 1px 3px rgba(20, 20, 19, 0.08), 0 1px 2px rgba(20, 20, 19, 0.04);
+  --pd-shadow-md: 0 4px 6px rgba(20, 20, 19, 0.07), 0 2px 4px rgba(20, 20, 19, 0.04);
+  --pd-shadow-lg: 0 10px 15px rgba(20, 20, 19, 0.08), 0 4px 6px rgba(20, 20, 19, 0.04);
+  --pd-shadow-xl: 0 20px 25px rgba(20, 20, 19, 0.10), 0 8px 10px rgba(20, 20, 19, 0.04);
+  --pd-shadow-focus: 0 0 0 3px rgba(217, 119, 87, 0.3);
+  --pd-shadow-focus-danger: 0 0 0 3px rgba(186, 61, 61, 0.3);
+  --pd-shadow-button-primary: 0 1px 2px rgba(20, 20, 19, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+  /* ── Domain: Tool Call Colors ─────────────────────────────────────────── */
+  --pd-tool-use-bg: #F5F0EB;
+  --pd-tool-use-border: var(--pd-palette-cream-300);
+  --pd-tool-use-icon: var(--pd-palette-terra-500);
+  --pd-tool-result-bg: var(--pd-palette-cream-50);
+  --pd-tool-result-border: var(--pd-palette-bamboo-300);
+  --pd-tool-result-icon: var(--pd-palette-bamboo-500);
+  --pd-tool-error-bg: var(--pd-palette-ruby-200);
+  --pd-tool-error-border: var(--pd-palette-ruby-500);
+  --pd-tool-error-icon: var(--pd-palette-ruby-500);
+  --pd-tool-thinking-bg: rgba(106, 155, 204, 0.08);
+  --pd-tool-thinking-border: var(--pd-palette-sky-300);
+  --pd-tool-thinking-icon: var(--pd-palette-sky-500);
+  --pd-tool-permission-bg: rgba(217, 160, 91, 0.08);
+  --pd-tool-permission-border: var(--pd-palette-amber-200);
+  --pd-tool-permission-icon: var(--pd-palette-amber-500);
+
+  /* ── Domain: Code / Syntax Highlighting ──────────────────────────────── */
+  --pd-code-bg: #F8F6F0;
+  --pd-code-fg: var(--pd-palette-ink-900);
+  --pd-code-comment: var(--pd-palette-stone-500);
+  --pd-code-keyword: #8B5CF6;
+  --pd-code-string: var(--pd-palette-bamboo-500);
+  --pd-code-number: var(--pd-palette-terra-500);
+  --pd-code-function: var(--pd-palette-sky-500);
+  --pd-code-variable: var(--pd-palette-ink-900);
+  --pd-code-type: #B45309;
+  --pd-code-operator: var(--pd-palette-stone-600);
+  --pd-code-punctuation: var(--pd-palette-stone-500);
+
+  /* ── Domain: Diff ────────────────────────────────────────────────────── */
+  --pd-diff-added-bg: rgba(107, 138, 71, 0.12);
+  --pd-diff-added-fg: #3D6B21;
+  --pd-diff-removed-bg: rgba(186, 61, 61, 0.12);
+  --pd-diff-removed-fg: #9C2626;
+  --pd-diff-changed-bg: rgba(217, 160, 91, 0.12);
+  --pd-diff-hunk-bg: rgba(106, 155, 204, 0.08);
+  --pd-diff-gutter: var(--pd-palette-stone-500);
+
+  /* ── Domain: Terminal ────────────────────────────────────────────────── */
+  --pd-terminal-bg: #1A1918;
+  --pd-terminal-fg: #E8E6DC;
+  --pd-terminal-cursor: var(--pd-palette-terra-500);
+  --pd-terminal-selection: rgba(217, 119, 87, 0.25);
+  --pd-terminal-black: #2F2E2C;
+  --pd-terminal-red: #BA3D3D;
+  --pd-terminal-green: #6B8A47;
+  --pd-terminal-yellow: #D9A05B;
+  --pd-terminal-blue: #6A9BCC;
+  --pd-terminal-magenta: #8B5CF6;
+  --pd-terminal-cyan: #5BAAAA;
+  --pd-terminal-white: #FAF9F5;
+
+  /* ── Domain: Panda Pet ───────────────────────────────────────────────── */
+  --pd-pet-primary: var(--pd-palette-terra-500);
+  --pd-pet-secondary: var(--pd-palette-bamboo-500);
+  --pd-pet-xp-bar: var(--pd-palette-terra-500);
+  --pd-pet-xp-bg: var(--pd-palette-cream-300);
+  --pd-pet-level-badge: var(--pd-palette-amber-500);
+  --pd-pet-species-border: var(--pd-palette-cream-400);
+  --pd-pet-mood-glow: rgba(217, 119, 87, 0.3);
+}
+
+/* ==========================================================================
+   3. [data-pd-theme="dark"] — Dark Theme
+      Palette overrides + Semantic + Domain Color Systems
+   ========================================================================== */
+
+[data-pd-theme="dark"] {
+  /* ── Palette: Ink (deep warm blacks) ─────────────────────────────────── */
+  --pd-palette-ink-950: #0D0D0C;
+  --pd-palette-ink-900: #141413;
+  --pd-palette-ink-800: #1A1A19;
+  --pd-palette-ink-700: #24231F;
+  --pd-palette-ink-600: #33322D;
+  --pd-palette-ink-500: #4A4944;
+
+  /* ── Palette: Stone / Cream (inverted text) ──────────────────────────── */
+  --pd-palette-stone-400: #C4C2BA;
+  --pd-palette-stone-300: #DEDCD3;
+  --pd-palette-cream-100: #FAF9F5;
+
+  /* ── Palette: Terra Cotta (brightened for dark bg) ───────────────────── */
+  --pd-palette-terra-300: #F0A189;
+  --pd-palette-terra-400: #E38B6E;
+  --pd-palette-terra-500: #D97757;
+
+  /* ── Palette: Status (400 series for dark bg) ────────────────────────── */
+  --pd-palette-bamboo-400: #8FAC66;
+  --pd-palette-sky-400: #8FB4D6;
+  --pd-palette-amber-400: #E5B877;
+  --pd-palette-ruby-400: #D16C6C;
+
+  /* ── Semantic: Surface ───────────────────────────────────────────────── */
+  --pd-color-bg: var(--pd-palette-ink-900);
+  --pd-color-bg-elevated: var(--pd-palette-ink-800);
+  --pd-color-bg-subtle: var(--pd-palette-ink-800);
+  --pd-color-bg-hover: var(--pd-palette-ink-700);
+  --pd-color-bg-selected: var(--pd-palette-ink-600);
+  --pd-color-bg-disabled: var(--pd-palette-ink-800);
+
+  /* ── Semantic: Foreground ────────────────────────────────────────────── */
+  --pd-color-fg: var(--pd-palette-cream-100);
+  --pd-color-fg-muted: var(--pd-palette-stone-400);
+  --pd-color-fg-subtle: var(--pd-palette-stone-300);
+  --pd-color-fg-on-accent: #FFFFFF;
+  --pd-color-fg-inverse: var(--pd-palette-ink-900);
+  --pd-color-fg-disabled: var(--pd-palette-ink-500);
+
+  /* ── Semantic: Border ────────────────────────────────────────────────── */
+  --pd-color-border: var(--pd-palette-ink-500);
+  --pd-color-border-strong: var(--pd-palette-stone-400);
+  --pd-color-border-focus: var(--pd-palette-terra-400);
+  --pd-color-border-subtle: var(--pd-palette-ink-600);
+
+  /* ── Semantic: Accent ────────────────────────────────────────────────── */
+  --pd-color-accent: var(--pd-palette-terra-400);
+  --pd-color-accent-hover: var(--pd-palette-terra-300);
+  --pd-color-accent-active: var(--pd-palette-terra-500);
+  --pd-color-accent-subtle: rgba(227, 139, 110, 0.12);
+  --pd-color-accent-fg: var(--pd-palette-terra-300);
+
+  /* ── Semantic: Status ────────────────────────────────────────────────── */
+  --pd-color-success: var(--pd-palette-bamboo-400);
+  --pd-color-success-bg: rgba(143, 172, 102, 0.15);
+  --pd-color-warning: var(--pd-palette-amber-400);
+  --pd-color-warning-bg: rgba(229, 184, 119, 0.15);
+  --pd-color-error: var(--pd-palette-ruby-400);
+  --pd-color-error-bg: rgba(209, 108, 108, 0.15);
+  --pd-color-info: var(--pd-palette-sky-400);
+  --pd-color-info-bg: rgba(143, 180, 214, 0.15);
+
+  /* ── Semantic: Shadow / Scrim ────────────────────────────────────────── */
+  --pd-color-scrim: rgba(0, 0, 0, 0.6);
+  --pd-color-selection: rgba(227, 139, 110, 0.2);
+
+  /* ── Shadow Scale ────────────────────────────────────────────────────── */
+  --pd-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --pd-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --pd-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --pd-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3), 0 4px 6px rgba(0, 0, 0, 0.2);
+  --pd-shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.4), 0 8px 10px rgba(0, 0, 0, 0.2);
+  --pd-shadow-focus: 0 0 0 3px rgba(227, 139, 110, 0.4);
+  --pd-shadow-focus-danger: 0 0 0 3px rgba(209, 108, 108, 0.4);
+  --pd-shadow-button-primary: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+  /* ── Domain: Tool Call Colors ─────────────────────────────────────────── */
+  --pd-tool-use-bg: rgba(227, 139, 110, 0.08);
+  --pd-tool-use-border: var(--pd-palette-ink-500);
+  --pd-tool-use-icon: var(--pd-palette-terra-400);
+  --pd-tool-result-bg: rgba(143, 172, 102, 0.08);
+  --pd-tool-result-border: rgba(143, 172, 102, 0.25);
+  --pd-tool-result-icon: var(--pd-palette-bamboo-400);
+  --pd-tool-error-bg: rgba(209, 108, 108, 0.12);
+  --pd-tool-error-border: var(--pd-palette-ruby-400);
+  --pd-tool-error-icon: var(--pd-palette-ruby-400);
+  --pd-tool-thinking-bg: rgba(143, 180, 214, 0.08);
+  --pd-tool-thinking-border: rgba(143, 180, 214, 0.25);
+  --pd-tool-thinking-icon: var(--pd-palette-sky-400);
+  --pd-tool-permission-bg: rgba(229, 184, 119, 0.08);
+  --pd-tool-permission-border: rgba(229, 184, 119, 0.25);
+  --pd-tool-permission-icon: var(--pd-palette-amber-400);
+
+  /* ── Domain: Code / Syntax Highlighting ──────────────────────────────── */
+  --pd-code-bg: var(--pd-palette-ink-800);
+  --pd-code-fg: var(--pd-palette-cream-100);
+  --pd-code-comment: #7A786F;
+  --pd-code-keyword: #A78BFA;
+  --pd-code-string: var(--pd-palette-bamboo-400);
+  --pd-code-number: var(--pd-palette-terra-300);
+  --pd-code-function: var(--pd-palette-sky-400);
+  --pd-code-variable: var(--pd-palette-cream-100);
+  --pd-code-type: #F59E0B;
+  --pd-code-operator: var(--pd-palette-stone-400);
+  --pd-code-punctuation: var(--pd-palette-stone-300);
+
+  /* ── Domain: Diff ────────────────────────────────────────────────────── */
+  --pd-diff-added-bg: rgba(143, 172, 102, 0.15);
+  --pd-diff-added-fg: #A8CF6E;
+  --pd-diff-removed-bg: rgba(209, 108, 108, 0.15);
+  --pd-diff-removed-fg: #E88A8A;
+  --pd-diff-changed-bg: rgba(229, 184, 119, 0.15);
+  --pd-diff-hunk-bg: rgba(143, 180, 214, 0.1);
+  --pd-diff-gutter: var(--pd-palette-ink-500);
+
+  /* ── Domain: Terminal ────────────────────────────────────────────────── */
+  --pd-terminal-bg: var(--pd-palette-ink-950);
+  --pd-terminal-fg: #E8E6DC;
+  --pd-terminal-cursor: var(--pd-palette-terra-400);
+  --pd-terminal-selection: rgba(227, 139, 110, 0.3);
+  --pd-terminal-black: #1A1A19;
+  --pd-terminal-red: #D16C6C;
+  --pd-terminal-green: #8FAC66;
+  --pd-terminal-yellow: #E5B877;
+  --pd-terminal-blue: #8FB4D6;
+  --pd-terminal-magenta: #A78BFA;
+  --pd-terminal-cyan: #6CC4C4;
+  --pd-terminal-white: #FAF9F5;
+
+  /* ── Domain: Panda Pet ───────────────────────────────────────────────── */
+  --pd-pet-primary: var(--pd-palette-terra-400);
+  --pd-pet-secondary: var(--pd-palette-bamboo-400);
+  --pd-pet-xp-bar: var(--pd-palette-terra-400);
+  --pd-pet-xp-bg: var(--pd-palette-ink-600);
+  --pd-pet-level-badge: var(--pd-palette-amber-400);
+  --pd-pet-species-border: var(--pd-palette-ink-500);
+  --pd-pet-mood-glow: rgba(227, 139, 110, 0.35);
+}
+
+/* ==========================================================================
+   4. @keyframes — 7 Preset Animations
+   ========================================================================== */
+
+@keyframes pd-hover-press {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pd-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pd-skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pd-streaming-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes pd-sidebar-collapse {
+  from { width: 264px; }
+  to { width: 64px; }
+}
+
+@keyframes pd-pet-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+
+@keyframes pd-pet-attention {
+  0% { transform: translateY(0); }
+  20% { transform: translateY(-4px); }
+  40% { transform: translateY(2px); }
+  60% { transform: translateY(-4px); }
+  80% { transform: translateY(2px); }
+  100% { transform: translateY(0); }
+}
+
+/* ==========================================================================
+   5. @media (prefers-reduced-motion) — Accessibility
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
