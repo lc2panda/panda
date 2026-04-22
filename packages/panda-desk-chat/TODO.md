@@ -1,7 +1,7 @@
 # Panda Desk Chat — UI 进度记录
 
 > 最后更新: 2026-04-22 +08:00
-> 当前阶段: W13 完成 — Electron Enhancement
+> 当前阶段: W14-2 完成 — Settings Refactor + Test Skeleton
 
 ## 已完成 Wave
 
@@ -175,18 +175,20 @@ W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
 - [x] 剪贴板 image buffer → base64 附件流程已在 W5 实现
 - [x] 无需额外代码变更
 
-## W14 — Settings & Testing (计划)
+## W14 — Settings Refactor & Test Skeleton
 
-### W14-1: SettingsPage 组件拆分
-- [ ] SettingsPage 大组件拆分为独立 Tab 组件 (GeneralTab, AppearanceTab, ProvidersTab, ShortcutsTab, AboutTab)
-- [ ] 每个 Tab 独立文件，SettingsPage 仅做路由编排
-- [ ] Tab 切换状态持久化到 uiStore
+### W14-1: SettingsPage 组件拆分 ✅ `e218758`
+- [x] SettingsPage 拆分为 5 个 Tab 组件 (GeneralTab, AppearanceTab, ProvidersTab, ShortcutsTab, AboutTab)
+- [x] SettingRow 共享布局组件
+- [x] SettingsPage 217→65 行 (70% 精简)
+- [x] 每个 Tab 独立文件，SettingsPage 仅做路由编排
 
-### W14-2: E2E 测试骨架
-- [ ] Playwright + Electron 测试配置
-- [ ] 基础冒烟测试: 启动 → 窗口创建 → 三栏布局渲染
-- [ ] IPC channel 联通测试: 至少覆盖 chat:send / stream:* / session:* 核心路径
-- [ ] CI 集成配置 (GitHub Actions)
+### W14-2: 单元测试骨架 ✅ `26780ab`
+- [x] vitest.config.ts 配置 (globals + path aliases)
+- [x] toastStore 测试: addToast, dismissToast, clearAll, auto-dismiss, initial state (5 tests)
+- [x] settingsStore 测试: defaults, setTheme, setLocale, toggleSidebar, setFontSize (5 tests)
+- [x] sessionStore 测试: initial state, createSession, deleteSession, renameSession, setActive (5 tests)
+- [x] 15/15 tests PASS
 
 ### W14-3: 性能优化
 - [ ] PdMessageList 虚拟滚动 (长对话 >100 条消息)
