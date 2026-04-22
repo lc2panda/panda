@@ -311,6 +311,10 @@ function _writeSystemOpenAtLogin(enabled: boolean): void {
     loginItemHelpers.linuxSetOpenAtLogin(enabled, { execCmd })
     return
   }
+  // macOS / Windows: skip login-item writes in dev mode (not packaged) —
+  // Electron dev processes lack the entitlement / registry path, so
+  // setLoginItemSettings always fails with "Operation not permitted".
+  if (!app.isPackaged) return
   app.setLoginItemSettings(
     loginItemHelpers.getLoginItemSettings({
       isPackaged: app.isPackaged,
