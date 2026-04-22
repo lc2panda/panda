@@ -27,6 +27,7 @@ export default {
   'sidebar.last7Days': '過去7日間',
   'sidebar.last30Days': '過去30日間',
   'sidebar.older': 'それ以前',
+  'sidebar.openInNewWindow': '新しいウィンドウで開く',
 
   // TabBar
   'tabbar.newTab': '新しいタブ',
@@ -151,6 +152,9 @@ export default {
   // Session switcher
   'sessionSwitcher.placeholder': 'セッションを検索...',
   'sessionSwitcher.noResults': '一致するセッションがありません',
+
+  // Menu
+  'menu.newWindow': '新しいウィンドウ',
 
   // Common
   'common.confirm': '確認',

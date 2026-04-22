@@ -1,5 +1,5 @@
-// Input: electron-updater autoUpdater events, BrowserWindow reference
-// Output: Update status events sent to renderer via IPC ('panda:update:status')
+// Input: electron-updater autoUpdater events, WindowManager broadcast
+// Output: Update status events broadcast to all renderer windows via IPC ('panda:update:status')
 // Pos: Electron main process — auto-update lifecycle manager
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -7,6 +7,7 @@
 import { autoUpdater } from 'electron-updater';
 import type { UpdateInfo, ProgressInfo } from 'electron-updater';
 import type { BrowserWindow } from 'electron';
+import { windowManager } from './window-manager';
 
 // ---------------------------------------------------------------------------
 // Update status channel (must match preload/chat.ts & IPC handlers)
@@ -19,14 +20,11 @@ export const UPDATE_STATUS_CHANNEL = 'panda:update:status';
 // ---------------------------------------------------------------------------
 
 class AppUpdater {
-  private mainWindow: BrowserWindow | null = null;
-
   /**
-   * Initialise the updater with a reference to the main window.
+   * Initialise the updater.
    * Call once after window creation in app.whenReady().
    */
-  init(win: BrowserWindow): void {
-    this.mainWindow = win;
+  init(_win?: BrowserWindow): void {
 
     // --- Configuration ---
     autoUpdater.autoDownload = false;
@@ -82,11 +80,10 @@ class AppUpdater {
     autoUpdater.quitAndInstall();
   }
 
-  /** Send an update status event to the renderer. */
+  /** Send an update status event to all renderer windows. */
   private sendStatus(status: string, data?: Record<string, unknown>): void {
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.webContents.send(UPDATE_STATUS_CHANNEL, { status, ...data });
-    }
+    // Broadcast to all windows — every renderer needs update status
+    windowManager.broadcast(UPDATE_STATUS_CHANNEL, { status, ...data });
   }
 }
 

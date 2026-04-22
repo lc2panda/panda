@@ -1,6 +1,6 @@
-// Input: Electron app lifecycle events, CLI backend process management
-// Output: BrowserWindow with preload-injected pandaAPI
-// Pos: Electron main process entry — creates window, manages lifecycle
+// Input: Electron app lifecycle events, CLI backend process management, WindowManager
+// Output: Multi-window BrowserWindows with preload-injected pandaAPI
+// Pos: Electron main process entry — creates windows via WindowManager, manages lifecycle
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { registerIpcHandlers, setupMainWindow } from './ipc/handlers';
 import { cliManager } from './backend/cli-manager';
 import { appUpdater } from './updater';
+import { windowManager } from './window-manager';
 
 // ---------------------------------------------------------------------------
 // Environment
@@ -26,29 +27,19 @@ let tray: Tray | null = null;
 let isQuitting = false;
 
 function createMainWindow(): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 800,
-    minHeight: 600,
-    title: 'Panda Code',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 16 },
-    backgroundColor: '#0a0a0a',
-    webPreferences: {
-      preload: join(__dirname, 'preload/chat.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false, // needed for preload contextBridge
+  const win = windowManager.createWindow({
+    windowOptions: {
+      minWidth: 800,
+      minHeight: 600,
+      title: 'Panda Code',
+      backgroundColor: '#0a0a0a',
+      trafficLightPosition: { x: 16, y: 16 },
     },
   });
 
-  // Load content
+  // Dev tools in dev mode
   if (isDev && VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
     win.webContents.openDevTools({ mode: 'detach' });
-  } else {
-    win.loadFile(join(__dirname, '../dist/index.html'));
   }
 
   // Open external links in system browser
@@ -57,9 +48,9 @@ function createMainWindow(): BrowserWindow {
     return { action: 'deny' };
   });
 
-  // Minimize to tray on close instead of quitting
+  // Minimize to tray on close instead of quitting (primary window only)
   win.on('close', (e) => {
-    if (!isQuitting) {
+    if (!isQuitting && win.id === mainWindow?.id) {
       e.preventDefault();
       win.hide();
     }
@@ -99,16 +90,29 @@ function createTray(): void {
     {
       label: 'Show Window',
       click: () => {
-        mainWindow?.show();
-        mainWindow?.focus();
+        const win = mainWindow ?? windowManager.getActiveWindow();
+        if (win && !win.isDestroyed()) {
+          win.show();
+          win.focus();
+        }
       },
     },
     {
       label: 'New Chat',
       click: () => {
-        mainWindow?.show();
-        mainWindow?.focus();
-        mainWindow?.webContents.send('panda:new-chat');
+        const win = mainWindow ?? windowManager.getActiveWindow();
+        if (win && !win.isDestroyed()) {
+          win.show();
+          win.focus();
+          win.webContents.send('panda:new-chat');
+        }
+      },
+    },
+    {
+      label: 'New Window',
+      click: () => {
+        const newWin = windowManager.createWindow();
+        setupMainWindow(newWin);
       },
     },
     { type: 'separator' },
@@ -125,8 +129,11 @@ function createTray(): void {
 
   // Left-click on tray icon shows/focuses window
   tray.on('click', () => {
-    mainWindow?.show();
-    mainWindow?.focus();
+    const win = mainWindow ?? windowManager.getActiveWindow();
+    if (win && !win.isDestroyed()) {
+      win.show();
+      win.focus();
+    }
   });
 }
 
@@ -182,6 +189,15 @@ const menuTemplate: Electron.MenuItemConstructorOptions[] = [
   {
     label: 'Window',
     submenu: [
+      {
+        label: 'New Window',
+        accelerator: 'CmdOrCtrl+Shift+N',
+        click: () => {
+          const newWin = windowManager.createWindow();
+          setupMainWindow(newWin);
+        },
+      },
+      { type: 'separator' },
       { role: 'minimize' },
       { role: 'zoom' },
       { role: 'close' },
@@ -215,13 +231,20 @@ app.whenReady().then(() => {
   // Listen for system theme changes and notify renderer
   nativeTheme.on('updated', () => {
     const isDark = nativeTheme.shouldUseDarkColors;
-    mainWindow?.webContents.send('panda:theme:changed', isDark);
+    windowManager.broadcast('panda:theme:changed', isDark);
   });
 
   // macOS: re-create window when dock icon clicked
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createMainWindow();
+    } else {
+      // Show an existing window
+      const win = mainWindow ?? windowManager.getActiveWindow();
+      if (win && !win.isDestroyed()) {
+        win.show();
+        win.focus();
+      }
     }
   });
 });
@@ -251,5 +274,7 @@ app.on('web-contents-created', (_, contents) => {
 // ---------------------------------------------------------------------------
 
 export function getMainWindow(): BrowserWindow | null {
-  return mainWindow;
+  return mainWindow ?? windowManager.getActiveWindow();
 }
+
+export { windowManager };

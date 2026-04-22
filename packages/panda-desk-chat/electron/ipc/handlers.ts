@@ -1,5 +1,5 @@
-// Input: ipcMain handle registrations + CLI backend manager (W7-2), notificationManager, appUpdater
-// Output: IPC request handlers for all 22 channels — connected to CLIManager + nativeTheme + notifications + updater
+// Input: ipcMain handle registrations + CLI backend manager (W7-2), WindowManager, notificationManager, appUpdater
+// Output: IPC request handlers for all 24 channels — connected to CLIManager + WindowManager + nativeTheme + notifications + updater
 // Pos: Main process IPC layer — routes renderer requests to CLI backend
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -10,6 +10,7 @@ import { join, basename } from 'node:path';
 import { cliManager } from '../backend/cli-manager';
 import { notificationManager } from '../notification';
 import { appUpdater } from '../updater';
+import { windowManager } from '../window-manager';
 
 // ---------------------------------------------------------------------------
 // IPC channel constants (must match preload/chat.ts)
@@ -22,7 +23,7 @@ const CH = {
   SESSION_LIST:        'panda:session:list',
   SESSION_CREATE:      'panda:session:create',
   SESSION_RENAME:      'panda:session:rename',
-  SESSION_DELETE:      'panda:session:delete',
+  SESSION_DELETE:       'panda:session:delete',
   SESSION_FOCUS:       'panda:session:focus',
   TOOL_PERM_RESPONSE:  'panda:tool:permission:response',
   FS_SEARCH:           'panda:chat:fs:search',
@@ -41,6 +42,9 @@ const CH = {
   UPDATE_CHECK:    'panda:update:check',
   UPDATE_DOWNLOAD: 'panda:update:download',
   UPDATE_INSTALL:  'panda:update:install',
+  // Window management
+  WINDOW_NEW:           'panda:window:new',
+  WINDOW_OPEN_SESSION:  'panda:window:open-session',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -48,7 +52,7 @@ const CH = {
 // ---------------------------------------------------------------------------
 
 export function setupMainWindow(win: BrowserWindow): void {
-  cliManager.setMainWindow(win);
+  cliManager.registerWindow(win);
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +240,28 @@ export function registerIpcHandlers(): void {
     appUpdater.quitAndInstall();
   });
 
-  console.log('[IPC] Registered 22 invoke handlers (CLI backend connected)');
+  // ── Window management ──────────────────────────────────────────────
+
+  ipcMain.handle(CH.WINDOW_NEW, async () => {
+    const win = windowManager.createWindow();
+    cliManager.registerWindow(win);
+    return { windowId: win.id };
+  });
+
+  ipcMain.handle(CH.WINDOW_OPEN_SESSION, async (_event, payload: { sessionId: string }) => {
+    // Check if a window is already showing this session
+    const existing = windowManager.getWindowForSession(payload.sessionId);
+    if (existing && !existing.isDestroyed()) {
+      existing.focus();
+      return { windowId: existing.id, reused: true };
+    }
+    // Create a new window targeting this session
+    const win = windowManager.createWindow({ sessionId: payload.sessionId });
+    cliManager.registerWindow(win);
+    return { windowId: win.id, reused: false };
+  });
+
+  console.log('[IPC] Registered 24 invoke handlers (CLI backend + window manager connected)');
 }
 
 // ---------------------------------------------------------------------------

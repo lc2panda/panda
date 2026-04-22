@@ -27,6 +27,7 @@ export default {
   'sidebar.last7Days': '최근 7일',
   'sidebar.last30Days': '최근 30일',
   'sidebar.older': '이전',
+  'sidebar.openInNewWindow': '새 창에서 열기',
 
   // TabBar
   'tabbar.newTab': '새 탭',
@@ -151,6 +152,9 @@ export default {
   // Session switcher
   'sessionSwitcher.placeholder': '세션 검색...',
   'sessionSwitcher.noResults': '일치하는 세션 없음',
+
+  // Menu
+  'menu.newWindow': '새 창',
 
   // Common
   'common.confirm': '확인',

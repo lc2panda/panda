@@ -1,4 +1,4 @@
-// Input: IPC channel definitions (B2-architecture.md §III) — 24 channels
+// Input: IPC channel definitions (B2-architecture.md §III) — 26 channels
 // Output: Zod schemas + channel constants for type-safe IPC validation
 // Pos: IPC foundation layer — consumed by preload, main process, and chat renderer
 //
@@ -42,6 +42,10 @@ export const IPC_CHANNELS = {
   MODEL_SET:           'panda:chat:model:set',
   PERMISSION_MODE_SET: 'panda:chat:permission-mode:set',
   CLIPBOARD_PASTE_IMG: 'panda:chat:clipboard:paste-image',
+
+  // Window management (2)
+  WINDOW_NEW:           'panda:window:new',
+  WINDOW_OPEN_SESSION:  'panda:window:open-session',
 } as const;
 
 // ─── Shared sub-schemas ────────────────────────────────────────────────────────

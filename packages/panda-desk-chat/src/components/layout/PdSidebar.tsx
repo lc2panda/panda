@@ -1,12 +1,13 @@
 // Input: expanded state + toggle callback; reads sessionStore for session list
-// Output: Collapsible sidebar with session list, search, CRUD, and navigation sections
-// Pos: Layout layer — left panel navigation, wired to sessionStore + chatStore + tabStore
+// Output: Collapsible sidebar with session list, search, CRUD, navigation, and "Open in New Window" option
+// Pos: Layout layer — left panel navigation, wired to sessionStore + chatStore + tabStore + windowManager bridge
 
 import { type ComponentType, type ReactNode, useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/cn';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useTabStore } from '@/stores/tabStore';
+import { openSessionInWindow } from '@/ipc/bridge';
 import { PdNavItem } from './PdNavItem';
 import {
   MessageSquare as _MessageSquare,
@@ -20,6 +21,7 @@ import {
   PanelLeftOpen as _PanelLeftOpen,
   Plus as _Plus,
   Trash2 as _Trash2,
+  ArrowUpRight as _ArrowUpRight,
 } from 'lucide-react';
 
 // Re-type lucide icons for React 18 compat (hoisted @types/react@19 conflict)
@@ -35,6 +37,7 @@ const PanelLeftClose = _PanelLeftClose as IconFC;
 const PanelLeftOpen = _PanelLeftOpen as IconFC;
 const Plus = _Plus as IconFC;
 const Trash2 = _Trash2 as IconFC;
+const ExternalLink = _ArrowUpRight as IconFC;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,6 +99,7 @@ interface SessionItemProps {
   onSelect: () => void;
   onDelete: () => void;
   onRename: (name: string) => void;
+  onOpenInNewWindow: () => void;
 }
 
 function SessionItem({
@@ -106,6 +110,7 @@ function SessionItem({
   onSelect,
   onDelete,
   onRename,
+  onOpenInNewWindow,
 }: SessionItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(name);
@@ -210,6 +215,29 @@ function SessionItem({
                 )}
               >
                 <Trash2 size={14} />
+              </span>
+              {/* Open in New Window — visible on hover */}
+              <span
+                role="button"
+                tabIndex={-1}
+                title="Open in New Window"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenInNewWindow();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    onOpenInNewWindow();
+                  }
+                }}
+                className={cn(
+                  'shrink-0 rounded-[var(--pd-radius-xs)] p-0.5',
+                  'opacity-0 transition-opacity group-hover:opacity-100',
+                  'text-[var(--pd-color-fg-subtle)] hover:text-[var(--pd-color-accent)]',
+                )}
+              >
+                <ExternalLink size={14} />
               </span>
             </>
           )}
@@ -365,6 +393,7 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
             onSelect={() => handleSelectSession(session.id)}
             onDelete={() => handleDeleteSession(session.id)}
             onRename={(name) => handleRenameSession(session.id, name)}
+            onOpenInNewWindow={() => openSessionInWindow(session.id)}
           />
         ))}
 

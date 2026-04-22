@@ -2,7 +2,7 @@
 // Output: 三栏三行布局框架
 // Pos: 应用根组件，承载所有页面和面板
 
-import { useState, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useState, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/cn';
 import { PdSidebar } from './components/layout/PdSidebar';
@@ -18,6 +18,7 @@ import { useChatStore, useSessionStore, useTabStore } from './stores';
 import { useToastStore } from './stores/toastStore';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useThemeEffect } from './hooks/useThemeEffect';
+import { openNewWindow } from './ipc/bridge';
 
 // --- Part C: Lazy-load non-first-screen components for faster cold start ---
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -44,13 +45,22 @@ export function App() {
     return id ? s.sessions.get(id) ?? null : null;
   });
 
+  // --- Multi-window: read ?session=ID from URL on mount ---
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session');
+    if (sessionId) {
+      setChatActiveSession(sessionId);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // --- Session / Tab actions for shortcuts ---
   const createSession = useSessionStore((s) => s.createSession);
   const sessionList = useSessionStore((s) => s.sessions);
   const addTab = useTabStore((s) => s.addTab);
   const setChatActiveSession = useChatStore((s) => s.setActiveSession);
 
-  // --- Global keyboard shortcuts (Cmd+B / Cmd+\ / Cmd+; / Cmd+N / Cmd+,) ---
+  // --- Global keyboard shortcuts (Cmd+B / Cmd+\ / Cmd+; / Cmd+N / Cmd+Shift+N / Cmd+,) ---
   useGlobalShortcuts({
     toggleSidebar: useCallback(() => setSidebarExpanded((p) => !p), []),
     toggleInspector: useCallback(() => setInspectorOpen((p) => !p), []),
@@ -60,6 +70,9 @@ export function App() {
       addTab(session.id, session.name);
       setChatActiveSession(session.id);
     }, [createSession, addTab, setChatActiveSession]),
+    newWindow: useCallback(() => {
+      openNewWindow();
+    }, []),
     openSettings: useCallback(() => setPage('settings'), []),
     toggleCommandPalette: useCallback(() => setCommandPaletteOpen((p) => !p), []),
     toggleSessionSwitcher: useCallback(() => setSessionSwitcherOpen((p) => !p), []),
@@ -76,6 +89,16 @@ export function App() {
         const session = createSession();
         addTab(session.id, session.name);
         setChatActiveSession(session.id);
+        setCommandPaletteOpen(false);
+      },
+    },
+    {
+      id: 'new-window',
+      label: 'New Window',
+      group: 'Window',
+      shortcut: '⌘⇧N',
+      action: () => {
+        openNewWindow();
         setCommandPaletteOpen(false);
       },
     },

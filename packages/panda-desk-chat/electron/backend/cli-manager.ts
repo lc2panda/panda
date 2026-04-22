@@ -1,5 +1,5 @@
-// Input: IPC handler 调用 (sendMessage/createSession/respondPermission 等), notificationManager
-// Output: CLI 子进程管理、NDJSON 解析、事件路由到 BrowserWindow, 系统通知 + dock badge
+// Input: IPC handler 调用 (sendMessage/createSession/respondPermission 等), WindowManager, notificationManager
+// Output: CLI 子进程管理、NDJSON 解析、事件路由到多 BrowserWindow, 系统通知 + dock badge
 // Pos: electron/backend — CLI 进程生命周期管理核心
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -12,6 +12,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { app, BrowserWindow } from 'electron';
 import { notificationManager } from '../notification';
+import { windowManager } from '../window-manager';
 import type {
   SDKMessage, SDKStreamEvent, SDKControlRequest, SDKResultMessage,
   SDKToolResultMessage, CLIInput, UserInput, ControlResponse,
@@ -502,18 +503,14 @@ export class CLISession extends EventEmitter {
 
 export class CLIManager {
   private sessions = new Map<string, CLISession>();
-  private mainWindow: BrowserWindow | null = null;
 
   // In-memory config (set via IPC, consumed on session start)
   private currentModel: string | undefined;
   private currentPermissionMode: string | undefined;
 
-  // ── Window reference ─────────────────────────────────────────────────
+  // ── Window registration (for focus-based unread clearing) ────────────
 
-  setMainWindow(win: BrowserWindow): void {
-    this.mainWindow = win;
-
-    // Clear unread badge when window regains focus
+  registerWindow(win: BrowserWindow): void {
     win.on('focus', () => {
       notificationManager.clearUnread();
     });
@@ -616,9 +613,9 @@ export class CLIManager {
 
   private wireSessionEvents(session: CLISession): void {
     const send = (channel: string, data: unknown) => {
-      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        this.mainWindow.webContents.send(channel, data);
-      }
+      // Route session-specific events to the window showing this session,
+      // falling back to broadcast if no specific window is mapped
+      windowManager.sendToSession(session.id, channel, data);
     };
 
     session.on('stream:start', (data) => {
@@ -632,8 +629,8 @@ export class CLIManager {
     session.on('stream:end', (data) => {
       send(MR.STREAM_END, data);
 
-      // Notify when assistant message completes and window is unfocused
-      if (this.mainWindow && !this.mainWindow.isDestroyed() && !this.mainWindow.isFocused()) {
+      // Notify when assistant message completes and no window is focused
+      if (!windowManager.isAnyWindowFocused()) {
         notificationManager.notify('Panda Code', 'New message from assistant');
         notificationManager.incrementUnread();
       }
@@ -668,9 +665,7 @@ export class CLIManager {
   // ── Broadcast session list to renderer ───────────────────────────────
 
   private broadcastSessionList(): void {
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.webContents.send(MR.SESSION_UPDATED, this.listSessions());
-    }
+    windowManager.broadcast(MR.SESSION_UPDATED, this.listSessions());
   }
 
   // ── Cleanup all sessions (app quit) ──────────────────────────────────

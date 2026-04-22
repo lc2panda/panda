@@ -162,6 +162,10 @@ export interface PandaChatAPI {
     install(): Promise<void>;
     onStatus(callback: (status: UpdateStatus) => void): Unsubscribe;
   };
+  window: {
+    newWindow(): Promise<{ windowId: number }>;
+    openSessionInWindow(sessionId: string): Promise<{ windowId: number; reused: boolean }>;
+  };
 }
 
 // ─── Global augmentation for window.pandaAPI ────────────────────────────────

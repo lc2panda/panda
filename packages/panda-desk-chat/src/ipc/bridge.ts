@@ -377,3 +377,17 @@ export function onUpdateStatus(callback: (status: UpdateStatus) => void): Unsubs
   if (IS_DEV) return () => {};
   return getPandaAPI().update.onStatus(callback);
 }
+
+// ─── Window management ──────────────────────────────────────────────────────
+
+/** Open a new independent window. */
+export async function openNewWindow(): Promise<{ windowId: number } | void> {
+  if (IS_DEV) return;
+  return getPandaAPI().window.newWindow();
+}
+
+/** Open a session in a new window (or focus existing window showing it). */
+export async function openSessionInWindow(sessionId: string): Promise<{ windowId: number; reused: boolean } | void> {
+  if (IS_DEV) return;
+  return getPandaAPI().window.openSessionInWindow(sessionId);
+}

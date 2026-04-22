@@ -27,6 +27,7 @@ export default {
   'sidebar.last7Days': '最近7天',
   'sidebar.last30Days': '最近30天',
   'sidebar.older': '更早',
+  'sidebar.openInNewWindow': '在新窗口中打开',
 
   // TabBar
   'tabbar.newTab': '新标签页',
@@ -151,6 +152,9 @@ export default {
   // Session switcher
   'sessionSwitcher.placeholder': '搜索会话...',
   'sessionSwitcher.noResults': '无匹配会话',
+
+  // Menu
+  'menu.newWindow': '新窗口',
 
   // Common
   'common.confirm': '确认',

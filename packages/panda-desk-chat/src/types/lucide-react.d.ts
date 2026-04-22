@@ -17,7 +17,7 @@ declare module 'lucide-react' {
 
   type LucideIcon = ComponentType<LucideProps>;
 
-  // --- 项目中实际使用的图标 (27 个) ---
+  // --- 项目中实际使用的图标 (28 个) ---
 
   // PdCheckbox.tsx
   export const Check: LucideIcon;
@@ -53,6 +53,7 @@ declare module 'lucide-react' {
   export const PanelLeftOpen: LucideIcon;
   export const Plus: LucideIcon;
   export const Trash2: LucideIcon;
+  export const ArrowUpRight: LucideIcon;
 
   // PdTabBar.tsx
   export const ChevronLeft: LucideIcon;

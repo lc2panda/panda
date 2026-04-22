@@ -1,5 +1,5 @@
 // Input: Electron contextBridge + ipcRenderer APIs
-// Output: window.pandaAPI — type-safe IPC client matching PandaChatAPI interface (25 channels + update namespace)
+// Output: window.pandaAPI — type-safe IPC client matching PandaChatAPI interface (27 channels + update + window namespaces)
 // Pos: Electron preload script — sole bridge between renderer and main process
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -51,6 +51,9 @@ const CH = {
   UPDATE_DOWNLOAD: 'panda:update:download',
   UPDATE_INSTALL:  'panda:update:install',
   UPDATE_STATUS:   'panda:update:status',
+  // Window management
+  WINDOW_NEW:           'panda:window:new',
+  WINDOW_OPEN_SESSION:  'panda:window:open-session',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -141,5 +144,10 @@ contextBridge.exposeInMainWorld('pandaAPI', {
         ipcRenderer.removeListener(CH.UPDATE_STATUS, handler);
       };
     },
+  },
+  window: {
+    newWindow: () => ipcRenderer.invoke(CH.WINDOW_NEW),
+    openSessionInWindow: (sessionId: string) =>
+      ipcRenderer.invoke(CH.WINDOW_OPEN_SESSION, { sessionId }),
   },
 });

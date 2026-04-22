@@ -27,6 +27,7 @@ export default {
   'sidebar.last7Days': 'Last 7 Days',
   'sidebar.last30Days': 'Last 30 Days',
   'sidebar.older': 'Older',
+  'sidebar.openInNewWindow': 'Open in New Window',
 
   // TabBar
   'tabbar.newTab': 'New Tab',
@@ -151,6 +152,9 @@ export default {
   // Session switcher
   'sessionSwitcher.placeholder': 'Search sessions...',
   'sessionSwitcher.noResults': 'No matching sessions',
+
+  // Menu
+  'menu.newWindow': 'New Window',
 
   // Common
   'common.confirm': 'Confirm',
