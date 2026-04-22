@@ -39,6 +39,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
   const elapsedSeconds = activeSession?.elapsedSeconds ?? 0;
   const tokenUsage = activeSession?.tokenUsage ?? null;
   const pendingPermission = activeSession?.pendingPermission ?? null;
+  const connectionState = activeSession?.connectionState ?? 'disconnected';
 
   const hasActiveSession = !!sessions.find((s: any) => s.id === activeId);
 
@@ -71,6 +72,18 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
     >
       {hasActiveSession ? (
         <>
+          {connectionState === 'error' && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-[var(--pd-color-error-subtle)] border-b border-[var(--pd-color-error)] text-[var(--pd-text-sm)] text-[var(--pd-color-error)]">
+              <span>⚠️</span>
+              <span>{t('chat.connectionError') || 'Connection lost. Retrying...'}</span>
+            </div>
+          )}
+          {connectionState === 'disconnected' && hasActiveSession && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-[var(--pd-color-warning-subtle)] border-b border-[var(--pd-color-warning)] text-[var(--pd-text-sm)] text-[var(--pd-color-fg-muted)]">
+              <span>🔌</span>
+              <span>{t('chat.disconnected') || 'Disconnected'}</span>
+            </div>
+          )}
           <PdMessageList
             messages={messages}
             isStreaming={isStreaming}

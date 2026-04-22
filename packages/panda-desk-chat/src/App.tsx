@@ -26,6 +26,10 @@ export function App() {
 
   const theme = useSettingsStore((s) => s.theme);
   const activeSessionId = useChatStore((s) => s.activeSessionId);
+  const activeSession = useChatStore((s) => {
+    const id = s.activeSessionId;
+    return id ? s.sessions.get(id) ?? null : null;
+  });
 
   // --- Global keyboard shortcuts (Cmd+B / Cmd+\ / Cmd+; / Cmd+N / Cmd+,) ---
   useGlobalShortcuts({
@@ -80,7 +84,15 @@ export function App() {
         </div>
 
         {/* StatusBar - 32px */}
-        <PdStatusBar />
+        <PdStatusBar
+          model={activeSession?.statusVerb || undefined}
+          tokenCount={
+            activeSession && (activeSession.tokenUsage.input > 0 || activeSession.tokenUsage.output > 0)
+              ? activeSession.tokenUsage
+              : undefined
+          }
+          connectionState={activeSession?.connectionState ?? 'disconnected'}
+        />
       </div>
 
       {/* -- Right: Inspector (320px, toggleable) -- */}

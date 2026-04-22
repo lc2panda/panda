@@ -20,7 +20,7 @@ const Circle = _Circle as IconFC;
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-export type ConnectionState = 'connected' | 'disconnected' | 'connecting';
+export type ConnectionState = 'connected' | 'disconnected' | 'connecting' | 'error';
 
 export interface PdStatusBarProps {
   model?: string;
@@ -43,6 +43,7 @@ const connectionMeta: Record<ConnectionState, { color: string; label: string }> 
   connected:    { color: 'var(--pd-color-success)',  label: 'Connected' },
   disconnected: { color: 'var(--pd-color-error)',    label: 'Disconnected' },
   connecting:   { color: 'var(--pd-color-warning)',  label: 'Connecting...' },
+  error:        { color: 'var(--pd-color-error)',    label: 'Error' },
 };
 
 // ---------------------------------------------------------------------------
@@ -99,7 +100,7 @@ export function PdStatusBar({
             fill={conn.color}
             stroke="none"
             className={cn(
-              connectionState === 'connecting' && 'animate-pulse',
+              (connectionState === 'connecting' || connectionState === 'error') && 'animate-pulse',
             )}
           />
           <span>{conn.label}</span>
