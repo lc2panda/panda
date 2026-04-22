@@ -377,13 +377,17 @@ export class CLISession extends EventEmitter {
 
     const userInput: UserInput = {
       type: 'user',
-      content: [
-        { type: 'text', text: content },
-        ...(attachments || []).map(a => ({
-          type: 'image' as const,
-          source: { type: 'base64' as const, media_type: a.mediaType, data: a.data },
-        })),
-      ],
+      message: {
+        role: 'user',
+        content: [
+          { type: 'text', text: content },
+          ...(attachments || []).map(a => ({
+            type: 'image' as const,
+            source: { type: 'base64' as const, media_type: a.mediaType, data: a.data },
+          })),
+        ],
+      },
+      parent_tool_use_id: null,
     };
 
     const line = JSON.stringify(userInput) + '\n';

@@ -87,13 +87,29 @@ export type SDKMessage =
   | SDKControlRequest | SDKToolResultMessage | SDKSystemMessage
   | SDKMessageBase;
 
-// === CLI stdin 输入类型 ===
+// === CLI stdin 输入类型 (SDKUserMessage 协议) ===
+
+/** Content block inside an API user message */
+export type UserContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
+
+/** Inner API-level user message (matches Anthropic APIUserMessage) */
+export interface APIUserMessage {
+  role: 'user';
+  content: UserContentBlock[];
+}
+
+/**
+ * SDKUserMessage — the envelope the CLI stream-json parser expects on stdin.
+ *
+ * CLI reads `message.message.role` (structuredIO.ts:457), so the nested
+ * `message` field with `role: "user"` is mandatory.
+ */
 export interface UserInput {
   type: 'user';
-  content: Array<
-    | { type: 'text'; text: string }
-    | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
-  >;
+  message: APIUserMessage;
+  parent_tool_use_id: string | null;
 }
 
 export interface ControlResponse {
