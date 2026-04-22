@@ -27,6 +27,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
     s.activeSessionId ? s.sessions.get(s.activeSessionId) ?? null : null,
   );
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const cancelStream = useChatStore((s) => s.cancelStream);
   const respondPermission = useChatStore((s) => s.respondPermission);
 
   // Derived per-session state
@@ -94,7 +95,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
             />
           )}
           <PdComposer
+            sessionId={activeId!}
             onSend={handleSend}
+            onStop={() => activeId && cancelStream(activeId)}
+            isStreaming={isStreaming}
             placeholder={t('composer.placeholder')}
             disabled={isStreaming}
           />
@@ -102,8 +106,6 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
       ) : (
         <PdHeroComposer
           onSend={handleNewSession}
-          title={t('hero.title')}
-          subtitle={t('hero.subtitle')}
         />
       )}
     </div>

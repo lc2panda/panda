@@ -11,7 +11,7 @@ import { PdInspector } from './components/layout/PdInspector';
 import { ChatPage } from './pages/ChatPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PdSideChat } from './components/chat';
-import { PdToast } from './components/containers/PdToast';
+import { PdToastContainer } from './components/containers/PdToast';
 import { useSettingsStore, useChatStore } from './stores';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 
@@ -73,7 +73,7 @@ export function App() {
         {/* Content - flex */}
         <div className="relative flex-1 overflow-hidden">
           {page === 'settings' ? (
-            <SettingsPage onBack={() => setPage('chat')} />
+            <SettingsPage onClose={() => setPage('chat')} />
           ) : (
             <ChatPage />
           )}
@@ -99,7 +99,7 @@ export function App() {
           onClose={() => setSideChatOpen(false)}
         />
       )}
-      <PdToast toasts={[]} onDismiss={() => {}} />
+      <PdToastContainer toasts={[]} onDismiss={() => {}} />
     </div>
   );
 }
