@@ -338,3 +338,15 @@ export async function setPermissionMode(
   if (IS_DEV) return getDevRelay().setPermissionMode(mode);
   return getPandaAPI().config.setPermissionMode({ mode });
 }
+
+/** Enable or disable system notifications. */
+export async function setNotificationEnabled(enabled: boolean): Promise<void> {
+  if (IS_DEV) return;
+  return getPandaAPI().notification.setEnabled(enabled);
+}
+
+/** Clear unread notification badge. */
+export async function clearNotifications(): Promise<void> {
+  if (IS_DEV) return;
+  return getPandaAPI().notification.clear();
+}

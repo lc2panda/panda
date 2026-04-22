@@ -1,5 +1,5 @@
-// Input: ipcMain handle registrations + CLI backend manager (W7-2)
-// Output: IPC request handlers for all 17 channels — connected to CLIManager + nativeTheme
+// Input: ipcMain handle registrations + CLI backend manager (W7-2), notificationManager
+// Output: IPC request handlers for all 19 channels — connected to CLIManager + nativeTheme + notifications
 // Pos: Main process IPC layer — routes renderer requests to CLI backend
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -8,6 +8,7 @@ import { ipcMain, BrowserWindow, clipboard, nativeImage, nativeTheme } from 'ele
 import { readdir, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { cliManager } from '../backend/cli-manager';
+import { notificationManager } from '../notification';
 
 // ---------------------------------------------------------------------------
 // IPC channel constants (must match preload/chat.ts)
@@ -32,6 +33,9 @@ const CH = {
   PERMISSION_MODE_SET: 'panda:chat:permission-mode:set',
   // Theme
   THEME_GET_SYSTEM:    'panda:theme:get-system',
+  // Notifications
+  NOTIFICATION_SET_ENABLED: 'panda:notification:set-enabled',
+  NOTIFICATION_CLEAR:       'panda:notification:clear',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -203,7 +207,17 @@ export function registerIpcHandlers(): void {
     return nativeTheme.shouldUseDarkColors;
   });
 
-  console.log('[IPC] Registered 17 invoke handlers (CLI backend connected)');
+  // ── Notifications ──────────────────────────────────────────────────
+
+  ipcMain.handle(CH.NOTIFICATION_SET_ENABLED, async (_event, enabled: boolean) => {
+    notificationManager.setEnabled(enabled);
+  });
+
+  ipcMain.handle(CH.NOTIFICATION_CLEAR, async () => {
+    notificationManager.clearUnread();
+  });
+
+  console.log('[IPC] Registered 19 invoke handlers (CLI backend connected)');
 }
 
 // ---------------------------------------------------------------------------

@@ -43,6 +43,9 @@ const CH = {
   // Theme
   THEME_CHANGED:       'panda:theme:changed',
   THEME_GET_SYSTEM:    'panda:theme:get-system',
+  // Notifications
+  NOTIFICATION_SET_ENABLED: 'panda:notification:set-enabled',
+  NOTIFICATION_CLEAR:       'panda:notification:clear',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -103,6 +106,10 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     getModels: (payload: unknown) => ipcRenderer.invoke(CH.MODEL_LIST, payload),
     setModel: (payload: unknown) => ipcRenderer.invoke(CH.MODEL_SET, payload),
     setPermissionMode: (payload: unknown) => ipcRenderer.invoke(CH.PERMISSION_MODE_SET, payload),
+  },
+  notification: {
+    setEnabled: (enabled: boolean) => ipcRenderer.invoke(CH.NOTIFICATION_SET_ENABLED, enabled),
+    clear: () => ipcRenderer.invoke(CH.NOTIFICATION_CLEAR),
   },
   theme: {
     getSystemTheme: () => ipcRenderer.invoke(CH.THEME_GET_SYSTEM),

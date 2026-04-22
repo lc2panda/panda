@@ -1,11 +1,12 @@
-// Input: settingsStore (workingDirectory, setWorkingDirectory, loadSettings), useI18n (t, locale, changeLocale)
-// Output: General settings panel — language switcher, working directory picker, reset button
+// Input: settingsStore (workingDirectory, setWorkingDirectory, loadSettings, notificationsEnabled, setNotificationsEnabled), useI18n (t, locale, changeLocale)
+// Output: General settings panel — language switcher, working directory picker, notifications toggle, reset button
 // Pos: settings/GeneralTab — first tab in SettingsPage
 
 import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { PdButton } from '../../components/atoms/PdButton';
 import { PdSelect } from '../../components/atoms/PdSelect';
+import { PdSwitch } from '../../components/atoms/PdSwitch';
 import { PdDirectoryPicker } from '../../components/special/PdDirectoryPicker';
 import { useI18n } from '../../hooks/useI18n';
 import type { Locale } from '../../i18n';
@@ -14,11 +15,13 @@ import { SettingRow } from './SettingRow';
 
 export const GeneralTab: React.FC = () => {
   const { t, locale, changeLocale } = useI18n();
-  const { loadSettings, workingDirectory, setWorkingDirectory } = useSettingsStore(
+  const { loadSettings, workingDirectory, setWorkingDirectory, notificationsEnabled, setNotificationsEnabled } = useSettingsStore(
     useShallow((s) => ({
       loadSettings: s.loadSettings,
       workingDirectory: s.workingDirectory,
       setWorkingDirectory: s.setWorkingDirectory,
+      notificationsEnabled: s.notificationsEnabled,
+      setNotificationsEnabled: s.setNotificationsEnabled,
     })),
   );
   return (
@@ -37,6 +40,9 @@ export const GeneralTab: React.FC = () => {
           { value: 'ja', label: '日本語' },
           { value: 'ko', label: '한국어' },
         ]} />
+      </SettingRow>
+      <SettingRow label={t('settings.notifications')} description={t('settings.notificationsDesc')}>
+        <PdSwitch checked={notificationsEnabled} onChange={setNotificationsEnabled} />
       </SettingRow>
       <SettingRow label={t('settings.reset')} description={t('settings.resetDesc')}>
         <PdButton variant="danger" size="sm" onClick={loadSettings}>{t('settings.resetBtn')}</PdButton>

@@ -1,6 +1,6 @@
-// Input: User preference changes (theme, locale, model, font size, layout toggles)
+// Input: User preference changes (theme, locale, model, font size, layout toggles, notifications)
 // Output: Persistent settings state for the entire application
-// Pos: State layer — consumed by theme provider, i18n, model selector, layout components
+// Pos: State layer — consumed by theme provider, i18n, model selector, layout components, notification manager
 
 import { create } from 'zustand';
 import { storage } from '../lib/storage';
@@ -27,6 +27,7 @@ interface PersistedSettings {
   inspectorVisible: boolean;
   effortLevel: EffortLevel;
   workingDirectory: string;
+  notificationsEnabled: boolean;
 }
 
 export interface SettingsStore extends PersistedSettings {
@@ -38,6 +39,7 @@ export interface SettingsStore extends PersistedSettings {
   setFontSize: (size: number) => void;
   setEffortLevel: (level: EffortLevel) => void;
   setWorkingDirectory: (dir: string) => void;
+  setNotificationsEnabled: (enabled: boolean) => void;
   toggleSidebar: () => void;
   toggleInspector: () => void;
   loadSettings: () => void;
@@ -58,6 +60,7 @@ const defaults: PersistedSettings = {
   inspectorVisible: false,
   effortLevel: 'auto',
   workingDirectory: '',
+  notificationsEnabled: true,
 };
 
 function pickPersisted(state: PersistedSettings): PersistedSettings {
@@ -71,6 +74,7 @@ function pickPersisted(state: PersistedSettings): PersistedSettings {
     inspectorVisible: state.inspectorVisible,
     effortLevel: state.effortLevel,
     workingDirectory: state.workingDirectory,
+    notificationsEnabled: state.notificationsEnabled,
   };
 }
 
@@ -112,6 +116,13 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
     set({ workingDirectory });
     get().saveSettings();
   },
+  setNotificationsEnabled: (enabled) => {
+    set({ notificationsEnabled: enabled });
+    get().saveSettings();
+    bridge.setNotificationEnabled(enabled).catch((err: unknown) => {
+      console.error('[settingsStore] setNotificationEnabled failed:', err);
+    });
+  },
   toggleSidebar: () => {
     set((state) => ({ sidebarExpanded: !state.sidebarExpanded }));
     get().saveSettings();
@@ -147,9 +158,12 @@ export function setupSettingsBridge(): void {
 
   // In production, push initial permission mode to backend
   if (!bridge.isDevMode()) {
-    const { permissionMode } = useSettingsStore.getState();
+    const { permissionMode, notificationsEnabled } = useSettingsStore.getState();
     bridge.setPermissionMode(permissionMode).catch((err: unknown) => {
       console.error('[settingsStore] initial setPermissionMode failed:', err);
+    });
+    bridge.setNotificationEnabled(notificationsEnabled).catch((err: unknown) => {
+      console.error('[settingsStore] initial setNotificationEnabled failed:', err);
     });
   }
 }

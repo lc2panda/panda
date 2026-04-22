@@ -1,5 +1,5 @@
-// Input: IPC handler 调用 (sendMessage/createSession/respondPermission 等)
-// Output: CLI 子进程管理、NDJSON 解析、事件路由到 BrowserWindow
+// Input: IPC handler 调用 (sendMessage/createSession/respondPermission 等), notificationManager
+// Output: CLI 子进程管理、NDJSON 解析、事件路由到 BrowserWindow, 系统通知 + dock badge
 // Pos: electron/backend — CLI 进程生命周期管理核心
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { app, BrowserWindow } from 'electron';
+import { notificationManager } from '../notification';
 import type {
   SDKMessage, SDKStreamEvent, SDKControlRequest, SDKResultMessage,
   SDKToolResultMessage, CLIInput, UserInput, ControlResponse,
@@ -511,6 +512,11 @@ export class CLIManager {
 
   setMainWindow(win: BrowserWindow): void {
     this.mainWindow = win;
+
+    // Clear unread badge when window regains focus
+    win.on('focus', () => {
+      notificationManager.clearUnread();
+    });
   }
 
   // ── Config setters ───────────────────────────────────────────────────
@@ -625,6 +631,12 @@ export class CLIManager {
 
     session.on('stream:end', (data) => {
       send(MR.STREAM_END, data);
+
+      // Notify when assistant message completes and window is unfocused
+      if (this.mainWindow && !this.mainWindow.isDestroyed() && !this.mainWindow.isFocused()) {
+        notificationManager.notify('Panda Code', 'New message from assistant');
+        notificationManager.incrementUnread();
+      }
     });
 
     session.on('tool:use:start', (data) => {
