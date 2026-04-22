@@ -238,9 +238,11 @@ function initPandaTray(ctx) {
         if (iconPath) {
             image = electron_1.nativeImage.createFromPath(iconPath);
             // [W25-P0-MAC-BLACKBAR-TRAY 20260420] Mac menu bar 中间黑色大块真正根因：
-            //   tray-{dark,light}.png 是 256×256 panda 剪影；setTemplateImage(true) 后 macOS
-            //   把所有非透明像素渲染成前景色 → menu bar 上显示巨大黑色圆形 panda。
-            //   修复：Mac 也 resize 到 22×22（Mac 标准 tray 尺寸），与 Win/Linux 一致。
+            //   tray-{dark,light}.png 是 256×256 panda 剪影；setTemplateImage(true) 后 macOS 把所有
+            //   非透明像素渲染成前景色（menu bar 黑）→ menu bar 上显示一个巨大的黑色圆形 panda 脸。
+            //   Mac 标准 tray icon 规格是 22×22 pt（@2x Retina 自动处理为 44×44）；
+            //   之前仅 !isMac 路径 resize 到 22×22，Mac 保持 256×256 → 异常大黑块。
+            //   修复：Mac 也 resize 到 22×22，与 Win/Linux 一致；setTemplateImage 保留（符合 Mac 规范）。
             if (!image.isEmpty()) {
                 try {
                     image = image.resize({ width: 22, height: 22 });

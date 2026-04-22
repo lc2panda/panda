@@ -7,8 +7,8 @@
   "type": "commonjs",
   "main": "src/main.js",
   "scripts": {
-    "start": "node launch.cjs",
-    "build": "tsc -p tsconfig.json",
+    "start": "tsc -p tsconfig.build.json && node launch.cjs",
+    "build": "tsc -p tsconfig.build.json",
     "build:dist": "node scripts/build-dist.cjs",
     "build:electron": "electron-builder",
     "test": "bun test"

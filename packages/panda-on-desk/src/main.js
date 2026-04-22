@@ -76,8 +76,6 @@ exports.__test = void 0;
 const electron_1 = require("electron");
 const path = __importStar(require("node:path"));
 const fs = __importStar(require("node:fs"));
-// ── 已 fork 的几何模块 ─────────────────────────────────────────────────────────
-const hitGeometry = __importStar(require("./geometry/hit-geometry"));
 const work_area_1 = require("./geometry/work-area");
 // W22-T1：多屏选择 — 纯函数 helper，便于 multi-display.test.ts mock displays 列表
 const display_select_1 = require("./geometry/display-select");
@@ -91,6 +89,7 @@ const tick_1 = __importDefault(require("./util/tick"));
 const loginItemHelpers = __importStar(require("./platform/login-item"));
 // W8-T3：错误监控 + 用户可见诊断日志（替换部分 silent try/catch + console.warn 吞错）
 const logger_1 = require("./util/logger");
+const chat_handler_1 = require("./ipc/chat-handler");
 // W19-T3：crash 自动恢复 — 退出码语义
 //   · 0   = 正常退出（before-quit 走完）
 //   · 1   = uncaughtException 触发 process.exit(1)
@@ -424,7 +423,7 @@ function applyPetWindowBounds(b) {
     }
 }
 function getHitRectScreen(petBounds) {
-    // [W24-P0-MAC-BLACKBAR 20260420] 顶部黑框真正根因（W21 nuclear 后第 4 次复发）：
+    // [W24-P0-MAC-BLACKBAR 20260420] 顶部黑框真正根因（v2.25.30 W21 nuclear 后第 4 次复发）：
     //   hitGeometry.getHitRectScreen 真实签名 6 参（theme/bounds/state/file/hitBox/options）；
     //   此处以 2 参 (petBounds, activeTheme) 调用 → 参数错位：theme=petBounds、bounds=activeTheme。
     //   内部 fallbackHitRect(bounds) 读 activeTheme.x/y/width/height（都 undefined）
@@ -434,6 +433,7 @@ function getHitRectScreen(petBounds) {
     //   → 用户看到"屏幕顶部大黑框"（实际左上 240×240 + menu bar 被遮挡）。
     //
     //   修复：彻底绕过 hitGeometry（2 参调用本就是错的），直接用 petBounds + 20px pad。
+    //   petBounds 由 getPetWindowBounds() 保证非空（_petVirtualBounds || win.getBounds() || 0s）。
     const pad = 20;
     const bx = Number.isFinite(petBounds?.x) ? petBounds.x : 100;
     const by = Number.isFinite(petBounds?.y) ? petBounds.y : 100;
@@ -1722,6 +1722,8 @@ else {
         catch (err) {
             console.warn('[panda-on-desk] W22-T1 enumerate displays failed:', err?.message);
         }
+        // M0-9：chat IPC stub handler（必须在 createChatWindow 之前注册）
+        (0, chat_handler_1.registerChatIpcHandlers)();
         createWindow();
         registerPersistentShortcutsFromSettings();
         // ── 删除：上游 codexLogMonitor / geminiLogMonitor 启动段（panda 单 provider 不需要） ──
