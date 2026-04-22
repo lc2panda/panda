@@ -1,7 +1,7 @@
 # Panda Desk Chat — UI 进度记录
 
-> 最后更新: 2026-04-22 09:00 +08:00
-> 当前阶段: W8 Streaming Chat Flow
+> 最后更新: 2026-04-22 09:30 +08:00
+> 当前阶段: W9 Type Safety & Dev Experience Polish
 
 ## 已完成 Wave
 
@@ -17,6 +17,9 @@
 | W6-2 | IPC bridge 连通 stores (6文件, 164+行) | b99e82b | ✅ |
 | W6-3 | DevMock 完整流程验证 (24/24 channel) | abf9d25 | ✅ |
 | W7 | Electron 骨架 (main/preload/ipc/build) | d49e8ab | ✅ |
+| W8-1 | chatStore 流式事件处理 — W6 已实现 | (W6) | ✅ |
+| W8-2 | ChatPage 连线 (PdMessageList+Streaming+Permission) | 513a62f | ✅ |
+| W8-3 | 消息渲染 (Markdown+thinking fold+streaming cursor) | (W4/W5) | ✅ |
 
 ## W7 Electron 骨架 ✅
 
@@ -39,28 +42,44 @@
 - ⏳ dev:electron 冒烟测试 — 需 GUI 环境
 - ⏳ E2E 24 channel 联通 — 需 GUI 环境
 
-## W8 — Streaming Chat Flow（CLI 事件 → 聊天渲染）
+## W8 — Streaming Chat Flow ✅
 
-目标：让 Electron 模式下的聊天功能端到端可用
+W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
 
-### W8-1: chatStore 流式事件处理
-- [ ] 在 chatStore 中添加 stream event handlers
-- [ ] stream:start → 创建新的 assistant message placeholder
-- [ ] stream:delta → 追加文本到当前 message（支持 text/thinking/tool_input 三种 delta type）
-- [ ] stream:end → 标记 message 完成，更新 token usage
-- [ ] bridge.ts 中注册对应的 onStreamStart/onStreamDelta/onStreamEnd 监听
+### W8-1: chatStore 流式事件处理 ✅ (W6 已实现)
+- [x] chatStore 中 stream event handlers（stream:start/delta/end）— W6 store 完整实现
+- [x] bridge.ts 中 onStreamStart/onStreamDelta/onStreamEnd 监听 — W6-2 IPC bridge 连通
 
-### W8-2: Tool 执行 UI 流程
-- [ ] tool:use:start → 在聊天中显示工具执行开始（工具名 + 输入参数折叠显示）
-- [ ] tool:use:end → 更新工具执行结果（输出 + 是否出错）
-- [ ] tool:permission:request → 弹出权限确认对话框
-- [ ] 用户批准/拒绝 → bridge.respondPermission() → CLI 继续/中止
+### W8-2: ChatPage 连线修复 ✅ `513a62f`
+- [x] PdMessageList 接入 chatStore 消息流
+- [x] PdStreamingIndicator 流式状态指示
+- [x] PdPermissionDialog 权限确认对话框
+- [x] tool:use:start/end 工具执行 UI 流程
+- [x] permission:request → bridge.respondPermission() 用户批准/拒绝
 
-### W8-3: 消息渲染增强
-- [ ] Markdown 渲染（代码块语法高亮）
-- [ ] Thinking 折叠面板（可展开查看推理过程）
-- [ ] 流式打字效果（光标闪烁）
-- [ ] 错误消息样式
+### W8-3: 消息渲染增强 ✅ (W4/W5 已实现)
+- [x] PdMarkdownRenderer — Markdown 渲染 + 代码块语法高亮
+- [x] PdMessageBubble — Thinking 折叠面板
+- [x] 流式打字效果（streaming cursor）
+
+## W9 — Type Safety & Dev Experience Polish
+
+### W9-1: 修复既有 tsc 错误
+- [ ] ChatPage.tsx 相关 Props 类型对齐
+- [ ] App.tsx onBack/routing props
+- [ ] lucide-react JSX 兼容性（可能需要 @types 版本调整）
+- [ ] tauri 模块声明移除/条件化
+
+### W9-2: DevMock 流式模拟
+- [ ] dev-mock.ts 中 sendMessage 触发模拟流式响应
+- [ ] 模拟 stream:start → 多个 stream:delta → stream:end 时序
+- [ ] 支持 thinking delta + text delta 混合流
+- [ ] 模拟 tool:use:start/end 和 permission:request 场景
+
+### W9-3: 错误处理 + 边界 UI
+- [ ] CLI 进程崩溃/断开的错误提示
+- [ ] 网络超时/API 错误的用户反馈
+- [ ] 空会话/无消息状态的 empty state
 
 ## 架构备忘
 
