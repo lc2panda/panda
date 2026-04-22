@@ -18,6 +18,13 @@ import type {
 } from './types';
 
 // ---------------------------------------------------------------------------
+// Respawn configuration
+// ---------------------------------------------------------------------------
+
+const RESPAWN_MAX_RETRIES = 5;
+const RESPAWN_BASE_DELAY_MS = 1000; // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+
+// ---------------------------------------------------------------------------
 // Channel constants for M→R events (must match preload/chat.ts)
 // ---------------------------------------------------------------------------
 
@@ -52,6 +59,14 @@ export class CLISession extends EventEmitter {
   // Tool input accumulation (for streaming tool_use via content_block_delta)
   private currentToolName: string | null = null;
   private currentToolInput: string = '';
+
+  // Auto-respawn state
+  private respawnCount = 0;
+  private respawnTimer: ReturnType<typeof setTimeout> | null = null;
+  private intentionalStop = false;
+
+  // Options used to start the session (needed for respawn)
+  private startOptions: { model?: string; permissionMode?: string } | undefined;
 
   constructor(id: string, cwd: string, name?: string) {
     super();
@@ -90,6 +105,10 @@ export class CLISession extends EventEmitter {
       console.warn(`[CLISession:${this.id}] Already started, ignoring duplicate start()`);
       return;
     }
+
+    // Persist options for respawn; reset intentional-stop flag
+    if (options) this.startOptions = options;
+    this.intentionalStop = false;
 
     this.state = 'starting';
     const cliPath = this.resolveCLIPath();
@@ -141,17 +160,25 @@ export class CLISession extends EventEmitter {
     // ── Process exit ─────────────────────────────────────────────────
     this.process.on('exit', (code, signal) => {
       console.log(`[CLISession:${this.id}] Exited: code=${code} signal=${signal}`);
-      this.state = 'stopped';
-      this.emit('exit', { sessionId: this.id, code, signal });
       this.cleanup();
+      if (!this.intentionalStop) {
+        this.scheduleRespawn('exit', code, signal);
+      } else {
+        this.state = 'stopped';
+        this.emit('exit', { sessionId: this.id, code, signal });
+      }
     });
 
     // ── Process error (e.g. ENOENT) ──────────────────────────────────
     this.process.on('error', (err) => {
       console.error(`[CLISession:${this.id}] Process error:`, err);
-      this.state = 'error';
-      this.emit('error', { sessionId: this.id, error: err.message });
       this.cleanup();
+      if (!this.intentionalStop) {
+        this.scheduleRespawn('error', null, null, err.message);
+      } else {
+        this.state = 'error';
+        this.emit('error', { sessionId: this.id, error: err.message });
+      }
     });
 
     this.state = 'idle';
@@ -201,6 +228,7 @@ export class CLISession extends EventEmitter {
     switch (event.type) {
       case 'message_start':
         this.state = 'streaming';
+        this.resetRespawnCount();
         this.currentMessageId = event.message?.id || randomUUID();
         this.emit('stream:start', {
           sessionId: this.id,
@@ -371,11 +399,13 @@ export class CLISession extends EventEmitter {
   // ── Destroy session ──────────────────────────────────────────────────
 
   destroy(): void {
-    this.cleanup();
+    this.intentionalStop = true;
+    this.cancelRespawn();
     if (this.process) {
       this.process.kill('SIGTERM');
       this.process = null;
     }
+    this.cleanup();
     this.state = 'stopped';
     this.removeAllListeners();
   }
@@ -386,6 +416,69 @@ export class CLISession extends EventEmitter {
     if (this.rl) {
       this.rl.close();
       this.rl = null;
+    }
+    // Clear process reference so respawn can call start() again
+    this.process = null;
+  }
+
+  // ── Auto-respawn with exponential backoff ─────────────────────────
+
+  private scheduleRespawn(
+    reason: 'exit' | 'error',
+    code: number | null,
+    signal: string | null,
+    errorMsg?: string,
+  ): void {
+    if (this.respawnCount >= RESPAWN_MAX_RETRIES) {
+      console.error(
+        `[CLISession:${this.id}] Respawn limit reached (${RESPAWN_MAX_RETRIES}). Giving up.`,
+      );
+      this.state = 'error';
+      this.emit('error', {
+        sessionId: this.id,
+        error: `CLI process ${reason} (${errorMsg ?? `code=${code} signal=${signal}`}). Auto-reconnect failed after ${RESPAWN_MAX_RETRIES} attempts.`,
+      });
+      return;
+    }
+
+    const delay = RESPAWN_BASE_DELAY_MS * Math.pow(2, this.respawnCount);
+    this.respawnCount++;
+    this.state = 'reconnecting';
+
+    console.log(
+      `[CLISession:${this.id}] Scheduling respawn #${this.respawnCount}/${RESPAWN_MAX_RETRIES} in ${delay}ms (reason: ${reason})`,
+    );
+
+    // Notify frontend about reconnecting state
+    this.emit('stateChange', {
+      sessionId: this.id,
+      state: 'reconnecting' as SessionState,
+      respawnAttempt: this.respawnCount,
+      maxRetries: RESPAWN_MAX_RETRIES,
+    });
+
+    this.respawnTimer = setTimeout(() => {
+      this.respawnTimer = null;
+      console.log(`[CLISession:${this.id}] Respawning now (attempt #${this.respawnCount})`);
+      this.start(this.startOptions);
+    }, delay);
+  }
+
+  /** Call when session is confirmed healthy (first prompt received) */
+  resetRespawnCount(): void {
+    if (this.respawnCount > 0) {
+      console.log(
+        `[CLISession:${this.id}] Session healthy — resetting respawn counter (was ${this.respawnCount})`,
+      );
+    }
+    this.respawnCount = 0;
+  }
+
+  /** Cancel any pending respawn timer */
+  cancelRespawn(): void {
+    if (this.respawnTimer) {
+      clearTimeout(this.respawnTimer);
+      this.respawnTimer = null;
     }
   }
 
@@ -552,6 +645,10 @@ export class CLIManager {
 
     session.on('error', (data) => {
       console.error(`[CLIManager] Session error:`, data);
+      this.broadcastSessionList();
+    });
+
+    session.on('stateChange', () => {
       this.broadcastSessionList();
     });
   }

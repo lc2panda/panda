@@ -104,7 +104,7 @@ export interface ControlResponse {
 export type CLIInput = UserInput | ControlResponse;
 
 // === Session 状态 ===
-export type SessionState = 'idle' | 'starting' | 'streaming' | 'awaiting_permission' | 'stopped' | 'error';
+export type SessionState = 'idle' | 'starting' | 'streaming' | 'awaiting_permission' | 'stopped' | 'error' | 'reconnecting';
 
 export interface SessionInfo {
   id: string;
