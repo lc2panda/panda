@@ -68,7 +68,7 @@ const RANDOM_MESSAGES = [
   "*munches bamboo*",
 ] as const;
 
-const OCCASION_MESSAGES: Record<PdPetCameoOccasion, readonly string[]> = {
+const OCCASION_MESSAGES: Record<PetCameoOccasion, readonly string[]> = {
   empty_state: EMPTY_STATE_MESSAGES,
   no_results: NO_RESULTS_MESSAGES,
   holiday: HOLIDAY_MESSAGES,

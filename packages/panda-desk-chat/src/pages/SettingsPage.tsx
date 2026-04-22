@@ -9,6 +9,7 @@ import { PdInput } from '../components/atoms/PdInput';
 import { PdSelect } from '../components/atoms/PdSelect';
 import { PdSwitch } from '../components/atoms/PdSwitch';
 import { useI18n } from '../hooks/useI18n';
+import type { Locale } from '../i18n';
 import { useTheme } from '../hooks/useTheme';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useProviderStore } from '../stores/providerStore';
@@ -39,12 +40,12 @@ const SettingRow: React.FC<SettingRowProps> = ({ label, description, children })
 );
 
 const GeneralTab: React.FC = () => {
-  const { t, locale, setLocale } = useI18n();
-  const { resetSettings } = useSettingsStore();
+  const { t, locale, changeLocale } = useI18n();
+  const { loadSettings } = useSettingsStore();
   return (
     <div>
       <SettingRow label={t('settings.language')} description={t('settings.languageDesc')}>
-        <PdSelect value={locale} onChange={(v: string) => setLocale(v)} options={[
+        <PdSelect value={locale} onChange={(v: string) => changeLocale(v as Locale)} options={[
           { value: 'en', label: 'English' },
           { value: 'zh', label: '中文' },
           { value: 'ja', label: '日本語' },
@@ -52,7 +53,7 @@ const GeneralTab: React.FC = () => {
         ]} />
       </SettingRow>
       <SettingRow label={t('settings.reset')} description={t('settings.resetDesc')}>
-        <PdButton variant="danger" size="sm" onClick={resetSettings}>{t('settings.resetBtn')}</PdButton>
+        <PdButton variant="danger" size="sm" onClick={loadSettings}>{t('settings.resetBtn')}</PdButton>
       </SettingRow>
     </div>
   );
