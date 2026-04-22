@@ -12,7 +12,9 @@
     "build:electron": "ELECTRON=true tsc -b && ELECTRON=true vite build",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "build": {
     "appId": "com.pandaai.desk-chat",
@@ -61,6 +63,7 @@
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "vite-plugin-electron": "^0.29.1",
-    "vite-plugin-electron-renderer": "^0.14.6"
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^4.1.5"
   }
 }
