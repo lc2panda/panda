@@ -1,10 +1,10 @@
 // Input: ipcMain handle registrations + CLI backend manager (W7-2)
-// Output: IPC request handlers for all 16 channels — connected to CLIManager
+// Output: IPC request handlers for all 17 channels — connected to CLIManager + nativeTheme
 // Pos: Main process IPC layer — routes renderer requests to CLI backend
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, clipboard, nativeImage, nativeTheme } from 'electron';
 import { readdir, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { cliManager } from '../backend/cli-manager';
@@ -30,6 +30,8 @@ const CH = {
   MODEL_LIST:          'panda:chat:model:list',
   MODEL_SET:           'panda:chat:model:set',
   PERMISSION_MODE_SET: 'panda:chat:permission-mode:set',
+  // Theme
+  THEME_GET_SYSTEM:    'panda:theme:get-system',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -77,8 +79,10 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(CH.CLIPBOARD_PASTE_IMG, async (_event, _payload: unknown) => {
-    // TODO: Clipboard image integration — read from system clipboard and return base64
-    return null;
+    const image = clipboard.readImage();
+    if (image.isEmpty()) return null;
+    const buffer = image.toPNG();
+    return buffer.toString('base64');
   });
 
   // ── Session management ─────────────────────────────────────────────
@@ -193,7 +197,13 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  console.log('[IPC] Registered 16 invoke handlers (CLI backend connected)');
+  // ── Theme ─────────────────────────────────────────────────────────
+
+  ipcMain.handle(CH.THEME_GET_SYSTEM, async () => {
+    return nativeTheme.shouldUseDarkColors;
+  });
+
+  console.log('[IPC] Registered 17 invoke handlers (CLI backend connected)');
 }
 
 // ---------------------------------------------------------------------------

@@ -40,6 +40,9 @@ const CH = {
   MODEL_SET:           'panda:chat:model:set',
   PERMISSION_MODE_SET: 'panda:chat:permission-mode:set',
   CLIPBOARD_PASTE_IMG: 'panda:chat:clipboard:paste-image',
+  // Theme
+  THEME_CHANGED:       'panda:theme:changed',
+  THEME_GET_SYSTEM:    'panda:theme:get-system',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -70,6 +73,7 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     send: (payload: unknown) => ipcRenderer.invoke(CH.CHAT_SEND, payload),
     stop: (payload: unknown) => ipcRenderer.invoke(CH.CHAT_STOP, payload),
     pasteImage: (payload: unknown) => ipcRenderer.invoke(CH.CLIPBOARD_PASTE_IMG, payload),
+    getClipboardImage: () => ipcRenderer.invoke(CH.CLIPBOARD_PASTE_IMG),
     onStreamStart: createSubscription(CH.CHAT_STREAM_START),
     onStreamDelta: createSubscription(CH.CHAT_STREAM_DELTA),
     onStreamEnd: createSubscription(CH.CHAT_STREAM_END),
@@ -99,5 +103,17 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     getModels: (payload: unknown) => ipcRenderer.invoke(CH.MODEL_LIST, payload),
     setModel: (payload: unknown) => ipcRenderer.invoke(CH.MODEL_SET, payload),
     setPermissionMode: (payload: unknown) => ipcRenderer.invoke(CH.PERMISSION_MODE_SET, payload),
+  },
+  theme: {
+    getSystemTheme: () => ipcRenderer.invoke(CH.THEME_GET_SYSTEM),
+    onThemeChange: (callback: (isDark: boolean) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, isDark: boolean) => {
+        callback(isDark);
+      };
+      ipcRenderer.on(CH.THEME_CHANGED, handler);
+      return () => {
+        ipcRenderer.removeListener(CH.THEME_CHANGED, handler);
+      };
+    },
   },
 });

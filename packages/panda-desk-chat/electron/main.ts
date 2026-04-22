@@ -4,7 +4,7 @@
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, Menu, nativeTheme, shell } from 'electron';
 import { join } from 'node:path';
 import { registerIpcHandlers, setupMainWindow } from './ipc/handlers';
 import { cliManager } from './backend/cli-manager';
@@ -63,6 +63,64 @@ function createMainWindow(): BrowserWindow {
 }
 
 // ---------------------------------------------------------------------------
+// Application menu (macOS standard Edit/View/Window + app menu)
+// ---------------------------------------------------------------------------
+
+const menuTemplate: Electron.MenuItemConstructorOptions[] = [
+  {
+    label: app.name,
+    submenu: [
+      { role: 'about' },
+      { type: 'separator' },
+      { role: 'services' },
+      { type: 'separator' },
+      { role: 'hide' },
+      { role: 'hideOthers' },
+      { role: 'unhide' },
+      { type: 'separator' },
+      { role: 'quit' },
+    ],
+  },
+  {
+    label: 'Edit',
+    submenu: [
+      { role: 'undo' },
+      { role: 'redo' },
+      { type: 'separator' },
+      { role: 'cut' },
+      { role: 'copy' },
+      { role: 'paste' },
+      { role: 'selectAll' },
+    ],
+  },
+  {
+    label: 'View',
+    submenu: [
+      { role: 'reload' },
+      { role: 'forceReload' },
+      { role: 'toggleDevTools' },
+      { type: 'separator' },
+      { role: 'resetZoom' },
+      { role: 'zoomIn' },
+      { role: 'zoomOut' },
+      { type: 'separator' },
+      { role: 'togglefullscreen' },
+    ],
+  },
+  {
+    label: 'Window',
+    submenu: [
+      { role: 'minimize' },
+      { role: 'zoom' },
+      { role: 'close' },
+    ],
+  },
+];
+
+const appMenu = Menu.buildFromTemplate(menuTemplate);
+Menu.setApplicationMenu(appMenu);
+
+// ---------------------------------------------------------------------------
 // App lifecycle
 // ---------------------------------------------------------------------------
 
@@ -72,6 +130,12 @@ app.whenReady().then(() => {
 
   mainWindow = createMainWindow();
   setupMainWindow(mainWindow);
+
+  // Listen for system theme changes and notify renderer
+  nativeTheme.on('updated', () => {
+    const isDark = nativeTheme.shouldUseDarkColors;
+    mainWindow?.webContents.send('panda:theme:changed', isDark);
+  });
 
   // macOS: re-create window when dock icon clicked
   app.on('activate', () => {

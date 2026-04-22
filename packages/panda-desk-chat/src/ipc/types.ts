@@ -99,6 +99,7 @@ export interface PandaChatAPI {
     send(payload: ChatSendPayload): Promise<void>;
     stop(payload: ChatStopPayload): Promise<void>;
     pasteImage(payload: ClipboardPastePayload): Promise<void>;
+    getClipboardImage(): Promise<string | null>;
     onStreamStart(cb: (payload: ChatStreamStartPayload) => void): Unsubscribe;
     onStreamDelta(cb: (payload: ChatStreamDeltaPayload) => void): Unsubscribe;
     onStreamEnd(cb: (payload: ChatStreamEndPayload) => void): Unsubscribe;

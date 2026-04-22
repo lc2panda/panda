@@ -113,6 +113,12 @@ export async function pasteImage(
   return getPandaAPI().chat.pasteImage({ sessionId, dataUrl });
 }
 
+/** Read image from system clipboard. Returns base64 PNG or null if empty. */
+export async function getClipboardImage(): Promise<string | null> {
+  if (IS_DEV) return null;
+  return getPandaAPI().chat.getClipboardImage();
+}
+
 /** Subscribe to stream-start events. Returns unsubscribe function. */
 export function onStreamStart(
   callback: (payload: ChatStreamStartPayload) => void,
