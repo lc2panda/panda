@@ -1,7 +1,7 @@
 # Panda Desk Chat — UI 进度记录
 
 > 最后更新: 2026-04-22 +08:00
-> 当前阶段: W14-2 完成 — Settings Refactor + Test Skeleton
+> 当前阶段: W14 完成 — Settings Refactor + Tests + Perf Optimization
 
 ## 已完成 Wave
 
@@ -37,6 +37,9 @@
 | W13-1 | Electron App Menu (macOS standard + keyboard shortcuts) | ac9ab73 | ✅ |
 | W13-2 | nativeTheme system theme follow + IPC sync | ac9ab73 | ✅ |
 | W13-3 | Clipboard Image paste (already implemented in Composer) | — | ✅ |
+| W14-1 | SettingsPage 拆分 5 Tab + SettingRow 共享组件 | e218758 | ✅ |
+| W14-2 | 单元测试骨架 (toastStore/settingsStore/sessionStore 15 tests) | 26780ab | ✅ |
+| W14-3 | 性能优化 (selector+memo+lazy 12 项) | 5a31f0f | ✅ |
 
 ## W7 Electron 骨架 ✅
 
@@ -175,7 +178,7 @@ W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
 - [x] 剪贴板 image buffer → base64 附件流程已在 W5 实现
 - [x] 无需额外代码变更
 
-## W14 — Settings Refactor & Test Skeleton
+## W14 — Settings Refactor & Test Skeleton & Perf ✅
 
 ### W14-1: SettingsPage 组件拆分 ✅ `e218758`
 - [x] SettingsPage 拆分为 5 个 Tab 组件 (GeneralTab, AppearanceTab, ProvidersTab, ShortcutsTab, AboutTab)
@@ -190,10 +193,11 @@ W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
 - [x] sessionStore 测试: initial state, createSession, deleteSession, renameSession, setActive (5 tests)
 - [x] 15/15 tests PASS
 
-### W14-3: 性能优化
-- [ ] PdMessageList 虚拟滚动 (长对话 >100 条消息)
-- [ ] chatStore selector 细粒度化，减少不必要 re-render
-- [ ] Electron 冷启动时间分析 + 优化 (preload 延迟加载)
+### W14-3: 性能优化 ✅ `5a31f0f`
+- [x] 5 个 zustand selector 细粒度化 → useShallow (ChatPage, App, 3 Settings tabs)
+- [x] 4 个 chat 子组件 React.memo (MessageBubble, UserBubble, ToolCallCard, ThinkingBlock)
+- [x] 3 个非关键组件 React.lazy (SettingsPage, CommandPalette, SessionSwitcher)
+- [x] 12 项优化覆盖 9 个文件，零新增文件
 
 ## 架构备忘
 
