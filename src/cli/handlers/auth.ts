@@ -37,7 +37,10 @@ import { isRunningOnHomespace } from '../../utils/envUtils.js'
 import { errorMessage } from '../../utils/errors.js'
 import { logError } from '../../utils/log.js'
 import { getAPIProvider } from '../../utils/model/providers.js'
-import { getInitialSettings } from '../../utils/settings/settings.js'
+import {
+  getInitialSettings,
+  removeSettingsEnvKeys,
+} from '../../utils/settings/settings.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import {
   buildAccountProperties,
@@ -296,25 +299,12 @@ function saveOpenAIConfig(
     }
   })
 
-  // Clean settings.json env vars that might conflict
-  try {
-    const { readFileSync, writeFileSync } = require('fs') as typeof import('fs')
-    const { join } = require('path') as typeof import('path')
-    const { homedir } = require('os') as typeof import('os')
-    const settingsPath = join(
-      process.env.PANDA_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.pandacc'),
-      'settings.json',
-    )
-    const raw = readFileSync(settingsPath, 'utf-8')
-    const settings = JSON.parse(raw)
-    if (settings.env) {
-      delete settings.env.ANTHROPIC_BASE_URL
-      delete settings.env.ANTHROPIC_AUTH_TOKEN
-      delete settings.env.ANTHROPIC_MODEL
-      if (Object.keys(settings.env).length === 0) delete settings.env
-      writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
-    }
-  } catch {}
+  // Clean settings.json env vars that might conflict (race-safe via updateSettingsForSource)
+  removeSettingsEnvKeys('userSettings', [
+    'ANTHROPIC_BASE_URL',
+    'ANTHROPIC_AUTH_TOKEN',
+    'ANTHROPIC_MODEL',
+  ])
 
   // Set env vars for the current process
   process.env.PANDA_PROVIDER = 'openai'
@@ -497,21 +487,12 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
     },
   }))
 
-  try {
-    const { readFileSync, writeFileSync } = await import('fs')
-    const { join } = await import('path')
-    const { homedir } = await import('os')
-    const settingsPath = join(process.env.PANDA_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.pandacc'), 'settings.json')
-    const raw = readFileSync(settingsPath, 'utf-8')
-    const settings = JSON.parse(raw)
-    if (settings.env) {
-      delete settings.env.ANTHROPIC_BASE_URL
-      delete settings.env.ANTHROPIC_AUTH_TOKEN
-      delete settings.env.ANTHROPIC_MODEL
-      if (Object.keys(settings.env).length === 0) delete settings.env
-      writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
-    }
-  } catch {}
+  // Clean stale Anthropic env vars from settings.json (race-safe)
+  removeSettingsEnvKeys('userSettings', [
+    'ANTHROPIC_BASE_URL',
+    'ANTHROPIC_AUTH_TOKEN',
+    'ANTHROPIC_MODEL',
+  ])
 
   // Set env vars so the current process can use them immediately
   process.env.ANTHROPIC_BASE_URL = provider.baseURL
@@ -604,26 +585,12 @@ export async function installOAuthTokens(tokens: OAuthTokens): Promise<void> {
   // (thirdPartyLogin 已处理，但 Anthropic OAuth 这条路之前漏了)
   // 不清会被 applySafeConfigEnvironmentVariables 重新注入 process.env，
   // 导致 Bearer token 被送到错的 host，触发 403 no body。
-  try {
-    const { readFileSync, writeFileSync } = await import('fs')
-    const { join } = await import('path')
-    const { homedir } = await import('os')
-    const settingsPath = join(
-      process.env.PANDA_CONFIG_DIR ??
-        process.env.CLAUDE_CONFIG_DIR ??
-        join(homedir(), '.pandacc'),
-      'settings.json',
-    )
-    const raw = readFileSync(settingsPath, 'utf-8')
-    const settings = JSON.parse(raw)
-    if (settings.env) {
-      delete settings.env.ANTHROPIC_BASE_URL
-      delete settings.env.ANTHROPIC_AUTH_TOKEN
-      delete settings.env.ANTHROPIC_MODEL
-      if (Object.keys(settings.env).length === 0) delete settings.env
-      writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
-    }
-  } catch {}
+  // Race-safe: delegate to updateSettingsForSource via removeSettingsEnvKeys
+  removeSettingsEnvKeys('userSettings', [
+    'ANTHROPIC_BASE_URL',
+    'ANTHROPIC_AUTH_TOKEN',
+    'ANTHROPIC_MODEL',
+  ])
 
   // 当前进程立即清掉同样的 env，避免本次会话继续用旧值
   delete process.env.ANTHROPIC_BASE_URL

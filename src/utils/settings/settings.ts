@@ -524,6 +524,29 @@ export function updateSettingsForSource(
 }
 
 /**
+ * Atomically remove specific keys from the `env` section of a settings file.
+ * Uses `updateSettingsForSource` internally so the write participates in the
+ * same read-merge-write cycle, avoiding TOCTOU races with other writers.
+ */
+export function removeSettingsEnvKeys(
+  source: EditableSettingSource,
+  keys: string[],
+): { error: Error | null } {
+  if (keys.length === 0) return { error: null }
+  const envPatch: Record<string, undefined> = {}
+  for (const k of keys) {
+    envPatch[k] = undefined
+  }
+  // Type-assertion: `updateSettingsForSource`'s mergeWith callback treats
+  // `undefined` values as deletions.  The SettingsJson schema requires
+  // `string` values, so we cast to satisfy the compiler while relying on
+  // the runtime deletion semantics.
+  return updateSettingsForSource(source, {
+    env: envPatch as unknown as Record<string, string>,
+  })
+}
+
+/**
  * Custom merge function for arrays - concatenate and deduplicate
  */
 function mergeArrays<T>(targetArray: T[], sourceArray: T[]): T[] {
