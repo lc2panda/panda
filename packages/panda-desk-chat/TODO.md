@@ -1,7 +1,7 @@
 # Panda Desk Chat — UI 进度记录
 
 > 最后更新: 2026-04-22 +08:00
-> 当前阶段: W11 完成 — Reliability + Component Audit
+> 当前阶段: W12 完成 — Component Integration
 
 ## 已完成 Wave
 
@@ -30,6 +30,10 @@
 | W11-1 | CLI auto-reconnect (3 retries + exponential backoff) | b125aef | ✅ |
 | W11-2 | newChat wiring (Sidebar + HeroComposer → chatStore) | cd4ba2a | ✅ |
 | W11-3 | Unused component audit (6 components marked TODO) | (W11) | ✅ |
+| W12-1 | Wire PdCommandPalette (Cmd+K) + PdSessionSwitcher (Cmd+P) | bc455f6 | ✅ |
+| W12-2 | Wire PdDirectoryPicker + PdRoutingBanner | bc455f6 | ✅ |
+| W12-3 | Toast system + i18n complete | bc455f6 | ✅ |
+| W12-4 | PdRoutingBanner + PdPetCameo integrated in ChatPage | c81b4ff | ✅ |
 
 ## W7 Electron 骨架 ✅
 
@@ -129,25 +133,46 @@ W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
   - **中价值 (W12 接入)**: PdRoutingBanner (model switch), PdPetCameo (empty state)
   - **低优先级**: PdBuddyEventCard (decorative milestone cards)
 
-## W12 — Component Integration + Electron Enhancement (计划)
+## W12 — Component Integration ✅
 
-### W12-1: Wire PdCommandPalette + PdSessionSwitcher
-- [ ] App.tsx: Cmd+K → PdCommandPalette overlay
-- [ ] App.tsx: Cmd+P → PdSessionSwitcher overlay
-- [ ] 连线 sessionStore 会话列表数据
+### W12-1: Wire PdCommandPalette + PdSessionSwitcher ✅ `bc455f6`
+- [x] App.tsx: Cmd+K → PdCommandPalette overlay
+- [x] App.tsx: Cmd+P → PdSessionSwitcher overlay
+- [x] 连线 sessionStore 会话列表数据
 
-### W12-2: Wire PdDirectoryPicker + PdRoutingBanner
-- [ ] SettingsPage General tab: PdDirectoryPicker 选择工作目录
-- [ ] ChatPage: PdRoutingBanner 显示模型切换通知
+### W12-2: Wire PdDirectoryPicker + PdRoutingBanner ✅ `bc455f6`
+- [x] SettingsPage General tab: PdDirectoryPicker 选择工作目录
+- [x] ChatPage: PdRoutingBanner 条件渲染 (chatStore.routingInfo)
 
-### W12-3: Wire PdPetCameo + Polish
-- [ ] ChatPage empty state: PdPetCameo 替代纯文字空状态
-- [ ] PdBuddyEventCard 评估是否保留或移除
+### W12-3: Wire PdPetCameo + Polish ✅ `c81b4ff`
+- [x] ChatPage empty state: PdPetCameo occasion="empty_state" 居中显示于 HeroComposer 上方
+- [x] PdBuddyEventCard 保留为低优先级装饰组件，暂不接入
+
+### W12-4: chatStore routing support ✅ `c81b4ff`
+- [x] RoutingInfo 类型 + routingInfo 字段加入 PerSessionState
+- [x] setRoutingInfo / dismissRouting actions
+- [x] PdRoutingBanner / PdPetCameo 头部注释更新，移除 TODO(W12) 标记
+
+## W13 — Electron Enhancement (计划)
+
+### W13-1: Native Menu
+- [ ] electron/main.ts: 自定义应用菜单 (File/Edit/View/Help)
+- [ ] 快捷键绑定: Cmd+N 新建会话, Cmd+W 关闭标签, Cmd+, 设置
+
+### W13-2: nativeTheme
+- [ ] 监听系统深色/浅色模式切换
+- [ ] 通过 IPC 同步到 renderer uiStore.theme
+- [ ] 支持 auto/light/dark 三档切换
+
+### W13-3: Clipboard Image
+- [ ] 粘贴图片到 Composer (Cmd+V)
+- [ ] 从 clipboard 读取 image buffer → base64 → 附件消息
+- [ ] 拖拽图片到聊天区域支持
 
 ## 架构备忘
 
 - App.tsx (105行): 三栏布局 shell + 页面切换 useState<'chat'|'settings'>
-- ChatPage: 纯内容区（MessageList + Composer / HeroComposer）
+- ChatPage: 纯内容区（RoutingBanner + MessageList + Composer / PetCameo + HeroComposer）
 - SettingsPage: 5 标签页（General/Appearance/Providers/Shortcuts/About）
 - IPC: 4 层架构 schemas→types→bridge→dev-mock，24 channel，5 组
 - Stores: chatStore(大型), sessionStore(完整), uiStore(完整), tabStore, settingsStore, providerStore
