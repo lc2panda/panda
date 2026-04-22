@@ -30,7 +30,7 @@ export const PANDA_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   PANDA_THEME: 'matrix',
   PANDA_MODEL_ROUTING: '1',
   PANDA_CONTEXT_COLLAPSE: '1',
-  PANDA_AGENT_MAX_TURNS: '10',
+  PANDA_AGENT_MAX_TURNS: '200',
   PANDA_AGENT_PER_TURN_LIMIT: '2',
   PANDA_AGENT_TIMEOUT_MS: '0',
   PANDA_FORK_TIMEOUT_MS: '0',
@@ -168,8 +168,17 @@ export function initDefaultPandaccSettings(options?: {
     }
   }
 
-  // 幂等：env / 顶层都无变化直接 return
-  if (newlyAddedKeys.length === 0 && newlyAddedTopLevelKeys.length === 0) {
+  // Migration: PANDA_AGENT_MAX_TURNS '10' → '200' (v2.21+)
+  // The old default of 10 caused agent output truncation for complex tasks.
+  // See runAgent.ts:814-819 comments for context.
+  let migrated = false
+  if (mergedEnv.PANDA_AGENT_MAX_TURNS === '10') {
+    mergedEnv.PANDA_AGENT_MAX_TURNS = '200'
+    migrated = true
+  }
+
+  // 幂等：env / 顶层都无变化且无迁移，直接 return
+  if (newlyAddedKeys.length === 0 && newlyAddedTopLevelKeys.length === 0 && !migrated) {
     return { newlyAddedKeys: [], newlyAddedTopLevelKeys: [], skipped: false }
   }
 
