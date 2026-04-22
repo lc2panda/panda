@@ -90,17 +90,32 @@ export class CLISession extends EventEmitter {
       return process.env.PANDA_CLI_PATH;
     }
 
-    // 2) Dev mode: relative to project root
+    // 2) Dev mode: resolve to monorepo root's dist/cli.js
+    //    At runtime __dirname is dist-electron/ (compiled output).
+    //    Relative path: dist-electron/ → panda-desk-chat/ → packages/ → cc-panda/
+    //    So ../../../dist/cli.js reaches the root project's dist/cli.js.
     if (!app.isPackaged) {
-      const devPath = path.resolve(process.cwd(), 'dist/cli.js');
-      if (existsSync(devPath)) return devPath;
-      // Fallback: relative to this file (electron/backend/ → ../../dist)
-      const fallback = path.resolve(__dirname, '../../../../dist/cli.js');
-      if (existsSync(fallback)) return fallback;
-      return devPath; // let spawn fail with clear path
+      // Primary: relative to compiled __dirname (dist-electron/)
+      const fromDirname = path.resolve(__dirname, '../../../dist/cli.js');
+      if (existsSync(fromDirname)) return fromDirname;
+      // Secondary: CWD might be monorepo root (e.g. launched from project root)
+      const fromCwd = path.resolve(process.cwd(), 'dist/cli.js');
+      if (existsSync(fromCwd)) return fromCwd;
+      // Tertiary: CWD is packages/panda-desk-chat/, go up two levels
+      const fromPkgCwd = path.resolve(process.cwd(), '../../dist/cli.js');
+      if (existsSync(fromPkgCwd)) return fromPkgCwd;
+      // Let spawn fail with a clear diagnostic path
+      console.error(
+        `[CLISession] CLI not found. Searched:\n` +
+        `  1) ${fromDirname}\n` +
+        `  2) ${fromCwd}\n` +
+        `  3) ${fromPkgCwd}\n` +
+        `Build the CLI first: cd <project-root> && bun run build`,
+      );
+      return fromDirname;
     }
 
-    // 3) Packaged app
+    // 3) Packaged app: CLI bundled as extraResource
     return path.join(process.resourcesPath, 'dist/cli.js');
   }
 
