@@ -1,5 +1,5 @@
 // Input: 无（读 PANDA_CONFIG_DIR / CLAUDE_CONFIG_DIR / 回退 os.homedir()/.pandacc）
-// Output: merge 16 项 PANDA_* 默认值到 settings.json 的 env block + N 项顶层 settings 默认（不覆盖已有）；
+// Output: merge 17 项 PANDA_* 默认值到 settings.json 的 env block + N 项顶层 settings 默认（不覆盖已有）；
 //         返回 { newlyAddedKeys, newlyAddedTopLevelKeys, skipped }
 // Pos: 启动早期（init.ts 最开头）或 npm postinstall，保证新用户一键获得 Panda 专属能力
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
@@ -9,7 +9,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 
 /**
- * 16 项 Panda 默认 env。任何新增项走此处集中。
+ * 17 项 Panda 默认 env。任何新增项走此处集中。
  *
  * v2.21.5 移除 PANDA_CONFIG_DIR: '~/.pandacc' 默认项 — 该字面值在
  * src/utils/envUtils.ts / env.ts / cli/handlers/auth.ts 多处被当作绝对路径直接
@@ -32,6 +32,7 @@ export const PANDA_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   PANDA_CONTEXT_COLLAPSE: '1',
   PANDA_AGENT_MAX_TURNS: '200',
   PANDA_AGENT_PER_TURN_LIMIT: '2',
+  PANDA_AGENT_MAX_OUTPUT_TOKENS: '65536',
   PANDA_AGENT_TIMEOUT_MS: '0',
   PANDA_FORK_TIMEOUT_MS: '0',
   PANDA_CACHE_TEXT_KEEP_LAST: '5',
