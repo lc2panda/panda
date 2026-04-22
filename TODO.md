@@ -89,9 +89,10 @@
   - initPandaccSettings.ts 代码默认值更新
   - 迁移逻辑：自动将旧值 '10' 升级为 '200'
 
-### 进行中
+### 收尾
 - [x] Fix 2: max_turns_reached 优雅降级 (40f6221)
-- [ ] Fix 3: 验证修复效果
+- [x] Fix 3: 验证通过 — 17 tool calls 完整输出
+- [x] Fix 4: 收尾修复 — fallback 对齐 200 + catch 错误日志改进
 
 ### 完整根因链
 settings.json '10' → env → runAgent.ts → query.ts 硬截断 → 无最终摘要 → 输出片段

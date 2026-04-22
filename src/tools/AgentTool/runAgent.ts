@@ -814,10 +814,10 @@ export async function* runAgent({
       // v2.20.7 原设 10 — 防止 subagent runaway loop。
       // 观测 4b284228: "读取记忆文件" agent 跑了 53 轮消耗 3.7M tokens。
       // Comdr 实践中发现 10 轮对复杂任务（多工具 + 深度推理）过于保守，
-      // 会在正常工作中强制截断，故主动调为 999 作为软默认。
+      // 会在正常工作中强制截断，故主动调为 200 作为软默认。
       // env PANDA_AGENT_MAX_TURNS 可覆盖（降回 10/30 等）。
       // Runaway 防御实际依赖：per-turn fork 限额 + uuid dedup + 上下文压缩。
-      maxTurns: maxTurns ?? agentDefinition.maxTurns ?? parseInt(process.env.PANDA_AGENT_MAX_TURNS || '999', 10),
+      maxTurns: maxTurns ?? agentDefinition.maxTurns ?? parseInt(process.env.PANDA_AGENT_MAX_TURNS || '200', 10),
       maxOutputTokensOverride: parseInt(process.env.PANDA_AGENT_MAX_OUTPUT_TOKENS || '65536', 10),
     })) {
       onQueryProgress?.()

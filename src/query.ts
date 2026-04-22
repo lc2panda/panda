@@ -1906,11 +1906,11 @@ async function* queryLoop(
         })) {
           yield finalMsg
         }
-      } catch {
+      } catch (err) {
         // If the summary call fails, proceed with the original truncation
         // behavior — no worse than before this change.
         logForDebugging(
-          '[query] max_turns graceful summary failed, proceeding with truncation',
+          `[query] max_turns graceful summary failed: ${err instanceof Error ? err.message : String(err)}`,
         )
       }
 
