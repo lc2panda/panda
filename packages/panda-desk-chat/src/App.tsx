@@ -2,7 +2,7 @@
 // Output: 三栏三行布局框架
 // Pos: 应用根组件，承载所有页面和面板
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/cn';
 import { PdSidebar } from './components/layout/PdSidebar';
 import { PdTabBarConnected } from './components/layout/PdTabBarConnected';
@@ -12,6 +12,8 @@ import { ChatPage } from './pages/ChatPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PdSideChat } from './components/chat';
 import { PdToastContainer } from './components/containers/PdToast';
+import { PdCommandPalette, type Command } from './components/special/PdCommandPalette';
+import { PdSessionSwitcher, type SessionItem } from './components/special/PdSessionSwitcher';
 import { useSettingsStore, useChatStore, useSessionStore, useTabStore } from './stores';
 import { useToastStore } from './stores/toastStore';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
@@ -24,6 +26,8 @@ export function App() {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [inspectorTab, setInspectorTab] = useState(0);
   const [sideChatOpen, setSideChatOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [sessionSwitcherOpen, setSessionSwitcherOpen] = useState(false);
 
   const { toasts, dismissToast } = useToastStore();
   const theme = useSettingsStore((s) => s.theme);
@@ -35,6 +39,7 @@ export function App() {
 
   // --- Session / Tab actions for shortcuts ---
   const createSession = useSessionStore((s) => s.createSession);
+  const sessionList = useSessionStore((s) => s.sessions);
   const addTab = useTabStore((s) => s.addTab);
   const setChatActiveSession = useChatStore((s) => s.setActiveSession);
 
@@ -49,7 +54,76 @@ export function App() {
       setChatActiveSession(session.id);
     }, [createSession, addTab, setChatActiveSession]),
     openSettings: useCallback(() => setPage('settings'), []),
+    toggleCommandPalette: useCallback(() => setCommandPaletteOpen((p) => !p), []),
+    toggleSessionSwitcher: useCallback(() => setSessionSwitcherOpen((p) => !p), []),
   });
+
+  // --- Command palette commands ---
+  const commands: Command[] = useMemo(() => [
+    {
+      id: 'new-chat',
+      label: 'New Chat',
+      group: 'Chat',
+      shortcut: '⌘N',
+      action: () => {
+        const session = createSession();
+        addTab(session.id, session.name);
+        setChatActiveSession(session.id);
+        setCommandPaletteOpen(false);
+      },
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      group: 'App',
+      shortcut: '⌘,',
+      action: () => {
+        setPage('settings');
+        setCommandPaletteOpen(false);
+      },
+    },
+    {
+      id: 'toggle-sidebar',
+      label: 'Toggle Sidebar',
+      group: 'View',
+      shortcut: '⌘B',
+      action: () => {
+        setSidebarExpanded((p) => !p);
+        setCommandPaletteOpen(false);
+      },
+    },
+    {
+      id: 'toggle-inspector',
+      label: 'Toggle Inspector',
+      group: 'View',
+      shortcut: '⌘\\',
+      action: () => {
+        setInspectorOpen((p) => !p);
+        setCommandPaletteOpen(false);
+      },
+    },
+    {
+      id: 'toggle-side-chat',
+      label: 'Toggle Side Chat',
+      group: 'View',
+      shortcut: '⌘;',
+      action: () => {
+        setSideChatOpen((p) => !p);
+        setCommandPaletteOpen(false);
+      },
+    },
+  ], [createSession, addTab, setChatActiveSession]);
+
+  // --- Session switcher items (SessionMeta → SessionItem) ---
+  const switcherSessions: SessionItem[] = useMemo(
+    () => sessionList.map((s) => ({
+      id: s.id,
+      title: s.name,
+      updatedAt: new Date(s.lastActive).getTime(),
+      messageCount: s.messageCount,
+    })),
+    [sessionList],
+  );
 
   // --- System theme follower ---
   useEffect(() => {
@@ -123,6 +197,20 @@ export function App() {
         />
       )}
       <PdToastContainer toasts={toasts} onDismiss={dismissToast} />
+      <PdCommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        commands={commands}
+      />
+      <PdSessionSwitcher
+        open={sessionSwitcherOpen}
+        onClose={() => setSessionSwitcherOpen(false)}
+        sessions={switcherSessions}
+        onSelect={(id) => {
+          setChatActiveSession(id);
+          setSessionSwitcherOpen(false);
+        }}
+      />
     </div>
   );
 }

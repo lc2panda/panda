@@ -1,6 +1,6 @@
 // Input: ShortcutActions callback map
 // Output: registers/cleans global keydown listener
-// Pos: Hook layer — consumed by App root for Cmd+B / Cmd+\ / Cmd+; / Cmd+N / Cmd+,
+// Pos: Hook layer — consumed by App root for Cmd+B / Cmd+\ / Cmd+; / Cmd+N / Cmd+, / Cmd+K / Cmd+P
 
 import { useEffect } from 'react';
 
@@ -10,6 +10,8 @@ export interface ShortcutActions {
   toggleSideChat: () => void;
   newChat: () => void;
   openSettings: () => void;
+  toggleCommandPalette: () => void;
+  toggleSessionSwitcher: () => void;
 }
 
 export function useGlobalShortcuts(actions: ShortcutActions) {
@@ -38,6 +40,14 @@ export function useGlobalShortcuts(actions: ShortcutActions) {
         case ',':
           e.preventDefault();
           actions.openSettings();
+          break;
+        case 'k':
+          e.preventDefault();
+          actions.toggleCommandPalette();
+          break;
+        case 'p':
+          e.preventDefault();
+          actions.toggleSessionSwitcher();
           break;
       }
     };
