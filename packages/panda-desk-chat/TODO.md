@@ -1,7 +1,7 @@
 # Panda Desk Chat — UI 进度记录
 
 > 最后更新: 2026-04-22 +08:00
-> 当前阶段: W15 完成 — Electron Tray + Test Coverage Expansion
+> 当前阶段: W16 进行中 — E2E / Notification / Auto-update / Theme 完成, Multi-window 进行中
 
 ## 已完成 Wave
 
@@ -42,6 +42,12 @@
 | W14-3 | 性能优化 (selector+memo+lazy 12 项) | 5a31f0f | ✅ |
 | W15-1 | Electron Tray 激活 (createTray + isQuitting + hide-to-tray) | f1089c6 | ✅ |
 | W15-2 | 测试覆盖 15→58 (chatStore 23 + tabStore 16) | d11c698 | ✅ |
+| W16-1 | E2E Playwright (启动→聊天→设置→托盘) | fc35cc7 | ✅ |
+| W16-2 | Notification System (系统通知 + Dock badge) | 0c81fa6 | ✅ |
+| W16-3 | 多窗口支持 (独立窗口 + session 切换) | — | ⏳ |
+| W16-4 | Auto-update (electron-updater + GitHub Releases) | 94675a0 | ✅ |
+| W16-5 | Theme System (nativeTheme 跟随 + 实时切换) | bca68a9 | ✅ |
+| W16-6 | Findings cleanup (stale TODOs, dynamic slash cmds, PetStrip, icon) | — | ✅ |
 
 ## W7 Electron 骨架 ✅
 
@@ -215,17 +221,23 @@ W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
 - [x] 原有 15 cases (toast+settings+session) 保持通过
 - [x] 58/58 pass in 166ms
 
-## W16 — 候选方向（按优先级）
+## W16 — 完成状态
 
-> 以下为可选方向，待 Comdr 确认优先级后启动。
+> 4/5 方向已完成，多窗口支持进行中。
 
-| # | 方向 | 描述 | 预估 |
-|---|------|------|------|
-| 1 | E2E Playwright | Electron E2E 测试 (启动→聊天→设置→托盘) | M |
-| 2 | Notification 系统 | 系统通知 (消息到达/任务完成) + Dock badge | S |
-| 3 | 多窗口支持 | New Chat 打开独立窗口 + 窗口间 session 切换 | L |
-| 4 | Auto-update | electron-updater + GitHub Releases 自动更新 | M |
-| 5 | 深色/浅色主题跟随 | nativeTheme 监听 + 实时切换 + 自定义主题 | S |
+| # | 方向 | 描述 | 预估 | 状态 |
+|---|------|------|------|------|
+| 1 | E2E Playwright | Electron E2E 测试 (启动→聊天→设置→托盘) | M | ✅ fc35cc7 |
+| 2 | Notification 系统 | 系统通知 (消息到达/任务完成) + Dock badge | S | ✅ 0c81fa6 |
+| 3 | 多窗口支持 | New Chat 打开独立窗口 + 窗口间 session 切换 | L | ⏳ 进行中 |
+| 4 | Auto-update | electron-updater + GitHub Releases 自动更新 | M | ✅ 94675a0 |
+| 5 | 深色/浅色主题跟随 | nativeTheme 监听 + 实时切换 + 自定义主题 | S | ✅ bca68a9 |
+
+### W16-6: Findings cleanup ✅
+- [x] Remove stale TODO(W12) from PdBuddyEventCard, PdCommandPalette, PdSessionSwitcher
+- [x] Replace hardcoded slash commands in PdComposer with IPC bridge fetch + fallback
+- [x] Clean PetStrip placeholder in PdSidebar (reserved for panda-on-desk)
+- [x] Add minimal SVG panda icon at public/icon.svg
 
 ## 架构备忘
 

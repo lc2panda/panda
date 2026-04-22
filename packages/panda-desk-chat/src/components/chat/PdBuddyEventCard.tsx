@@ -1,7 +1,6 @@
-// TODO(W12): Not yet wired to any page — integrate or remove in W12
-// Input: Event type and data (milestone, species unlock, holiday, upgrade, achievement)
-// Output: Decorative event card in conversation flow
-// Pos: Chat layer — Panda-exclusive conversation milestone cards
+// Input: BuddyEventType + payload (milestone, species unlock, holiday, upgrade, achievement)
+// Output: Decorative event card rendered inline in conversation flow
+// Pos: Chat layer — Panda buddy event cards, rendered via PdMessageList when event messages appear
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 

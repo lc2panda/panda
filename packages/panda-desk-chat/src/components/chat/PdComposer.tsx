@@ -1,4 +1,4 @@
-// Input: User text, slash commands, file attachments
+// Input: User text, slash commands (dynamic via IPC), file attachments
 // Output: Message submission to IPC bridge
 // Pos: Chat layer — primary user interaction point
 import React, {
@@ -10,6 +10,7 @@ import React, {
   useState,
 } from "react";
 import { cn } from "../../lib/cn";
+import { getSlashCommands } from "../../ipc/bridge";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -36,7 +37,7 @@ export interface PdComposerHandle {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Slash command items (placeholder — will be replaced by real registry)      */
+/*  Slash command items — fetched from IPC, hardcoded fallback for dev/web    */
 /* -------------------------------------------------------------------------- */
 
 interface SlashItem {
@@ -44,7 +45,7 @@ interface SlashItem {
   description: string;
 }
 
-const SLASH_COMMANDS: SlashItem[] = [
+const FALLBACK_SLASH_COMMANDS: SlashItem[] = [
   { command: "/clear", description: "Clear conversation" },
   { command: "/compact", description: "Compact context" },
   { command: "/help", description: "Show available commands" },
@@ -81,6 +82,24 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
     const [isComposing, setIsComposing] = useState(false);
     const [slashOpen, setSlashOpen] = useState(false);
     const [slashFilter, setSlashFilter] = useState("");
+    const [slashCommands, setSlashCommands] = useState<SlashItem[]>(FALLBACK_SLASH_COMMANDS);
+
+    /* -- Fetch slash commands from IPC on mount --------------------------- */
+    useEffect(() => {
+      let cancelled = false;
+      getSlashCommands()
+        .then((cmds) => {
+          if (!cancelled && cmds?.length) {
+            setSlashCommands(
+              cmds.map((c) => ({ command: c.name, description: c.description })),
+            );
+          }
+        })
+        .catch(() => {
+          /* keep fallback */
+        });
+      return () => { cancelled = true; };
+    }, []);
 
     /* -- Imperative handle ------------------------------------------------ */
     useImperativeHandle(ref, () => ({
@@ -111,7 +130,7 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
     }, [value, resize]);
 
     /* -- Slash menu logic ------------------------------------------------- */
-    const filteredSlash = SLASH_COMMANDS.filter((s) =>
+    const filteredSlash = slashCommands.filter((s) =>
       s.command.startsWith(`/${slashFilter}`),
     );
 

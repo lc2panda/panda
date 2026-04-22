@@ -409,7 +409,7 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         ))}
       </div>
 
-      {/* ── PetStrip placeholder ── */}
+      {/* ── PetStrip — reserved for panda-on-desk integration ── */}
       <div
         className={cn(
           'flex shrink-0 items-center justify-center',
@@ -417,9 +417,8 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
           'text-[length:var(--pd-text-xs)] text-[var(--pd-color-fg-subtle)]',
         )}
         style={{ height: 'var(--pd-layout-pet-strip)' }}
-      >
-        {expanded ? '🐼 PetStrip' : '🐼'}
-      </div>
+        aria-hidden="true"
+      />
     </aside>
   );
 }

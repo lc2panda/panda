@@ -1,4 +1,6 @@
-// TODO(W12): Not yet wired to any page — integrate or remove in W12
+// Input: open flag, command list, onClose/onSelect callbacks
+// Output: Cmd+K overlay — fuzzy-searchable command palette
+// Pos: App top-level overlay — wired in App.tsx (W12-1, commit bc455f6)
 // Input: Cmd+K 触发
 // Output: 全局命令面板浮层
 // Pos: App 顶层 overlay

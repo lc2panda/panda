@@ -94,7 +94,13 @@
 根因链：settings.json '10' → env → runAgent.ts → query.ts 硬截断 → 无最终摘要 → 输出片段
 
 ## UI 功能实现（就绪）
-> Agent bug 已修复，可恢复 W16
+> Agent bug 已修复，W16 进行中
 
 W15 已完成：系统托盘激活 + 58 测试用例
-W16 就绪：Agent bug 已修复，可启动下一波
+W16 进行中 (4/5 完成):
+- [x] W16-1: E2E Playwright (fc35cc7)
+- [x] W16-2: Notification System (0c81fa6)
+- [ ] W16-3: 多窗口支持 (进行中)
+- [x] W16-4: Auto-update (94675a0)
+- [x] W16-5: Theme System (bca68a9)
+- [x] W16-6: Findings cleanup — stale TODOs, dynamic slash cmds, PetStrip, icon

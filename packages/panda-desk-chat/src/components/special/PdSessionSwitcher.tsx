@@ -1,7 +1,6 @@
-// TODO(W12): Not yet wired to any page — integrate or remove in W12
-// Input: Cmd+P 触发，会话列表
-// Output: fuzzy 搜索会话切换面板
-// Pos: App 顶层 overlay
+// Input: open flag, session list, onClose/onSelect callbacks
+// Output: Cmd+P overlay — fuzzy-searchable session switcher panel
+// Pos: App top-level overlay — wired in App.tsx (W12-1, commit bc455f6)
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, MessageSquare, X } from 'lucide-react';
