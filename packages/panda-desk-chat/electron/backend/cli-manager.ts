@@ -10,6 +10,10 @@ import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { app, BrowserWindow } from 'electron';
 import { notificationManager } from '../notification';
 import { windowManager } from '../window-manager';

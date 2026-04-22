@@ -5,7 +5,11 @@
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
 import { BrowserWindow, screen } from 'electron';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // ---------------------------------------------------------------------------
 // WindowManager — tracks multiple BrowserWindows & session routing
