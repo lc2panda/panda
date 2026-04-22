@@ -2155,6 +2155,11 @@ async function* queryModel(
         switch (part.type) {
           case 'message_start': {
             partialMessage = part.message
+            // Ensure partialMessage.usage is never undefined so downstream
+            // code that reads usage.input_tokens won't crash.
+            if (partialMessage && !partialMessage.usage) {
+              ;(partialMessage as { usage: typeof EMPTY_USAGE }).usage = EMPTY_USAGE
+            }
             ttftMs = Date.now() - start
             usage = updateUsage(usage, part.message?.usage)
             // Capture research from message_start if available (internal only).

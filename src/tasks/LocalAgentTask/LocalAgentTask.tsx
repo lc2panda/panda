@@ -69,10 +69,10 @@ export function updateProgressFromMessage(tracker: ProgressTracker, message: Mes
   if (message.type !== 'assistant') {
     return;
   }
-  const usage = message.message.usage as { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
+  const usage = message.message.usage;
   // Keep latest input (it's cumulative in the API), sum outputs
-  tracker.latestInputTokens = usage.input_tokens + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0);
-  tracker.cumulativeOutputTokens += usage.output_tokens;
+  tracker.latestInputTokens = (usage?.input_tokens ?? 0) + (usage?.cache_creation_input_tokens ?? 0) + (usage?.cache_read_input_tokens ?? 0);
+  tracker.cumulativeOutputTokens += (usage?.output_tokens ?? 0);
   const contentBlocks = message.message.content as Array<{ type: string; name?: string; input?: unknown }>;
   for (const content of contentBlocks) {
     if (content.type === 'tool_use') {
