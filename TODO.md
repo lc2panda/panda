@@ -79,27 +79,22 @@
 ### 💡 产品灵感捕获
 - [ ] **Samantha 式情绪理解** (2026-04-08 13:45 +08:00) — 超级助手应该像电影 *Her* 中的 Samantha 一样理解用户情绪。当前已有 moodSense 关键词+情绪分析（Phase 1.2）和 emotionalMemory 持久化（Phase 1.5），下一步可深化为：多轮情绪追踪、语境推断意图、主动关怀式回应、情绪记忆长期画像。目标：从"工具"进化为"懂你的伙伴"。
 
-## Agent 输出截断 Bug 修复（进行中）
-> 开始时间：2026-04-22
-> 根因：PANDA_AGENT_MAX_TURNS=10 覆盖代码默认值 999，限制 agent 为 10 轮
+## Agent 输出截断 Bug 修复 ✅
+> 完成时间：2026-04-22
+> 根因：PANDA_AGENT_MAX_TURNS=10 覆盖代码默认值 200，限制 agent 为 10 轮
 
-### 已完成
 - [x] Fix 1: PANDA_AGENT_MAX_TURNS 10→200 (db6f5cb)
   - settings.json 运行时配置更新
   - initPandaccSettings.ts 代码默认值更新
   - 迁移逻辑：自动将旧值 '10' 升级为 '200'
-
-### 收尾
 - [x] Fix 2: max_turns_reached 优雅降级 (40f6221)
 - [x] Fix 3: 验证通过 — 17 tool calls 完整输出
-- [x] Fix 4: 收尾修复 — fallback 对齐 200 + catch 错误日志改进
+- [x] Fix 4: 收尾修复 — fallback 对齐 200 + catch 错误日志改进 (8aeb651)
 
-### 完整根因链
-settings.json '10' → env → runAgent.ts → query.ts 硬截断 → 无最终摘要 → 输出片段
+根因链：settings.json '10' → env → runAgent.ts → query.ts 硬截断 → 无最终摘要 → 输出片段
 
-## UI 功能实现（暂停中）
-> 暂停原因：Agent 输出截断 bug 需优先修复
-> 暂停时间：2026-04-22
+## UI 功能实现（就绪）
+> Agent bug 已修复，可恢复 W16
 
 W15 已完成：系统托盘激活 + 58 测试用例
-W16 待定：需完成 Agent bug 修复后恢复
+W16 就绪：Agent bug 已修复，可启动下一波
