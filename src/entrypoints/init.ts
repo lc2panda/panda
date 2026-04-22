@@ -6,7 +6,7 @@
 import { profileCheckpoint } from '../utils/startupProfiler.js'
 import '../bootstrap/state.js'
 import '../utils/config.js'
-import { existsSync, cpSync, copyFileSync, mkdirSync } from 'fs'
+import { existsSync, cpSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 import type { Attributes, MetricOptions } from '@opentelemetry/api'
@@ -87,8 +87,39 @@ function migrateFromClaude() {
   }
 }
 
+/**
+ * Fix stale `.claude` paths inside plugin JSON files after brand migration.
+ *
+ * v2.18.0 migrateFromClaude() copied the directory tree but did not rewrite
+ * internal path references in `installed_plugins.json` / `known_marketplaces.json`.
+ * This function performs an idempotent string replacement so that `installPath`
+ * and `installLocation` point at the actual `.pandacc` directory.
+ */
+function migratePluginPaths(): void {
+  const pandaccDir = join(homedir(), '.pandacc')
+  const oldDir = join(homedir(), '.claude')
+
+  const targets = [
+    join(pandaccDir, 'plugins', 'installed_plugins.json'),
+    join(pandaccDir, 'plugins', 'known_marketplaces.json'),
+  ]
+
+  for (const filePath of targets) {
+    if (!existsSync(filePath)) continue
+    try {
+      const content = readFileSync(filePath, 'utf-8')
+      if (content.includes(oldDir)) {
+        writeFileSync(filePath, content.replaceAll(oldDir, pandaccDir))
+      }
+    } catch {
+      // Non-fatal — never block startup for plugin path fixup
+    }
+  }
+}
+
 export const init = memoize(async (): Promise<void> => {
   migrateFromClaude()
+  migratePluginPaths()
   installHello2ccHooks()
   // Panda: 自动补齐 16 项 PANDA_* 默认 env + 3 项顶层 settings 默认到
   // ~/.pandacc/settings.json（v2.21.5 移除 PANDA_CONFIG_DIR，故为 16 而非 17）。
