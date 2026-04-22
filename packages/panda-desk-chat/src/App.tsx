@@ -13,6 +13,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { PdSideChat } from './components/chat';
 import { PdToastContainer } from './components/containers/PdToast';
 import { useSettingsStore, useChatStore } from './stores';
+import { useToastStore } from './stores/toastStore';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 
 type Page = 'chat' | 'settings';
@@ -24,6 +25,7 @@ export function App() {
   const [inspectorTab, setInspectorTab] = useState(0);
   const [sideChatOpen, setSideChatOpen] = useState(false);
 
+  const { toasts, dismissToast } = useToastStore();
   const theme = useSettingsStore((s) => s.theme);
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const activeSession = useChatStore((s) => {
@@ -111,7 +113,7 @@ export function App() {
           onClose={() => setSideChatOpen(false)}
         />
       )}
-      <PdToastContainer toasts={[]} onDismiss={() => {}} />
+      <PdToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }
