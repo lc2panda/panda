@@ -45,6 +45,8 @@ export default {
   'chat.retry': 'リトライ',
   'chat.copy': 'コピー',
   'chat.fork': 'セッションをフォーク',
+  'chat.connectionError': '接続が切断されました。再試行中...',
+  'chat.disconnected': '切断されました',
 
   // Composer
   'composer.hero.title': '何かお手伝いできますか？',

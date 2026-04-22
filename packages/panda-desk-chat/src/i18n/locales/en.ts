@@ -45,6 +45,8 @@ export default {
   'chat.retry': 'Retry',
   'chat.copy': 'Copy',
   'chat.fork': 'Fork Session',
+  'chat.connectionError': 'Connection lost. Retrying...',
+  'chat.disconnected': 'Disconnected',
 
   // Composer
   'composer.hero.title': 'How can I help you?',

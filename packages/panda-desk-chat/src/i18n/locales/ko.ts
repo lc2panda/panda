@@ -45,6 +45,8 @@ export default {
   'chat.retry': '재시도',
   'chat.copy': '복사',
   'chat.fork': '세션 포크',
+  'chat.connectionError': '연결이 끊어졌습니다. 재시도 중...',
+  'chat.disconnected': '연결 끊김',
 
   // Composer
   'composer.hero.title': '무엇을 도와드릴까요?',

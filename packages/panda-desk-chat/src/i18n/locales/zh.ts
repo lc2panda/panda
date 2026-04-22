@@ -45,6 +45,8 @@ export default {
   'chat.retry': '重试',
   'chat.copy': '复制',
   'chat.fork': 'Fork 会话',
+  'chat.connectionError': '连接已断开，正在重试...',
+  'chat.disconnected': '已断开连接',
 
   // Composer
   'composer.hero.title': '有什么可以帮你的？',
