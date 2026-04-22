@@ -12,7 +12,7 @@ import { ChatPage } from './pages/ChatPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PdSideChat } from './components/chat';
 import { PdToastContainer } from './components/containers/PdToast';
-import { useSettingsStore, useChatStore } from './stores';
+import { useSettingsStore, useChatStore, useSessionStore, useTabStore } from './stores';
 import { useToastStore } from './stores/toastStore';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 
@@ -33,12 +33,21 @@ export function App() {
     return id ? s.sessions.get(id) ?? null : null;
   });
 
+  // --- Session / Tab actions for shortcuts ---
+  const createSession = useSessionStore((s) => s.createSession);
+  const addTab = useTabStore((s) => s.addTab);
+  const setChatActiveSession = useChatStore((s) => s.setActiveSession);
+
   // --- Global keyboard shortcuts (Cmd+B / Cmd+\ / Cmd+; / Cmd+N / Cmd+,) ---
   useGlobalShortcuts({
     toggleSidebar: useCallback(() => setSidebarExpanded((p) => !p), []),
     toggleInspector: useCallback(() => setInspectorOpen((p) => !p), []),
     toggleSideChat: useCallback(() => setSideChatOpen((p) => !p), []),
-    newChat: useCallback(() => { /* TODO: wire to store */ }, []),
+    newChat: useCallback(() => {
+      const session = createSession();
+      addTab(session.id, session.name);
+      setChatActiveSession(session.id);
+    }, [createSession, addTab, setChatActiveSession]),
     openSettings: useCallback(() => setPage('settings'), []),
   });
 
