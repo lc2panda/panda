@@ -73,7 +73,7 @@ export const PdSwitch: React.FC<PdSwitchProps> = ({
     >
       <span
         className={cn(
-          "inline-block rounded-full bg-white shadow-sm",
+          "inline-block rounded-full bg-[var(--pd-color-bg-elevated)] shadow-sm",
           "transition-transform duration-[var(--pd-duration-quick)]",
           "translate-x-0.5",
           thumbSizes[size],

@@ -135,18 +135,27 @@
   /* ── Palette: Cream / Stone / Ink ────────────────────────────────────── */
   --pd-palette-cream-50: #FDFCF8;
   --pd-palette-cream-100: #FAF9F5;
-  --pd-palette-cream-200: #F4F3EE;
-  --pd-palette-cream-300: #E8E6DC;
+  --pd-palette-cream-200: #F4F4F0;
+  --pd-palette-cream-300: #EFEEEA;
+  --pd-palette-cream-350: #E9E8E4;
   --pd-palette-cream-400: #D7D4C8;
   --pd-palette-stone-500: #B0AEA5;
-  --pd-palette-stone-600: #8A8880;
+  --pd-palette-stone-600: #87736D;
+  --pd-palette-stone-700: #54433E;
   --pd-palette-stone-800: #2F2E2C;
-  --pd-palette-ink-900: #141413;
+  --pd-palette-ink-900: #1B1C1A;
+
+  /* ── Palette: Warm Brown (border / outline) ──────────────────────────── */
+  --pd-palette-warm-brown-300: #DAC1BA;
+  --pd-palette-warm-brown-500: #87736D;
+  --pd-palette-warm-brown-700: #54433E;
+  --pd-palette-warm-brown-900: #390C00;
 
   /* ── Palette: Terra Cotta ────────────────────────────────────────────── */
+  --pd-palette-terra-300: #FFDBD0;
   --pd-palette-terra-400: #E38B6E;
-  --pd-palette-terra-500: #D97757;
-  --pd-palette-terra-600: #C15F3C;
+  --pd-palette-terra-500: #B85A38;
+  --pd-palette-terra-600: #8F482F;
   --pd-palette-terra-700: #B85A38;
   --pd-palette-terra-800: #9C4B2E;
 
@@ -161,37 +170,44 @@
   --pd-palette-ruby-500: #BA3D3D;
 
   /* ── Semantic: Surface ───────────────────────────────────────────────── */
-  --pd-color-bg: var(--pd-palette-cream-100);
+  --pd-color-bg: var(--pd-palette-cream-100);               /* #FAF9F5 main bg */
   --pd-color-bg-elevated: var(--pd-palette-cream-50);
-  --pd-color-bg-subtle: var(--pd-palette-cream-200);
-  --pd-color-bg-hover: var(--pd-palette-cream-300);
-  --pd-color-bg-selected: var(--pd-palette-cream-300);
+  --pd-color-bg-subtle: var(--pd-palette-cream-200);         /* #F4F4F0 */
+  --pd-color-bg-hover: var(--pd-palette-cream-350);          /* #E9E8E4 */
+  --pd-color-bg-selected: var(--pd-palette-cream-300);       /* #EFEEEA */
   --pd-color-bg-disabled: var(--pd-palette-cream-200);
+  --pd-color-surface-container: var(--pd-palette-cream-300); /* #EFEEEA card/sidebar */
+  --pd-color-surface-container-low: var(--pd-palette-cream-200); /* #F4F4F0 */
+  --pd-color-surface-container-high: var(--pd-palette-cream-350); /* #E9E8E4 */
+  --pd-color-user-message-bg: var(--pd-palette-cream-300);   /* #EFEEEA user bubble */
 
   /* ── Semantic: Foreground ────────────────────────────────────────────── */
-  --pd-color-fg: var(--pd-palette-ink-900);
-  --pd-color-fg-muted: var(--pd-palette-stone-600);
+  --pd-color-fg: var(--pd-palette-ink-900);                  /* #1B1C1A */
+  --pd-color-fg-muted: var(--pd-palette-warm-brown-700);     /* #54433E warm brown secondary */
+  --pd-color-fg-tertiary: var(--pd-palette-warm-brown-500);  /* #87736D warm brown tertiary */
   --pd-color-fg-subtle: var(--pd-palette-stone-500);
   --pd-color-fg-on-accent: #FFFFFF;
   --pd-color-fg-inverse: var(--pd-palette-cream-100);
   --pd-color-fg-disabled: var(--pd-palette-cream-400);
 
   /* ── Semantic: Border ────────────────────────────────────────────────── */
-  --pd-color-border: var(--pd-palette-cream-300);
-  --pd-color-border-strong: var(--pd-palette-cream-400);
-  --pd-color-border-focus: var(--pd-palette-terra-500);
-  --pd-color-border-subtle: var(--pd-palette-cream-200);
+  --pd-color-border: var(--pd-palette-warm-brown-300);        /* #DAC1BA subtle warm */
+  --pd-color-border-strong: var(--pd-palette-warm-brown-500); /* #87736D warm brown */
+  --pd-color-border-focus: var(--pd-palette-terra-500);       /* #B85A38 */
+  --pd-color-border-subtle: var(--pd-palette-cream-300);      /* #EFEEEA */
+  --pd-color-border-variant: var(--pd-palette-warm-brown-300); /* #DAC1BA */
 
   /* ── Semantic: Accent ────────────────────────────────────────────────── */
-  --pd-color-accent: var(--pd-palette-terra-500);
-  --pd-color-accent-hover: var(--pd-palette-terra-600);
-  --pd-color-accent-active: var(--pd-palette-terra-600);
-  --pd-color-accent-subtle: rgba(217, 119, 87, 0.1);
-  --pd-color-accent-fg: var(--pd-palette-terra-700);
-  --pd-color-link: var(--pd-palette-terra-700);
+  --pd-color-accent: var(--pd-palette-terra-500);          /* #B85A38 WCAG 4.6:1 */
+  --pd-color-accent-hover: var(--pd-palette-terra-600);    /* #8F482F */
+  --pd-color-accent-active: var(--pd-palette-terra-600);   /* #8F482F */
+  --pd-color-accent-subtle: rgba(184, 90, 56, 0.1);
+  --pd-color-accent-fg: var(--pd-palette-terra-500);       /* #B85A38 */
+  --pd-color-accent-container: var(--pd-palette-terra-300); /* #FFDBD0 */
+  --pd-color-link: var(--pd-palette-terra-500);
 
   /* ── Semantic: Status ────────────────────────────────────────────────── */
-  --pd-color-success: var(--pd-palette-bamboo-500);
+  --pd-color-success: #4F6237;
   --pd-color-success-bg: var(--pd-palette-bamboo-300);
   --pd-color-warning: var(--pd-palette-amber-500);
   --pd-color-warning-bg: var(--pd-palette-amber-200);
@@ -202,7 +218,13 @@
 
   /* ── Semantic: Shadow / Scrim ────────────────────────────────────────── */
   --pd-color-scrim: rgba(20, 20, 19, 0.4);
-  --pd-color-selection: rgba(217, 119, 87, 0.15);
+  --pd-color-selection: rgba(184, 90, 56, 0.15);
+  --pd-color-selection-bg: rgba(255, 219, 208, 0.9);
+  --pd-color-selection-text: var(--pd-palette-warm-brown-900);  /* #390C00 */
+
+  /* ── Semantic: Glass / Frost ─────────────────────────────────────────── */
+  --pd-glass-surface: rgba(255, 255, 255, 0.84);
+  --pd-glass-border: rgba(218, 193, 186, 0.22);
 
   /* ── Shadow Scale ────────────────────────────────────────────────────── */
   --pd-shadow-xs: 0 1px 2px rgba(20, 20, 19, 0.05);
@@ -210,7 +232,7 @@
   --pd-shadow-md: 0 4px 6px rgba(20, 20, 19, 0.07), 0 2px 4px rgba(20, 20, 19, 0.04);
   --pd-shadow-lg: 0 10px 15px rgba(20, 20, 19, 0.08), 0 4px 6px rgba(20, 20, 19, 0.04);
   --pd-shadow-xl: 0 20px 25px rgba(20, 20, 19, 0.10), 0 8px 10px rgba(20, 20, 19, 0.04);
-  --pd-shadow-focus: 0 0 0 3px rgba(217, 119, 87, 0.3);
+  --pd-shadow-focus: 0 0 0 3px rgba(184, 90, 56, 0.3);
   --pd-shadow-focus-danger: 0 0 0 3px rgba(186, 61, 61, 0.3);
   --pd-shadow-button-primary: 0 1px 2px rgba(20, 20, 19, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 
@@ -257,7 +279,7 @@
   --pd-terminal-bg: #1A1918;
   --pd-terminal-fg: #E8E6DC;
   --pd-terminal-cursor: var(--pd-palette-terra-500);
-  --pd-terminal-selection: rgba(217, 119, 87, 0.25);
+  --pd-terminal-selection: rgba(184, 90, 56, 0.25);
   --pd-terminal-black: #2F2E2C;
   --pd-terminal-red: #BA3D3D;
   --pd-terminal-green: #6B8A47;
@@ -274,7 +296,7 @@
   --pd-pet-xp-bg: var(--pd-palette-cream-300);
   --pd-pet-level-badge: var(--pd-palette-amber-500);
   --pd-pet-species-border: var(--pd-palette-cream-400);
-  --pd-pet-mood-glow: rgba(217, 119, 87, 0.3);
+  --pd-pet-mood-glow: rgba(184, 90, 56, 0.3);
 }
 
 /* ==========================================================================
@@ -286,15 +308,15 @@
   /* ── Palette: Ink (deep warm blacks) ─────────────────────────────────── */
   --pd-palette-ink-950: #0D0D0C;
   --pd-palette-ink-900: #141413;
-  --pd-palette-ink-800: #1A1A19;
-  --pd-palette-ink-700: #24231F;
+  --pd-palette-ink-800: #1E1E1D;
+  --pd-palette-ink-700: #292928;
   --pd-palette-ink-600: #33322D;
-  --pd-palette-ink-500: #4A4944;
+  --pd-palette-ink-500: #3A3836;
 
   /* ── Palette: Stone / Cream (inverted text) ──────────────────────────── */
-  --pd-palette-stone-400: #C4C2BA;
+  --pd-palette-stone-400: #A8A19A;
   --pd-palette-stone-300: #DEDCD3;
-  --pd-palette-cream-100: #FAF9F5;
+  --pd-palette-cream-100: #E8E6E0;
 
   /* ── Palette: Terra Cotta (brightened for dark bg) ───────────────────── */
   --pd-palette-terra-300: #F0A189;
@@ -308,26 +330,32 @@
   --pd-palette-ruby-400: #D16C6C;
 
   /* ── Semantic: Surface ───────────────────────────────────────────────── */
-  --pd-color-bg: var(--pd-palette-ink-900);
-  --pd-color-bg-elevated: var(--pd-palette-ink-800);
+  --pd-color-bg: var(--pd-palette-ink-900);                  /* #141413 */
+  --pd-color-bg-elevated: var(--pd-palette-ink-800);         /* #1E1E1D */
   --pd-color-bg-subtle: var(--pd-palette-ink-800);
-  --pd-color-bg-hover: var(--pd-palette-ink-700);
+  --pd-color-bg-hover: var(--pd-palette-ink-700);            /* #292928 */
   --pd-color-bg-selected: var(--pd-palette-ink-600);
   --pd-color-bg-disabled: var(--pd-palette-ink-800);
+  --pd-color-surface-container: var(--pd-palette-ink-800);   /* #1E1E1D */
+  --pd-color-surface-container-low: var(--pd-palette-ink-800);
+  --pd-color-surface-container-high: var(--pd-palette-ink-700); /* #292928 */
+  --pd-color-user-message-bg: var(--pd-palette-ink-700);     /* #292928 */
 
   /* ── Semantic: Foreground ────────────────────────────────────────────── */
-  --pd-color-fg: var(--pd-palette-cream-100);
-  --pd-color-fg-muted: var(--pd-palette-stone-400);
+  --pd-color-fg: var(--pd-palette-cream-100);                /* #E8E6E0 */
+  --pd-color-fg-muted: var(--pd-palette-stone-400);          /* #A8A19A */
+  --pd-color-fg-tertiary: #7A756F;                           /* warm gray tertiary */
   --pd-color-fg-subtle: var(--pd-palette-stone-300);
   --pd-color-fg-on-accent: #FFFFFF;
   --pd-color-fg-inverse: var(--pd-palette-ink-900);
   --pd-color-fg-disabled: var(--pd-palette-ink-500);
 
   /* ── Semantic: Border ────────────────────────────────────────────────── */
-  --pd-color-border: var(--pd-palette-ink-500);
+  --pd-color-border: var(--pd-palette-ink-500);              /* #3A3836 */
   --pd-color-border-strong: var(--pd-palette-stone-400);
   --pd-color-border-focus: var(--pd-palette-terra-400);
   --pd-color-border-subtle: var(--pd-palette-ink-600);
+  --pd-color-border-variant: var(--pd-palette-ink-600);      /* dark warm border variant */
 
   /* ── Semantic: Accent ────────────────────────────────────────────────── */
   --pd-color-accent: var(--pd-palette-terra-400);
@@ -335,6 +363,7 @@
   --pd-color-accent-active: var(--pd-palette-terra-500);
   --pd-color-accent-subtle: rgba(227, 139, 110, 0.12);
   --pd-color-accent-fg: var(--pd-palette-ink-900);
+  --pd-color-accent-container: rgba(227, 139, 110, 0.15);   /* dark terracotta container */
   --pd-color-link: var(--pd-palette-terra-300);
 
   /* ── Semantic: Status ────────────────────────────────────────────────── */
@@ -350,6 +379,12 @@
   /* ── Semantic: Shadow / Scrim ────────────────────────────────────────── */
   --pd-color-scrim: rgba(0, 0, 0, 0.6);
   --pd-color-selection: rgba(227, 139, 110, 0.2);
+  --pd-color-selection-bg: rgba(183, 90, 56, 0.35);
+  --pd-color-selection-text: #E8E6E0;
+
+  /* ── Semantic: Glass / Frost ─────────────────────────────────────────── */
+  --pd-glass-surface: rgba(20, 20, 19, 0.84);
+  --pd-glass-border: rgba(58, 56, 54, 0.35);
 
   /* ── Shadow Scale ────────────────────────────────────────────────────── */
   --pd-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -456,13 +491,14 @@
    ========================================================================== */
 
 [data-pd-theme] {
+  /* ── Legacy unprefixed aliases ──────────────────────────────────────── */
   --bg-primary: var(--pd-color-bg);
   --bg-secondary: var(--pd-color-bg-subtle);
   --bg-tertiary: var(--pd-color-bg-hover);
   --bg-elevated: var(--pd-color-bg-elevated);
   --text-primary: var(--pd-color-fg);
   --text-secondary: var(--pd-color-fg-muted);
-  --text-tertiary: var(--pd-text-tertiary, var(--pd-color-fg-muted));
+  --text-tertiary: var(--pd-color-fg-tertiary, var(--pd-color-fg-muted));
   --border-primary: var(--pd-color-border);
   --border-secondary: var(--pd-color-border-subtle);
   --accent-primary: var(--pd-color-accent);
@@ -470,6 +506,20 @@
   --accent-muted: var(--pd-color-accent-subtle, var(--pd-color-accent));
   --shadow-sm: var(--pd-shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
   --shadow-md: var(--pd-shadow-md, 0 4px 6px rgba(0,0,0,0.07));
+
+  /* ── --pd-* shorthand aliases (used by tailwind.config.ts + global.css) */
+  --pd-bg: var(--pd-color-bg);
+  --pd-bg-secondary: var(--pd-color-bg-subtle);
+  --pd-bg-tertiary: var(--pd-color-bg-hover);
+  --pd-surface: var(--pd-color-surface-container);
+  --pd-border: var(--pd-color-border);
+  --pd-text: var(--pd-color-fg);
+  --pd-text-secondary: var(--pd-color-fg-muted);
+  --pd-text-muted: var(--pd-color-fg-tertiary);
+  --pd-accent: var(--pd-color-accent);
+  --pd-accent-hover: var(--pd-color-accent-hover);
+  --pd-sidebar-width: var(--pd-layout-sidebar-width);
+  --pd-inspector-width: var(--pd-layout-right-panel);
 }
 
 /* ==========================================================================

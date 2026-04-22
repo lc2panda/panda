@@ -41,6 +41,22 @@ body {
   color: var(--pd-text);
 }
 
+/* Text selection styling (warm terracotta) */
+::selection {
+  background: var(--pd-color-selection-bg);
+  color: var(--pd-color-selection-text);
+}
+
+/* Link styling */
+a {
+  text-decoration: underline;
+  color: var(--pd-color-link, var(--pd-accent));
+}
+
+a:hover {
+  text-decoration: none;
+}
+
 /* Electron: disable text selection on non-content areas */
 .no-select {
   -webkit-user-select: none;
