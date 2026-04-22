@@ -1,5 +1,5 @@
 // Input: content, timestamp, thinkingContent, toolCalls, isStreaming, transcriptMode from UIMessage
-// Output: Styled assistant message with markdown, thinking fold, tool cards, copy action
+// Output: Left-aligned assistant bubble with asymmetric radius, border, shadow (Claude desktop style)
 // Pos: Chat layer — renders individual assistant turns inside MessageList
 import React, { useState, useCallback } from "react";
 import { cn } from "../../lib/cn";
@@ -69,6 +69,14 @@ export const PdMessageBubble: React.FC<PdMessageBubbleProps> = React.memo(({
         "relative group",
         "mb-[var(--pd-space-3)]",
       )}
+      style={{
+        marginLeft: 40,
+        background: 'var(--pd-color-surface, var(--pd-color-bg))',
+        borderRadius: '8px 20px 20px 20px',
+        border: '1px solid color-mix(in srgb, var(--pd-color-border) 60%, transparent)',
+        boxShadow: 'var(--pd-shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+        padding: '12px 16px',
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >

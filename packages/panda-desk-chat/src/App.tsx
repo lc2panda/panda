@@ -146,7 +146,7 @@ export function App() {
 
   // --- Session switcher items (SessionMeta → SessionItem) ---
   const switcherSessions: SessionItem[] = useMemo(
-    () => sessionList.map((s) => ({
+    () => (sessionList ?? []).map((s) => ({
       id: s.id,
       title: s.name,
       updatedAt: new Date(s.lastActive).getTime(),

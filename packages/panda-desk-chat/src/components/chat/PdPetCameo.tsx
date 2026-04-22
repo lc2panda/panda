@@ -1,5 +1,5 @@
 // Input: Occasion type (empty_state, no_results, holiday, random)
-// Output: Cute panda character illustration with message
+// Output: Panda mascot SVG illustration with occasion message
 // Pos: ChatPage empty state — centered above HeroComposer when no active session
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -26,22 +26,7 @@ export interface PdPetCameoProps {
 /*  Constants                                                                 */
 /* -------------------------------------------------------------------------- */
 
-const SPECIES_POOL = [
-  "\uD83D\uDC3C", // panda
-  "\uD83D\uDC3B", // bear
-  "\uD83E\uDD8A", // fox
-  "\uD83D\uDC31", // cat
-  "\uD83D\uDC36", // dog
-  "\uD83D\uDC30", // rabbit
-  "\uD83D\uDC28", // koala
-  "\uD83E\uDD81", // lion
-  "\uD83D\uDC2F", // tiger
-  "\uD83D\uDC2E", // cow
-  "\uD83D\uDC37", // pig
-  "\uD83D\uDC38", // frog
-  "\uD83E\uDD89", // owl
-  "\uD83D\uDC27", // penguin
-] as const;
+/** Always panda — brand mascot, no random rotation */
 
 const EMPTY_STATE_MESSAGES = [
   "Ready to help!",
@@ -88,9 +73,6 @@ function pickRandom<T>(arr: readonly T[]): T {
 /* -------------------------------------------------------------------------- */
 
 export const PdPetCameo: React.FC<PdPetCameoProps> = ({ occasion, message }) => {
-  // Pick species + fallback message once on mount (useMemo with empty deps
-  // is intentional — we want stable picks per mount, not per render).
-  const species = useMemo(() => pickRandom(SPECIES_POOL), []);
   const displayMessage = useMemo(
     () => message ?? pickRandom(OCCASION_MESSAGES[occasion]),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,17 +87,30 @@ export const PdPetCameo: React.FC<PdPetCameoProps> = ({ occasion, message }) => 
         "select-none",
       )}
       role="img"
-      aria-label={`Pet cameo: ${displayMessage}`}
+      aria-label={`Panda mascot: ${displayMessage}`}
     >
-      <span
+      <div
         className={cn(
           "pet-cameo__species",
-          "block text-[4rem] leading-none",
+          "block leading-none",
         )}
         aria-hidden="true"
+        style={{ width: 80, height: 80 }}
       >
-        {species}
-      </span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="80" height="80">
+          <circle cx="68" cy="68" r="44" fill="#1a1a1a" />
+          <circle cx="188" cy="68" r="44" fill="#1a1a1a" />
+          <ellipse cx="128" cy="148" rx="88" ry="80" fill="#f5f5f5" />
+          <ellipse cx="92" cy="128" rx="28" ry="24" fill="#1a1a1a" transform="rotate(-8 92 128)" />
+          <ellipse cx="164" cy="128" rx="28" ry="24" fill="#1a1a1a" transform="rotate(8 164 128)" />
+          <circle cx="92" cy="126" r="8" fill="#f5f5f5" />
+          <circle cx="164" cy="126" r="8" fill="#f5f5f5" />
+          <circle cx="95" cy="123" r="3" fill="#ffffff" />
+          <circle cx="167" cy="123" r="3" fill="#ffffff" />
+          <ellipse cx="128" cy="158" rx="10" ry="7" fill="#1a1a1a" />
+          <path d="M118 165 Q128 174 138 165" stroke="#1a1a1a" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        </svg>
+      </div>
       <p
         className={cn(
           "text-[var(--pd-text-sm)]",

@@ -62,26 +62,29 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
   error: null,
 
   setSessions: (sessions) => {
-    set({ sessions, isLoading: false, error: null });
+    set({ sessions: Array.isArray(sessions) ? sessions : [], isLoading: false, error: null });
     get().saveSessions();
   },
 
   addSession: (session) => {
-    set((state) => ({ sessions: [...state.sessions, session] }));
+    set((state) => ({ sessions: [...(Array.isArray(state.sessions) ? state.sessions : []), session] }));
     get().saveSessions();
   },
 
   removeSession: (sessionId) => {
-    set((state) => ({
-      sessions: state.sessions.filter((s) => s.id !== sessionId),
-      activeId: state.activeId === sessionId ? (state.sessions[0]?.id ?? null) : state.activeId,
-    }));
+    set((state) => {
+      const list = Array.isArray(state.sessions) ? state.sessions : [];
+      return {
+        sessions: list.filter((s) => s.id !== sessionId),
+        activeId: state.activeId === sessionId ? (list[0]?.id ?? null) : state.activeId,
+      };
+    });
     get().saveSessions();
   },
 
   updateSession: (sessionId, updates) => {
     set((state) => ({
-      sessions: state.sessions.map((s) =>
+      sessions: (Array.isArray(state.sessions) ? state.sessions : []).map((s) =>
         s.id === sessionId ? { ...s, ...updates } : s,
       ),
     }));
@@ -116,7 +119,7 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
       messageCount: 0,
     };
     set((state) => ({
-      sessions: [session, ...state.sessions],
+      sessions: [session, ...(Array.isArray(state.sessions) ? state.sessions : [])],
       activeId: session.id,
     }));
     get().saveSessions();
@@ -125,7 +128,8 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
 
   deleteSession: (sessionId) => {
     const { sessions, activeId } = get();
-    const remaining = sessions.filter((s) => s.id !== sessionId);
+    const list = Array.isArray(sessions) ? sessions : [];
+    const remaining = list.filter((s) => s.id !== sessionId);
     const newActiveId =
       activeId === sessionId
         ? (remaining[0]?.id ?? null)
@@ -140,7 +144,7 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
 
   renameSession: (sessionId, name) => {
     set((state) => ({
-      sessions: state.sessions.map((s) =>
+      sessions: (Array.isArray(state.sessions) ? state.sessions : []).map((s) =>
         s.id === sessionId ? { ...s, name } : s,
       ),
     }));
@@ -153,10 +157,11 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
 
   loadSessions: () => {
     const saved = storage.get<SessionMeta[]>(SESSIONS_KEY, []);
+    const list = Array.isArray(saved) ? saved : [];
     const activeId = storage.get<string | null>(ACTIVE_ID_KEY, null);
     set({
-      sessions: saved,
-      activeId: activeId && saved.some((s) => s.id === activeId) ? activeId : (saved[0]?.id ?? null),
+      sessions: list,
+      activeId: activeId && list.some((s) => s.id === activeId) ? activeId : (list[0]?.id ?? null),
       isLoading: false,
     });
   },
