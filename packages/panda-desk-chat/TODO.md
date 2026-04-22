@@ -1,7 +1,7 @@
 # Panda Desk Chat — UI 进度记录
 
 > 最后更新: 2026-04-22 +08:00
-> 当前阶段: W14 完成 — Settings Refactor + Tests + Perf Optimization
+> 当前阶段: W15 完成 — Electron Tray + Test Coverage Expansion
 
 ## 已完成 Wave
 
@@ -40,6 +40,8 @@
 | W14-1 | SettingsPage 拆分 5 Tab + SettingRow 共享组件 | e218758 | ✅ |
 | W14-2 | 单元测试骨架 (toastStore/settingsStore/sessionStore 15 tests) | 26780ab | ✅ |
 | W14-3 | 性能优化 (selector+memo+lazy 12 项) | 5a31f0f | ✅ |
+| W15-1 | Electron Tray 激活 (createTray + isQuitting + hide-to-tray) | f1089c6 | ✅ |
+| W15-2 | 测试覆盖 15→58 (chatStore 23 + tabStore 16) | d11c698 | ✅ |
 
 ## W7 Electron 骨架 ✅
 
@@ -198,6 +200,32 @@ W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
 - [x] 4 个 chat 子组件 React.memo (MessageBubble, UserBubble, ToolCallCard, ThinkingBlock)
 - [x] 3 个非关键组件 React.lazy (SettingsPage, CommandPalette, SessionSwitcher)
 - [x] 12 项优化覆盖 9 个文件，零新增文件
+
+## W15 — Electron Tray + Test Coverage Expansion ✅
+
+### W15-1: System Tray 激活 ✅ `f1089c6`
+- [x] createTray() 在 setupMainWindow() 后调用（此前定义但未调用）
+- [x] before-quit handler 设 isQuitting=true，支持 Cmd+Q 正常退出
+- [x] Tray 右键菜单: Show/New Chat/Quit；左键点击显示窗口
+- [x] 关闭按钮隐藏到托盘而非退出
+
+### W15-2: 测试覆盖扩展 15→58 ✅ `d11c698`
+- [x] chatStore 23 cases: session lifecycle, connectionState, messages, tools, permissions, routing, transcriptMode
+- [x] tabStore 16 cases: add/remove/reorder/rename/pin/closeOthers/closeAll/getBySessionId
+- [x] 原有 15 cases (toast+settings+session) 保持通过
+- [x] 58/58 pass in 166ms
+
+## W16 — 候选方向（按优先级）
+
+> 以下为可选方向，待 Comdr 确认优先级后启动。
+
+| # | 方向 | 描述 | 预估 |
+|---|------|------|------|
+| 1 | E2E Playwright | Electron E2E 测试 (启动→聊天→设置→托盘) | M |
+| 2 | Notification 系统 | 系统通知 (消息到达/任务完成) + Dock badge | S |
+| 3 | 多窗口支持 | New Chat 打开独立窗口 + 窗口间 session 切换 | L |
+| 4 | Auto-update | electron-updater + GitHub Releases 自动更新 | M |
+| 5 | 深色/浅色主题跟随 | nativeTheme 监听 + 实时切换 + 自定义主题 | S |
 
 ## 架构备忘
 
