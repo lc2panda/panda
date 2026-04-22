@@ -1863,6 +1863,57 @@ async function* queryLoop(
         maxTurns,
         turnCount: nextTurnCount,
       })
+
+      // Graceful degradation: allow one final tool-free turn for summary.
+      // Without this, the agent's output is truncated mid-task — the caller
+      // only sees the last assistant turn's internal thoughts instead of a
+      // complete summary of findings.
+      try {
+        const summaryHint: UserMessage = {
+          type: 'user' as const,
+          uuid: deps.uuid() as import('crypto').UUID,
+          message: {
+            role: 'user' as const,
+            content: [
+              {
+                type: 'text' as const,
+                text: '[System: You have reached the maximum number of turns. Please provide a complete summary of all your findings and work done so far. Do not request any tool calls.]',
+              },
+            ],
+          },
+        }
+        const finalMessages: Message[] = [
+          ...messagesForQuery,
+          ...assistantMessages,
+          ...toolResults,
+          summaryHint,
+        ]
+        // Recursive call with maxTurns=1 + empty tools + canUseTool=false
+        // to guarantee no further tool execution or infinite recursion.
+        for await (const finalMsg of query({
+          ...params,
+          messages: finalMessages,
+          maxTurns: 1,
+          canUseTool: () => false,
+          toolUseContext: {
+            ...updatedToolUseContext,
+            options: {
+              ...updatedToolUseContext.options,
+              tools: [],
+              refreshTools: undefined,
+            },
+          },
+        })) {
+          yield finalMsg
+        }
+      } catch {
+        // If the summary call fails, proceed with the original truncation
+        // behavior — no worse than before this change.
+        logForDebugging(
+          '[query] max_turns graceful summary failed, proceeding with truncation',
+        )
+      }
+
       return { reason: 'max_turns', turnCount: nextTurnCount }
     }
 
