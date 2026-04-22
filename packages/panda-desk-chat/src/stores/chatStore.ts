@@ -60,6 +60,12 @@ export interface PendingPermission {
   tier: 'read' | 'write' | 'exec';
 }
 
+export interface RoutingInfo {
+  fromModel?: string;
+  toModel: string;
+  reason?: string;
+}
+
 export interface PerSessionState {
   sessionId: string;
   messages: UIMessage[];
@@ -74,6 +80,7 @@ export interface PerSessionState {
   tokenUsage: TokenUsage;
   elapsedSeconds: number;
   statusVerb: string;
+  routingInfo: RoutingInfo | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +102,7 @@ function createEmptySession(sessionId: string): PerSessionState {
     tokenUsage: { input: 0, output: 0 },
     elapsedSeconds: 0,
     statusVerb: '',
+    routingInfo: null,
   };
 }
 
@@ -218,6 +226,10 @@ export interface ChatStore {
   // Timer / status
   setElapsed: (sessionId: string, seconds: number) => void;
   setStatusVerb: (sessionId: string, verb: string) => void;
+
+  // Routing
+  setRoutingInfo: (sessionId: string, info: RoutingInfo) => void;
+  dismissRouting: (sessionId: string) => void;
 
   // Batch flush (call every ~16 ms from a RAF loop)
   flushStreamBuffer: (sessionId: string) => void;
@@ -554,6 +566,24 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       if (!session) return state;
       return {
         sessions: putSession(state.sessions, { ...session, statusVerb: verb }),
+      };
+    }),
+
+  setRoutingInfo: (sessionId, info) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      return {
+        sessions: putSession(state.sessions, { ...session, routingInfo: info }),
+      };
+    }),
+
+  dismissRouting: (sessionId) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      return {
+        sessions: putSession(state.sessions, { ...session, routingInfo: null }),
       };
     }),
 

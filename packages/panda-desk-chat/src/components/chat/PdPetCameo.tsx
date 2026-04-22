@@ -1,7 +1,6 @@
-// TODO(W12): Not yet wired to any page — integrate or remove in W12
 // Input: Occasion type (empty_state, no_results, holiday, random)
 // Output: Cute panda character illustration with message
-// Pos: Chat layer — decorative element for empty/special states
+// Pos: ChatPage empty state — centered above HeroComposer when no active session
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 

@@ -1,7 +1,6 @@
-// TODO(W12): Not yet wired to any page — integrate or remove in W12
-// Input: Model routing info (from/to model, reason)
+// Input: Model routing info (from/to model, reason) via chatStore.routingInfo
 // Output: Inline banner showing model switch notification
-// Pos: Chat layer — shows when AI model changes mid-conversation
+// Pos: ChatPage — between error banners and MessageList, conditional on routingInfo
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 

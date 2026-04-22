@@ -1,5 +1,5 @@
 // Input: chatStore (per-session state via activeSessionId), sessionStore (sessions, activeId), useI18n
-// Output: 聊天内容区 — MessageList + StreamingIndicator + PermissionDialog + Composer 或 HeroComposer
+// Output: 聊天内容区 — RoutingBanner + MessageList + StreamingIndicator + PermissionDialog + Composer 或 PetCameo + HeroComposer
 // Pos: App.tsx 的 main content slot，不含外层布局
 
 import React, { useCallback } from 'react';
@@ -8,6 +8,8 @@ import { PdComposer } from '../components/chat/PdComposer';
 import { PdHeroComposer } from '../components/chat/PdHeroComposer';
 import { PdStreamingIndicator } from '../components/chat/PdStreamingIndicator';
 import { PdPermissionDialog } from '../components/chat/PdPermissionDialog';
+import { PdRoutingBanner } from '../components/chat/PdRoutingBanner';
+import { PdPetCameo } from '../components/chat/PdPetCameo';
 import { useI18n } from '../hooks/useI18n';
 import { useChatStore } from '../stores/chatStore';
 import { useSessionStore } from '../stores/sessionStore';
@@ -29,6 +31,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
   const sendMessage = useChatStore((s) => s.sendMessage);
   const cancelStream = useChatStore((s) => s.cancelStream);
   const respondPermission = useChatStore((s) => s.respondPermission);
+  const dismissRouting = useChatStore((s) => s.dismissRouting);
 
   // Derived per-session state
   const messages = activeSession?.messages ?? [];
@@ -40,6 +43,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
   const tokenUsage = activeSession?.tokenUsage ?? null;
   const pendingPermission = activeSession?.pendingPermission ?? null;
   const connectionState = activeSession?.connectionState ?? 'disconnected';
+  const routingInfo = activeSession?.routingInfo ?? null;
 
   const hasActiveSession = !!sessions.find((s: any) => s.id === activeId);
 
@@ -84,6 +88,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
               <span>{t('chat.disconnected') || 'Disconnected'}</span>
             </div>
           )}
+          {routingInfo && activeId && (
+            <PdRoutingBanner
+              fromModel={routingInfo.fromModel}
+              toModel={routingInfo.toModel}
+              reason={routingInfo.reason}
+              onDismiss={() => dismissRouting(activeId)}
+            />
+          )}
           <PdMessageList
             messages={messages}
             isStreaming={isStreaming}
@@ -117,9 +129,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
           />
         </>
       ) : (
-        <PdHeroComposer
-          onSend={handleNewSession}
-        />
+        <>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <PdPetCameo occasion="empty_state" />
+          </div>
+          <PdHeroComposer
+            onSend={handleNewSession}
+          />
+        </>
       )}
     </div>
   );
