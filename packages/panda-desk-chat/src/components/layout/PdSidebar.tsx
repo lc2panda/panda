@@ -274,8 +274,8 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
     [setActive, setChatActiveSession],
   );
 
-  const handleNewSession = useCallback(() => {
-    const session = createSession();
+  const handleNewSession = useCallback(async () => {
+    const session = await createSession();
     addTab(session.id, session.name);
     setChatActiveSession(session.id);
   }, [createSession, addTab, setChatActiveSession]);

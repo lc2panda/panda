@@ -59,9 +59,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
   );
 
   const handleNewSession = useCallback(
-    (content: string) => {
+    async (content: string) => {
       if (!content.trim()) return;
-      const session = createSession();
+      const session = await createSession();
       sendMessage(session.id, content);
     },
     [createSession, sendMessage],

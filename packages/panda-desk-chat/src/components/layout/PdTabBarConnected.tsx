@@ -104,8 +104,8 @@ export function PdTabBarConnected() {
   );
 
   // ── New tab ──
-  const handleNewTab = useCallback(() => {
-    const session = createSession();
+  const handleNewTab = useCallback(async () => {
+    const session = await createSession();
     addTab(session.id, session.name);
     setChatActiveSession(session.id);
   }, [createSession, addTab, setChatActiveSession]);

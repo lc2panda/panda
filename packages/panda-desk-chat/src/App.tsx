@@ -65,8 +65,8 @@ export function App() {
     toggleSidebar: useCallback(() => setSidebarExpanded((p) => !p), []),
     toggleInspector: useCallback(() => setInspectorOpen((p) => !p), []),
     toggleSideChat: useCallback(() => setSideChatOpen((p) => !p), []),
-    newChat: useCallback(() => {
-      const session = createSession();
+    newChat: useCallback(async () => {
+      const session = await createSession();
       addTab(session.id, session.name);
       setChatActiveSession(session.id);
     }, [createSession, addTab, setChatActiveSession]),
@@ -85,8 +85,8 @@ export function App() {
       label: 'New Chat',
       group: 'Chat',
       shortcut: '⌘N',
-      action: () => {
-        const session = createSession();
+      action: async () => {
+        const session = await createSession();
         addTab(session.id, session.name);
         setChatActiveSession(session.id);
         setCommandPaletteOpen(false);

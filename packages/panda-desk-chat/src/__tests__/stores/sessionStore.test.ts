@@ -5,9 +5,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock bridge module — sessionStore calls bridge methods on init
+let _mockIdCounter = 0;
 vi.mock('@/ipc/bridge', () => ({
   isDevMode: () => true,
-  createSession: vi.fn().mockResolvedValue(undefined),
+  createSession: vi.fn().mockImplementation(() =>
+    Promise.resolve({ id: `mock-uuid-${++_mockIdCounter}` }),
+  ),
   deleteSession: vi.fn().mockResolvedValue(undefined),
   renameSession: vi.fn().mockResolvedValue(undefined),
   onSessionUpdated: vi.fn().mockReturnValue(() => {}),
@@ -33,6 +36,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 
 describe('sessionStore', () => {
   beforeEach(() => {
+    _mockIdCounter = 0;
     localStorageMock.clear();
     useSessionStore.setState({ sessions: [], activeId: null, isLoading: false, error: null });
   });
@@ -43,19 +47,19 @@ describe('sessionStore', () => {
     expect(activeId).toBeNull();
   });
 
-  it('createSession adds a session and sets it active', () => {
-    const session = useSessionStore.getState().createSession('Test Session');
+  it('createSession adds a session and sets it active', async () => {
+    const session = await useSessionStore.getState().createSession('Test Session');
 
     const state = useSessionStore.getState();
     expect(state.sessions).toHaveLength(1);
     expect(state.sessions[0].name).toBe('Test Session');
-    expect(state.sessions[0].id).toBeTruthy();
+    expect(state.sessions[0].id).toBe('mock-uuid-1');
     expect(state.activeId).toBe(session.id);
   });
 
-  it('deleteSession removes the session', () => {
-    const s1 = useSessionStore.getState().createSession('S1');
-    useSessionStore.getState().createSession('S2');
+  it('deleteSession removes the session', async () => {
+    const s1 = await useSessionStore.getState().createSession('S1');
+    await useSessionStore.getState().createSession('S2');
     expect(useSessionStore.getState().sessions).toHaveLength(2);
 
     useSessionStore.getState().deleteSession(s1.id);
@@ -65,17 +69,17 @@ describe('sessionStore', () => {
     expect(remaining[0].name).toBe('S2');
   });
 
-  it('renameSession updates the session name', () => {
-    const session = useSessionStore.getState().createSession('Original');
+  it('renameSession updates the session name', async () => {
+    const session = await useSessionStore.getState().createSession('Original');
     useSessionStore.getState().renameSession(session.id, 'Renamed');
 
     const updated = useSessionStore.getState().sessions.find(s => s.id === session.id);
     expect(updated?.name).toBe('Renamed');
   });
 
-  it('setActive switches the active session', () => {
-    const s1 = useSessionStore.getState().createSession('S1');
-    const s2 = useSessionStore.getState().createSession('S2');
+  it('setActive switches the active session', async () => {
+    const s1 = await useSessionStore.getState().createSession('S1');
+    const s2 = await useSessionStore.getState().createSession('S2');
 
     // After creating s2, activeId should be s2
     expect(useSessionStore.getState().activeId).toBe(s2.id);

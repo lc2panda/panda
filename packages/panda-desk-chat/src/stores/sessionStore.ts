@@ -35,7 +35,7 @@ export interface SessionStore {
 
   // Session management
   setActive: (sessionId: string) => void;
-  createSession: (name?: string) => SessionMeta;
+  createSession: (name?: string) => Promise<SessionMeta>;
   deleteSession: (sessionId: string) => void;
   renameSession: (sessionId: string, name: string) => void;
 
@@ -54,11 +54,6 @@ const ACTIVE_ID_KEY = 'sessions:activeId';
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
-
-let _nextId = 1;
-function generateSessionId(): string {
-  return `session-${Date.now()}-${_nextId++}`;
-}
 
 export const useSessionStore = create<SessionStore>()((set, get) => ({
   sessions: [],
@@ -105,11 +100,16 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
     });
   },
 
-  createSession: (name?: string) => {
+  createSession: async (name?: string) => {
     const now = new Date().toISOString();
+    const displayName = name ?? 'New Chat';
+
+    // Create session in backend first to get the authoritative UUID
+    const response = await bridge.createSession('', displayName);
+
     const session: SessionMeta = {
-      id: generateSessionId(),
-      name: name ?? `New Chat`,
+      id: response.id,
+      name: displayName,
       cwd: '',
       createdAt: now,
       lastActive: now,
@@ -120,10 +120,6 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
       activeId: session.id,
     }));
     get().saveSessions();
-    // Sync to backend via IPC bridge
-    bridge.createSession(session.cwd || '', session.name).catch((err: unknown) => {
-      console.error('[sessionStore] bridge.createSession failed:', err);
-    });
     return session;
   },
 
