@@ -7,6 +7,7 @@ export { useSessionStore, setupSessionBridge } from './sessionStore';
 export { useTabStore } from './tabStore';
 export { useSettingsStore, setupSettingsBridge } from './settingsStore';
 export { useUIStore } from './uiStore';
+export { useToastStore } from './toastStore';
 export { useProviderStore, setupProviderBridge } from './providerStore';
 
 // Re-export commonly used types
@@ -23,7 +24,8 @@ export type {
 export type { SessionMeta } from './sessionStore';
 export type { Tab } from './tabStore';
 export type { Theme, PermissionMode, Locale, EffortLevel } from './settingsStore';
-export type { ModalType, Toast } from './uiStore';
+export type { ModalType } from './uiStore';
+export type { Toast, ToastType } from './toastStore';
 export type { Provider, ModelInfo } from './providerStore';
 
 // ---------------------------------------------------------------------------

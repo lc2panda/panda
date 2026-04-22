@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import * as bridge from '../ipc/bridge';
+import { useToastStore } from './toastStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -563,6 +564,10 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     addUserMessage(sessionId, content);
     bridge.sendMessage(sessionId, content).catch((err) => {
       console.error('[chatStore] sendMessage failed:', err);
+      useToastStore.getState().addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to send message',
+      });
     });
   },
 
@@ -571,12 +576,20 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     resolvePermission(sessionId);
     bridge.respondToPermission(sessionId, toolUseId, decision).catch((err) => {
       console.error('[chatStore] respondPermission failed:', err);
+      useToastStore.getState().addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to respond to permission',
+      });
     });
   },
 
   cancelStream: (sessionId) => {
     bridge.stopGeneration(sessionId).catch((err) => {
       console.error('[chatStore] cancelStream failed:', err);
+      useToastStore.getState().addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to cancel stream',
+      });
     });
     set((state) => {
       const session = getSession(state.sessions, sessionId);
@@ -598,6 +611,10 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   pasteImage: (sessionId, dataUrl) => {
     bridge.pasteImage(sessionId, dataUrl).catch((err) => {
       console.error('[chatStore] pasteImage failed:', err);
+      useToastStore.getState().addToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to paste image',
+      });
     });
   },
 }));
