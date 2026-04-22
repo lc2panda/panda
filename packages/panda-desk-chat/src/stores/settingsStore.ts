@@ -26,6 +26,7 @@ interface PersistedSettings {
   sidebarExpanded: boolean;
   inspectorVisible: boolean;
   effortLevel: EffortLevel;
+  workingDirectory: string;
 }
 
 export interface SettingsStore extends PersistedSettings {
@@ -36,6 +37,7 @@ export interface SettingsStore extends PersistedSettings {
   setModel: (modelId: string) => void;
   setFontSize: (size: number) => void;
   setEffortLevel: (level: EffortLevel) => void;
+  setWorkingDirectory: (dir: string) => void;
   toggleSidebar: () => void;
   toggleInspector: () => void;
   loadSettings: () => void;
@@ -55,6 +57,7 @@ const defaults: PersistedSettings = {
   sidebarExpanded: true,
   inspectorVisible: false,
   effortLevel: 'auto',
+  workingDirectory: '',
 };
 
 function pickPersisted(state: PersistedSettings): PersistedSettings {
@@ -67,6 +70,7 @@ function pickPersisted(state: PersistedSettings): PersistedSettings {
     sidebarExpanded: state.sidebarExpanded,
     inspectorVisible: state.inspectorVisible,
     effortLevel: state.effortLevel,
+    workingDirectory: state.workingDirectory,
   };
 }
 
@@ -102,6 +106,10 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
   },
   setEffortLevel: (effortLevel) => {
     set({ effortLevel });
+    get().saveSettings();
+  },
+  setWorkingDirectory: (workingDirectory) => {
+    set({ workingDirectory });
     get().saveSettings();
   },
   toggleSidebar: () => {

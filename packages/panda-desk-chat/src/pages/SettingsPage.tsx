@@ -8,6 +8,7 @@ import { PdButton } from '../components/atoms/PdButton';
 import { PdInput } from '../components/atoms/PdInput';
 import { PdSelect } from '../components/atoms/PdSelect';
 import { PdSwitch } from '../components/atoms/PdSwitch';
+import { PdDirectoryPicker } from '../components/special/PdDirectoryPicker';
 import { useI18n } from '../hooks/useI18n';
 import type { Locale } from '../i18n';
 import { useTheme } from '../hooks/useTheme';
@@ -41,9 +42,16 @@ const SettingRow: React.FC<SettingRowProps> = ({ label, description, children })
 
 const GeneralTab: React.FC = () => {
   const { t, locale, changeLocale } = useI18n();
-  const { loadSettings } = useSettingsStore();
+  const { loadSettings, workingDirectory, setWorkingDirectory } = useSettingsStore();
   return (
     <div>
+      <SettingRow label={t('settings.workingDir')} description={t('settings.workingDirDesc')}>
+        <PdDirectoryPicker
+          value={workingDirectory}
+          onChange={setWorkingDirectory}
+          placeholder={t('settings.workingDirPlaceholder')}
+        />
+      </SettingRow>
       <SettingRow label={t('settings.language')} description={t('settings.languageDesc')}>
         <PdSelect value={locale} onChange={(v: string) => changeLocale(v as Locale)} options={[
           { value: 'en', label: 'English' },
