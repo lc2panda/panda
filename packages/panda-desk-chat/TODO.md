@@ -1,7 +1,7 @@
 # Panda Desk Chat — UI 进度记录
 
-> 最后更新: 2026-04-22 15:30 +08:00
-> 当前阶段: W10 Toast Notification System + Final Polish
+> 最后更新: 2026-04-22 15:45 +08:00
+> 当前阶段: W10 完成 — Toast Notification System + i18n
 
 ## 已完成 Wave
 
@@ -23,6 +23,9 @@
 | W9-1 | tsc 22→0 错误 (lucide类型+Props对齐+Locale安全) | cddbf51 | ✅ |
 | W9-2 | DevMock 完整流式模拟 (thinking+text+tool+permission) | (W9-1) | ✅ |
 | W9-3 | 错误处理 UI (StatusBar error state + ChatPage banners) | 620a645 | ✅ |
+| W10-1 | Toast Store (zustand) + chatStore 错误集成 | (W10) | ✅ |
+| W10-2 | PdToastContainer 接入 App.tsx | (W10) | ✅ |
+| W10-3 | i18n error banner keys (en/zh/ja/ko) | 581f68b | ✅ |
 
 ## W7 Electron 骨架 ✅
 
@@ -85,20 +88,20 @@ W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
 - [x] 网络超时/API 错误的用户反馈
 - [x] 空会话/无消息状态的 empty state
 
-## W10 — Toast Notification System + Final Polish
+## W10 — Toast Notification System + Final Polish ✅
 
-### W10-1: Toast Store
-- [ ] 创建 toastStore (zustand)：add/dismiss/clearAll
-- [ ] ToastItem 类型：id, type (success/error/warning/info), message, duration
-- [ ] chatStore 错误处理改为 pushToast 而非 console.error
+### W10-1: Toast Store ✅
+- [x] 创建 toastStore (zustand)：add/dismiss/clearAll
+- [x] ToastItem 类型：id, type (success/error/warning/info), message, duration
+- [x] chatStore 错误处理改为 pushToast 而非 console.error
 
-### W10-2: Wire PdToastContainer
-- [ ] App.tsx: 从 toastStore 读取 toasts 传给 PdToastContainer
-- [ ] 替换硬编码的 toasts={[]} onDismiss={() => {}}
+### W10-2: Wire PdToastContainer ✅
+- [x] App.tsx: 从 toastStore 读取 toasts 传给 PdToastContainer
+- [x] 替换硬编码的 toasts={[]} onDismiss={() => {}}
 
-### W10-3: i18n 补全
-- [ ] 新增的 error banner 文案翻译 (zh/en/ja/ko)
-- [ ] chat.connectionError, chat.disconnected keys
+### W10-3: i18n 补全 ✅ `581f68b`
+- [x] 新增的 error banner 文案翻译 (zh/en/ja/ko)
+- [x] chat.connectionError, chat.disconnected keys
 
 ## 架构备忘
 
