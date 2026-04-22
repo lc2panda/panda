@@ -19,14 +19,9 @@ export const PdDirectoryPicker = forwardRef<HTMLDivElement, PdDirectoryPickerPro
     const handleBrowse = async () => {
       if (disabled) return;
       try {
-        // Attempt IPC bridge for Electron/Tauri environments
+        // Attempt IPC bridge for Electron environment
         const w = (window as unknown) as Record<string, unknown>;
-        if (w.__TAURI__) {
-          // @ts-ignore — resolved at runtime by Tauri bundler
-          const { open } = await import("@tauri-apps/plugin-dialog");
-          const selected = await open({ directory: true, multiple: false });
-          if (typeof selected === "string") onChange(selected);
-        } else if (w.electronAPI && typeof (w.electronAPI as Record<string, unknown>).selectDirectory === "function") {
+        if (w.electronAPI && typeof (w.electronAPI as Record<string, unknown>).selectDirectory === "function") {
           const result = await (w.electronAPI as { selectDirectory: () => Promise<string | null> }).selectDirectory();
           if (result) onChange(result);
         } else {
