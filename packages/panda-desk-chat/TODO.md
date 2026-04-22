@@ -1,7 +1,7 @@
 # Panda Desk Chat — UI 进度记录
 
-> 最后更新: 2026-04-22 09:30 +08:00
-> 当前阶段: W9 Type Safety & Dev Experience Polish
+> 最后更新: 2026-04-22 11:00 +08:00
+> 当前阶段: W9-3 Error Handling & Edge UI (W9-1/W9-2 完成)
 
 ## 已完成 Wave
 
@@ -20,6 +20,8 @@
 | W8-1 | chatStore 流式事件处理 — W6 已实现 | (W6) | ✅ |
 | W8-2 | ChatPage 连线 (PdMessageList+Streaming+Permission) | 513a62f | ✅ |
 | W8-3 | 消息渲染 (Markdown+thinking fold+streaming cursor) | (W4/W5) | ✅ |
+| W9-1 | tsc 22→0 错误 (lucide类型+Props对齐+Locale安全) | cddbf51 | ✅ |
+| W9-2 | DevMock 完整流式模拟 (thinking+text+tool+permission) | (W9-1) | ✅ |
 
 ## W7 Electron 骨架 ✅
 
@@ -64,17 +66,18 @@ W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
 
 ## W9 — Type Safety & Dev Experience Polish
 
-### W9-1: 修复既有 tsc 错误
-- [ ] ChatPage.tsx 相关 Props 类型对齐
-- [ ] App.tsx onBack/routing props
-- [ ] lucide-react JSX 兼容性（可能需要 @types 版本调整）
-- [ ] tauri 模块声明移除/条件化
+### W9-1: 修复既有 tsc 错误 ✅ `cddbf51`
+- [x] ChatPage.tsx 相关 Props 类型对齐
+- [x] App.tsx onBack/routing props
+- [x] lucide-react JSX 兼容性（27 图标类型覆盖）
+- [x] tauri 模块声明移除/条件化
+- [x] Locale 类型安全
 
-### W9-2: DevMock 流式模拟
-- [ ] dev-mock.ts 中 sendMessage 触发模拟流式响应
-- [ ] 模拟 stream:start → 多个 stream:delta → stream:end 时序
-- [ ] 支持 thinking delta + text delta 混合流
-- [ ] 模拟 tool:use:start/end 和 permission:request 场景
+### W9-2: DevMock 流式模拟 ✅
+- [x] dev-mock.ts 中 sendMessage 触发模拟流式响应
+- [x] 模拟 stream:start → 多个 stream:delta → stream:end 时序
+- [x] 支持 thinking delta + text delta 混合流
+- [x] 模拟 tool:use:start/end 和 permission:request 场景
 
 ### W9-3: 错误处理 + 边界 UI
 - [ ] CLI 进程崩溃/断开的错误提示
