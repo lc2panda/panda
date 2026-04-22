@@ -4,7 +4,7 @@
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
-import { app, BrowserWindow, Menu, nativeTheme, shell } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, nativeTheme, shell, Tray } from 'electron';
 import { join } from 'node:path';
 import { registerIpcHandlers, setupMainWindow } from './ipc/handlers';
 import { cliManager } from './backend/cli-manager';
@@ -21,6 +21,8 @@ const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost
 // ---------------------------------------------------------------------------
 
 let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let isQuitting = false;
 
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -54,12 +56,77 @@ function createMainWindow(): BrowserWindow {
     return { action: 'deny' };
   });
 
-  // Cleanup
+  // Minimize to tray on close instead of quitting
+  win.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      win.hide();
+    }
+  });
+
+  // Cleanup reference when window is destroyed
   win.on('closed', () => {
     mainWindow = null;
   });
 
   return win;
+}
+
+// ---------------------------------------------------------------------------
+// System tray
+// ---------------------------------------------------------------------------
+
+/** 16x16 monochrome panda icon encoded as a PNG data-URL (template image). */
+const TRAY_ICON_DATA_URL =
+  'data:image/png;base64,' +
+  'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA' +
+  'lElEQVQ4y2NgGAUMDAwMjEQq/s/AwMBMjAFMDFQCowYMOAP+' +
+  'k2oAE6kGMJPbBMxkxgKaG8BMbhMwk2IAMzlpgJkUA5jJTQPM' +
+  '5KYBMAMY/xMwgIXcJmAmtwmYyY0FZnJjgZncWGAmNxaYyY0F' +
+  'ZnJjgZncWGAmNxaYyY0FZnJjgZncWGAmNxaYyY0FMIMxAACa' +
+  'jBY1yEypzAAAAABJRU5ErkJggg==';
+
+function createTray(): void {
+  const icon = nativeImage.createFromDataURL(TRAY_ICON_DATA_URL);
+  // Mark as template so macOS adapts to menubar light/dark mode
+  icon.setTemplateImage(true);
+
+  tray = new Tray(icon);
+  tray.setToolTip('Panda Code');
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show Window',
+      click: () => {
+        mainWindow?.show();
+        mainWindow?.focus();
+      },
+    },
+    {
+      label: 'New Chat',
+      click: () => {
+        mainWindow?.show();
+        mainWindow?.focus();
+        mainWindow?.webContents.send('panda:new-chat');
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(contextMenu);
+
+  // Left-click on tray icon shows/focuses window
+  tray.on('click', () => {
+    mainWindow?.show();
+    mainWindow?.focus();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +198,9 @@ app.whenReady().then(() => {
   mainWindow = createMainWindow();
   setupMainWindow(mainWindow);
 
+  // System tray (minimize-to-tray support)
+  createTray();
+
   // Listen for system theme changes and notify renderer
   nativeTheme.on('updated', () => {
     const isDark = nativeTheme.shouldUseDarkColors;
@@ -147,6 +217,7 @@ app.whenReady().then(() => {
 
 // Cleanup CLI processes before quit
 app.on('before-quit', () => {
+  isQuitting = true;
   cliManager.destroyAll();
 });
 
