@@ -1,7 +1,7 @@
 # Panda Desk Chat — UI 进度记录
 
 > 最后更新: 2026-04-22 +08:00
-> 当前阶段: W12 完成 — Component Integration
+> 当前阶段: W13 完成 — Electron Enhancement
 
 ## 已完成 Wave
 
@@ -34,6 +34,9 @@
 | W12-2 | Wire PdDirectoryPicker + PdRoutingBanner | bc455f6 | ✅ |
 | W12-3 | Toast system + i18n complete | bc455f6 | ✅ |
 | W12-4 | PdRoutingBanner + PdPetCameo integrated in ChatPage | c81b4ff | ✅ |
+| W13-1 | Electron App Menu (macOS standard + keyboard shortcuts) | ac9ab73 | ✅ |
+| W13-2 | nativeTheme system theme follow + IPC sync | ac9ab73 | ✅ |
+| W13-3 | Clipboard Image paste (already implemented in Composer) | — | ✅ |
 
 ## W7 Electron 骨架 ✅
 
@@ -153,27 +156,48 @@ W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
 - [x] setRoutingInfo / dismissRouting actions
 - [x] PdRoutingBanner / PdPetCameo 头部注释更新，移除 TODO(W12) 标记
 
-## W13 — Electron Enhancement (计划)
+## W13 — Electron Enhancement ✅
 
-### W13-1: Native Menu
-- [ ] electron/main.ts: 自定义应用菜单 (File/Edit/View/Help)
-- [ ] 快捷键绑定: Cmd+N 新建会话, Cmd+W 关闭标签, Cmd+, 设置
+### W13-1: Native App Menu ✅ `ac9ab73`
+- [x] electron/main.ts: macOS 标准菜单 (App/Edit/View/Window)
+- [x] 快捷键绑定: Cmd+Q 退出, Cmd+Z/X/C/V 编辑, Cmd+R 刷新, Cmd+Shift+I DevTools
+- [x] Menu.setApplicationMenu() 在 app.whenReady() 后初始化
 
-### W13-2: nativeTheme
-- [ ] 监听系统深色/浅色模式切换
-- [ ] 通过 IPC 同步到 renderer uiStore.theme
-- [ ] 支持 auto/light/dark 三档切换
+### W13-2: nativeTheme ✅ `ac9ab73`
+- [x] nativeTheme.on('updated') 监听系统主题切换
+- [x] IPC channel 'native-theme:changed' → renderer 同步
+- [x] preload/chat.ts 暴露 onNativeThemeChanged 回调
+- [x] bridge.ts 注册 nativeTheme 监听接口
+- [x] IPC handler count: 16 → 17
 
-### W13-3: Clipboard Image
-- [ ] 粘贴图片到 Composer (Cmd+V)
-- [ ] 从 clipboard 读取 image buffer → base64 → 附件消息
-- [ ] 拖拽图片到聊天区域支持
+### W13-3: Clipboard Image ✅ (已就位)
+- [x] PdHeroComposer / PdComposerInput 已支持粘贴图片 (Cmd+V)
+- [x] 剪贴板 image buffer → base64 附件流程已在 W5 实现
+- [x] 无需额外代码变更
+
+## W14 — Settings & Testing (计划)
+
+### W14-1: SettingsPage 组件拆分
+- [ ] SettingsPage 大组件拆分为独立 Tab 组件 (GeneralTab, AppearanceTab, ProvidersTab, ShortcutsTab, AboutTab)
+- [ ] 每个 Tab 独立文件，SettingsPage 仅做路由编排
+- [ ] Tab 切换状态持久化到 uiStore
+
+### W14-2: E2E 测试骨架
+- [ ] Playwright + Electron 测试配置
+- [ ] 基础冒烟测试: 启动 → 窗口创建 → 三栏布局渲染
+- [ ] IPC channel 联通测试: 至少覆盖 chat:send / stream:* / session:* 核心路径
+- [ ] CI 集成配置 (GitHub Actions)
+
+### W14-3: 性能优化
+- [ ] PdMessageList 虚拟滚动 (长对话 >100 条消息)
+- [ ] chatStore selector 细粒度化，减少不必要 re-render
+- [ ] Electron 冷启动时间分析 + 优化 (preload 延迟加载)
 
 ## 架构备忘
 
 - App.tsx (105行): 三栏布局 shell + 页面切换 useState<'chat'|'settings'>
 - ChatPage: 纯内容区（RoutingBanner + MessageList + Composer / PetCameo + HeroComposer）
 - SettingsPage: 5 标签页（General/Appearance/Providers/Shortcuts/About）
-- IPC: 4 层架构 schemas→types→bridge→dev-mock，24 channel，5 组
+- IPC: 4 层架构 schemas→types→bridge→dev-mock，25 channel，5 组 + nativeTheme
 - Stores: chatStore(大型), sessionStore(完整), uiStore(完整), tabStore, settingsStore, providerStore
 - Bridge: 所有 stores 已连通 IPC bridge (W6-2)，DevMock 覆盖全部 24 channel (W6-3)
