@@ -1,3 +1,4 @@
+// TODO(W12): Not yet wired to any page — integrate or remove in W12
 // Input: Model routing info (from/to model, reason)
 // Output: Inline banner showing model switch notification
 // Pos: Chat layer — shows when AI model changes mid-conversation

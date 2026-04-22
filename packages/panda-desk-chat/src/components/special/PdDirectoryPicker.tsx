@@ -1,3 +1,4 @@
+// TODO(W12): Not yet wired to any page — integrate or remove in W12
 // Input: value (path string), onChange, label props
 // Output: Directory path display with browse button
 // Pos: Special layer — file-system directory selector UI

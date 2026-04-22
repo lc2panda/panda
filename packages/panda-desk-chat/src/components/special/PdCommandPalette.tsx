@@ -1,3 +1,4 @@
+// TODO(W12): Not yet wired to any page — integrate or remove in W12
 // Input: Cmd+K 触发
 // Output: 全局命令面板浮层
 // Pos: App 顶层 overlay

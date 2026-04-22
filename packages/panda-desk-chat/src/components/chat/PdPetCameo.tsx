@@ -1,3 +1,4 @@
+// TODO(W12): Not yet wired to any page — integrate or remove in W12
 // Input: Occasion type (empty_state, no_results, holiday, random)
 // Output: Cute panda character illustration with message
 // Pos: Chat layer — decorative element for empty/special states

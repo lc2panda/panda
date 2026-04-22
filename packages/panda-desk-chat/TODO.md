@@ -1,7 +1,7 @@
 # Panda Desk Chat — UI 进度记录
 
-> 最后更新: 2026-04-22 15:45 +08:00
-> 当前阶段: W10 完成 — Toast Notification System + i18n
+> 最后更新: 2026-04-22 +08:00
+> 当前阶段: W11 完成 — Reliability + Component Audit
 
 ## 已完成 Wave
 
@@ -26,6 +26,10 @@
 | W10-1 | Toast Store (zustand) + chatStore 错误集成 | (W10) | ✅ |
 | W10-2 | PdToastContainer 接入 App.tsx | (W10) | ✅ |
 | W10-3 | i18n error banner keys (en/zh/ja/ko) | 581f68b | ✅ |
+| W10-4 | Toast store export + chatStore integration fix | 045876e | ✅ |
+| W11-1 | CLI auto-reconnect (3 retries + exponential backoff) | b125aef | ✅ |
+| W11-2 | newChat wiring (Sidebar + HeroComposer → chatStore) | cd4ba2a | ✅ |
+| W11-3 | Unused component audit (6 components marked TODO) | (W11) | ✅ |
 
 ## W7 Electron 骨架 ✅
 
@@ -102,6 +106,43 @@ W8 各子任务已在先前 Wave 中实现或在 513a62f 中集成完成：
 ### W10-3: i18n 补全 ✅ `581f68b`
 - [x] 新增的 error banner 文案翻译 (zh/en/ja/ko)
 - [x] chat.connectionError, chat.disconnected keys
+
+### W10-4: Toast store export fix ✅ `045876e`
+- [x] toastStore 正确导出到 stores/index.ts
+- [x] chatStore 错误路径集成 toastStore.pushToast
+
+## W11 — Reliability + Component Audit ✅
+
+### W11-1: CLI auto-reconnect ✅ `b125aef`
+- [x] bridge.ts: 断线检测 + 3 次指数退避重连
+- [x] chatStore: reconnect 状态管理 + UI 反馈
+
+### W11-2: newChat wiring ✅ `cd4ba2a`
+- [x] Sidebar "New Chat" 按钮连线 chatStore.newChat()
+- [x] HeroComposer 空状态触发新会话
+
+### W11-3: Unused component audit ✅
+- [x] 6 组件审计: PdBuddyEventCard, PdRoutingBanner, PdPetCameo, PdDirectoryPicker, PdCommandPalette, PdSessionSwitcher
+- [x] 每个组件顶部添加 `TODO(W12)` 标记
+- [x] 评估结果:
+  - **高价值 (W12 接入)**: PdCommandPalette (Cmd+K), PdSessionSwitcher (Cmd+P), PdDirectoryPicker (Settings)
+  - **中价值 (W12 接入)**: PdRoutingBanner (model switch), PdPetCameo (empty state)
+  - **低优先级**: PdBuddyEventCard (decorative milestone cards)
+
+## W12 — Component Integration + Electron Enhancement (计划)
+
+### W12-1: Wire PdCommandPalette + PdSessionSwitcher
+- [ ] App.tsx: Cmd+K → PdCommandPalette overlay
+- [ ] App.tsx: Cmd+P → PdSessionSwitcher overlay
+- [ ] 连线 sessionStore 会话列表数据
+
+### W12-2: Wire PdDirectoryPicker + PdRoutingBanner
+- [ ] SettingsPage General tab: PdDirectoryPicker 选择工作目录
+- [ ] ChatPage: PdRoutingBanner 显示模型切换通知
+
+### W12-3: Wire PdPetCameo + Polish
+- [ ] ChatPage empty state: PdPetCameo 替代纯文字空状态
+- [ ] PdBuddyEventCard 评估是否保留或移除
 
 ## 架构备忘
 
