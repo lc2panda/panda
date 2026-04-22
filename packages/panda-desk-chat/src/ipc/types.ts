@@ -1,5 +1,5 @@
 // Input: Zod schemas from ./schemas.ts
-// Output: TypeScript types inferred from Zod + PandaChatAPI named interface (C-5)
+// Output: TypeScript types inferred from Zod + PandaChatAPI named interface (C-5) + UpdateStatus type
 // Pos: IPC type layer — consumed by bridge.ts, chat renderer components, and main process handlers
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -92,6 +92,24 @@ export type ClipboardPastePayload   = z.infer<typeof clipboardPasteImageSchema>;
 
 export type Unsubscribe = () => void;
 
+// ─── Update status type ────────────────────────────────────────────────────
+
+export type UpdateStatusType =
+  | 'checking'
+  | 'available'
+  | 'up-to-date'
+  | 'downloading'
+  | 'downloaded'
+  | 'error';
+
+export interface UpdateStatus {
+  status: UpdateStatusType;
+  version?: string;
+  releaseNotes?: string | { version: string; note: string }[] | null;
+  percent?: number;
+  message?: string;
+}
+
 // ─── PandaChatAPI: named interface matching preload (C-5 compliant) ─────────
 
 export interface PandaChatAPI {
@@ -137,6 +155,12 @@ export interface PandaChatAPI {
   theme: {
     getSystemTheme(): Promise<'light' | 'dark'>;
     onThemeChange(callback: (isDark: boolean) => void): Unsubscribe;
+  };
+  update: {
+    check(): Promise<void>;
+    download(): Promise<void>;
+    install(): Promise<void>;
+    onStatus(callback: (status: UpdateStatus) => void): Unsubscribe;
   };
 }
 

@@ -1,5 +1,5 @@
-// Input: ipcMain handle registrations + CLI backend manager (W7-2), notificationManager
-// Output: IPC request handlers for all 19 channels — connected to CLIManager + nativeTheme + notifications
+// Input: ipcMain handle registrations + CLI backend manager (W7-2), notificationManager, appUpdater
+// Output: IPC request handlers for all 22 channels — connected to CLIManager + nativeTheme + notifications + updater
 // Pos: Main process IPC layer — routes renderer requests to CLI backend
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -9,6 +9,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { cliManager } from '../backend/cli-manager';
 import { notificationManager } from '../notification';
+import { appUpdater } from '../updater';
 
 // ---------------------------------------------------------------------------
 // IPC channel constants (must match preload/chat.ts)
@@ -36,6 +37,10 @@ const CH = {
   // Notifications
   NOTIFICATION_SET_ENABLED: 'panda:notification:set-enabled',
   NOTIFICATION_CLEAR:       'panda:notification:clear',
+  // Update
+  UPDATE_CHECK:    'panda:update:check',
+  UPDATE_DOWNLOAD: 'panda:update:download',
+  UPDATE_INSTALL:  'panda:update:install',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -217,7 +222,21 @@ export function registerIpcHandlers(): void {
     notificationManager.clearUnread();
   });
 
-  console.log('[IPC] Registered 19 invoke handlers (CLI backend connected)');
+  // ── Auto-update ─────────────────────────────────────────────────────
+
+  ipcMain.handle(CH.UPDATE_CHECK, async () => {
+    await appUpdater.checkForUpdates();
+  });
+
+  ipcMain.handle(CH.UPDATE_DOWNLOAD, async () => {
+    await appUpdater.downloadUpdate();
+  });
+
+  ipcMain.handle(CH.UPDATE_INSTALL, async () => {
+    appUpdater.quitAndInstall();
+  });
+
+  console.log('[IPC] Registered 22 invoke handlers (CLI backend connected)');
 }
 
 // ---------------------------------------------------------------------------

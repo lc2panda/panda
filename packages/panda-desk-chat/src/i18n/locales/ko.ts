@@ -94,6 +94,15 @@ export default {
   'settings.notifications': '시스템 알림',
   'settings.notificationsDesc': '새 메시지가 도착하면 알림을 표시합니다',
 
+  // Settings > About > Update
+  'settings.about.checkUpdate': '업데이트 확인',
+  'settings.about.upToDate': '최신 버전입니다',
+  'settings.about.updateAvailable': '업데이트 사용 가능: v{version}',
+  'settings.about.downloading': '다운로드 중... {percent}%',
+  'settings.about.readyToInstall': '업데이트 준비 완료 — 재시작하여 적용',
+  'settings.about.restartNow': '지금 재시작',
+  'settings.about.checkFailed': '업데이트 확인 실패',
+
   // Inspector
   'inspector.context': '컨텍스트',
   'inspector.files': '파일',

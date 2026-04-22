@@ -94,6 +94,15 @@ export default {
   'settings.notifications': 'システム通知',
   'settings.notificationsDesc': '新しいメッセージが届いたときに通知を表示',
 
+  // Settings > About > Update
+  'settings.about.checkUpdate': 'アップデートを確認',
+  'settings.about.upToDate': '最新です',
+  'settings.about.updateAvailable': 'アップデートあり: v{version}',
+  'settings.about.downloading': 'ダウンロード中... {percent}%',
+  'settings.about.readyToInstall': '更新準備完了 — 再起動して適用',
+  'settings.about.restartNow': '今すぐ再起動',
+  'settings.about.checkFailed': 'アップデート確認に失敗',
+
   // Inspector
   'inspector.context': 'コンテキスト',
   'inspector.files': 'ファイル',

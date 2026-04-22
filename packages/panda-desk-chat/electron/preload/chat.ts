@@ -1,5 +1,5 @@
 // Input: Electron contextBridge + ipcRenderer APIs
-// Output: window.pandaAPI — type-safe IPC client matching PandaChatAPI interface
+// Output: window.pandaAPI — type-safe IPC client matching PandaChatAPI interface (25 channels + update namespace)
 // Pos: Electron preload script — sole bridge between renderer and main process
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -46,6 +46,11 @@ const CH = {
   // Notifications
   NOTIFICATION_SET_ENABLED: 'panda:notification:set-enabled',
   NOTIFICATION_CLEAR:       'panda:notification:clear',
+  // Update
+  UPDATE_CHECK:    'panda:update:check',
+  UPDATE_DOWNLOAD: 'panda:update:download',
+  UPDATE_INSTALL:  'panda:update:install',
+  UPDATE_STATUS:   'panda:update:status',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -120,6 +125,20 @@ contextBridge.exposeInMainWorld('pandaAPI', {
       ipcRenderer.on(CH.THEME_CHANGED, handler);
       return () => {
         ipcRenderer.removeListener(CH.THEME_CHANGED, handler);
+      };
+    },
+  },
+  update: {
+    check: () => ipcRenderer.invoke(CH.UPDATE_CHECK),
+    download: () => ipcRenderer.invoke(CH.UPDATE_DOWNLOAD),
+    install: () => ipcRenderer.invoke(CH.UPDATE_INSTALL),
+    onStatus: (callback: (status: Record<string, unknown>) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: Record<string, unknown>) => {
+        callback(status);
+      };
+      ipcRenderer.on(CH.UPDATE_STATUS, handler);
+      return () => {
+        ipcRenderer.removeListener(CH.UPDATE_STATUS, handler);
       };
     },
   },

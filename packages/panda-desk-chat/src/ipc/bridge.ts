@@ -1,6 +1,6 @@
 // Input: window.pandaAPI injected by preload/chat.ts via contextBridge (named API)
 //        In dev mode: DevMockRelay provides full simulated backend (chat + session + config + fs)
-// Output: Type-safe IPC client for chat renderer components
+// Output: Type-safe IPC client for chat renderer components (+ auto-update bridge)
 // Pos: IPC bridge layer — sole entry point for renderer → main communication
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -8,6 +8,7 @@
 import type {
   PandaChatAPI,
   Unsubscribe,
+  UpdateStatus,
   ChatSendPayload,
   ChatStreamStartPayload,
   ChatStreamDeltaPayload,
@@ -349,4 +350,30 @@ export async function setNotificationEnabled(enabled: boolean): Promise<void> {
 export async function clearNotifications(): Promise<void> {
   if (IS_DEV) return;
   return getPandaAPI().notification.clear();
+}
+
+// ─── Update ──────────────────────────────────────────────────────────────────
+
+/** Check for application updates. */
+export async function checkForUpdates(): Promise<void> {
+  if (IS_DEV) return;
+  return getPandaAPI().update.check();
+}
+
+/** Download the available update. */
+export async function downloadUpdate(): Promise<void> {
+  if (IS_DEV) return;
+  return getPandaAPI().update.download();
+}
+
+/** Quit and install the downloaded update. */
+export async function installUpdate(): Promise<void> {
+  if (IS_DEV) return;
+  return getPandaAPI().update.install();
+}
+
+/** Subscribe to update status events from main process. Returns unsubscribe fn. */
+export function onUpdateStatus(callback: (status: UpdateStatus) => void): Unsubscribe {
+  if (IS_DEV) return () => {};
+  return getPandaAPI().update.onStatus(callback);
 }

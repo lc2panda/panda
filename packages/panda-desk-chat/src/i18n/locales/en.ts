@@ -94,6 +94,15 @@ export default {
   'settings.notifications': 'System Notifications',
   'settings.notificationsDesc': 'Show notifications when new messages arrive',
 
+  // Settings > About > Update
+  'settings.about.checkUpdate': 'Check for Updates',
+  'settings.about.upToDate': "You're up to date",
+  'settings.about.updateAvailable': 'Update available: v{version}',
+  'settings.about.downloading': 'Downloading... {percent}%',
+  'settings.about.readyToInstall': 'Update ready — restart to apply',
+  'settings.about.restartNow': 'Restart Now',
+  'settings.about.checkFailed': 'Update check failed',
+
   // Inspector
   'inspector.context': 'Context',
   'inspector.files': 'Files',

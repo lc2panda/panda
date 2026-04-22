@@ -8,6 +8,7 @@ import { app, BrowserWindow, Menu, nativeImage, nativeTheme, shell, Tray } from 
 import { join } from 'node:path';
 import { registerIpcHandlers, setupMainWindow } from './ipc/handlers';
 import { cliManager } from './backend/cli-manager';
+import { appUpdater } from './updater';
 
 // ---------------------------------------------------------------------------
 // Environment
@@ -138,6 +139,10 @@ const menuTemplate: Electron.MenuItemConstructorOptions[] = [
     label: app.name,
     submenu: [
       { role: 'about' },
+      {
+        label: 'Check for Updates...',
+        click: () => appUpdater.checkForUpdates(),
+      },
       { type: 'separator' },
       { role: 'services' },
       { type: 'separator' },
@@ -200,6 +205,12 @@ app.whenReady().then(() => {
 
   // System tray (minimize-to-tray support)
   createTray();
+
+  // Auto-updater
+  appUpdater.init(mainWindow);
+  if (app.isPackaged) {
+    setTimeout(() => appUpdater.checkForUpdates(), 5000);
+  }
 
   // Listen for system theme changes and notify renderer
   nativeTheme.on('updated', () => {

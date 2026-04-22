@@ -94,6 +94,15 @@ export default {
   'settings.notifications': '系统通知',
   'settings.notificationsDesc': '收到新消息时显示系统通知',
 
+  // Settings > About > Update
+  'settings.about.checkUpdate': '检查更新',
+  'settings.about.upToDate': '已是最新版本',
+  'settings.about.updateAvailable': '有新版本: v{version}',
+  'settings.about.downloading': '下载中... {percent}%',
+  'settings.about.readyToInstall': '更新就绪 — 重启以应用',
+  'settings.about.restartNow': '立即重启',
+  'settings.about.checkFailed': '更新检查失败',
+
   // Inspector
   'inspector.context': '上下文',
   'inspector.files': '文件',
