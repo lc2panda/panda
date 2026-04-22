@@ -2,21 +2,26 @@
 // Output: 三栏三行布局框架
 // Pos: 应用根组件，承载所有页面和面板
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/cn';
 import { PdSidebar } from './components/layout/PdSidebar';
 import { PdTabBarConnected } from './components/layout/PdTabBarConnected';
 import { PdStatusBar } from './components/layout/PdStatusBar';
 import { PdInspector } from './components/layout/PdInspector';
 import { ChatPage } from './pages/ChatPage';
-import { SettingsPage } from './pages/SettingsPage';
 import { PdSideChat } from './components/chat';
 import { PdToastContainer } from './components/containers/PdToast';
-import { PdCommandPalette, type Command } from './components/special/PdCommandPalette';
-import { PdSessionSwitcher, type SessionItem } from './components/special/PdSessionSwitcher';
+import type { Command } from './components/special/PdCommandPalette';
+import type { SessionItem } from './components/special/PdSessionSwitcher';
 import { useSettingsStore, useChatStore, useSessionStore, useTabStore } from './stores';
 import { useToastStore } from './stores/toastStore';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+
+// --- Part C: Lazy-load non-first-screen components for faster cold start ---
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const PdCommandPalette = lazy(() => import('./components/special/PdCommandPalette').then(m => ({ default: m.PdCommandPalette })));
+const PdSessionSwitcher = lazy(() => import('./components/special/PdSessionSwitcher').then(m => ({ default: m.PdSessionSwitcher })));
 
 type Page = 'chat' | 'settings';
 
@@ -29,7 +34,9 @@ export function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [sessionSwitcherOpen, setSessionSwitcherOpen] = useState(false);
 
-  const { toasts, dismissToast } = useToastStore();
+  const { toasts, dismissToast } = useToastStore(
+    useShallow((s) => ({ toasts: s.toasts, dismissToast: s.dismissToast })),
+  );
   const theme = useSettingsStore((s) => s.theme);
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const activeSession = useChatStore((s) => {
@@ -162,7 +169,9 @@ export function App() {
         {/* Content - flex */}
         <div className="relative flex-1 overflow-hidden">
           {page === 'settings' ? (
-            <SettingsPage onClose={() => setPage('chat')} />
+            <Suspense fallback={<div style={{ padding: 'var(--pd-space-4)', opacity: 0.5 }}>Loading...</div>}>
+              <SettingsPage onClose={() => setPage('chat')} />
+            </Suspense>
           ) : (
             <ChatPage />
           )}
@@ -197,20 +206,22 @@ export function App() {
         />
       )}
       <PdToastContainer toasts={toasts} onDismiss={dismissToast} />
-      <PdCommandPalette
-        open={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
-        commands={commands}
-      />
-      <PdSessionSwitcher
-        open={sessionSwitcherOpen}
-        onClose={() => setSessionSwitcherOpen(false)}
-        sessions={switcherSessions}
-        onSelect={(id) => {
-          setChatActiveSession(id);
-          setSessionSwitcherOpen(false);
-        }}
-      />
+      <Suspense fallback={null}>
+        <PdCommandPalette
+          open={commandPaletteOpen}
+          onClose={() => setCommandPaletteOpen(false)}
+          commands={commands}
+        />
+        <PdSessionSwitcher
+          open={sessionSwitcherOpen}
+          onClose={() => setSessionSwitcherOpen(false)}
+          sessions={switcherSessions}
+          onSelect={(id) => {
+            setChatActiveSession(id);
+            setSessionSwitcherOpen(false);
+          }}
+        />
+      </Suspense>
     </div>
   );
 }

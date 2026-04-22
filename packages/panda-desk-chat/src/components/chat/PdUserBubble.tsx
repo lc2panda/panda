@@ -22,7 +22,7 @@ function formatRelativeTime(ts: number): string {
   });
 }
 
-export const PdUserBubble: React.FC<PdUserBubbleProps> = ({
+export const PdUserBubble: React.FC<PdUserBubbleProps> = React.memo(({
   content,
   timestamp,
 }) => {
@@ -64,6 +64,6 @@ export const PdUserBubble: React.FC<PdUserBubbleProps> = ({
       </p>
     </div>
   );
-};
+});
 
 PdUserBubble.displayName = "PdUserBubble";

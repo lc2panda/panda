@@ -3,6 +3,7 @@
 // Pos: App.tsx 的 main content slot，不含外层布局
 
 import React, { useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { PdMessageList } from '../components/chat/PdMessageList';
 import { PdComposer } from '../components/chat/PdComposer';
 import { PdHeroComposer } from '../components/chat/PdHeroComposer';
@@ -21,8 +22,10 @@ export interface ChatPageProps {
 export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
   const { t } = useI18n();
 
-  // Session store — list + active ID
-  const { sessions, activeId, createSession } = useSessionStore();
+  // Session store — list + active ID (shallow compare avoids re-render on unrelated store changes)
+  const { sessions, activeId, createSession } = useSessionStore(
+    useShallow((s) => ({ sessions: s.sessions, activeId: s.activeId, createSession: s.createSession })),
+  );
 
   // Chat store — session-aware selectors
   const activeSession = useChatStore((s) =>

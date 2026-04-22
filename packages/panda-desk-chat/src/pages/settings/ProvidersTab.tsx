@@ -3,6 +3,7 @@
 // Pos: settings/ProvidersTab — third tab in SettingsPage
 
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { PdInput } from '../../components/atoms/PdInput';
 import { useI18n } from '../../hooks/useI18n';
 import { useProviderStore } from '../../stores/providerStore';
@@ -10,7 +11,9 @@ import { SettingRow } from './SettingRow';
 
 export const ProvidersTab: React.FC = () => {
   const { t } = useI18n();
-  const { providers, setProviders } = useProviderStore();
+  const { providers, setProviders } = useProviderStore(
+    useShallow((s) => ({ providers: s.providers, setProviders: s.setProviders })),
+  );
   return (
     <div>
       {(providers || []).map((p: any) => (

@@ -59,7 +59,7 @@ const BADGE: Record<ToolCallStatus, BadgeConfig> = {
 /*  PdToolCallCard                                                           */
 /* -------------------------------------------------------------------------- */
 
-export const PdToolCallCard: React.FC<PdToolCallCardProps> = ({
+export const PdToolCallCard: React.FC<PdToolCallCardProps> = React.memo(({
   toolName,
   input,
   status,
@@ -220,6 +220,6 @@ export const PdToolCallCard: React.FC<PdToolCallCardProps> = ({
       </div>
     </div>
   );
-};
+});
 
 PdToolCallCard.displayName = "PdToolCallCard";

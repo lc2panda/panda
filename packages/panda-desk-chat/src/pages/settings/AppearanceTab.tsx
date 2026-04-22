@@ -3,6 +3,7 @@
 // Pos: settings/AppearanceTab — second tab in SettingsPage
 
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { PdSelect } from '../../components/atoms/PdSelect';
 import { useI18n } from '../../hooks/useI18n';
 import { useTheme } from '../../hooks/useTheme';
@@ -12,7 +13,9 @@ import { SettingRow } from './SettingRow';
 export const AppearanceTab: React.FC = () => {
   const { t } = useI18n();
   const { mode, setMode } = useTheme();
-  const { fontSize, setFontSize } = useSettingsStore();
+  const { fontSize, setFontSize } = useSettingsStore(
+    useShallow((s) => ({ fontSize: s.fontSize, setFontSize: s.setFontSize })),
+  );
   return (
     <div>
       <SettingRow label={t('settings.theme')} description={t('settings.themeDesc')}>

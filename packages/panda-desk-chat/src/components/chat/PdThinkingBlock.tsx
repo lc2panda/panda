@@ -32,7 +32,7 @@ function preview(text: string): string {
 /*  PdThinkingBlock                                                          */
 /* -------------------------------------------------------------------------- */
 
-export const PdThinkingBlock: React.FC<PdThinkingBlockProps> = ({
+export const PdThinkingBlock: React.FC<PdThinkingBlockProps> = React.memo(({
   content,
   isStreaming = false,
   defaultExpanded = false,
@@ -93,6 +93,6 @@ export const PdThinkingBlock: React.FC<PdThinkingBlockProps> = ({
       </div>
     </div>
   );
-};
+});
 
 PdThinkingBlock.displayName = "PdThinkingBlock";

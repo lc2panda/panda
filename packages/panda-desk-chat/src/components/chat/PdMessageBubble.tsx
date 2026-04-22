@@ -34,7 +34,7 @@ const statusVariant: Record<string, "success" | "warning" | "error" | "info" | "
 
 /* ── Component ────────────────────────────────────────────────────────── */
 
-export const PdMessageBubble: React.FC<PdMessageBubbleProps> = ({
+export const PdMessageBubble: React.FC<PdMessageBubbleProps> = React.memo(({
   content,
   timestamp: _timestamp,
   thinkingContent,
@@ -223,6 +223,6 @@ export const PdMessageBubble: React.FC<PdMessageBubbleProps> = ({
       )}
     </div>
   );
-};
+});
 
 PdMessageBubble.displayName = "PdMessageBubble";

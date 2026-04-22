@@ -3,6 +3,7 @@
 // Pos: settings/GeneralTab — first tab in SettingsPage
 
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { PdButton } from '../../components/atoms/PdButton';
 import { PdSelect } from '../../components/atoms/PdSelect';
 import { PdDirectoryPicker } from '../../components/special/PdDirectoryPicker';
@@ -13,7 +14,13 @@ import { SettingRow } from './SettingRow';
 
 export const GeneralTab: React.FC = () => {
   const { t, locale, changeLocale } = useI18n();
-  const { loadSettings, workingDirectory, setWorkingDirectory } = useSettingsStore();
+  const { loadSettings, workingDirectory, setWorkingDirectory } = useSettingsStore(
+    useShallow((s) => ({
+      loadSettings: s.loadSettings,
+      workingDirectory: s.workingDirectory,
+      setWorkingDirectory: s.setWorkingDirectory,
+    })),
+  );
   return (
     <div>
       <SettingRow label={t('settings.workingDir')} description={t('settings.workingDirDesc')}>
