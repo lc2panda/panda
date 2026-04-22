@@ -11,12 +11,22 @@
     <!-- FOUC prevention: sync theme before first paint -->
     <script>
       (function() {
-        var stored = localStorage.getItem('pd-theme') || 'system';
-        var theme = stored;
-        if (stored === 'system') {
-          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        // Read from Zustand settings store (panda-desk:settings JSON blob)
+        var theme = 'system';
+        try {
+          var raw = localStorage.getItem('panda-desk:settings');
+          if (raw) { theme = JSON.parse(raw).theme || 'system'; }
+        } catch(e) {}
+        // Fallback: legacy pd-theme key
+        if (theme === 'system') {
+          var legacy = localStorage.getItem('pd-theme');
+          if (legacy && legacy !== 'system') theme = legacy;
         }
-        document.documentElement.setAttribute('data-pd-theme', theme);
+        var resolved = theme;
+        if (theme === 'system') {
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-pd-theme', resolved);
         // Matrix variant
         var variant = localStorage.getItem('pd-variant') || '';
         if (variant) document.documentElement.setAttribute('data-pd-variant', variant);

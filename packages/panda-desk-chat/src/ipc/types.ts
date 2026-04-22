@@ -130,6 +130,14 @@ export interface PandaChatAPI {
     setModel(payload: ModelSetPayload): Promise<void>;
     setPermissionMode(payload: PermissionModePayload): Promise<void>;
   };
+  notification: {
+    setEnabled(enabled: boolean): Promise<void>;
+    clear(): Promise<void>;
+  };
+  theme: {
+    getSystemTheme(): Promise<'light' | 'dark'>;
+    onThemeChange(callback: (isDark: boolean) => void): Unsubscribe;
+  };
 }
 
 // ─── Global augmentation for window.pandaAPI ────────────────────────────────

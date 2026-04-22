@@ -86,10 +86,13 @@ export default {
   'settings.workingDirDesc': 'Default working directory for new sessions',
   'settings.workingDirPlaceholder': 'Select working directory…',
   'settings.theme': 'Theme',
+  'settings.themeDesc': 'Choose light, dark, or follow your system preference',
   'settings.theme.light': 'Light',
   'settings.theme.dark': 'Dark',
   'settings.theme.system': 'System',
   'settings.theme.matrix': 'Matrix',
+  'settings.notifications': 'System Notifications',
+  'settings.notificationsDesc': 'Show notifications when new messages arrive',
 
   // Inspector
   'inspector.context': 'Context',

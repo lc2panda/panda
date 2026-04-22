@@ -86,10 +86,13 @@ export default {
   'settings.workingDirDesc': '设置默认工作目录，新会话将在此目录下运行',
   'settings.workingDirPlaceholder': '选择工作目录…',
   'settings.theme': '主题',
+  'settings.themeDesc': '选择浅色、深色或跟随系统偏好',
   'settings.theme.light': '浅色',
   'settings.theme.dark': '深色',
   'settings.theme.system': '跟随系统',
   'settings.theme.matrix': 'Matrix',
+  'settings.notifications': '系统通知',
+  'settings.notificationsDesc': '收到新消息时显示系统通知',
 
   // Inspector
   'inspector.context': '上下文',

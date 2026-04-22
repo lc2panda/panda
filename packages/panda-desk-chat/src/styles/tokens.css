@@ -449,6 +449,30 @@
 }
 
 /* ==========================================================================
+   3c. Shorthand Aliases
+       Maps the simplified --bg-*, --text-*, --border-*, --accent-*, --shadow-*
+       names to the canonical --pd-* tokens. These resolve at runtime because
+       the --pd-* variables are set by [data-pd-theme].
+   ========================================================================== */
+
+[data-pd-theme] {
+  --bg-primary: var(--pd-color-bg);
+  --bg-secondary: var(--pd-color-bg-subtle);
+  --bg-tertiary: var(--pd-color-bg-hover);
+  --bg-elevated: var(--pd-color-bg-elevated);
+  --text-primary: var(--pd-color-fg);
+  --text-secondary: var(--pd-color-fg-muted);
+  --text-tertiary: var(--pd-text-tertiary, var(--pd-color-fg-muted));
+  --border-primary: var(--pd-color-border);
+  --border-secondary: var(--pd-color-border-subtle);
+  --accent-primary: var(--pd-color-accent);
+  --accent-hover: var(--pd-color-accent-hover);
+  --accent-muted: var(--pd-color-accent-subtle, var(--pd-color-accent));
+  --shadow-sm: var(--pd-shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+  --shadow-md: var(--pd-shadow-md, 0 4px 6px rgba(0,0,0,0.07));
+}
+
+/* ==========================================================================
    4. @keyframes — 7 Preset Animations
    ========================================================================== */
 

@@ -86,10 +86,13 @@ export default {
   'settings.workingDirDesc': '新しいセッションのデフォルト作業ディレクトリ',
   'settings.workingDirPlaceholder': '作業ディレクトリを選択…',
   'settings.theme': 'テーマ',
+  'settings.themeDesc': 'ライト、ダーク、またはシステム設定に従う',
   'settings.theme.light': 'ライト',
   'settings.theme.dark': 'ダーク',
   'settings.theme.system': 'システム',
   'settings.theme.matrix': 'マトリックス',
+  'settings.notifications': 'システム通知',
+  'settings.notificationsDesc': '新しいメッセージが届いたときに通知を表示',
 
   // Inspector
   'inspector.context': 'コンテキスト',

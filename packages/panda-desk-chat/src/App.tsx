@@ -2,7 +2,7 @@
 // Output: 三栏三行布局框架
 // Pos: 应用根组件，承载所有页面和面板
 
-import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/cn';
 import { PdSidebar } from './components/layout/PdSidebar';
@@ -14,9 +14,10 @@ import { PdSideChat } from './components/chat';
 import { PdToastContainer } from './components/containers/PdToast';
 import type { Command } from './components/special/PdCommandPalette';
 import type { SessionItem } from './components/special/PdSessionSwitcher';
-import { useSettingsStore, useChatStore, useSessionStore, useTabStore } from './stores';
+import { useChatStore, useSessionStore, useTabStore } from './stores';
 import { useToastStore } from './stores/toastStore';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import { useThemeEffect } from './hooks/useThemeEffect';
 
 // --- Part C: Lazy-load non-first-screen components for faster cold start ---
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -37,7 +38,6 @@ export function App() {
   const { toasts, dismissToast } = useToastStore(
     useShallow((s) => ({ toasts: s.toasts, dismissToast: s.dismissToast })),
   );
-  const theme = useSettingsStore((s) => s.theme);
   const activeSessionId = useChatStore((s) => s.activeSessionId);
   const activeSession = useChatStore((s) => {
     const id = s.activeSessionId;
@@ -132,20 +132,8 @@ export function App() {
     [sessionList],
   );
 
-  // --- System theme follower ---
-  useEffect(() => {
-    if (theme !== 'system') {
-      document.documentElement.setAttribute('data-theme', theme);
-      return;
-    }
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = (e: MediaQueryList | MediaQueryListEvent) => {
-      document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-    };
-    apply(mq);
-    mq.addEventListener('change', apply);
-    return () => mq.removeEventListener('change', apply);
-  }, [theme]);
+  // --- Theme: apply data-pd-theme to <html> based on user preference ---
+  useThemeEffect();
 
   return (
     <div

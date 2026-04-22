@@ -86,10 +86,13 @@ export default {
   'settings.workingDirDesc': '새 세션의 기본 작업 디렉토리',
   'settings.workingDirPlaceholder': '작업 디렉토리 선택…',
   'settings.theme': '테마',
+  'settings.themeDesc': '라이트, 다크 또는 시스템 설정 따르기',
   'settings.theme.light': '라이트',
   'settings.theme.dark': '다크',
   'settings.theme.system': '시스템',
   'settings.theme.matrix': '매트릭스',
+  'settings.notifications': '시스템 알림',
+  'settings.notificationsDesc': '새 메시지가 도착하면 알림을 표시합니다',
 
   // Inspector
   'inspector.context': '컨텍스트',
