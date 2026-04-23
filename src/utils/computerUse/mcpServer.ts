@@ -58,11 +58,16 @@ async function tryGetInstalledAppNames(): Promise<string[] | undefined> {
  * server exists only to answer ListTools.
  */
 export async function createComputerUseMcpServerForCli(): Promise<
-  ReturnType<typeof createComputerUseMcpServer>
+  ReturnType<typeof createComputerUseMcpServer> | null
 > {
   const adapter = getComputerUseHostAdapter()
   const coordinateMode = getChicagoCoordinateMode()
   const server = createComputerUseMcpServer(adapter, coordinateMode)
+
+  if (!server) {
+    logForDebugging('[Computer Use MCP] createComputerUseMcpServer returned null (stub); skipping server setup')
+    return null
+  }
 
   const installedAppNames = await tryGetInstalledAppNames()
   const tools = buildComputerUseTools(
@@ -87,6 +92,13 @@ export async function runComputerUseMcpServer(): Promise<void> {
   initializeAnalyticsSink()
 
   const server = await createComputerUseMcpServerForCli()
+  if (!server) {
+    logForDebugging('[Computer Use MCP] Server is null (stub); exiting subprocess')
+    await Promise.all([shutdown1PEventLogging(), shutdownDatadog()])
+    // eslint-disable-next-line custom-rules/no-process-exit
+    process.exit(0)
+    return
+  }
   const transport = new StdioServerTransport()
 
   let exiting = false
