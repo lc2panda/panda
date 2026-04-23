@@ -727,10 +727,17 @@ export function setupBridgeListeners(): void {
 
   const store = useChatStore.getState;
 
+  // 设置初始状态为 connecting（表示正在尝试连接）
+  const activeSession = store().activeSessionId;
+  if (activeSession) {
+    store().setConnectionState(activeSession, 'connecting');
+  }
+
   // stream:start → create assistant message placeholder
   bridge.onStreamStart((payload) => {
     const { sessionId, messageId } = payload as { sessionId: string; messageId: string };
     store().startStreaming(sessionId, messageId);
+    store().setConnectionState(sessionId, 'connected');
     activeSessions.add(sessionId);
     startFlushLoop();
     // Buddy: record user message + award XP
@@ -758,6 +765,7 @@ export function setupBridgeListeners(): void {
       tokenUsage?: TokenUsage;
     };
     store().endStreaming(sessionId, messageId, finishReason, tokenUsage);
+    store().setConnectionState(sessionId, 'connected');
     activeSessions.delete(sessionId);
     if (activeSessions.size === 0) stopFlushLoop();
   });

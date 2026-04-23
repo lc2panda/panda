@@ -55,6 +55,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
   const routingInfo = activeSession?.routingInfo ?? null;
 
   const hasActiveSession = !!sessions.find((s: any) => s.id === activeId);
+  const showConversation = hasActiveSession && messages.length > 0;
 
   const handleSend = useCallback(
     (content: string) => {
@@ -108,7 +109,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
         minHeight: 0,
       }}
     >
-      {hasActiveSession ? (
+      {showConversation ? (
         <>
           {connectionState === 'error' && (
             <div className="flex items-center gap-2 px-4 py-2 bg-[var(--pd-color-error-subtle)] border-b border-[var(--pd-color-error)] text-[var(--pd-text-sm)] text-[var(--pd-color-error)]">
@@ -116,10 +117,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
               <span>{t('chat.connectionError') || 'Connection lost. Retrying...'}</span>
             </div>
           )}
-          {connectionState === 'disconnected' && hasActiveSession && (
+          {connectionState === 'disconnected' && showConversation && (
             <div className="flex items-center gap-2 px-4 py-2 bg-[var(--pd-color-warning-subtle)] border-b border-[var(--pd-color-warning)] text-[var(--pd-text-sm)] text-[var(--pd-color-fg-muted)]">
               <span>🔌</span>
-              <span>{t('chat.disconnected') || 'Disconnected'}</span>
+              <span>{t('statusbar.connection.disconnected' as any) || 'Disconnected'}</span>
             </div>
           )}
           {routingInfo && activeId && (
@@ -176,7 +177,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
             <PdPetCameo occasion="empty_state" />
           </div>
           <PdHeroComposer
-            onSend={handleNewSession}
+            onSend={activeId ? handleSend : handleNewSession}
           />
         </>
       )}

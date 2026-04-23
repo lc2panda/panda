@@ -127,23 +127,7 @@
 /* ---------------------------------------------------------------------------
  * 6. Sarasa Mono SC — CJK Monospace / CJK code
  *    Source: https://github.com/be5invis/Sarasa-Gothic (OFL)
- *    Status: PLACEHOLDER — woff2 files must be manually downloaded.
- *    Fallback: JetBrains Mono → system monospace
+ *    NOTE: No @font-face declared — relies on system-installed font.
+ *    If Sarasa Mono SC is installed locally it will be picked up by the
+ *    font-stack in tokens.css; otherwise JetBrains Mono → system monospace.
  * --------------------------------------------------------------------------- */
-@font-face {
-  font-family: 'Sarasa Mono SC';
-  src: url('/fonts/sarasa-mono-sc/SarasaMonoSC-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
-  font-style: normal;
-  font-feature-settings: 'liga' 0;
-}
-
-@font-face {
-  font-family: 'Sarasa Mono SC';
-  src: url('/fonts/sarasa-mono-sc/SarasaMonoSC-Bold.woff2') format('woff2');
-  font-weight: 700;
-  font-display: swap;
-  font-style: normal;
-  font-feature-settings: 'liga' 0;
-}
