@@ -16,7 +16,7 @@
  * GrowthBook gate `tengu_malort_pedway` (see gates.ts).
  */
 
-import { bindSessionContext, type ComputerUseSessionContext, type CuCallToolResult, type CuPermissionRequest, type CuPermissionResponse, DEFAULT_GRANT_FLAGS, type ScreenshotDims } from '@ant/computer-use-mcp';
+import { type ComputerUseSessionContext, type CuCallToolResult, type CuPermissionRequest, type CuPermissionResponse, DEFAULT_GRANT_FLAGS, type ScreenshotDims } from '@ant/computer-use-mcp';
 import * as React from 'react';
 import { getSessionId } from '../../bootstrap/state.js';
 import { ComputerUseApproval } from '../../components/permissions/ComputerUseApproval/ComputerUseApproval.js';
@@ -26,6 +26,7 @@ import { checkComputerUseLock, tryAcquireComputerUseLock } from './computerUseLo
 import { registerEscHotkey } from './escHotkey.js';
 import { getChicagoCoordinateMode } from './gates.js';
 import { getComputerUseHostAdapter } from './hostAdapter.js';
+import { dispatchComputerUseAction } from './mcpServer.js';
 import { getComputerUseMCPRenderingOverrides } from './toolRendering.js';
 type CallOverride = Pick<Tool, 'call'>['call'];
 type Binding = {
@@ -232,7 +233,8 @@ function getOrBind(): Binding {
   const ctx = buildSessionContext();
   binding = {
     ctx,
-    dispatch: bindSessionContext(getComputerUseHostAdapter(), getChicagoCoordinateMode(), ctx)
+    dispatch: (name: string, args: unknown) =>
+      dispatchComputerUseAction(getComputerUseHostAdapter().executor, name, args)
   };
   return binding;
 }

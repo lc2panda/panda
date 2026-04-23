@@ -1,12 +1,11 @@
-import { buildComputerUseTools } from '@ant/computer-use-mcp'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import { buildMcpToolName } from '../../services/mcp/mcpStringUtils.js'
 import type { ScopedMcpServerConfig } from '../../services/mcp/types.js'
 
 import { isInBundledMode } from '../bundledMode.js'
-import { CLI_CU_CAPABILITIES, COMPUTER_USE_MCP_SERVER_NAME } from './common.js'
-import { getChicagoCoordinateMode } from './gates.js'
+import { COMPUTER_USE_MCP_SERVER_NAME } from './common.js'
+import { COMPUTER_USE_TOOLS } from './mcpServer.js'
 
 /**
  * Build the dynamic MCP config + allowed tool names. Mirror of
@@ -24,10 +23,8 @@ export function setupComputerUseMCP(): {
   mcpConfig: Record<string, ScopedMcpServerConfig>
   allowedTools: string[]
 } {
-  const allowedTools = buildComputerUseTools(
-    CLI_CU_CAPABILITIES,
-    getChicagoCoordinateMode(),
-  ).map(t => buildMcpToolName(COMPUTER_USE_MCP_SERVER_NAME, t.name))
+  const allowedTools = COMPUTER_USE_TOOLS
+    .map(t => buildMcpToolName(COMPUTER_USE_MCP_SERVER_NAME, t.name))
 
   // command/args are never spawned — client.ts intercepts by name and
   // uses the in-process server. The config just needs to exist with
