@@ -825,6 +825,33 @@ export function setupBridgeListeners(): void {
   bridge.onWindowToggle(() => {
     window.dispatchEvent(new CustomEvent('pd-window-toggle'));
   });
+
+  // session:ready → CLI has finished initialization
+  bridge.onSessionReady((payload) => {
+    const { sessionId } = payload as { sessionId: string };
+    store().setConnectionState(sessionId, 'connected');
+  });
+
+  // message:history → replayed messages during resume
+  bridge.onMessageHistory((payload) => {
+    const { sessionId, role, content } = payload as {
+      sessionId: string;
+      role: 'assistant' | 'user' | 'system';
+      content?: string;
+    };
+    if (role === 'assistant' || role === 'user') {
+      const sess = store().sessions.get(sessionId);
+      if (!sess) return;
+      const msg: UIMessage = {
+        id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        role: role as 'assistant' | 'user',
+        content: typeof content === 'string' ? content : JSON.stringify(content ?? ''),
+        timestamp: Date.now(),
+      };
+      const updated = { ...sess, messages: [...sess.messages, msg] };
+      useChatStore.setState((s) => ({ sessions: putSession(s.sessions, updated) }));
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------

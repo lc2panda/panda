@@ -88,6 +88,20 @@ export type ModelSetPayload         = z.infer<typeof modelSetSchema>;
 export type PermissionModePayload   = z.infer<typeof permissionModeSetSchema>;
 export type ClipboardPastePayload   = z.infer<typeof clipboardPasteImageSchema>;
 
+// Connection lifecycle (session ready + history replay)
+export interface SessionReadyPayload {
+  sessionId: string;
+}
+
+export interface MessageHistoryPayload {
+  sessionId: string;
+  role: 'assistant' | 'user' | 'system';
+  type?: string;
+  content?: unknown;
+  message?: string;
+  [key: string]: unknown;
+}
+
 // ─── Unsubscribe function type ──────────────────────────────────────────────
 
 export type Unsubscribe = () => void;
@@ -130,6 +144,8 @@ export interface PandaChatAPI {
     delete(payload: SessionDeletePayload): Promise<void>;
     focus(payload: SessionFocusPayload): Promise<void>;
     onUpdated(cb: (payload: SessionUpdatedPayload) => void): Unsubscribe;
+    onReady(cb: (payload: SessionReadyPayload) => void): Unsubscribe;
+    onMessageHistory(cb: (payload: MessageHistoryPayload) => void): Unsubscribe;
   };
   tool: {
     respondPermission(payload: ToolPermResponsePayload): Promise<void>;

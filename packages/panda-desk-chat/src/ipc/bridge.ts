@@ -17,6 +17,8 @@ import type {
   SessionListResponse,
   SessionCreateResponse,
   SessionUpdatedPayload,
+  SessionReadyPayload,
+  MessageHistoryPayload,
   ToolUseStartPayload,
   ToolUseEndPayload,
   ToolPermRequestPayload,
@@ -222,6 +224,32 @@ export function onSessionUpdated(
     return () => relay.off('session:updated', wrapped);
   }
   return getPandaAPI().session.onUpdated(callback);
+}
+
+/** Subscribe to session-ready events. Returns unsubscribe function. */
+export function onSessionReady(
+  callback: (payload: SessionReadyPayload) => void,
+): Unsubscribe {
+  if (IS_DEV) {
+    const relay = getDevRelay();
+    const wrapped = (e: unknown) => callback(e as SessionReadyPayload);
+    relay.on('session:ready', wrapped);
+    return () => relay.off('session:ready', wrapped);
+  }
+  return getPandaAPI().session.onReady(callback);
+}
+
+/** Subscribe to message-history events (resume replay). Returns unsubscribe function. */
+export function onMessageHistory(
+  callback: (payload: MessageHistoryPayload) => void,
+): Unsubscribe {
+  if (IS_DEV) {
+    const relay = getDevRelay();
+    const wrapped = (e: unknown) => callback(e as MessageHistoryPayload);
+    relay.on('message:history', wrapped);
+    return () => relay.off('message:history', wrapped);
+  }
+  return getPandaAPI().session.onMessageHistory(callback);
 }
 
 // ─── Tool permissions ──────────────────────────────────────────────────────

@@ -154,6 +154,9 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(CH.FS_LIST, async (_event, payload: { directory: string }) => {
+    if (!payload?.directory || typeof payload.directory !== 'string') {
+      return { success: false, files: [], error: 'Invalid directory path' };
+    }
     try {
       const entries = await readdir(payload.directory, { withFileTypes: true });
       const results: Array<{ name: string; path: string; isDir: boolean; size: number }> = [];

@@ -56,6 +56,9 @@ const CH = {
   WINDOW_OPEN_SESSION:  'panda:window:open-session',
   WINDOW_GET_ID:        'panda:window:get-id',
   WINDOW_INIT:          'panda:window:init',
+  // Connection lifecycle
+  SESSION_READY:        'panda:session:ready',
+  MESSAGE_HISTORY:      'panda:message:history',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -99,6 +102,8 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     delete: (payload: unknown) => ipcRenderer.invoke(CH.SESSION_DELETE, payload),
     focus: (payload: unknown) => ipcRenderer.invoke(CH.SESSION_FOCUS, payload),
     onUpdated: createSubscription(CH.SESSION_UPDATED),
+    onReady: createSubscription(CH.SESSION_READY),
+    onMessageHistory: createSubscription(CH.MESSAGE_HISTORY),
   },
   tool: {
     respondPermission: (payload: unknown) => ipcRenderer.invoke(CH.TOOL_PERM_RESPONSE, payload),

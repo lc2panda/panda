@@ -333,6 +333,10 @@ export class DevMockRelay {
     };
     this.sessions.unshift(session);
     this.emitSessionUpdated();
+    // Simulate CLI ready after a short delay
+    setTimeout(() => {
+      this.emit('session:ready', { sessionId: id });
+    }, 300);
     return { id };
   }
 

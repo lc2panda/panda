@@ -234,6 +234,25 @@ export class CLISession extends EventEmitter {
       case 'keep_alive':
         // Heartbeat — no action needed
         break;
+      case 'system': {
+        // 系统消息 — 标记 CLI 已就绪，emit ready 事件
+        this.emit('session:ready', this.id);
+        // 如果消息包含内容，也传递给前端
+        if ((msg as unknown as Record<string, unknown>).content || (msg as unknown as Record<string, unknown>).message) {
+          this.emit('message:system', this.id, msg);
+        }
+        break;
+      }
+      case 'assistant': {
+        // 助手消息回放（resume 时的历史消息）
+        this.emit('message:assistant', this.id, msg);
+        break;
+      }
+      case 'user': {
+        // 用户消息回放
+        this.emit('message:user', this.id, msg);
+        break;
+      }
       default:
         console.log(`[CLISession:${this.id}] Unhandled message type: ${msg.type}`);
         break;
@@ -669,6 +688,22 @@ export class CLIManager {
 
     session.on('tool:permission:request', (data) => {
       send(MR.TOOL_PERM_REQ, data);
+    });
+
+    session.on('session:ready', (sessionId: string) => {
+      windowManager.sendToSession(sessionId, 'panda:session:ready', { sessionId });
+    });
+
+    session.on('message:assistant', (sessionId: string, msg: unknown) => {
+      windowManager.sendToSession(sessionId, 'panda:message:history', { sessionId, role: 'assistant', ...(msg as Record<string, unknown>) });
+    });
+
+    session.on('message:user', (sessionId: string, msg: unknown) => {
+      windowManager.sendToSession(sessionId, 'panda:message:history', { sessionId, role: 'user', ...(msg as Record<string, unknown>) });
+    });
+
+    session.on('message:system', (sessionId: string, msg: unknown) => {
+      windowManager.sendToSession(sessionId, 'panda:message:history', { sessionId, role: 'system', ...(msg as Record<string, unknown>) });
     });
 
     session.on('exit', () => {
