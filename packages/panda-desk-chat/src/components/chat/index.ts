@@ -49,3 +49,9 @@ export type { PdHeroComposerProps } from "./PdHeroComposer";
 
 export { PdSuperAssistBar } from "./PdSuperAssistBar";
 export type { PdSuperAssistBarProps } from "./PdSuperAssistBar";
+
+export { PdDiffViewer } from "./PdDiffViewer";
+export type { PdDiffViewerProps } from "./PdDiffViewer";
+
+export { PdAskUserQuestion } from "./PdAskUserQuestion";
+export type { PdAskUserQuestionProps } from "./PdAskUserQuestion";

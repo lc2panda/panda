@@ -3,6 +3,7 @@
 // Pos:    Chat > tool-renderers — specialized renderer for file operations
 import React, { useMemo } from "react";
 import { cn } from "../../../lib/cn";
+import { PdDiffViewer } from "../PdDiffViewer";
 import type { ToolRendererProps } from "./index";
 
 /* -------------------------------------------------------------------------- */
@@ -42,28 +43,6 @@ function NumberedLines({ text, startLine = 1, className }: {
             {startLine + i}
           </span>
           <span className="flex-1 whitespace-pre-wrap break-all">{line}</span>
-        </div>
-      ))}
-    </pre>
-  );
-}
-
-/** Simple red/green diff view. */
-function DiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
-  const oldLines = oldStr.split("\n");
-  const newLines = newStr.split("\n");
-  return (
-    <pre className="m-0 overflow-x-auto text-[12px] leading-[1.6] font-[var(--pd-font-mono)]">
-      {oldLines.map((line, i) => (
-        <div key={`d-${i}`} className="flex bg-[#3c1618]">
-          <span className="inline-block w-[40px] pr-2 text-right text-[#dc2626] select-none shrink-0 opacity-70">-</span>
-          <span className="flex-1 whitespace-pre-wrap break-all text-[#f87171]">{line}</span>
-        </div>
-      ))}
-      {newLines.map((line, i) => (
-        <div key={`a-${i}`} className="flex bg-[#132a1a]">
-          <span className="inline-block w-[40px] pr-2 text-right text-[#5a9e6f] select-none shrink-0 opacity-70">+</span>
-          <span className="flex-1 whitespace-pre-wrap break-all text-[#6ee7b7]">{line}</span>
         </div>
       ))}
     </pre>
@@ -113,18 +92,19 @@ export const FileRenderer: React.FC<ToolRendererProps> = React.memo(({
       {/* Body */}
       <div className="bg-[var(--pd-color-bg-subtle)] font-[var(--pd-font-mono)]">
         {isEdit && fi.old_string != null && fi.new_string != null ? (
-          /* Diff view for Edit */
-          <div className="px-1 py-2">
-            <DiffView oldStr={fi.old_string} newStr={fi.new_string} />
-          </div>
+          /* Diff view for Edit — uses PdDiffViewer with LCS-based unified diff */
+          <PdDiffViewer
+            oldContent={fi.old_string}
+            newContent={fi.new_string}
+            fileName={filePath}
+          />
         ) : isWrite && fi.content ? (
-          /* Write preview with line numbers */
-          <div className="px-1 py-2">
-            <NumberedLines
-              text={fi.content}
-              className="text-[var(--pd-color-fg)] font-[var(--pd-font-mono)]"
-            />
-          </div>
+          /* Write preview — show as diff (empty → new content) */
+          <PdDiffViewer
+            oldContent=""
+            newContent={fi.content}
+            fileName={filePath}
+          />
         ) : result ? (
           /* Read result with line numbers */
           <div className="px-1 py-2">
