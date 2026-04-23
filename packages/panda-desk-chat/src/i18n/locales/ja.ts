@@ -75,6 +75,36 @@ export default {
   'statusbar.mcp': 'MCP',
   'statusbar.sandbox': 'サンドボックス',
   'statusbar.theme': 'テーマ',
+  'statusbar.dnd': 'サイレントモード',
+
+  // StatusBar — connection states
+  'statusbar.connection.connected': '接続済み',
+  'statusbar.connection.connecting': '接続中',
+  'statusbar.connection.disconnected': '未接続',
+  'statusbar.connection.error': '接続エラー',
+  'statusbar.connection.reconnecting': '再接続中',
+
+  // StatusBar — permission modes
+  'statusbar.permission.default': 'デフォルト',
+  'statusbar.permission.plan': 'プラン',
+  'statusbar.permission.auto': '自動承認',
+  'statusbar.permission.bypass': 'バイパス',
+  'statusbar.permission.default.desc': 'ツール実行前に確認',
+  'statusbar.permission.plan.desc': 'プランモード — 実行前に計画',
+  'statusbar.permission.auto.desc': '安全な操作を自動承認',
+  'statusbar.permission.bypass.desc': 'すべての権限確認をスキップ',
+
+  // StatusBar — effort levels
+  'statusbar.effort.min': '最小',
+  'statusbar.effort.low': '低',
+  'statusbar.effort.medium': '中',
+  'statusbar.effort.high': '高',
+  'statusbar.effort.max': '最大',
+  'statusbar.effort.min.desc': '簡潔な回答',
+  'statusbar.effort.low.desc': '要点を含む簡潔な回答',
+  'statusbar.effort.medium.desc': 'バランスの取れた深さ',
+  'statusbar.effort.high.desc': '詳細な分析',
+  'statusbar.effort.max.desc': '最大限の詳細と推論',
 
   // Settings
   'settings.title': '設定',

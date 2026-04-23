@@ -6,6 +6,7 @@ import { useState, useRef, useEffect, type ComponentType } from 'react';
 import { cn } from '@/lib/cn';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useProviderStore } from '@/stores/providerStore';
+import { useI18n } from '@/hooks/useI18n';
 import type { PermissionMode, EffortLevel } from '@/stores/settingsStore';
 import type { ModelInfo } from '@/stores/providerStore';
 import {
@@ -45,23 +46,30 @@ const dropdownItem = cn(
 );
 
 // ---------------------------------------------------------------------------
-// Permission chip data
+// Permission chip — color mapping (labels via i18n)
 // ---------------------------------------------------------------------------
-const permissionMeta: Record<PermissionMode, { color: string; label: string; desc: string }> = {
-  default:           { color: 'var(--pd-color-fg-muted)',  label: 'Default',  desc: 'Ask before each tool use' },
-  plan:              { color: 'var(--pd-color-info)',       label: 'Plan',     desc: 'Read-only, no writes' },
-  auto:              { color: 'var(--pd-color-success)',    label: 'Auto',     desc: 'Auto-approve safe tools' },
-  bypassPermissions: { color: 'var(--pd-color-error)',      label: 'Bypass',   desc: 'Skip all permission checks' },
+const permissionColors: Record<PermissionMode, string> = {
+  default:           'var(--pd-color-fg-muted)',
+  plan:              'var(--pd-color-info)',
+  auto:              'var(--pd-color-success)',
+  bypassPermissions: 'var(--pd-color-error)',
+};
+
+const permissionI18nKeys: Record<PermissionMode, { label: string; desc: string }> = {
+  default:           { label: 'statusbar.permission.default',  desc: 'statusbar.permission.default.desc' },
+  plan:              { label: 'statusbar.permission.plan',     desc: 'statusbar.permission.plan.desc' },
+  auto:              { label: 'statusbar.permission.auto',     desc: 'statusbar.permission.auto.desc' },
+  bypassPermissions: { label: 'statusbar.permission.bypass',   desc: 'statusbar.permission.bypass.desc' },
 };
 
 // ---------------------------------------------------------------------------
-// Effort chip data
+// Effort chip — i18n keys
 // ---------------------------------------------------------------------------
-const effortMeta: Record<EffortLevel, string> = {
-  auto:   'Auto',
-  low:    'Low',
-  medium: 'Medium',
-  high:   'High',
+const effortI18nKeys: Record<EffortLevel, { label: string; desc: string }> = {
+  auto:   { label: 'statusbar.effort.medium', desc: 'statusbar.effort.medium.desc' },
+  low:    { label: 'statusbar.effort.low',    desc: 'statusbar.effort.low.desc' },
+  medium: { label: 'statusbar.effort.medium', desc: 'statusbar.effort.medium.desc' },
+  high:   { label: 'statusbar.effort.high',   desc: 'statusbar.effort.high.desc' },
 };
 const effortCycle: EffortLevel[] = ['auto', 'low', 'medium', 'high'];
 
@@ -86,20 +94,23 @@ function PermissionChip() {
   const setMode = useSettingsStore((s) => s.setPermissionMode);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
   useClickOutside(ref, () => setOpen(false));
 
-  const meta = permissionMeta[mode];
+  const color = permissionColors[mode];
+  const keys = permissionI18nKeys[mode];
 
   return (
     <div ref={ref} className={chipBase} onClick={() => setOpen((v) => !v)}>
       <Shield size={12} className="shrink-0" />
-      <span style={{ color: meta.color }}>{meta.label}</span>
+      <span style={{ color }}>{t(keys.label as any)}</span>
       <ChevronDown size={10} className="shrink-0 opacity-50" />
 
       {open && (
         <div className={dropdownBase}>
-          {(Object.keys(permissionMeta) as PermissionMode[]).map((key) => {
-            const m = permissionMeta[key];
+          {(Object.keys(permissionColors) as PermissionMode[]).map((key) => {
+            const c = permissionColors[key];
+            const k = permissionI18nKeys[key];
             const active = key === mode;
             return (
               <button
@@ -108,9 +119,9 @@ function PermissionChip() {
                 className={cn(dropdownItem, active && 'bg-[var(--pd-color-bg-hover)] text-[var(--pd-color-fg)]')}
                 onClick={(e) => { e.stopPropagation(); setMode(key); setOpen(false); }}
               >
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: m.color }} />
-                <span className="font-medium">{m.label}</span>
-                <span className="ml-auto opacity-60">{m.desc}</span>
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c }} />
+                <span className="font-medium">{t(k.label as any)}</span>
+                <span className="ml-auto opacity-60">{t(k.desc as any)}</span>
               </button>
             );
           })}
@@ -184,16 +195,19 @@ function ModelChip() {
 function EffortChip() {
   const level = useSettingsStore((s) => s.effortLevel);
   const setLevel = useSettingsStore((s) => s.setEffortLevel);
+  const { t } = useI18n();
 
   const cycle = () => {
     const idx = effortCycle.indexOf(level);
     setLevel(effortCycle[(idx + 1) % effortCycle.length]);
   };
 
+  const keys = effortI18nKeys[level];
+
   return (
-    <div className={chipBase} onClick={cycle} title={`Effort: ${effortMeta[level]} (click to cycle)`}>
+    <div className={chipBase} onClick={cycle} title={`${t('statusbar.effort' as any)}: ${t(keys.label as any)} (${t(keys.desc as any)})`}>
       <Gauge size={12} className="shrink-0" />
-      <span>{effortMeta[level]}</span>
+      <span>{t(keys.label as any)}</span>
     </div>
   );
 }

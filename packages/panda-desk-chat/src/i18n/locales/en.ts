@@ -75,6 +75,36 @@ export default {
   'statusbar.mcp': 'MCP',
   'statusbar.sandbox': 'Sandbox',
   'statusbar.theme': 'Theme',
+  'statusbar.dnd': 'Do Not Disturb',
+
+  // StatusBar — connection states
+  'statusbar.connection.connected': 'Connected',
+  'statusbar.connection.connecting': 'Connecting',
+  'statusbar.connection.disconnected': 'Disconnected',
+  'statusbar.connection.error': 'Error',
+  'statusbar.connection.reconnecting': 'Reconnecting',
+
+  // StatusBar — permission modes
+  'statusbar.permission.default': 'Default',
+  'statusbar.permission.plan': 'Plan',
+  'statusbar.permission.auto': 'Auto Accept',
+  'statusbar.permission.bypass': 'Bypass',
+  'statusbar.permission.default.desc': 'Ask before executing tools',
+  'statusbar.permission.plan.desc': 'Plan mode — think before acting',
+  'statusbar.permission.auto.desc': 'Auto-accept safe operations',
+  'statusbar.permission.bypass.desc': 'Skip all permission prompts',
+
+  // StatusBar — effort levels
+  'statusbar.effort.min': 'Min',
+  'statusbar.effort.low': 'Low',
+  'statusbar.effort.medium': 'Medium',
+  'statusbar.effort.high': 'High',
+  'statusbar.effort.max': 'Max',
+  'statusbar.effort.min.desc': 'Quick, concise responses',
+  'statusbar.effort.low.desc': 'Brief with key details',
+  'statusbar.effort.medium.desc': 'Balanced depth',
+  'statusbar.effort.high.desc': 'Thorough analysis',
+  'statusbar.effort.max.desc': 'Maximum detail and reasoning',
 
   // Settings
   'settings.title': 'Settings',

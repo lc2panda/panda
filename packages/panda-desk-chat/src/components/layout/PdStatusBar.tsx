@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn';
 import { StatusBarChips } from './StatusBarChips';
 import { PdPetMood } from '@/components/special/PdPetMood';
 import { useBuddyStore } from '@/stores/buddyStore';
+import { useI18n } from '@/hooks/useI18n';
 import {
   BellOff as _BellOff,
   Bell as _Bell,
@@ -43,11 +44,18 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
-const connectionMeta: Record<ConnectionState, { color: string; label: string }> = {
-  connected:    { color: 'var(--pd-color-success)',  label: 'Connected' },
-  disconnected: { color: 'var(--pd-color-error)',    label: 'Disconnected' },
-  connecting:   { color: 'var(--pd-color-warning)',  label: 'Connecting...' },
-  error:        { color: 'var(--pd-color-error)',    label: 'Error' },
+const connectionColors: Record<ConnectionState, string> = {
+  connected:    'var(--pd-color-success)',
+  disconnected: 'var(--pd-color-error)',
+  connecting:   'var(--pd-color-warning)',
+  error:        'var(--pd-color-error)',
+};
+
+const connectionI18nKeys: Record<ConnectionState, string> = {
+  connected:    'statusbar.connection.connected',
+  disconnected: 'statusbar.connection.disconnected',
+  connecting:   'statusbar.connection.connecting',
+  error:        'statusbar.connection.error',
 };
 
 // ---------------------------------------------------------------------------
@@ -61,7 +69,9 @@ export function PdStatusBar({
   dnd = false,
   onPetClick,
 }: PdStatusBarProps) {
-  const conn = connectionMeta[connectionState];
+  const { t } = useI18n();
+  const connColor = connectionColors[connectionState];
+  const connLabel = t(connectionI18nKeys[connectionState] as any);
   const buddyLevel = useBuddyStore((s) => s.level);
 
   return (
@@ -124,22 +134,22 @@ export function PdStatusBar({
       {/* -- Right: connection + DND -- */}
       <div className="flex items-center gap-3">
         {/* Connection indicator */}
-        <span className="flex items-center gap-1.5" title={conn.label}>
+        <span className="flex items-center gap-1.5" title={connLabel}>
           <Circle
             size={8}
-            fill={conn.color}
+            fill={connColor}
             stroke="none"
             className={cn(
               (connectionState === 'connecting' || connectionState === 'error') && 'animate-pulse',
             )}
           />
-          <span>{conn.label}</span>
+          <span>{connLabel}</span>
         </span>
 
         {/* DND toggle */}
         <button
           type="button"
-          title={dnd ? 'Do Not Disturb (on)' : 'Notifications (on)'}
+          title={dnd ? `${t('statusbar.dnd')} (on)` : `${t('statusbar.dnd')} (off)`}
           className={cn(
             'rounded-[var(--pd-radius-sm)] p-0.5 transition-colors',
             'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',

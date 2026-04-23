@@ -166,7 +166,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
             onSend={handleSend}
             onStop={() => activeId && cancelStream(activeId)}
             isStreaming={isStreaming}
-            placeholder={t('composer.placeholder')}
+            placeholder={t('chat.placeholder')}
             disabled={isStreaming}
           />
         </>

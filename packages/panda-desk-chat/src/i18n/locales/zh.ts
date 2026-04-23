@@ -75,6 +75,36 @@ export default {
   'statusbar.mcp': 'MCP',
   'statusbar.sandbox': '沙箱',
   'statusbar.theme': '主题',
+  'statusbar.dnd': '免打扰',
+
+  // StatusBar — connection states
+  'statusbar.connection.connected': '已连接',
+  'statusbar.connection.connecting': '连接中',
+  'statusbar.connection.disconnected': '未连接',
+  'statusbar.connection.error': '连接错误',
+  'statusbar.connection.reconnecting': '重连中',
+
+  // StatusBar — permission modes
+  'statusbar.permission.default': '默认',
+  'statusbar.permission.plan': '计划',
+  'statusbar.permission.auto': '自动',
+  'statusbar.permission.bypass': '跳过确认',
+  'statusbar.permission.default.desc': '执行工具前需确认',
+  'statusbar.permission.plan.desc': '计划模式 — 先思考再行动',
+  'statusbar.permission.auto.desc': '自动接受安全操作',
+  'statusbar.permission.bypass.desc': '跳过所有权限确认',
+
+  // StatusBar — effort levels
+  'statusbar.effort.min': '最低',
+  'statusbar.effort.low': '低',
+  'statusbar.effort.medium': '中',
+  'statusbar.effort.high': '高',
+  'statusbar.effort.max': '最高',
+  'statusbar.effort.min.desc': '快速简洁的回复',
+  'statusbar.effort.low.desc': '简要但包含关键细节',
+  'statusbar.effort.medium.desc': '平衡的深度',
+  'statusbar.effort.high.desc': '详细的分析',
+  'statusbar.effort.max.desc': '最大细节与推理深度',
 
   // Settings
   'settings.title': '设置',

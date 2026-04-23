@@ -75,6 +75,36 @@ export default {
   'statusbar.mcp': 'MCP',
   'statusbar.sandbox': '샌드박스',
   'statusbar.theme': '테마',
+  'statusbar.dnd': '방해 금지',
+
+  // StatusBar — connection states
+  'statusbar.connection.connected': '연결됨',
+  'statusbar.connection.connecting': '연결 중',
+  'statusbar.connection.disconnected': '연결 끊김',
+  'statusbar.connection.error': '연결 오류',
+  'statusbar.connection.reconnecting': '재연결 중',
+
+  // StatusBar — permission modes
+  'statusbar.permission.default': '기본',
+  'statusbar.permission.plan': '계획',
+  'statusbar.permission.auto': '자동 승인',
+  'statusbar.permission.bypass': '바이패스',
+  'statusbar.permission.default.desc': '도구 실행 전 확인',
+  'statusbar.permission.plan.desc': '계획 모드 — 실행 전 계획',
+  'statusbar.permission.auto.desc': '안전한 작업 자동 승인',
+  'statusbar.permission.bypass.desc': '모든 권한 확인 건너뛰기',
+
+  // StatusBar — effort levels
+  'statusbar.effort.min': '최소',
+  'statusbar.effort.low': '낮음',
+  'statusbar.effort.medium': '보통',
+  'statusbar.effort.high': '높음',
+  'statusbar.effort.max': '최대',
+  'statusbar.effort.min.desc': '빠르고 간결한 응답',
+  'statusbar.effort.low.desc': '핵심 내용 포함 간결 응답',
+  'statusbar.effort.medium.desc': '균형 잡힌 깊이',
+  'statusbar.effort.high.desc': '상세한 분석',
+  'statusbar.effort.max.desc': '최대 상세도와 추론',
 
   // Settings
   'settings.title': '설정',

@@ -39,6 +39,36 @@ export function PdHeroComposer({ onSend, onSlashCommand }: PdHeroComposerProps) 
       justifyContent: 'center', flex: 1, padding: '40px 20px',
       maxWidth: 'var(--pd-composer-max-width)', margin: '0 auto', width: '100%',
     }}>
+      {/* Brand panda icon */}
+      <div style={{
+        width: 64, height: 64,
+        marginBottom: 16,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.10))',
+      }}>
+        <svg viewBox="0 0 64 64" width="64" height="64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Ears */}
+          <circle cx="14" cy="14" r="10" fill="var(--pd-color-fg)" />
+          <circle cx="50" cy="14" r="10" fill="var(--pd-color-fg)" />
+          <circle cx="14" cy="14" r="5" fill="var(--pd-color-bg-secondary, var(--pd-color-bg))" />
+          <circle cx="50" cy="14" r="5" fill="var(--pd-color-bg-secondary, var(--pd-color-bg))" />
+          {/* Head */}
+          <ellipse cx="32" cy="34" rx="22" ry="20" fill="var(--pd-color-bg)" stroke="var(--pd-color-fg)" strokeWidth="2" />
+          {/* Eye patches */}
+          <ellipse cx="22" cy="30" rx="7" ry="6" fill="var(--pd-color-fg)" transform="rotate(-10 22 30)" />
+          <ellipse cx="42" cy="30" rx="7" ry="6" fill="var(--pd-color-fg)" transform="rotate(10 42 30)" />
+          {/* Eyes */}
+          <circle cx="23" cy="30" r="2.5" fill="var(--pd-color-bg)" />
+          <circle cx="41" cy="30" r="2.5" fill="var(--pd-color-bg)" />
+          <circle cx="24" cy="29.5" r="1" fill="var(--pd-color-fg)" />
+          <circle cx="42" cy="29.5" r="1" fill="var(--pd-color-fg)" />
+          {/* Nose + mouth */}
+          <ellipse cx="32" cy="38" rx="3" ry="2" fill="var(--pd-color-fg)" />
+          <path d="M32 40 Q29 44 26 42" stroke="var(--pd-color-fg)" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          <path d="M32 40 Q35 44 38 42" stroke="var(--pd-color-fg)" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+        </svg>
+      </div>
+
       {/* Title */}
       <h1 style={{
         fontSize: '32px', fontWeight: 700, fontFamily: 'var(--pd-font-serif)',
