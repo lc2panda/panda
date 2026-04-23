@@ -239,6 +239,17 @@ export function setupSessionBridge(): void {
       .then((list) => {
         if (list.length > 0) {
           useSessionStore.getState().setSessions(list as unknown as SessionMeta[]);
+        } else {
+          // Backend has no sessions (fresh restart) but frontend may have
+          // persisted sessions from a previous run.  Focus the active one so
+          // the backend's ensureSession() re-materialises it.
+          const { activeId } = useSessionStore.getState();
+          if (activeId) {
+            console.log('[sessionStore] Backend empty, re-materialising active session:', activeId);
+            bridge.focusSession(activeId).catch((err: unknown) =>
+              console.warn('[sessionStore] Failed to re-materialise session:', err),
+            );
+          }
         }
       })
       .catch((err: unknown) => console.error('[sessionStore] listSessions failed:', err));

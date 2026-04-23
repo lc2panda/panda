@@ -572,6 +572,15 @@ export class CLIManager {
 
   async createSession(cwd: string, name?: string): Promise<SessionInfo> {
     const id = randomUUID();
+    return this.createSessionWithId(id, cwd, name);
+  }
+
+  /**
+   * Create a session with a specific ID.  Used internally by ensureSession()
+   * to re-materialise sessions whose IDs still live in the renderer's
+   * localStorage but were lost when the main process restarted.
+   */
+  private async createSessionWithId(id: string, cwd: string, name?: string): Promise<SessionInfo> {
     const session = new CLISession(id, cwd, name);
     this.sessions.set(id, session);
 
@@ -583,6 +592,21 @@ export class CLIManager {
 
     this.broadcastSessionList();
     return session.toInfo();
+  }
+
+  /**
+   * Return the existing session or transparently create a new CLI process
+   * for a stale session ID that the renderer still remembers after an
+   * Electron restart.
+   */
+  async ensureSession(sessionId: string, cwd?: string, name?: string): Promise<CLISession> {
+    let session = this.sessions.get(sessionId);
+    if (!session) {
+      console.log(`[CLIManager] Auto-creating session for stale ID: ${sessionId}`);
+      await this.createSessionWithId(sessionId, cwd || process.cwd(), name);
+      session = this.sessions.get(sessionId)!;
+    }
+    return session;
   }
 
   async deleteSession(sessionId: string): Promise<void> {
@@ -603,8 +627,7 @@ export class CLIManager {
   }
 
   async focusSession(sessionId: string): Promise<SessionInfo | null> {
-    const session = this.sessions.get(sessionId);
-    if (!session) return null;
+    const session = await this.ensureSession(sessionId);
 
     // Re-start stopped sessions
     if (session.state === 'stopped' || session.state === 'error') {
@@ -620,12 +643,8 @@ export class CLIManager {
 
   // ── Message routing ──────────────────────────────────────────────────
 
-  sendMessage(sessionId: string, content: string, attachments?: Array<{ mediaType: string; data: string }>): void {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      console.error(`[CLIManager] Session not found: ${sessionId}`);
-      return;
-    }
+  async sendMessage(sessionId: string, content: string, attachments?: Array<{ mediaType: string; data: string }>): Promise<void> {
+    const session = await this.ensureSession(sessionId);
     session.sendMessage(content, attachments);
   }
 

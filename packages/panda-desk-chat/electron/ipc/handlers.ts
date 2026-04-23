@@ -85,7 +85,12 @@ export function registerIpcHandlers(): void {
   // ── Chat messaging ─────────────────────────────────────────────────
 
   ipcMain.handle(CH.CHAT_SEND, async (_event, payload: { sessionId: string; content: string; attachments?: Array<{ mediaType: string; data: string }> }) => {
-    cliManager.sendMessage(payload.sessionId, payload.content, payload.attachments);
+    try {
+      await cliManager.sendMessage(payload.sessionId, payload.content, payload.attachments);
+    } catch (err) {
+      console.error('[IPC] CHAT_SEND failed:', err);
+      throw err;
+    }
   });
 
   ipcMain.handle(CH.CHAT_STOP, async (_event, payload: { sessionId: string }) => {
@@ -118,7 +123,12 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(CH.SESSION_FOCUS, async (_event, payload: { sessionId: string }) => {
-    return await cliManager.focusSession(payload.sessionId);
+    try {
+      return await cliManager.focusSession(payload.sessionId);
+    } catch (err) {
+      console.error('[IPC] SESSION_FOCUS failed:', err);
+      throw err;
+    }
   });
 
   // ── Tool permissions ───────────────────────────────────────────────
