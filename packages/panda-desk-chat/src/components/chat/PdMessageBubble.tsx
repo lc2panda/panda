@@ -1,7 +1,7 @@
 // Input: content, timestamp, thinkingContent, toolCalls, isStreaming, transcriptMode, interaction props
 // Output: Left-aligned assistant bubble with asymmetric radius, border, shadow, hover ActionBar
 // Pos: Chat layer — renders individual assistant turns inside MessageList
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import { cn } from "../../lib/cn";
 import { PdBadge } from "../atoms/PdBadge";
 import { PdMarkdownRenderer } from "./PdMarkdownRenderer";
@@ -120,6 +120,12 @@ export const PdMessageBubble: React.FC<PdMessageBubbleProps> = React.memo(({
   const [copied, setCopied] = useState(false);
   const [hovered, setHovered] = useState(false);
 
+  // Entry animation: only for newly mounted, non-streaming, normal-mode bubbles
+  const isNewMount = useRef(true);
+  const shouldAnimate = isNewMount.current && !isStreaming && transcriptMode === 'normal';
+  // After first render, mark as not new
+  if (isNewMount.current) isNewMount.current = false;
+
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(content);
@@ -158,6 +164,7 @@ export const PdMessageBubble: React.FC<PdMessageBubbleProps> = React.memo(({
       className={cn(
         "relative group",
         "mb-[var(--pd-space-3)]",
+        shouldAnimate && "pd-bubble-enter",
       )}
       style={{
         marginLeft: 40,

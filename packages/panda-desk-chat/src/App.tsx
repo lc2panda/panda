@@ -16,6 +16,7 @@ import type { Command } from './components/special/PdCommandPalette';
 import type { SessionItem } from './components/special/PdSessionSwitcher';
 import { useChatStore, useSessionStore, useTabStore } from './stores';
 import { useToastStore } from './stores/toastStore';
+import { useUIStore } from './stores/uiStore';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useThemeEffect } from './hooks/useThemeEffect';
 import { openNewWindow } from './ipc/bridge';
@@ -53,6 +54,16 @@ export function App() {
       setChatActiveSession(sessionId);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Sync uiStore inspector state → local state (sidebar → inspector linkage) ---
+  const uiInspectorTab = useUIStore((s) => s.inspectorTab);
+  const uiInspectorVisible = useUIStore((s) => s.inspectorVisible);
+  useEffect(() => {
+    if (uiInspectorVisible) {
+      setInspectorOpen(true);
+      setInspectorTab(uiInspectorTab);
+    }
+  }, [uiInspectorTab, uiInspectorVisible]);
 
   // --- Session / Tab actions for shortcuts ---
   const createSession = useSessionStore((s) => s.createSession);

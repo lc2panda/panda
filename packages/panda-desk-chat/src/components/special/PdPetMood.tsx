@@ -64,7 +64,7 @@ const KEYFRAMES_CSS = `
 }
 `;
 
-const ANIMATION_DURATIONS: Record<string, string> = {
+export const ANIMATION_DURATIONS: Record<string, string> = {
   'pd-pet-breathe': '3s ease-in-out infinite',
   'pd-pet-headshake': '1s ease-in-out infinite',
   'pd-pet-blink': '0.5s step-end infinite',
@@ -78,7 +78,7 @@ const ANIMATION_DURATIONS: Record<string, string> = {
 
 let keyframesInjected = false;
 
-function ensureKeyframes(): void {
+export function ensureKeyframes(): void {
   if (keyframesInjected) return;
   if (typeof document === 'undefined') return;
   if (document.getElementById(KEYFRAMES_ID)) {

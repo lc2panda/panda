@@ -1,8 +1,11 @@
-// Input: species, mood, size, animated props
-// Output: Panda mascot avatar with inline SVG (always panda, species prop kept for API compat)
+// Input: species, mood, size, animated, animState props
+// Output: Panda mascot avatar with inline SVG and mood-driven CSS animation
 // Pos: Special layer — personality/mascot display element
 import React, { forwardRef } from "react";
 import { cn } from "@/lib/cn";
+import { PET_MOOD_MAP } from "@/hooks/usePetMood";
+import { ensureKeyframes, ANIMATION_DURATIONS } from "./PdPetMood";
+import type { PetMoodState } from "@/hooks/usePetMood";
 
 export type PetSpecies =
   | "panda" | "cat" | "dog" | "fox" | "rabbit"
@@ -15,6 +18,8 @@ export type PetMood =
 export interface PdPetAvatarProps {
   species: PetSpecies;
   mood?: PetMood;
+  /** Behavioral state driving CSS animation (idle/thinking/coding/error/celebrating) */
+  animState?: PetMoodState;
   size?: "xs" | "sm" | "md" | "lg";
   animated?: boolean;
   className?: string;
@@ -58,9 +63,24 @@ function PandaSvg({ size }: { size: number }) {
   );
 }
 
+/** Map PetMoodState → CSS animation string using PdPetMood keyframes */
+function getMoodAnimation(animState?: PetMoodState): string | undefined {
+  if (!animState) return undefined;
+  const config = PET_MOOD_MAP[animState];
+  if (!config?.animation) return undefined;
+  const duration = ANIMATION_DURATIONS[config.animation] ?? '3s';
+  const easing = animState === 'coding' ? 'step-end' : 'ease-in-out';
+  return `${config.animation} ${duration} ${easing} infinite`;
+}
+
 export const PdPetAvatar = forwardRef<HTMLDivElement, PdPetAvatarProps>(
-  ({ species, mood = "neutral", size = "md", animated = false, className }, ref) => {
+  ({ species, mood = "neutral", size = "md", animated = false, animState, className }, ref) => {
     const s = sizeMap[size] ?? sizeMap.md;
+
+    // Inject keyframes on first render if animState provided
+    if (animState) ensureKeyframes();
+
+    const moodAnim = getMoodAnimation(animState);
 
     return (
       <div
@@ -68,11 +88,13 @@ export const PdPetAvatar = forwardRef<HTMLDivElement, PdPetAvatarProps>(
         aria-hidden="true"
         data-species={species}
         data-mood={mood}
+        data-anim-state={animState ?? "none"}
+        style={moodAnim ? { animation: moodAnim } : undefined}
         className={cn(
           "inline-flex items-center justify-center rounded-full",
           "bg-[var(--pd-color-bg-hover)] select-none",
           s.container,
-          animated && "animate-bounce",
+          animated && !moodAnim && "animate-bounce",
           className,
         )}
       >

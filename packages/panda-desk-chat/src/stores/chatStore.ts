@@ -783,6 +783,22 @@ export function setupBridgeListeners(): void {
       isError: boolean;
     };
     store().endToolUse(sessionId, toolUseId, result, isError);
+
+    // Buddy: estimate written code lines for write-type tools
+    if (!isError && result) {
+      const session = store().sessions.get(sessionId);
+      const msgs = session?.messages ?? [];
+      const lastAssistant = msgs.findLast((m) => m.role === 'assistant');
+      const toolCall = lastAssistant?.toolCalls?.find((tc) => tc.id === toolUseId);
+      const tn = toolCall?.toolName ?? '';
+      const WRITE_TOOLS = ['FileEditTool', 'FileWriteTool', 'Write', 'Edit'];
+      if (WRITE_TOOLS.includes(tn)) {
+        const lines = (result.match(/\n/g)?.length ?? 0) + 1;
+        if (lines > 0) {
+          useBuddyStore.getState().recordCodeLines(lines);
+        }
+      }
+    }
   });
 
   // permission:request

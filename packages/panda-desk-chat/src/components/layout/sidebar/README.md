@@ -1,5 +1,5 @@
-- SearchPanel.tsx — 全局搜索面板（会话消息+标题搜索）
-- FilesPanel.tsx — 文件浏览面板（从 tool call 提取文件操作记录）
+- SearchPanel.tsx — 多模式搜索面板（会话/文件/全文三模式，IPC bridge 后端搜索 + toolCalls fallback）
+- FilesPanel.tsx — 文件浏览面板（时间线/树/浏览三视图，IPC listDirectory + toolCalls 提取，Inspector 联动）
 - MemoryPanel.tsx — 记忆库面板（CLAUDE.md + 项目记忆条目）
 - WorkflowPanel.tsx — 工作流模板面板（点击执行 slash 命令）
 

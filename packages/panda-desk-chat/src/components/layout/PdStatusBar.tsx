@@ -30,6 +30,8 @@ export interface PdStatusBarProps {
   connectionState?: ConnectionState;
   permissionMode?: string;
   dnd?: boolean;
+  /** Callback when pet mood/level badge is clicked (e.g. open Inspector petState tab) */
+  onPetClick?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +59,7 @@ export function PdStatusBar({
   connectionState = 'connected',
   permissionMode,
   dnd = false,
+  onPetClick,
 }: PdStatusBarProps) {
   const conn = connectionMeta[connectionState];
   const buddyLevel = useBuddyStore((s) => s.level);
@@ -75,7 +78,17 @@ export function PdStatusBar({
       {/* -- Left: pet mood + level + chips + model + tokens -- */}
       <div className="flex items-center gap-3">
         {/* Pet mood indicator + Level badge */}
-        <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onPetClick}
+          disabled={!onPetClick}
+          title={`Buddy Lv.${buddyLevel} — ${onPetClick ? 'Click to inspect' : ''}`}
+          className={cn(
+            'flex items-center gap-1 rounded-[var(--pd-radius-sm)] px-0.5',
+            onPetClick && 'cursor-pointer hover:bg-[var(--pd-color-bg-hover)] transition-colors',
+            !onPetClick && 'cursor-default',
+          )}
+        >
           <PdPetMood size="xs" />
           <span
             className={cn(
@@ -86,7 +99,7 @@ export function PdStatusBar({
           >
             Lv.{buddyLevel}
           </span>
-        </div>
+        </button>
 
         <StatusBarChips />
 

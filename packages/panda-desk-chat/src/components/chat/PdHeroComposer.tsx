@@ -53,14 +53,10 @@ export function PdHeroComposer({ onSend, onSlashCommand }: PdHeroComposerProps) 
         {t('composer.hero.subtitle')}
       </p>
 
-      {/* Input area */}
-      <div style={{
+      {/* Input area — glassmorphism card */}
+      <div className="pd-hero-glass" style={{
         width: '100%', position: 'relative',
-        background: 'var(--pd-color-bg-elevated)',
-        borderRadius: 'var(--pd-radius-xl)',
-        border: '1px solid var(--pd-color-border)',
-        boxShadow: 'var(--pd-shadow-md)',
-        transition: 'border-color var(--pd-duration-fast) var(--pd-ease-standard)',
+        transition: 'border-color var(--pd-duration-fast) var(--pd-ease-standard), box-shadow var(--pd-duration-fast) var(--pd-ease-standard)',
       }}>
         <textarea
           ref={textareaRef}

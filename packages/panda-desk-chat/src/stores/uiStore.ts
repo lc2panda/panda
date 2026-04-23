@@ -30,6 +30,11 @@ export interface UIStore {
   composerFocused: boolean;
   searchQuery: string;
 
+  // Inspector cross-component linkage (sidebar → App → PdInspector)
+  inspectorTab: number;
+  inspectorVisible: boolean;
+  inspectorHighlightFile: string | null;
+
   // Actions
   openModal: (modal: ModalType) => void;
   closeModal: () => void;
@@ -38,6 +43,9 @@ export interface UIStore {
   setSidebarHovered: (hovered: boolean) => void;
   setComposerFocused: (focused: boolean) => void;
   setSearchQuery: (query: string) => void;
+  setInspectorTab: (tab: number) => void;
+  setInspectorVisible: (visible: boolean) => void;
+  openInspectorFile: (filePath: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,6 +58,9 @@ export const useUIStore = create<UIStore>()((set) => ({
   isSidebarHovered: false,
   composerFocused: false,
   searchQuery: '',
+  inspectorTab: 0,
+  inspectorVisible: false,
+  inspectorHighlightFile: null,
 
   openModal: (modal) => set({ activeModal: modal }),
   closeModal: () => set({ activeModal: null }),
@@ -70,4 +81,8 @@ export const useUIStore = create<UIStore>()((set) => ({
   setSidebarHovered: (isSidebarHovered) => set({ isSidebarHovered }),
   setComposerFocused: (composerFocused) => set({ composerFocused }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
+  setInspectorTab: (inspectorTab) => set({ inspectorTab }),
+  setInspectorVisible: (inspectorVisible) => set({ inspectorVisible }),
+  openInspectorFile: (filePath) =>
+    set({ inspectorTab: 1, inspectorVisible: true, inspectorHighlightFile: filePath }),
 }));

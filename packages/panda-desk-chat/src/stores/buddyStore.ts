@@ -430,3 +430,11 @@ export const useBuddyStore = create<BuddyState>((set, get) => ({
     return get().events.filter((e) => e.timestamp > since);
   },
 }));
+
+/* -------------------------------------------------------------------------- */
+/*  Subscribe safety-net: persist on every state change                       */
+/* -------------------------------------------------------------------------- */
+
+useBuddyStore.subscribe((state) => {
+  persistState(state);
+});
