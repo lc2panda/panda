@@ -34,6 +34,8 @@ export interface PdComposerProps {
 export interface PdComposerHandle {
   focus: () => void;
   clear: () => void;
+  /** Insert "/" into textarea and open the slash command menu */
+  insertSlash: () => void;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -108,6 +110,12 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
         setValue("");
         setAttachments([]);
         resize();
+      },
+      insertSlash: () => {
+        setValue("/");
+        setSlashOpen(true);
+        setSlashFilter("");
+        textareaRef.current?.focus();
       },
     }));
 

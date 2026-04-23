@@ -46,3 +46,6 @@ export type { PdPetCameoProps, PetCameoOccasion } from "./PdPetCameo";
 
 export { PdHeroComposer } from "./PdHeroComposer";
 export type { PdHeroComposerProps } from "./PdHeroComposer";
+
+export { PdSuperAssistBar } from "./PdSuperAssistBar";
+export type { PdSuperAssistBarProps } from "./PdSuperAssistBar";

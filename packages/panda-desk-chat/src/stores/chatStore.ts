@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import * as bridge from '../ipc/bridge';
 import { useToastStore } from './toastStore';
+import { useBuddyStore } from './buddyStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -732,6 +733,9 @@ export function setupBridgeListeners(): void {
     store().startStreaming(sessionId, messageId);
     activeSessions.add(sessionId);
     startFlushLoop();
+    // Buddy: record user message + award XP
+    useBuddyStore.getState().recordMessage();
+    useBuddyStore.getState().addXP(5, 'message');
   });
 
   // stream:delta → buffer deltas
@@ -767,9 +771,10 @@ export function setupBridgeListeners(): void {
       input: Record<string, unknown>;
     };
     store().startToolUse(sessionId, toolUseId, toolName, input);
+    // Buddy: record tool use + award XP
+    useBuddyStore.getState().recordToolUse(toolName);
+    useBuddyStore.getState().addXP(3, 'tool_use');
   });
-
-  // tool:end
   bridge.onToolUseEnd((payload) => {
     const { sessionId, toolUseId, result, isError } = payload as {
       sessionId: string;

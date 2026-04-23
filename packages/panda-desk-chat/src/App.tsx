@@ -184,7 +184,12 @@ export function App() {
               <SettingsPage onClose={() => setPage('chat')} />
             </Suspense>
           ) : (
-            <ChatPage />
+            <ChatPage
+              onOpenBuddyLog={() => {
+                setInspectorTab(7);
+                setInspectorOpen(true);
+              }}
+            />
           )}
         </div>
 

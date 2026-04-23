@@ -22,9 +22,11 @@ import {
   Plus as _Plus,
   Trash2 as _Trash2,
   ArrowUpRight as _ArrowUpRight,
-  Pin as _Pin,
   ChevronDown as _ChevronDown,
   ChevronRight as _ChevronRight,
+  // @ts-ignore lucide-react 0.511 ships Pin & FolderKanban at runtime but bundled .d.ts misses top-level named exports
+  Pin as _Pin,
+  // @ts-ignore same as above
   FolderKanban as _FolderKanban,
 } from 'lucide-react';
 

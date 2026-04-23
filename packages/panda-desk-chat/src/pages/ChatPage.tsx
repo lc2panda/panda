@@ -1,12 +1,14 @@
 // Input: chatStore (per-session state via activeSessionId), sessionStore (sessions, activeId), useI18n
-// Output: 聊天内容区 — RoutingBanner + MessageList + StreamingIndicator + PermissionDialog + Composer 或 PetCameo + HeroComposer
+// Output: 聊天内容区 — RoutingBanner + MessageList + StreamingIndicator + PermissionDialog + SuperAssistBar + Composer 或 PetCameo + HeroComposer
 // Pos: App.tsx 的 main content slot，不含外层布局
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { PdMessageList } from '../components/chat/PdMessageList';
 import { PdComposer } from '../components/chat/PdComposer';
+import type { PdComposerHandle } from '../components/chat/PdComposer';
 import { PdHeroComposer } from '../components/chat/PdHeroComposer';
+import { PdSuperAssistBar } from '../components/chat/PdSuperAssistBar';
 import { PdStreamingIndicator } from '../components/chat/PdStreamingIndicator';
 import { PdPermissionDialog } from '../components/chat/PdPermissionDialog';
 import { PdRoutingBanner } from '../components/chat/PdRoutingBanner';
@@ -17,10 +19,14 @@ import { useSessionStore } from '../stores/sessionStore';
 
 export interface ChatPageProps {
   className?: string;
+  /** Callback to open Inspector on the Buddy Log tab */
+  onOpenBuddyLog?: () => void;
 }
 
-export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
+export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog }) => {
   const { t } = useI18n();
+  const composerRef = useRef<PdComposerHandle>(null);
+  const [thinkHardActive, setThinkHardActive] = useState(false);
 
   // Session store — list + active ID (shallow compare avoids re-render on unrelated store changes)
   const { sessions, activeId, createSession } = useSessionStore(
@@ -53,9 +59,13 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
   const handleSend = useCallback(
     (content: string) => {
       if (!content.trim() || !activeId) return;
-      sendMessage(activeId, content);
+      // When "think hard" mode is active, prepend directive
+      const payload = thinkHardActive
+        ? `think hard\n\n${content}`
+        : content;
+      sendMessage(activeId, payload);
     },
-    [sendMessage, activeId],
+    [sendMessage, activeId, thinkHardActive],
   );
 
   const handleNewSession = useCallback(
@@ -66,6 +76,27 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
     },
     [createSession, sendMessage],
   );
+
+  /* -- SuperAssistBar callbacks -- */
+  const handleAssistCommand = useCallback(
+    (cmd: string) => {
+      if (!activeId) return;
+      sendMessage(activeId, cmd);
+    },
+    [sendMessage, activeId],
+  );
+
+  const handleToggleThinking = useCallback((active: boolean) => {
+    setThinkHardActive(active);
+  }, []);
+
+  const handleOpenSlashMenu = useCallback(() => {
+    composerRef.current?.insertSlash();
+  }, []);
+
+  const handleOpenBuddyLog = useCallback(() => {
+    onOpenBuddyLog?.();
+  }, [onOpenBuddyLog]);
 
   return (
     <div
@@ -103,7 +134,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
             messages={messages}
             isStreaming={isStreaming}
             streamingText={streamingText}
-            sessionId={activeId}
+            sessionId={activeId ?? ''}
           />
           {isStreaming && (
             <PdStreamingIndicator
@@ -123,7 +154,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
               }
             />
           )}
+          <PdSuperAssistBar
+            onSendCommand={handleAssistCommand}
+            onToggleThinking={handleToggleThinking}
+            onOpenSlashMenu={handleOpenSlashMenu}
+            onOpenBuddyLog={handleOpenBuddyLog}
+          />
           <PdComposer
+            ref={composerRef}
             sessionId={activeId!}
             onSend={handleSend}
             onStop={() => activeId && cancelStream(activeId)}

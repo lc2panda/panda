@@ -1,11 +1,13 @@
-// Input: Array of UIMessage from chatStore, isStreaming flag, streamingText
-// Output: Scrollable message list with auto-scroll and a11y live region
-// Pos: Chat layer — main conversation display area wrapping PdUserBubble + PdMessageBubble
-import React, { useEffect, useRef, useCallback } from "react";
+// Input: Array of UIMessage from chatStore, buddy events from buddyStore, isStreaming flag, streamingText
+// Output: Scrollable message list with auto-scroll, buddy event cards interleaved, and a11y live region
+// Pos: Chat layer — main conversation display area wrapping PdUserBubble + PdMessageBubble + PdBuddyEventCard
+import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import { cn } from "../../lib/cn";
 import { PdUserBubble } from "./PdUserBubble";
 import { PdMessageBubble, type ToolCallInfo } from "./PdMessageBubble";
+import { PdBuddyEventCard } from "./PdBuddyEventCard";
 import { useChatStore, type TranscriptMode, type MessageFeedback } from "../../stores/chatStore";
+import { useBuddyStore, type BuddyEvent } from "../../stores/buddyStore";
 
 export interface UIMessage {
   id: string;
@@ -35,6 +37,38 @@ export const PdMessageList: React.FC<PdMessageListProps> = ({
   const transcriptMode = useChatStore((s) => s.transcriptMode);
   const retryLastMessage = useChatStore((s) => s.retryLastMessage);
   const setFeedback = useChatStore((s) => s.setFeedback);
+  const buddyEvents = useBuddyStore((s) => s.events);
+
+  /* ── Merge messages and buddy events into a single timeline ────────── */
+  type TimelineItem =
+    | { kind: 'message'; msg: UIMessage; idx: number }
+    | { kind: 'buddy'; event: BuddyEvent };
+
+  const timeline = useMemo<TimelineItem[]>(() => {
+    // Only include buddy events that fall within the message time range
+    const firstTs = messages.length > 0 ? messages[0].timestamp : 0;
+    const relevantEvents = firstTs > 0
+      ? buddyEvents.filter((e) => e.timestamp >= firstTs)
+      : buddyEvents;
+
+    const items: TimelineItem[] = [];
+    let eIdx = 0;
+
+    for (let mIdx = 0; mIdx < messages.length; mIdx++) {
+      // Insert any buddy events that occurred before this message
+      while (eIdx < relevantEvents.length && relevantEvents[eIdx].timestamp <= messages[mIdx].timestamp) {
+        items.push({ kind: 'buddy', event: relevantEvents[eIdx] });
+        eIdx++;
+      }
+      items.push({ kind: 'message', msg: messages[mIdx], idx: mIdx });
+    }
+    // Remaining buddy events after the last message
+    while (eIdx < relevantEvents.length) {
+      items.push({ kind: 'buddy', event: relevantEvents[eIdx] });
+      eIdx++;
+    }
+    return items;
+  }, [messages, buddyEvents]);
 
   /* ── Detect manual scroll-up ───────────────────────────────────────── */
   const handleScroll = useCallback(() => {
@@ -67,7 +101,21 @@ export const PdMessageList: React.FC<PdMessageListProps> = ({
         "scrollbar-track-transparent",
       )}
     >
-      {messages.map((msg, idx) => {
+      {timeline.map((item) => {
+        if (item.kind === 'buddy') {
+          return (
+            <PdBuddyEventCard
+              key={`buddy-${item.event.id}`}
+              type={item.event.type}
+              title={item.event.title}
+              description={item.event.description}
+              emoji={item.event.emoji}
+              timestamp={item.event.timestamp}
+            />
+          );
+        }
+
+        const { msg, idx } = item;
         const isLast = idx === messages.length - 1;
         const isLastAssistant = isLast && msg.role === "assistant";
 

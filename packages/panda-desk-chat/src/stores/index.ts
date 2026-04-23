@@ -9,6 +9,7 @@ export { useSettingsStore, setupSettingsBridge } from './settingsStore';
 export { useUIStore } from './uiStore';
 export { useToastStore } from './toastStore';
 export { useProviderStore, setupProviderBridge } from './providerStore';
+export { useBuddyStore } from './buddyStore';
 
 // Re-export commonly used types
 export type {
@@ -27,6 +28,7 @@ export type { Theme, PermissionMode, Locale, EffortLevel } from './settingsStore
 export type { ModalType } from './uiStore';
 export type { Toast, ToastType } from './toastStore';
 export type { Provider, ModelInfo } from './providerStore';
+export type { BuddyEvent, BuddyMilestone, BuddyStats, BuddyEventType } from './buddyStore';
 
 // ---------------------------------------------------------------------------
 // Unified bridge initialization
