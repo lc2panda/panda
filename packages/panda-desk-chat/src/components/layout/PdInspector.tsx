@@ -2,8 +2,12 @@
 // Output: 右侧信息面板 320px，9 Tab
 // Pos: App 右栏，可隐藏
 
-import { type ComponentType } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
 import { X as _X } from 'lucide-react';
+import { ContextPanel } from './inspector/ContextPanel';
+import { FilesPanel } from './inspector/FilesPanel';
+import { DiffPanel } from './inspector/DiffPanel';
+import { AgentsPanel } from './inspector/AgentsPanel';
 
 type IconFC = ComponentType<{ className?: string; size?: number }>;
 const X = _X as IconFC;
@@ -24,6 +28,28 @@ export interface PdInspectorProps {
   activeTab: number;
   onTabChange: (tab: number) => void;
   onClose: () => void;
+}
+
+/** Map tab id to implemented panel or placeholder */
+function renderTabContent(tabId: string | undefined): ReactNode {
+  switch (tabId) {
+    case 'context':
+      return <ContextPanel />;
+    case 'files':
+      return <FilesPanel />;
+    case 'diff':
+      return <DiffPanel />;
+    case 'agents':
+      return <AgentsPanel />;
+    default:
+      return (
+        <div className="p-3">
+          <div className="pt-10 text-center text-[var(--pd-text-sm)] text-[var(--pd-color-fg-muted)]">
+            {tabId ?? 'Inspector'} 面板
+          </div>
+        </div>
+      );
+  }
 }
 
 export function PdInspector({ activeTab, onTabChange, onClose }: PdInspectorProps) {
@@ -69,10 +95,8 @@ export function PdInspector({ activeTab, onTabChange, onClose }: PdInspectorProp
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-auto p-3">
-        <div className="pt-10 text-center text-[var(--pd-text-sm)] text-[var(--pd-color-fg-muted)]">
-          {INSPECTOR_TABS[activeTab]?.label} 面板
-        </div>
+      <div className="flex-1 overflow-y-auto">
+        {renderTabContent(INSPECTOR_TABS[activeTab]?.id)}
       </div>
     </div>
   );

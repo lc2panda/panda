@@ -3,6 +3,7 @@
 // Pos: Chat layer — displays tool use within conversation
 import React, { useState } from "react";
 import { cn } from "../../lib/cn";
+import { getToolRenderer, type ToolRendererProps } from "./tool-renderers";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -171,52 +172,82 @@ export const PdToolCallCard: React.FC<PdToolCallCardProps> = React.memo(({
           expanded ? "max-h-[4000px] opacity-100" : "max-h-0 opacity-0",
         )}
       >
-        {/* Input section */}
-        <div className="px-3 pb-2">
-          <pre
-            className={cn(
-              "m-0 p-2 overflow-x-auto",
-              "rounded-[var(--pd-radius-sm)]",
-              "bg-[var(--pd-color-bg-subtle)]",
-              "text-[var(--pd-code-base)]",
-              "font-[var(--pd-font-mono)]",
-              "text-[var(--pd-color-fg-muted)]",
-            )}
-          >
-            {formattedInput}
-          </pre>
-        </div>
+        {/* Tool-specific or generic rendering */}
+        {(() => {
+          const SpecializedRenderer = getToolRenderer(toolName);
+          if (SpecializedRenderer) {
+            /* Parse input safely for specialized renderers */
+            let parsedInput: Record<string, unknown> = {};
+            try {
+              parsedInput = typeof input === "string" ? JSON.parse(input) : (input ?? {});
+            } catch {
+              parsedInput = { _raw: input };
+            }
+            return (
+              <div className="px-3 pb-2">
+                <SpecializedRenderer
+                  input={parsedInput}
+                  result={result}
+                  status={status}
+                  toolName={toolName}
+                  isError={isError}
+                />
+              </div>
+            );
+          }
 
-        {/* Result section */}
-        {result != null && (
-          <div className="px-3 pb-2">
-            <div
-              className={cn(
-                "text-[var(--pd-text-xs)] font-[var(--pd-font-medium)]",
-                "mb-1",
-                isError
-                  ? "text-[var(--pd-color-error-fg)]"
-                  : "text-[var(--pd-color-fg-muted)]",
+          /* Generic fallback — original JSON display */
+          return (
+            <>
+              {/* Input section */}
+              <div className="px-3 pb-2">
+                <pre
+                  className={cn(
+                    "m-0 p-2 overflow-x-auto",
+                    "rounded-[var(--pd-radius-sm)]",
+                    "bg-[var(--pd-color-bg-subtle)]",
+                    "text-[var(--pd-code-base)]",
+                    "font-[var(--pd-font-mono)]",
+                    "text-[var(--pd-color-fg-muted)]",
+                  )}
+                >
+                  {formattedInput}
+                </pre>
+              </div>
+
+              {/* Result section */}
+              {result != null && (
+                <div className="px-3 pb-2">
+                  <div
+                    className={cn(
+                      "text-[var(--pd-text-xs)] font-[var(--pd-font-medium)]",
+                      "mb-1",
+                      isError
+                        ? "text-[var(--pd-color-error-fg)]"
+                        : "text-[var(--pd-color-fg-muted)]",
+                    )}
+                  >
+                    {isError ? "Error" : "Result"}
+                  </div>
+                  <pre
+                    className={cn(
+                      "m-0 p-2 overflow-x-auto",
+                      "rounded-[var(--pd-radius-sm)]",
+                      "bg-[var(--pd-color-bg-subtle)]",
+                      "text-[var(--pd-code-base)]",
+                      "font-[var(--pd-font-mono)]",
+                      isError
+                        ? "text-[var(--pd-color-error-fg)]"
+                        : "text-[var(--pd-color-fg)]",
+                    )}
+                  >
+                    {result}
+                  </pre>
+                </div>
               )}
-            >
-              {isError ? "Error" : "Result"}
-            </div>
-            <pre
-              className={cn(
-                "m-0 p-2 overflow-x-auto",
-                "rounded-[var(--pd-radius-sm)]",
-                "bg-[var(--pd-color-bg-subtle)]",
-                "text-[var(--pd-code-base)]",
-                "font-[var(--pd-font-mono)]",
-                isError
-                  ? "text-[var(--pd-color-error-fg)]"
-                  : "text-[var(--pd-color-fg)]",
-              )}
-            >
-              {result}
-            </pre>
-          </div>
-        )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );

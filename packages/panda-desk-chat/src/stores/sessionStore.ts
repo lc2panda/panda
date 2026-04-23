@@ -17,6 +17,7 @@ export interface SessionMeta {
   createdAt: string; // ISO 8601
   lastActive: string; // ISO 8601
   messageCount: number;
+  isPinned?: boolean;
 }
 
 export interface SessionStore {
@@ -24,6 +25,7 @@ export interface SessionStore {
   activeId: string | null;
   isLoading: boolean;
   error: string | null;
+  projectFilter: string | null; // null = all projects
 
   // Actions
   setSessions: (sessions: SessionMeta[]) => void;
@@ -38,6 +40,8 @@ export interface SessionStore {
   createSession: (name?: string) => Promise<SessionMeta>;
   deleteSession: (sessionId: string) => void;
   renameSession: (sessionId: string, name: string) => void;
+  togglePin: (sessionId: string) => void;
+  setProjectFilter: (project: string | null) => void;
 
   // Persistence
   loadSessions: () => void;
@@ -60,6 +64,7 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
   activeId: null,
   isLoading: false,
   error: null,
+  projectFilter: null,
 
   setSessions: (sessions) => {
     set({ sessions: Array.isArray(sessions) ? sessions : [], isLoading: false, error: null });
@@ -153,6 +158,19 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
       console.error('[sessionStore] bridge.renameSession failed:', err);
     });
     get().saveSessions();
+  },
+
+  togglePin: (sessionId) => {
+    set((state) => ({
+      sessions: (Array.isArray(state.sessions) ? state.sessions : []).map((s) =>
+        s.id === sessionId ? { ...s, isPinned: !s.isPinned } : s,
+      ),
+    }));
+    get().saveSessions();
+  },
+
+  setProjectFilter: (project) => {
+    set({ projectFilter: project });
   },
 
   loadSessions: () => {

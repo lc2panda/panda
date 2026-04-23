@@ -103,6 +103,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
             messages={messages}
             isStreaming={isStreaming}
             streamingText={streamingText}
+            sessionId={activeId}
           />
           {isStreaming && (
             <PdStreamingIndicator

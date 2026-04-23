@@ -26,6 +26,8 @@ export interface UIToolCall {
   status: 'pending' | 'running' | 'success' | 'error';
 }
 
+export type MessageFeedback = 'positive' | 'negative' | null;
+
 export interface UIMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -36,6 +38,7 @@ export interface UIMessage {
   toolCalls?: UIToolCall[];
   tokenUsage?: TokenUsage;
   finishReason?: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use';
+  feedback?: MessageFeedback;
 }
 
 export type TranscriptMode = 'normal' | 'verbose' | 'summary';
@@ -243,6 +246,10 @@ export interface ChatStore {
   ) => void;
   cancelStream: (sessionId: string) => void;
   pasteImage: (sessionId: string, dataUrl: string) => void;
+
+  // Interaction enhancements (§11.4.2)
+  setFeedback: (sessionId: string, messageId: string, feedback: MessageFeedback) => void;
+  retryLastMessage: (sessionId: string) => void;
 }
 
 export const useChatStore = create<ChatStore>()((set, get) => ({
@@ -646,6 +653,57 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         message: err instanceof Error ? err.message : 'Failed to paste image',
       });
     });
+  },
+
+  // -- Interaction enhancements (§11.4.2) ------------------------------------
+
+  setFeedback: (sessionId, messageId, feedback) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      const updated = updateMessage(session.messages, messageId, (msg) => ({
+        ...msg,
+        feedback,
+      }));
+      if (!updated) return state;
+      return {
+        sessions: putSession(state.sessions, { ...session, messages: updated }),
+      };
+    }),
+
+  retryLastMessage: (sessionId) => {
+    const state = get();
+    const session = getSession(state.sessions, sessionId);
+    if (!session) return;
+    if (session.chatState !== 'idle') return;
+
+    // Find the last user message content
+    const { messages } = session;
+    let lastUserContent: string | null = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUserContent = messages[i].content;
+        break;
+      }
+    }
+    if (!lastUserContent) return;
+
+    // Remove the last assistant message (if it is the final message)
+    const trimmed =
+      messages.length > 0 && messages[messages.length - 1].role === 'assistant'
+        ? messages.slice(0, -1)
+        : [...messages];
+
+    set((s) => {
+      const sess = getSession(s.sessions, sessionId);
+      if (!sess) return s;
+      return {
+        sessions: putSession(s.sessions, { ...sess, messages: trimmed }),
+      };
+    });
+
+    // Re-send via the bridge (addUserMessage + bridge call)
+    get().sendMessage(sessionId, lastUserContent);
   },
 }));
 

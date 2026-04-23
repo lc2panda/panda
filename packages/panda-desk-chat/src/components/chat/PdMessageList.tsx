@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useCallback } from "react";
 import { cn } from "../../lib/cn";
 import { PdUserBubble } from "./PdUserBubble";
 import { PdMessageBubble, type ToolCallInfo } from "./PdMessageBubble";
-import { useChatStore, type TranscriptMode } from "../../stores/chatStore";
+import { useChatStore, type TranscriptMode, type MessageFeedback } from "../../stores/chatStore";
 
 export interface UIMessage {
   id: string;
@@ -14,22 +14,27 @@ export interface UIMessage {
   timestamp: number;
   thinkingContent?: string;
   toolCalls?: ToolCallInfo[];
+  feedback?: MessageFeedback;
 }
 
 export interface PdMessageListProps {
   messages: UIMessage[];
   isStreaming: boolean;
   streamingText: string;
+  sessionId: string;
 }
 
 export const PdMessageList: React.FC<PdMessageListProps> = ({
   messages,
   isStreaming,
   streamingText,
+  sessionId,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const transcriptMode = useChatStore((s) => s.transcriptMode);
+  const retryLastMessage = useChatStore((s) => s.retryLastMessage);
+  const setFeedback = useChatStore((s) => s.setFeedback);
 
   /* ── Detect manual scroll-up ───────────────────────────────────────── */
   const handleScroll = useCallback(() => {
@@ -91,6 +96,12 @@ export const PdMessageList: React.FC<PdMessageListProps> = ({
             toolCalls={msg.toolCalls}
             isStreaming={isLastAssistant && isStreaming}
             transcriptMode={transcriptMode}
+            isLastAssistant={isLastAssistant}
+            onRetry={isLastAssistant ? () => retryLastMessage(sessionId) : undefined}
+            feedback={msg.feedback}
+            onFeedbackChange={
+              (value) => setFeedback(sessionId, msg.id, value)
+            }
           />
         );
       })}
