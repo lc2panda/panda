@@ -1,5 +1,5 @@
 // Input: Streaming state (verb, elapsed time, token count)
-// Output: Animated pill indicating active generation
+// Output: Animated pill indicating active generation with 3-dot pulse
 // Pos: Chat layer — visual feedback for streaming responses
 import React from "react";
 import { cn } from "../../lib/cn";
@@ -16,7 +16,18 @@ export interface PdStreamingIndicatorProps {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  PdStreamingIndicator                                                     */
+/*  Helpers                                                                   */
+/* -------------------------------------------------------------------------- */
+
+function formatElapsed(s: number): string {
+  if (s < 60) return `${Math.floor(s)}s`;
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}m ${sec}s`;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Component                                                                 */
 /* -------------------------------------------------------------------------- */
 
 export const PdStreamingIndicator: React.FC<PdStreamingIndicatorProps> = ({
@@ -25,33 +36,33 @@ export const PdStreamingIndicator: React.FC<PdStreamingIndicatorProps> = ({
   tokens,
   className,
 }) => {
-  const elapsedDisplay = elapsed < 60
-    ? `${elapsed}s`
-    : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+  const elapsedDisplay = formatElapsed(elapsed);
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-[var(--pd-space-1\\.5)]",
-        "px-[var(--pd-space-3)] py-[var(--pd-space-1)]",
-        "rounded-[var(--pd-radius-full)]",
-        "bg-[var(--pd-color-accent-subtle)]",
-        "text-[var(--pd-color-accent-fg)]",
-        "text-[var(--pd-text-xs)]",
-        "font-[var(--pd-font-medium)]",
-        "select-none",
-        "animate-[pd-streaming-shimmer_2s_ease-in-out_infinite]",
+        "inline-flex items-center gap-2 px-3 py-1 rounded-full",
+        "bg-[var(--pd-color-bg-float)] text-[var(--pd-color-fg-muted)]",
+        "text-xs font-medium select-none",
         className,
       )}
     >
-      {/* Shimmer diamond */}
-      <span className="text-[var(--pd-color-accent)]" aria-hidden="true">
-        &#x27E1;
+      {/* Shimmer cursor (original) */}
+      <span className="inline-block w-2 h-4 rounded-sm bg-[var(--pd-color-accent)] animate-pulse" />
+
+      {/* 3-dot pulse — uses pd-pulse-dot keyframe from global.css */}
+      <span className="inline-flex items-center gap-1" aria-hidden="true">
+        <span className="pd-thinking-dot" />
+        <span className="pd-thinking-dot" />
+        <span className="pd-thinking-dot" />
       </span>
 
-      <span>{verb}...</span>
+      <span className="text-[var(--pd-color-fg-muted)]">
+        正在输入...
+      </span>
+
       <span className="text-[var(--pd-color-accent-fg)] opacity-70">
-        {elapsedDisplay}
+        {verb} · {elapsedDisplay}
       </span>
 
       {tokens !== undefined && tokens > 0 && (

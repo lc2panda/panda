@@ -122,3 +122,25 @@ W16 进行中 (4/5 完成):
 - [x] G7: URL session 参数传递 (b484392)
 - [x] G9: 窗口位置/尺寸持久化 (b484392)
 - [x] G10: appUpdater 广播所有窗口 (b484392)
+
+## UI Claude Desktop 对齐 (§12) ✅
+> 完成时间：2026-04-23
+
+### Wave E — P0 缺失组件
+- [x] E-1: PdDiffViewer 组件 (a218919)
+- [x] E-2: PdAskUserQuestion 组件 (a218919)
+- [x] E-3: FileRenderer 接入 DiffViewer (a218919)
+- [x] E-4: BashRenderer ANSI 增强 (a218919)
+- [x] E-5: SearchRenderer 结构化 (a218919)
+
+### Wave F — P1 视觉品质
+- [x] F-1: glass-panel 毛玻璃效果 (3d32f2d)
+- [x] F-2: ThinkingBlock 计时 + pulse 动画 (3d32f2d)
+- [x] F-3: Composer 底栏 Model + Permission 选择器 (3d32f2d)
+- [x] F-4: HeroComposer 增强 96px + pills (3d32f2d)
+- [x] F-5: Tab 关闭退出动画 (3d32f2d)
+- [x] F-6: prefers-reduced-motion 已有
+
+### Wave G — P2 功能完善
+- [x] G-1: Sidebar duplicate + archive (本次)
+- [x] G-5: Streaming 3-dot pulse (本次)

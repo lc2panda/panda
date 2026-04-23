@@ -33,6 +33,10 @@ import {
   Pin as _Pin,
   // @ts-ignore same as above
   FolderKanban as _FolderKanban,
+  // @ts-ignore same as above
+  Copy as _Copy,
+  // @ts-ignore same as above
+  Archive as _Archive,
 } from 'lucide-react';
 
 // Re-type lucide icons for React 18 compat (hoisted @types/react@19 conflict)
@@ -53,6 +57,8 @@ const PinIcon = _Pin as IconFC;
 const ChevronDown = _ChevronDown as IconFC;
 const ChevronRight = _ChevronRight as IconFC;
 const FolderKanban = _FolderKanban as IconFC;
+const CopyIcon = _Copy as IconFC;
+const ArchiveIcon = _Archive as IconFC;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -101,7 +107,7 @@ const WORKSPACE_NAV_MODES: WorkspaceMode[] = ['search', 'files', 'memory', 'work
 // ---------------------------------------------------------------------------
 // Date grouping logic
 // ---------------------------------------------------------------------------
-type DateGroupKey = 'pinned' | 'today' | 'yesterday' | 'last7days' | 'older';
+type DateGroupKey = 'pinned' | 'today' | 'yesterday' | 'last7days' | 'older' | 'archived';
 
 interface DateGroup {
   key: DateGroupKey;
@@ -115,9 +121,10 @@ const GROUP_LABELS: Record<DateGroupKey, string> = {
   yesterday: '昨天',
   last7days: '近 7 天',
   older: '更早',
+  archived: '📦 已归档',
 };
 
-const GROUP_ORDER: DateGroupKey[] = ['pinned', 'today', 'yesterday', 'last7days', 'older'];
+const GROUP_ORDER: DateGroupKey[] = ['pinned', 'today', 'yesterday', 'last7days', 'older', 'archived'];
 
 function groupSessionsByDate(sessions: SessionMeta[]): DateGroup[] {
   const now = new Date();
@@ -131,9 +138,14 @@ function groupSessionsByDate(sessions: SessionMeta[]): DateGroup[] {
     yesterday: [],
     last7days: [],
     older: [],
+    archived: [],
   };
 
   for (const s of sessions) {
+    if (s.archived) {
+      buckets.archived.push(s);
+      continue;
+    }
     if (s.isPinned) {
       buckets.pinned.push(s);
       continue;
@@ -317,11 +329,14 @@ interface SessionItemProps {
   expanded: boolean;
   messageCount: number;
   isPinned?: boolean;
+  archived?: boolean;
   onSelect: () => void;
   onDelete: () => void;
   onRename: (name: string) => void;
   onOpenInNewWindow: () => void;
   onTogglePin: () => void;
+  onDuplicate?: () => void;
+  onArchive?: () => void;
 }
 
 function SessionItem({
@@ -330,11 +345,14 @@ function SessionItem({
   expanded,
   messageCount,
   isPinned,
+  archived,
   onSelect,
   onDelete,
   onRename,
   onOpenInNewWindow,
   onTogglePin,
+  onDuplicate,
+  onArchive,
 }: SessionItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(name);
@@ -380,6 +398,7 @@ function SessionItem({
         'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
         'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
         active && 'bg-[var(--pd-color-accent-subtle)] text-[var(--pd-color-fg)]',
+        archived && 'opacity-50',
       )}
     >
       <span className="shrink-0">
@@ -487,6 +506,58 @@ function SessionItem({
               >
                 <ExternalLink size={14} />
               </span>
+              {/* Duplicate — visible on hover */}
+              {onDuplicate && (
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  title="复制会话"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDuplicate();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.stopPropagation();
+                      onDuplicate();
+                    }
+                  }}
+                  className={cn(
+                    'shrink-0 rounded-[var(--pd-radius-xs)] p-0.5',
+                    'opacity-0 transition-opacity group-hover:opacity-100',
+                    'text-[var(--pd-color-fg-subtle)] hover:text-[var(--pd-color-accent)]',
+                  )}
+                >
+                  <CopyIcon size={14} />
+                </span>
+              )}
+              {/* Archive — visible on hover */}
+              {onArchive && (
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  title={archived ? '取消归档' : '归档'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onArchive();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.stopPropagation();
+                      onArchive();
+                    }
+                  }}
+                  className={cn(
+                    'shrink-0 rounded-[var(--pd-radius-xs)] p-0.5',
+                    'opacity-0 transition-opacity group-hover:opacity-100',
+                    archived
+                      ? 'text-[var(--pd-color-accent)]'
+                      : 'text-[var(--pd-color-fg-subtle)] hover:text-[var(--pd-color-accent)]',
+                  )}
+                >
+                  <ArchiveIcon size={14} />
+                </span>
+              )}
             </>
           )}
         </>
@@ -510,6 +581,8 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
   const deleteSession = useSessionStore((s) => s.deleteSession);
   const renameSession = useSessionStore((s) => s.renameSession);
   const togglePin = useSessionStore((s) => s.togglePin);
+  const duplicateSession = useSessionStore((s) => s.duplicateSession);
+  const archiveSession = useSessionStore((s) => s.archiveSession);
   const projectFilter = useSessionStore((s) => s.projectFilter);
   const setProjectFilter = useSessionStore((s) => s.setProjectFilter);
 
@@ -555,6 +628,25 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
       renameSession(sessionId, name);
     },
     [renameSession],
+  );
+
+  const handleDuplicateSession = useCallback(
+    async (sessionId: string) => {
+      const dup = await duplicateSession(sessionId);
+      if (dup) {
+        setActive(dup.id);
+        setChatActiveSession(dup.id);
+        addTab(dup.id, dup.name);
+      }
+    },
+    [duplicateSession, setActive, setChatActiveSession, addTab],
+  );
+
+  const handleArchiveSession = useCallback(
+    (sessionId: string) => {
+      archiveSession(sessionId);
+    },
+    [archiveSession],
   );
 
   // ── Workspace panel toggle ──
@@ -667,10 +759,13 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
           onRename={(name) => handleRenameSession(session.id, name)}
           onOpenInNewWindow={() => openSessionInWindow(session.id)}
           onTogglePin={() => togglePin(session.id)}
+          onDuplicate={() => handleDuplicateSession(session.id)}
+          onArchive={() => handleArchiveSession(session.id)}
+          archived={session.archived}
         />
       );
     },
-    [activeId, expanded, handleSelectSession, handleDeleteSession, handleRenameSession, togglePin, toggleGroup],
+    [activeId, expanded, handleSelectSession, handleDeleteSession, handleRenameSession, togglePin, handleDuplicateSession, handleArchiveSession, toggleGroup],
   );
 
   // ── Unique projects for selector ──
@@ -815,6 +910,9 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
                 onRename={(name) => handleRenameSession(session.id, name)}
                 onOpenInNewWindow={() => openSessionInWindow(session.id)}
                 onTogglePin={() => togglePin(session.id)}
+                onDuplicate={() => handleDuplicateSession(session.id)}
+                onArchive={() => handleArchiveSession(session.id)}
+                archived={session.archived}
               />
             ))}
             <SidebarDivider />
@@ -836,6 +934,9 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
             onRename={(name) => handleRenameSession(session.id, name)}
             onOpenInNewWindow={() => openSessionInWindow(session.id)}
             onTogglePin={() => togglePin(session.id)}
+            onDuplicate={() => handleDuplicateSession(session.id)}
+            onArchive={() => handleArchiveSession(session.id)}
+            archived={session.archived}
           />
         ))}
 

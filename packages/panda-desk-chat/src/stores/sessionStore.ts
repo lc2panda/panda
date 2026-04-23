@@ -18,6 +18,7 @@ export interface SessionMeta {
   lastActive: string; // ISO 8601
   messageCount: number;
   isPinned?: boolean;
+  archived?: boolean;
 }
 
 export interface SessionStore {
@@ -38,9 +39,11 @@ export interface SessionStore {
   // Session management
   setActive: (sessionId: string) => void;
   createSession: (name?: string) => Promise<SessionMeta>;
+  duplicateSession: (sessionId: string) => Promise<SessionMeta | null>;
   deleteSession: (sessionId: string) => void;
   renameSession: (sessionId: string, name: string) => void;
   togglePin: (sessionId: string) => void;
+  archiveSession: (sessionId: string) => void;
   setProjectFilter: (project: string | null) => void;
 
   // Persistence
@@ -131,6 +134,15 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
     return session;
   },
 
+  duplicateSession: async (sessionId) => {
+    const { sessions } = get();
+    const list = Array.isArray(sessions) ? sessions : [];
+    const source = list.find((s) => s.id === sessionId);
+    if (!source) return null;
+    const duplicated = await get().createSession(`${source.name} (copy)`);
+    return duplicated;
+  },
+
   deleteSession: (sessionId) => {
     const { sessions, activeId } = get();
     const list = Array.isArray(sessions) ? sessions : [];
@@ -164,6 +176,15 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
     set((state) => ({
       sessions: (Array.isArray(state.sessions) ? state.sessions : []).map((s) =>
         s.id === sessionId ? { ...s, isPinned: !s.isPinned } : s,
+      ),
+    }));
+    get().saveSessions();
+  },
+
+  archiveSession: (sessionId) => {
+    set((state) => ({
+      sessions: (Array.isArray(state.sessions) ? state.sessions : []).map((s) =>
+        s.id === sessionId ? { ...s, archived: !s.archived } : s,
       ),
     }));
     get().saveSessions();
