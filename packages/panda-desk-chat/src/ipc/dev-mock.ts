@@ -416,7 +416,7 @@ export class DevMockRelay {
       const store = useTabStore.getState();
       const existing = store.getTabBySessionId(sessionId);
       if (existing) {
-        store.setActive(existing.id);
+        store.setActiveTab(existing.id);
       } else {
         const session = this.sessions.find((s) => s.id === sessionId);
         store.addTab(sessionId, session?.name ?? 'Session');

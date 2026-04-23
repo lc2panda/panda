@@ -14,12 +14,12 @@ import { PdSideChat } from './components/chat';
 import { PdToastContainer } from './components/containers/PdToast';
 import type { Command } from './components/special/PdCommandPalette';
 import type { SessionItem } from './components/special/PdSessionSwitcher';
-import { useChatStore, useSessionStore, useTabStore } from './stores';
+import { useChatStore, useSessionStore, useTabStore, useWindowStore } from './stores';
 import { useToastStore } from './stores/toastStore';
 import { useUIStore } from './stores/uiStore';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useThemeEffect } from './hooks/useThemeEffect';
-import { openNewWindow } from './ipc/bridge';
+import { openNewWindow, getWindowId, onWindowInit } from './ipc/bridge';
 
 // --- Part C: Lazy-load non-first-screen components for faster cold start ---
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -46,12 +46,43 @@ export function App() {
     return id ? s.sessions.get(id) ?? null : null;
   });
 
+  // --- Multi-window: init windowStore + subscribe window:init events ---
+  const setWindowId = useWindowStore((s) => s.setWindowId);
+  useEffect(() => {
+    // Eagerly fetch windowId from main process
+    getWindowId().then((id) => {
+      if (id > 0) setWindowId(id);
+    });
+    // Also listen for window:init push from main (carries sessionId)
+    const unsub = onWindowInit((payload) => {
+      if (payload.windowId > 0) setWindowId(payload.windowId);
+      if (payload.sessionId) {
+        setChatActiveSession(payload.sessionId);
+        // Ensure a tab exists for the pushed session
+        const existing = useTabStore.getState().getTabBySessionId(payload.sessionId);
+        if (!existing) {
+          addTab(payload.sessionId, 'Session');
+        } else {
+          useTabStore.getState().setActiveTab(existing.id);
+        }
+      }
+    });
+    return unsub;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // --- Multi-window: read ?session=ID from URL on mount ---
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get('session');
     if (sessionId) {
       setChatActiveSession(sessionId);
+      // Also focus/create tab for this session
+      const existing = useTabStore.getState().getTabBySessionId(sessionId);
+      if (existing) {
+        useTabStore.getState().setActiveTab(existing.id);
+      } else {
+        addTab(sessionId, 'Session');
+      }
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
