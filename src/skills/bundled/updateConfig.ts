@@ -30,7 +30,7 @@ Settings load in order: user → project → local (later overrides earlier).
 \`\`\`json
 {
   "permissions": {
-    "allow": ["Bash(npm:*)", "Edit(.claude)", "Read"],
+    "allow": ["Bash(npm:*)", "Edit(.pandacc)", "Read"],
     "deny": ["Bash(rm -rf:*)"],
     "ask": ["Write(/etc/*)"],
     "defaultMode": "default" | "plan" | "acceptEdits" | "dontAsk",
@@ -368,7 +368,7 @@ When adding to permission arrays or hook arrays, **merge with existing**, don't 
   "permissions": {
     "allow": [
       "Bash(git:*)",      // existing
-      "Edit(.claude)",    // existing
+      "Edit(.pandacc)",   // existing
       "Bash(npm:*)"       // new
     ]
   }

@@ -73,7 +73,7 @@ function migrateFromClaude() {
     try {
       // Only migrate essential config files first (fast), defer bulk data
       mkdirSync(neu, { recursive: true })
-      const essentials = ['settings.json', 'credentials.json', 'config', 'projects']
+      const essentials = ['settings.json', 'credentials.json', 'config', 'projects', 'channels', 'plugins']
       for (const item of essentials) {
         const src = join(old, item)
         if (existsSync(src)) {

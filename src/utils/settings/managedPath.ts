@@ -16,11 +16,11 @@ export const getManagedFilePath = memoize(function (): string {
 
   switch (getPlatform()) {
     case 'macos':
-      return '/Library/Application Support/ClaudeCode'
+      return '/Library/Application Support/PandaCode'
     case 'windows':
-      return 'C:\\Program Files\\ClaudeCode'
+      return 'C:\\Program Files\\PandaCode'
     default:
-      return '/etc/claude-code'
+      return '/etc/panda-code'
   }
 })
 
