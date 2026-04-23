@@ -100,7 +100,25 @@ W15 已完成：系统托盘激活 + 58 测试用例
 W16 进行中 (4/5 完成):
 - [x] W16-1: E2E Playwright (fc35cc7)
 - [x] W16-2: Notification System (0c81fa6)
-- [ ] W16-3: 多窗口支持 (进行中)
+- [x] W16-3: 多窗口支持 (08256ec, b484392, 99d2ea0)
 - [x] W16-4: Auto-update (94675a0)
 - [x] W16-5: Theme System (bca68a9)
 - [x] W16-6: Findings cleanup — stale TODOs, dynamic slash cmds, PetStrip, icon
+
+## CSP 安全加固 ✅
+> 完成时间：2026-04-23
+- [x] 移除 CSP unsafe-eval (08256ec)
+- [x] 提取 FOUC 内联脚本到 public/fouc.js
+- [x] BrowserWindow 添加 sandbox: true
+- [x] session 级 CSP response header 双重保障
+
+## 多窗口完善 ✅ (W16-3)
+> 完成时间：2026-04-23
+- [x] G1: windowStore + renderer windowId 感知 (99d2ea0)
+- [x] G3: tabStore 窗口隔离 (99d2ea0)
+- [x] G4: DevMockRelay 多窗口支持 (99d2ea0)
+- [x] G5: NotificationManager 智能路由 (b484392)
+- [x] G6: WINDOW_POSITION sender 定位 (b484392)
+- [x] G7: URL session 参数传递 (b484392)
+- [x] G9: 窗口位置/尺寸持久化 (b484392)
+- [x] G10: appUpdater 广播所有窗口 (b484392)
