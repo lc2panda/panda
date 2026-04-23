@@ -1,5 +1,5 @@
 // Input: expanded state + toggle callback; reads sessionStore for session list
-// Output: Collapsible sidebar with date-grouped session list, project selector, pin, search, CRUD, navigation
+// Output: Collapsible sidebar with date-grouped session list, project selector, pin, search, CRUD, workspace panels, navigation
 // Pos: Layout layer — left panel navigation, wired to sessionStore + chatStore + tabStore + windowManager bridge
 
 import { type ComponentType, type ReactNode, useState, useCallback, useRef, useEffect, useMemo } from 'react';
@@ -9,6 +9,11 @@ import { useChatStore } from '@/stores/chatStore';
 import { useTabStore } from '@/stores/tabStore';
 import { openSessionInWindow } from '@/ipc/bridge';
 import { PdNavItem } from './PdNavItem';
+import { SearchPanel } from './sidebar/SearchPanel';
+import { FilesPanel } from './sidebar/FilesPanel';
+import { MemoryPanel } from './sidebar/MemoryPanel';
+import { WorkflowPanel } from './sidebar/WorkflowPanel';
+import { useVirtualList } from '@/hooks/useVirtualList';
 import {
   MessageSquare as _MessageSquare,
   Search as _Search,
@@ -87,6 +92,11 @@ const bottomNav: NavEntry[] = [
   { icon: <Settings size={20} />, label: '设置' },
   { icon: <User size={20} />,    label: '账户' },
 ];
+
+// Workspace panel mode type (matches workspaceNav order)
+type WorkspaceMode = 'sessions' | 'search' | 'files' | 'memory' | 'workflow';
+
+const WORKSPACE_NAV_MODES: WorkspaceMode[] = ['search', 'files', 'memory', 'workflow'];
 
 // ---------------------------------------------------------------------------
 // Date grouping logic
@@ -490,6 +500,7 @@ function SessionItem({
 // ---------------------------------------------------------------------------
 export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('sessions');
 
   // Session store
   const sessions = useSessionStore((s) => s.sessions);
@@ -546,6 +557,24 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
     [renameSession],
   );
 
+  // ── Workspace panel toggle ──
+  const toggleWorkspaceMode = useCallback(
+    (mode: WorkspaceMode) => {
+      setWorkspaceMode((prev) => (prev === mode ? 'sessions' : mode));
+    },
+    [],
+  );
+
+  // Search panel navigation: switch to session and scroll to message
+  const handleSearchNavigate = useCallback(
+    (sessionId: string, _messageId?: string) => {
+      setActive(sessionId);
+      setChatActiveSession(sessionId);
+      setWorkspaceMode('sessions');
+    },
+    [setActive, setChatActiveSession],
+  );
+
   // ── Filter by project, then by search ──
   const projectFiltered = projectFilter
     ? sessions.filter((s) => s.cwd === projectFilter)
@@ -559,6 +588,90 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
 
   // ── Date-grouped sessions ──
   const dateGroups = useMemo(() => groupSessionsByDate(filteredSessions), [filteredSessions]);
+
+  // ── Virtual scrolling: flatten groups into a single list for virtualization ──
+  const SIDEBAR_VIRTUALIZE_THRESHOLD = 100;
+  const shouldVirtualizeSidebar = expanded && filteredSessions.length > SIDEBAR_VIRTUALIZE_THRESHOLD;
+
+  type SidebarVItem =
+    | { kind: 'header'; key: string; label: string; collapsed: boolean }
+    | { kind: 'session'; session: SessionMeta }
+    | { kind: 'divider'; key: string };
+
+  const sidebarVItems = useMemo<SidebarVItem[]>(() => {
+    if (!shouldVirtualizeSidebar) return [];
+    const items: SidebarVItem[] = [];
+    for (const group of dateGroups) {
+      const isCollapsed = !!collapsedGroups[group.key];
+      items.push({ kind: 'header', key: group.key, label: group.label, collapsed: isCollapsed });
+      if (!isCollapsed) {
+        for (const session of group.sessions) {
+          items.push({ kind: 'session', session });
+        }
+      }
+      items.push({ kind: 'divider', key: `div-${group.key}` });
+    }
+    return items;
+  }, [shouldVirtualizeSidebar, dateGroups, collapsedGroups]);
+
+  const sidebarScrollRef = useRef<HTMLDivElement>(null);
+
+  const {
+    virtualItems: sidebarVirtualItems,
+    totalHeight: sidebarTotalHeight,
+    paddingTop: sidebarPaddingTop,
+    paddingBottom: sidebarPaddingBottom,
+    onScroll: sidebarVirtualOnScroll,
+  } = useVirtualList({
+    items: sidebarVItems,
+    containerRef: sidebarScrollRef,
+    estimatedItemHeight: 48,
+    overscan: 8,
+    enabled: shouldVirtualizeSidebar,
+  });
+
+  const handleSidebarScroll = useCallback(
+    (e: React.UIEvent) => {
+      if (shouldVirtualizeSidebar) sidebarVirtualOnScroll(e);
+    },
+    [shouldVirtualizeSidebar, sidebarVirtualOnScroll],
+  );
+
+  const renderSidebarVItem = useCallback(
+    (vItem: SidebarVItem) => {
+      if (vItem.kind === 'header') {
+        return (
+          <DateGroupHeader
+            key={vItem.key}
+            label={vItem.label}
+            collapsed={vItem.collapsed}
+            onToggle={() => toggleGroup(vItem.key)}
+          />
+        );
+      }
+      if (vItem.kind === 'divider') {
+        return <SidebarDivider key={vItem.key} />;
+      }
+      const session = vItem.session;
+      return (
+        <SessionItem
+          key={session.id}
+          id={session.id}
+          name={session.name}
+          active={session.id === activeId}
+          expanded={expanded}
+          messageCount={session.messageCount}
+          isPinned={session.isPinned}
+          onSelect={() => handleSelectSession(session.id)}
+          onDelete={() => handleDeleteSession(session.id)}
+          onRename={(name) => handleRenameSession(session.id, name)}
+          onOpenInNewWindow={() => openSessionInWindow(session.id)}
+          onTogglePin={() => togglePin(session.id)}
+        />
+      );
+    },
+    [activeId, expanded, handleSelectSession, handleDeleteSession, handleRenameSession, togglePin, toggleGroup],
+  );
 
   // ── Unique projects for selector ──
   const uniqueProjects = useMemo(() => getUniqueProjects(sessions), [sessions]);
@@ -642,15 +755,46 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         </div>
       )}
 
-      {/* ── Session list (date-grouped) + workspace nav ── */}
-      <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2">
-        {expanded && filteredSessions.length === 0 && (
+      {/* ── Session list (date-grouped) / Workspace panels + workspace nav ── */}
+      <div
+        ref={sidebarScrollRef}
+        onScroll={handleSidebarScroll}
+        className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2"
+      >
+        {/* ── Workspace panels (replace session list when active) ── */}
+        {workspaceMode === 'search' && expanded && (
+          <SearchPanel onNavigate={handleSearchNavigate} />
+        )}
+        {workspaceMode === 'files' && expanded && (
+          <FilesPanel />
+        )}
+        {workspaceMode === 'memory' && expanded && (
+          <MemoryPanel />
+        )}
+        {workspaceMode === 'workflow' && expanded && (
+          <WorkflowPanel />
+        )}
+
+        {/* ── Session list (only when in 'sessions' mode) ── */}
+        {workspaceMode === 'sessions' && expanded && filteredSessions.length === 0 && (
           <div className="px-3 py-4 text-center text-[length:var(--pd-text-xs)] text-[var(--pd-color-fg-subtle)]">
             {searchQuery ? '无匹配会话' : '暂无会话，点击上方创建'}
           </div>
         )}
 
-        {expanded && dateGroups.map((group) => (
+        {/* Virtualized expanded session list */}
+        {workspaceMode === 'sessions' && expanded && shouldVirtualizeSidebar && (
+          <div style={{ height: sidebarTotalHeight, position: 'relative' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
+              <div style={{ height: sidebarPaddingTop }} />
+              {sidebarVirtualItems.map((vi) => renderSidebarVItem(vi.item))}
+              <div style={{ height: sidebarPaddingBottom }} />
+            </div>
+          </div>
+        )}
+
+        {/* Non-virtualized expanded session list (original) */}
+        {workspaceMode === 'sessions' && expanded && !shouldVirtualizeSidebar && dateGroups.map((group) => (
           <div key={group.key}>
             <DateGroupHeader
               label={group.label}
@@ -678,7 +822,7 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         ))}
 
         {/* Collapsed sidebar: flat icon-only list */}
-        {!expanded && filteredSessions.map((session) => (
+        {workspaceMode === 'sessions' && !expanded && filteredSessions.map((session) => (
           <SessionItem
             key={session.id}
             id={session.id}
@@ -696,7 +840,7 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         ))}
 
         {/* Collapsed: icon-only new-session button */}
-        {!expanded && (
+        {workspaceMode === 'sessions' && !expanded && (
           <button
             type="button"
             onClick={handleNewSession}
@@ -713,13 +857,15 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
 
         <SidebarDivider />
 
-        {workspaceNav.map((item) => (
+        {workspaceNav.map((item, idx) => (
           <PdNavItem
             key={item.label}
             icon={item.icon}
             label={item.label}
             shortcut={item.shortcut}
             collapsed={!expanded}
+            active={workspaceMode === WORKSPACE_NAV_MODES[idx]}
+            onClick={() => toggleWorkspaceMode(WORKSPACE_NAV_MODES[idx])}
           />
         ))}
       </div>
