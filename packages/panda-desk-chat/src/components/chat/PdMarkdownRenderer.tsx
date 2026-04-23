@@ -269,7 +269,7 @@ function useMarkdownComponents(): Components {
       h1({ children, ...props }) {
         return (
           <h1
-            className="text-[var(--pd-text-xl)] font-[var(--pd-font-bold)] leading-[var(--pd-leading-heading)] mt-[var(--pd-space-4)] mb-[var(--pd-space-2)] text-[var(--pd-color-fg)]"
+            className="text-[var(--pd-text-xl)] font-[var(--pd-font-bold)] [font-family:var(--pd-font-serif)] leading-[var(--pd-leading-heading)] mt-[var(--pd-space-4)] mb-[var(--pd-space-2)] text-[var(--pd-color-fg)]"
             {...props}
           >
             {children}
@@ -279,7 +279,7 @@ function useMarkdownComponents(): Components {
       h2({ children, ...props }) {
         return (
           <h2
-            className="text-[var(--pd-text-lg)] font-[var(--pd-font-semibold)] leading-[var(--pd-leading-heading)] mt-[var(--pd-space-3)] mb-[var(--pd-space-1)] text-[var(--pd-color-fg)]"
+            className="text-[var(--pd-text-lg)] font-[var(--pd-font-semibold)] [font-family:var(--pd-font-serif)] leading-[var(--pd-leading-heading)] mt-[var(--pd-space-3)] mb-[var(--pd-space-1)] text-[var(--pd-color-fg)]"
             {...props}
           >
             {children}

@@ -28,7 +28,7 @@ export const PdEmptyState = forwardRef<HTMLDivElement, PdEmptyStateProps>(
             <div className="w-12 h-12 flex items-center justify-center">{icon}</div>
           </div>
         )}
-        <h3 className="text-[var(--pd-text-lg)] font-[var(--pd-font-semibold)] text-[var(--pd-color-fg)]">
+        <h3 className="pd-heading-serif text-[var(--pd-text-lg)] font-[var(--pd-font-semibold)] text-[var(--pd-color-fg)]">
           {title}
         </h3>
         {description && (

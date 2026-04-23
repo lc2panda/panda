@@ -91,6 +91,12 @@ a:hover {
   background: var(--pd-text-muted);
 }
 
+/* §11.2.2 — serif 字体应用于标题 */
+h1, h2,
+.pd-heading-serif {
+  font-family: var(--pd-font-serif);
+}
+
 /* ── Reduce-motion: disable animations for accessibility ────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,

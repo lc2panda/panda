@@ -58,7 +58,7 @@ const FALLBACK_SLASH_COMMANDS: SlashItem[] = [
 /* -------------------------------------------------------------------------- */
 
 const MAX_TEXTAREA_HEIGHT = 200;
-const MIN_TEXTAREA_HEIGHT = 36;
+const MIN_TEXTAREA_HEIGHT = 44;
 
 /* -------------------------------------------------------------------------- */
 /*  PdComposer                                                                */
@@ -214,10 +214,10 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
           "mx-auto",
           "bg-[var(--pd-color-bg-elevated)]",
           "border border-[var(--pd-color-border)]",
-          "rounded-[var(--pd-radius-xl)]",
+          "rounded-[var(--pd-radius-2xl)]",
           "shadow-[var(--pd-shadow-md)]",
           "transition-shadow duration-[var(--pd-duration-quick)]",
-          "focus-within:shadow-[var(--pd-shadow-focus)]",
+          "focus-within:shadow-[0_0_0_2px_rgba(193,95,60,0.2)]",
           "focus-within:border-[var(--pd-color-border-focus)]",
         )}
       >
@@ -264,7 +264,7 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
         )}
 
         {/* -- Input row --------------------------------------------------- */}
-        <div className="relative flex items-end gap-[var(--pd-space-2)] px-4 py-3">
+        <div className="relative flex items-end gap-[var(--pd-space-2)] pr-2 py-1">
           {/* Textarea */}
           <textarea
             ref={textareaRef}
@@ -277,7 +277,8 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
             placeholder={placeholder}
             rows={1}
             className={cn(
-              "flex-1 min-h-[36px] max-h-[200px]",
+              "flex-1 min-h-[44px] max-h-[200px]",
+              "py-[12px] px-[16px]",
               "bg-transparent text-[var(--pd-text-base)] text-[var(--pd-color-fg)]",
               "placeholder:text-[var(--pd-color-fg-muted)]",
               "border-none outline-none resize-none",

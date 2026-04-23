@@ -41,7 +41,7 @@ export function PdHeroComposer({ onSend, onSlashCommand }: PdHeroComposerProps) 
     }}>
       {/* Title */}
       <h1 style={{
-        fontSize: '32px', fontWeight: 700, fontFamily: 'var(--pd-font-sans)',
+        fontSize: '32px', fontWeight: 700, fontFamily: 'var(--pd-font-serif)',
         color: 'var(--pd-color-fg)', marginBottom: '8px', lineHeight: 1.2,
       }}>
         {t('composer.hero.title')}

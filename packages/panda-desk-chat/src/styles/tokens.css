@@ -191,15 +191,15 @@
   --pd-color-fg-disabled: var(--pd-palette-cream-400);
 
   /* ── Semantic: Border ────────────────────────────────────────────────── */
-  --pd-color-border: var(--pd-palette-warm-brown-300);        /* #DAC1BA subtle warm */
-  --pd-color-border-strong: var(--pd-palette-warm-brown-500); /* #87736D warm brown */
+  --pd-color-border: rgba(0, 0, 0, 0.08);                    /* Claude 近透明边框 */
+  --pd-color-border-strong: rgba(0, 0, 0, 0.15);             /* 降低视觉重量 */
   --pd-color-border-focus: var(--pd-palette-terra-500);       /* #B85A38 */
   --pd-color-border-subtle: var(--pd-palette-cream-300);      /* #EFEEEA */
   --pd-color-border-variant: var(--pd-palette-warm-brown-300); /* #DAC1BA */
 
   /* ── Semantic: Accent ────────────────────────────────────────────────── */
-  --pd-color-accent: var(--pd-palette-terra-500);          /* #B85A38 WCAG 4.6:1 */
-  --pd-color-accent-hover: var(--pd-palette-terra-600);    /* #8F482F */
+  --pd-color-accent: #C15F3C;                              /* Claude terracotta, WCAG AA 4.5:1 */
+  --pd-color-accent-hover: #D4714F;                        /* hover 提亮 (Claude 风格) */
   --pd-color-accent-active: var(--pd-palette-terra-600);   /* #8F482F */
   --pd-color-accent-subtle: rgba(184, 90, 56, 0.1);
   --pd-color-accent-fg: var(--pd-palette-terra-500);       /* #B85A38 */
@@ -229,7 +229,7 @@
   /* ── Shadow Scale ────────────────────────────────────────────────────── */
   --pd-shadow-xs: 0 1px 2px rgba(20, 20, 19, 0.05);
   --pd-shadow-sm: 0 1px 3px rgba(20, 20, 19, 0.08), 0 1px 2px rgba(20, 20, 19, 0.04);
-  --pd-shadow-md: 0 4px 6px rgba(20, 20, 19, 0.07), 0 2px 4px rgba(20, 20, 19, 0.04);
+  --pd-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.04);
   --pd-shadow-lg: 0 10px 15px rgba(20, 20, 19, 0.08), 0 4px 6px rgba(20, 20, 19, 0.04);
   --pd-shadow-xl: 0 20px 25px rgba(20, 20, 19, 0.10), 0 8px 10px rgba(20, 20, 19, 0.04);
   --pd-shadow-focus: 0 0 0 3px rgba(184, 90, 56, 0.3);
@@ -330,8 +330,8 @@
   --pd-palette-ruby-400: #D16C6C;
 
   /* ── Semantic: Surface ───────────────────────────────────────────────── */
-  --pd-color-bg: var(--pd-palette-ink-900);                  /* #141413 */
-  --pd-color-bg-elevated: var(--pd-palette-ink-800);         /* #1E1E1D */
+  --pd-color-bg: #1B1A19;                                    /* Claude dark 偏暖灰 */
+  --pd-color-bg-elevated: #252422;                           /* 配套调亮 */
   --pd-color-bg-subtle: var(--pd-palette-ink-800);
   --pd-color-bg-hover: var(--pd-palette-ink-700);            /* #292928 */
   --pd-color-bg-selected: var(--pd-palette-ink-600);
@@ -389,7 +389,7 @@
   /* ── Shadow Scale ────────────────────────────────────────────────────── */
   --pd-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
   --pd-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-  --pd-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --pd-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
   --pd-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3), 0 4px 6px rgba(0, 0, 0, 0.2);
   --pd-shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.4), 0 8px 10px rgba(0, 0, 0, 0.2);
   --pd-shadow-focus: 0 0 0 3px rgba(227, 139, 110, 0.4);
