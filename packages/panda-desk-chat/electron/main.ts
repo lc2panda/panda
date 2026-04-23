@@ -4,7 +4,7 @@
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
-import { app, BrowserWindow, Menu, nativeImage, nativeTheme, shell, Tray } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, nativeTheme, session, shell, Tray } from 'electron';
 import { join } from 'node:path';
 import { registerIpcHandlers, setupMainWindow } from './ipc/handlers';
 import { cliManager } from './backend/cli-manager';
@@ -215,6 +215,18 @@ Menu.setApplicationMenu(appMenu);
 app.whenReady().then(() => {
   // Register IPC handlers before creating window
   registerIpcHandlers();
+
+  // Session-level CSP header (defense-in-depth alongside <meta> tag)
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:1455 http://127.0.0.1:1456 http://127.0.0.1:1457 http://127.0.0.1:1458 http://127.0.0.1:1459 http://127.0.0.1:1460; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+        ],
+      },
+    });
+  });
 
   mainWindow = createMainWindow();
   setupMainWindow(mainWindow);

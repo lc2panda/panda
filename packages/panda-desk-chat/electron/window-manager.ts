@@ -40,6 +40,7 @@ class WindowManager {
         preload: join(__dirname, 'preload/chat.js'),
         contextIsolation: true,
         nodeIntegration: false,
+        sandbox: true,
       },
       ...options?.windowOptions,
     });
