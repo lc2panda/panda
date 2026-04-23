@@ -81,6 +81,18 @@ export function PdTabBar({
   const overflowBtnRef = useRef<HTMLButtonElement>(null);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
 
+  // ── Tab close animation state ──
+  const [closingTabId, setClosingTabId] = useState<string | null>(null);
+
+  const handleClose = useCallback((tabId: string) => {
+    setClosingTabId(tabId);
+    // Wait for the CSS animation to finish (~300ms) before actually closing
+    setTimeout(() => {
+      setClosingTabId(null);
+      onClose(tabId);
+    }, 300);
+  }, [onClose]);
+
   // ── Overflow detection ──
   const checkOverflow = useCallback(() => {
     const el = scrollRef.current;
@@ -183,7 +195,7 @@ export function PdTabBar({
         className="flex flex-1 items-stretch overflow-x-auto scrollbar-none"
       >
         {tabs.map((tab, index) => (
-          <div key={tab.id} className="relative flex items-stretch">
+          <div key={tab.id} className={cn("relative flex items-stretch", closingTabId === tab.id && "pd-tab-closing")}>
             {/* ── Drop indicator (left edge) ── */}
             {dropTargetIndex === index && dragFromIndex !== null && dragFromIndex !== index && (
               <span
@@ -307,12 +319,12 @@ export function PdTabBar({
                   tabIndex={-1}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onClose(tab.id);
+                    handleClose(tab.id);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.stopPropagation();
-                      onClose(tab.id);
+                      handleClose(tab.id);
                     }
                   }}
                   className={cn(

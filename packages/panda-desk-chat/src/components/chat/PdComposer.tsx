@@ -13,6 +13,7 @@ import React, {
 import { cn } from "../../lib/cn";
 import { getSlashCommands } from "../../ipc/bridge";
 import { useChatStore } from "@/stores/chatStore";
+import { useSettingsStore, type PermissionMode } from "@/stores/settingsStore";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -102,6 +103,35 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
 
     /* -- File paths extracted from chat tool calls ------------------------ */
     const activeSession = useChatStore((s) => s.getActiveSession());
+
+    /* -- Settings: model & permission mode -------------------------------- */
+    const currentModel = useSettingsStore((s) => s.model);
+    const permissionMode = useSettingsStore((s) => s.permissionMode);
+    const setModel = useSettingsStore((s) => s.setModel);
+    const setPermissionMode = useSettingsStore((s) => s.setPermissionMode);
+    const [showModelMenu, setShowModelMenu] = useState(false);
+    const [showPermMenu, setShowPermMenu] = useState(false);
+
+    const MODEL_OPTIONS = useMemo(() => [
+      "claude-sonnet-4-20250514",
+      "claude-opus-4-20250514",
+      "claude-haiku-3-20250307",
+    ], []);
+
+    const PERM_OPTIONS: { value: PermissionMode; label: string; icon: string }[] = useMemo(() => [
+      { value: "default", label: "Default", icon: "🛡️" },
+      { value: "plan", label: "Plan", icon: "📋" },
+      { value: "auto", label: "Auto-approve", icon: "⚡" },
+      { value: "bypassPermissions", label: "YOLO", icon: "🔓" },
+    ], []);
+
+    /** Short display name for a model ID */
+    const shortModelName = useCallback((m: string) => {
+      if (m.includes("opus")) return "Opus";
+      if (m.includes("sonnet")) return "Sonnet";
+      if (m.includes("haiku")) return "Haiku";
+      return m.split("-").slice(0, 2).join(" ");
+    }, []);
 
     const filePathsFromChat = useMemo(() => {
       const paths = new Set<string>();
@@ -432,13 +462,11 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
     return (
       <div
         className={cn(
+          "pd-glass-panel",
           "relative",
           "w-full max-w-[var(--pd-layout-composer-max-width)]",
           "mx-auto",
-          "bg-[var(--pd-color-bg-elevated)]",
-          "border border-[var(--pd-color-border)]",
           "rounded-[var(--pd-radius-2xl)]",
-          "shadow-[var(--pd-shadow-md)]",
           "transition-shadow duration-[var(--pd-duration-quick)]",
           "focus-within:shadow-[0_0_0_2px_rgba(193,95,60,0.2)]",
           "focus-within:border-[var(--pd-color-border-focus)]",
@@ -490,9 +518,8 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
           </div>
         )}
 
-        {/* -- Input row --------------------------------------------------- */}
-        <div className="relative flex items-end gap-[var(--pd-space-2)] pr-2 py-1">
-          {/* Textarea */}
+        {/* -- Textarea ---------------------------------------------------- */}
+        <div className="relative">
           <textarea
             ref={textareaRef}
             value={value}
@@ -504,7 +531,7 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
             placeholder={placeholder}
             rows={1}
             className={cn(
-              "flex-1 min-h-[44px] max-h-[200px]",
+              "w-full min-h-[44px] max-h-[200px]",
               "py-[12px] px-[16px]",
               "bg-transparent text-[var(--pd-text-base)] text-[var(--pd-color-fg)]",
               "placeholder:text-[var(--pd-color-fg-muted)]",
@@ -515,6 +542,129 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
               disabled && "opacity-50 cursor-not-allowed",
             )}
           />
+        </div>
+
+        {/* -- Bottom bar --------------------------------------------------- */}
+        <div className="relative flex items-center gap-[var(--pd-space-1)] px-2 pb-2 pt-0">
+          {/* Attach button */}
+          <button
+            type="button"
+            aria-label="Attach file"
+            className={cn(
+              "shrink-0 w-7 h-7 flex items-center justify-center",
+              "rounded-[var(--pd-radius-md)]",
+              "text-[var(--pd-color-fg-muted)]",
+              "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
+              "transition-colors duration-[var(--pd-duration-fast)]",
+            )}
+          >
+            <AttachIcon />
+          </button>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Model selector */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => { setShowModelMenu((v) => !v); setShowPermMenu(false); }}
+              className={cn(
+                "flex items-center gap-1 px-2 h-7",
+                "rounded-[var(--pd-radius-md)]",
+                "text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)]",
+                "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
+                "transition-colors duration-[var(--pd-duration-fast)]",
+                "font-[family-name:var(--pd-font-sans)]",
+              )}
+            >
+              <span>{shortModelName(currentModel)}</span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M2.5 4L5 6.5L7.5 4" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            {showModelMenu && (
+              <div
+                className={cn(
+                  "absolute bottom-full right-0 mb-1",
+                  "min-w-[180px] py-1",
+                  "rounded-[var(--pd-radius-md)]",
+                  "border border-[var(--pd-color-border)]",
+                  "bg-[var(--pd-color-bg-elevated)]",
+                  "shadow-[var(--pd-shadow-lg)]",
+                  "z-[var(--pd-z-dropdown)]",
+                )}
+              >
+                {MODEL_OPTIONS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => { setModel(m); setShowModelMenu(false); }}
+                    className={cn(
+                      "w-full px-3 py-1.5 text-left",
+                      "text-[var(--pd-text-sm)]",
+                      "hover:bg-[var(--pd-color-bg-hover)]",
+                      "transition-colors duration-[var(--pd-duration-fast)]",
+                      m === currentModel
+                        ? "text-[var(--pd-color-accent)] font-[var(--pd-font-medium)]"
+                        : "text-[var(--pd-color-fg)]",
+                    )}
+                  >
+                    {shortModelName(m)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Permission mode selector */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => { setShowPermMenu((v) => !v); setShowModelMenu(false); }}
+              className={cn(
+                "flex items-center gap-1 px-2 h-7",
+                "rounded-[var(--pd-radius-md)]",
+                "text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)]",
+                "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
+                "transition-colors duration-[var(--pd-duration-fast)]",
+              )}
+              title={`Permission: ${permissionMode}`}
+            >
+              <span>{PERM_OPTIONS.find((p) => p.value === permissionMode)?.icon ?? "\u{1F6E1}\u{FE0F}"}</span>
+            </button>
+            {showPermMenu && (
+              <div
+                className={cn(
+                  "absolute bottom-full right-0 mb-1",
+                  "min-w-[150px] py-1",
+                  "rounded-[var(--pd-radius-md)]",
+                  "border border-[var(--pd-color-border)]",
+                  "bg-[var(--pd-color-bg-elevated)]",
+                  "shadow-[var(--pd-shadow-lg)]",
+                  "z-[var(--pd-z-dropdown)]",
+                )}
+              >
+                {PERM_OPTIONS.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => { setPermissionMode(p.value); setShowPermMenu(false); }}
+                    className={cn(
+                      "w-full px-3 py-1.5 text-left flex items-center gap-2",
+                      "text-[var(--pd-text-sm)]",
+                      "hover:bg-[var(--pd-color-bg-hover)]",
+                      "transition-colors duration-[var(--pd-duration-fast)]",
+                      p.value === permissionMode
+                        ? "text-[var(--pd-color-accent)] font-[var(--pd-font-medium)]"
+                        : "text-[var(--pd-color-fg)]",
+                    )}
+                  >
+                    <span>{p.icon}</span>
+                    <span>{p.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Send / Stop button */}
           {isStreaming ? (
@@ -671,6 +821,15 @@ function SendIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M22 2L11 13" />
       <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+    </svg>
+  );
+}
+
+function AttachIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
     </svg>
   );
 }

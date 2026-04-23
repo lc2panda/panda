@@ -297,6 +297,12 @@
   --pd-pet-level-badge: var(--pd-palette-amber-500);
   --pd-pet-species-border: var(--pd-palette-cream-400);
   --pd-pet-mood-glow: rgba(184, 90, 56, 0.3);
+
+  /* ── Glass Panel ────────────────────────────────────────────────────── */
+  --pd-glass-bg: rgba(255, 255, 255, 0.72);
+  --pd-glass-border: rgba(255, 255, 255, 0.2);
+  --pd-glass-blur: 20px;
+  --pd-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 /* ==========================================================================
@@ -457,6 +463,11 @@
   --pd-pet-level-badge: var(--pd-palette-amber-400);
   --pd-pet-species-border: var(--pd-palette-ink-500);
   --pd-pet-mood-glow: rgba(227, 139, 110, 0.35);
+
+  /* ── Glass Panel ────────────────────────────────────────────────────── */
+  --pd-glass-bg: rgba(27, 26, 25, 0.78);
+  --pd-glass-border: rgba(255, 255, 255, 0.08);
+  --pd-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.24), 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 /* --------------------------------------------------------------------------
