@@ -112,7 +112,7 @@
   --pd-duration-instant: 0ms;
   --pd-duration-fast: 75ms;
   --pd-duration-quick: 150ms;
-  --pd-duration-normal: 200ms;
+  --pd-duration-normal: 280ms;
   --pd-duration-slow: 300ms;
   --pd-duration-slower: 500ms;
   --pd-duration-pet: 600ms;
@@ -191,8 +191,8 @@
   --pd-color-fg-disabled: var(--pd-palette-cream-400);
 
   /* ── Semantic: Border ────────────────────────────────────────────────── */
-  --pd-color-border: rgba(0, 0, 0, 0.08);                    /* Claude 近透明边框 */
-  --pd-color-border-strong: rgba(0, 0, 0, 0.15);             /* 降低视觉重量 */
+  --pd-color-border: var(--pd-palette-warm-brown-300, #DAC1BA); /* cc-haha 暖棕边框 */
+  --pd-color-border-strong: var(--pd-palette-warm-brown-400, #C4A99F); /* cc-haha 暖棕强边框 */
   --pd-color-border-focus: var(--pd-palette-terra-500);       /* #B85A38 */
   --pd-color-border-subtle: var(--pd-palette-cream-300);      /* #EFEEEA */
   --pd-color-border-variant: var(--pd-palette-warm-brown-300); /* #DAC1BA */
@@ -357,8 +357,8 @@
   --pd-color-fg-disabled: var(--pd-palette-ink-500);
 
   /* ── Semantic: Border ────────────────────────────────────────────────── */
-  --pd-color-border: var(--pd-palette-ink-500);              /* #3A3836 */
-  --pd-color-border-strong: var(--pd-palette-stone-400);
+  --pd-color-border: var(--pd-palette-ink-500, #3A3836);      /* cc-haha dark 边框 */
+  --pd-color-border-strong: var(--pd-palette-ink-400, #4A4846); /* cc-haha dark 强边框 */
   --pd-color-border-focus: var(--pd-palette-terra-400);
   --pd-color-border-subtle: var(--pd-palette-ink-600);
   --pd-color-border-variant: var(--pd-palette-ink-600);      /* dark warm border variant */

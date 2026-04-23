@@ -178,6 +178,25 @@ export default {
   // Command palette
   'commandPalette.placeholder': 'Type a command...',
   'commandPalette.noResults': 'No results found',
+  'commandPalette.newChat': 'New Chat',
+
+  // Pet cameo
+  'pet.emptyState.ready': 'Ready to help!',
+  'pet.emptyState.build': 'What shall we build?',
+  'pet.emptyState.start': 'Start a conversation',
+  'pet.emptyState.code': "Let's code together!",
+  'pet.noResults.nothing': 'Nothing found here...',
+  'pet.noResults.empty': 'No results yet!',
+  'pet.noResults.hmm': "Hmm, that's empty.",
+  'pet.holiday.happy': 'Happy coding holiday!',
+  'pet.holiday.break': 'Take a break & celebrate!',
+  'pet.random.hi': 'Hi there!',
+  'pet.random.bamboo': 'Bamboo break?',
+  'pet.random.lucky': 'Feeling lucky!',
+  'pet.random.munches': '*munches bamboo*',
+
+  // Session defaults
+  'session.defaultName': 'New Chat',
 
   // Session switcher
   'sessionSwitcher.placeholder': 'Search sessions...',

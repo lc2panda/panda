@@ -6,6 +6,7 @@
 
 import React, { useMemo } from "react";
 import { cn } from "@/lib/cn";
+import { t } from "@/i18n";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -28,37 +29,47 @@ export interface PdPetCameoProps {
 
 /** Always panda — brand mascot, no random rotation */
 
-const EMPTY_STATE_MESSAGES = [
-  "Ready to help!",
-  "What shall we build?",
-  "Start a conversation",
-  "Let's code together!",
-] as const;
+function getEmptyStateMessages() {
+  return [
+    t('pet.emptyState.ready'),
+    t('pet.emptyState.build'),
+    t('pet.emptyState.start'),
+    t('pet.emptyState.code'),
+  ];
+}
 
-const NO_RESULTS_MESSAGES = [
-  "Nothing found here...",
-  "No results yet!",
-  "Hmm, that's empty.",
-] as const;
+function getNoResultsMessages() {
+  return [
+    t('pet.noResults.nothing'),
+    t('pet.noResults.empty'),
+    t('pet.noResults.hmm'),
+  ];
+}
 
-const HOLIDAY_MESSAGES = [
-  "Happy coding holiday!",
-  "Take a break & celebrate!",
-] as const;
+function getHolidayMessages() {
+  return [
+    t('pet.holiday.happy'),
+    t('pet.holiday.break'),
+  ];
+}
 
-const RANDOM_MESSAGES = [
-  "Hi there!",
-  "Bamboo break?",
-  "Feeling lucky!",
-  "*munches bamboo*",
-] as const;
+function getRandomMessages() {
+  return [
+    t('pet.random.hi'),
+    t('pet.random.bamboo'),
+    t('pet.random.lucky'),
+    t('pet.random.munches'),
+  ];
+}
 
-const OCCASION_MESSAGES: Record<PetCameoOccasion, readonly string[]> = {
-  empty_state: EMPTY_STATE_MESSAGES,
-  no_results: NO_RESULTS_MESSAGES,
-  holiday: HOLIDAY_MESSAGES,
-  random: RANDOM_MESSAGES,
-};
+function getOccasionMessages(occasion: PetCameoOccasion): string[] {
+  switch (occasion) {
+    case 'empty_state': return getEmptyStateMessages();
+    case 'no_results': return getNoResultsMessages();
+    case 'holiday': return getHolidayMessages();
+    case 'random': return getRandomMessages();
+  }
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
@@ -74,7 +85,7 @@ function pickRandom<T>(arr: readonly T[]): T {
 
 export const PdPetCameo: React.FC<PdPetCameoProps> = ({ occasion, message }) => {
   const displayMessage = useMemo(
-    () => message ?? pickRandom(OCCASION_MESSAGES[occasion]),
+    () => message ?? pickRandom(getOccasionMessages(occasion)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [occasion, message],
   );

@@ -178,6 +178,25 @@ export default {
   // Command palette
   'commandPalette.placeholder': '명령어 입력...',
   'commandPalette.noResults': '결과 없음',
+  'commandPalette.newChat': '새 대화',
+
+  // Pet cameo
+  'pet.emptyState.ready': '도움 준비 완료!',
+  'pet.emptyState.build': '무엇을 만들까요?',
+  'pet.emptyState.start': '대화를 시작하세요',
+  'pet.emptyState.code': '함께 코딩해요!',
+  'pet.noResults.nothing': '여기엔 아무것도 없어요...',
+  'pet.noResults.empty': '아직 결과가 없어요!',
+  'pet.noResults.hmm': '음, 비어있네요.',
+  'pet.holiday.happy': '즐거운 코딩 휴일!',
+  'pet.holiday.break': '쉬면서 축하해요!',
+  'pet.random.hi': '안녕하세요!',
+  'pet.random.bamboo': '대나무 한 입?',
+  'pet.random.lucky': '행운이 가득!',
+  'pet.random.munches': '*대나무 우적우적*',
+
+  // Session defaults
+  'session.defaultName': '새 대화',
 
   // Session switcher
   'sessionSwitcher.placeholder': '세션 검색...',

@@ -13,6 +13,7 @@ import { ChatPage } from './pages/ChatPage';
 import { PdSideChat } from './components/chat';
 import { PdToastContainer } from './components/containers/PdToast';
 import type { Command } from './components/special/PdCommandPalette';
+import { t } from './i18n';
 import type { SessionItem } from './components/special/PdSessionSwitcher';
 import { useChatStore, useSessionStore, useTabStore, useWindowStore } from './stores';
 import { useToastStore } from './stores/toastStore';
@@ -124,7 +125,7 @@ export function App() {
   const commands: Command[] = useMemo(() => [
     {
       id: 'new-chat',
-      label: 'New Chat',
+      label: t('commandPalette.newChat'),
       group: 'Chat',
       shortcut: '⌘N',
       action: async () => {

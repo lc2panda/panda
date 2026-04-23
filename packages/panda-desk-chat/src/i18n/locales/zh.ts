@@ -178,6 +178,25 @@ export default {
   // Command palette
   'commandPalette.placeholder': '输入命令...',
   'commandPalette.noResults': '无匹配结果',
+  'commandPalette.newChat': '新对话',
+
+  // Pet cameo
+  'pet.emptyState.ready': '准备就绪！',
+  'pet.emptyState.build': '想构建点什么？',
+  'pet.emptyState.start': '开始对话',
+  'pet.emptyState.code': '一起写代码吧！',
+  'pet.noResults.nothing': '这里什么都没找到…',
+  'pet.noResults.empty': '暂无结果！',
+  'pet.noResults.hmm': '嗯，空空如也。',
+  'pet.holiday.happy': '编程假日快乐！',
+  'pet.holiday.break': '休息一下，庆祝吧！',
+  'pet.random.hi': '你好呀！',
+  'pet.random.bamboo': '来根竹子？',
+  'pet.random.lucky': '今天手气不错！',
+  'pet.random.munches': '*嚼竹子中*',
+
+  // Session defaults
+  'session.defaultName': '新对话',
 
   // Session switcher
   'sessionSwitcher.placeholder': '搜索会话...',

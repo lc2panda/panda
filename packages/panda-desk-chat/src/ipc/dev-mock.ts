@@ -325,7 +325,7 @@ export class DevMockRelay {
     const now = new Date().toISOString();
     const session: MockSession = {
       id,
-      name: name ?? 'New Chat',
+      name: name ?? '新对话',
       cwd: cwd || '/Users/panda/project',
       createdAt: now,
       lastActive: now,

@@ -3,7 +3,17 @@
 // Pos: ChatPage 空会话时显示
 
 import { useState, useRef, useCallback } from 'react';
-import { ArrowUp } from 'lucide-react';
+import {
+  ArrowUp,
+  // @ts-ignore lucide-react 0.511 ships these at runtime but bundled .d.ts misses top-level named exports
+  Code,
+  // @ts-ignore same as above
+  Sparkles,
+  // @ts-ignore same as above
+  HelpCircle,
+  // @ts-ignore same as above
+  Wand2,
+} from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { t } from '../../i18n';
 
@@ -17,11 +27,10 @@ export interface PdHeroComposerProps {
 /* -------------------------------------------------------------------------- */
 
 const SUGGESTIONS = [
-  { label: 'Write', prompt: 'Help me write ' },
-  { label: 'Learn', prompt: 'Explain how ' },
-  { label: 'Code', prompt: 'Write code to ' },
-  { label: 'Life', prompt: 'Give me advice about ' },
-  { label: "Panda's choice", prompt: 'Surprise me with something interesting' },
+  { label: 'Write', labelZh: '写作', icon: Sparkles, prompt: 'Help me write ' },
+  { label: 'Learn', labelZh: '学习', icon: HelpCircle, prompt: 'Explain how ' },
+  { label: 'Code', labelZh: '编程', icon: Code, prompt: 'Write code to ' },
+  { label: 'Panda 推荐', labelZh: 'Panda 推荐', icon: Wand2, prompt: 'Surprise me with something interesting' },
 ] as const;
 
 /* -------------------------------------------------------------------------- */
@@ -132,26 +141,32 @@ export function PdHeroComposer({ onSend, onSlashCommand }: PdHeroComposerProps) 
 
       {/* Suggestion pills */}
       <div className="flex flex-wrap justify-center gap-2 max-w-[var(--pd-layout-composer-max-width)]">
-        {SUGGESTIONS.map((s) => (
-          <button
-            key={s.label}
-            type="button"
-            onClick={() => handleSuggestion(s.prompt)}
-            className={cn(
-              "px-4 py-2",
-              "text-[var(--pd-text-sm)]",
-              "text-[var(--pd-color-fg-muted)]",
-              "border border-[var(--pd-color-border)]",
-              "rounded-[var(--pd-radius-full)]",
-              "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
-              "transition-colors duration-[var(--pd-duration-fast)]",
-              "cursor-pointer",
-              "font-[family-name:var(--pd-font-sans)]",
-            )}
-          >
-            {s.label}
-          </button>
-        ))}
+        {SUGGESTIONS.map((s) => {
+          const Icon = s.icon;
+          return (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => handleSuggestion(s.prompt)}
+              className={cn(
+                "inline-flex items-center gap-1.5",
+                "px-4 py-2",
+                "text-sm",
+                "text-[var(--pd-color-fg-muted)]",
+                "border border-[var(--pd-color-border)]",
+                "bg-[var(--pd-color-bg-elevated)]",
+                "rounded-full",
+                "hover:bg-[var(--pd-color-bg-subtle)] hover:text-[var(--pd-color-fg)]",
+                "transition-colors duration-[var(--pd-duration-fast)]",
+                "cursor-pointer",
+                "font-[family-name:var(--pd-font-sans)]",
+              )}
+            >
+              <Icon size={14} className="opacity-60" />
+              {s.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

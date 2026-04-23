@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { storage } from '../lib/storage';
 import * as bridge from '../ipc/bridge';
+import { t } from '../i18n';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -113,7 +114,7 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
 
   createSession: async (name?: string) => {
     const now = new Date().toISOString();
-    const displayName = name ?? 'New Chat';
+    const displayName = name ?? t('session.defaultName');
 
     // Create session in backend first to get the authoritative UUID
     const response = await bridge.createSession('', displayName);

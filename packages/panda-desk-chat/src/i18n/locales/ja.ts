@@ -178,6 +178,25 @@ export default {
   // Command palette
   'commandPalette.placeholder': 'コマンドを入力...',
   'commandPalette.noResults': '結果が見つかりません',
+  'commandPalette.newChat': '新しいチャット',
+
+  // Pet cameo
+  'pet.emptyState.ready': 'お手伝いします！',
+  'pet.emptyState.build': '何を作りましょうか？',
+  'pet.emptyState.start': '会話を始めましょう',
+  'pet.emptyState.code': '一緒にコーディングしよう！',
+  'pet.noResults.nothing': 'ここには何もありません…',
+  'pet.noResults.empty': 'まだ結果がありません！',
+  'pet.noResults.hmm': 'うーん、空っぽです。',
+  'pet.holiday.happy': 'コーディング休日おめでとう！',
+  'pet.holiday.break': '休憩して祝いましょう！',
+  'pet.random.hi': 'こんにちは！',
+  'pet.random.bamboo': '竹はいかが？',
+  'pet.random.lucky': 'ラッキー！',
+  'pet.random.munches': '*竹をもぐもぐ*',
+
+  // Session defaults
+  'session.defaultName': '新しいチャット',
 
   // Session switcher
   'sessionSwitcher.placeholder': 'セッションを検索...',
