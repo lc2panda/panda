@@ -940,7 +940,7 @@ export const connectToServer = memoize(
         inProcessServer = await createComputerUseMcpServerForCli()
         if (!inProcessServer) {
           logMCPDebug(name, `Computer Use MCP server returned null (stub); skipping`)
-          return
+          return { name, type: 'disabled' as const, config: serverRef }
         }
         const [clientTransport, serverTransport] = createLinkedTransportPair()
         await inProcessServer.connect(serverTransport)
