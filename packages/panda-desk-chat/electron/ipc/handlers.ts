@@ -45,6 +45,7 @@ const CH = {
   // Window management
   WINDOW_NEW:           'panda:window:new',
   WINDOW_OPEN_SESSION:  'panda:window:open-session',
+  WINDOW_GET_ID:        'panda:window:get-id',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -198,10 +199,10 @@ export function registerIpcHandlers(): void {
     cliManager.setPermissionMode(payload.mode);
   });
 
-  ipcMain.handle(CH.WINDOW_POSITION, async (_event, payload: { x: number; y: number; width: number; height: number }) => {
-    const wins = BrowserWindow.getAllWindows();
-    if (wins.length > 0) {
-      wins[0].setBounds({
+  ipcMain.handle(CH.WINDOW_POSITION, async (event, payload: { x: number; y: number; width: number; height: number }) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) {
+      win.setBounds({
         x: Math.round(payload.x),
         y: Math.round(payload.y),
         width: Math.round(payload.width),
@@ -259,6 +260,11 @@ export function registerIpcHandlers(): void {
     const win = windowManager.createWindow({ sessionId: payload.sessionId });
     cliManager.registerWindow(win);
     return { windowId: win.id, reused: false };
+  });
+
+  ipcMain.handle(CH.WINDOW_GET_ID, async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    return win?.id ?? -1;
   });
 
   console.log('[IPC] Registered 24 invoke handlers (CLI backend + window manager connected)');

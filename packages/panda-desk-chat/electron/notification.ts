@@ -2,7 +2,8 @@
 // Output: System notifications (OS-level) + macOS dock badge management
 // Pos: electron/notification — centralized notification manager for main process
 
-import { Notification, app, BrowserWindow } from 'electron';
+import { Notification, app } from 'electron';
+import { windowManager } from './window-manager';
 
 // ---------------------------------------------------------------------------
 // NotificationManager — singleton for system notifications + dock badge
@@ -18,25 +19,29 @@ class NotificationManager {
   }
 
   /**
-   * Show a system notification when the main window is unfocused.
-   * Clicking the notification focuses the main window.
+   * Show a system notification when no window is focused.
+   * Clicking the notification focuses the session's window (or the best available).
    */
-  notify(title: string, body: string, onClick?: () => void): void {
+  notify(title: string, body: string, onClick?: () => void, sessionId?: string): void {
     if (!this.enabled) return;
     if (!Notification.isSupported()) return;
 
-    // Only notify when window is not focused
-    const wins = BrowserWindow.getAllWindows();
-    const mainWin = wins[0];
-    if (mainWin && mainWin.isFocused()) return;
+    // Skip notification if any window is focused
+    if (windowManager.isAnyWindowFocused()) return;
 
     const notification = new Notification({ title, body });
 
     notification.on('click', () => {
-      if (mainWin && !mainWin.isDestroyed()) {
-        if (mainWin.isMinimized()) mainWin.restore();
-        mainWin.show();
-        mainWin.focus();
+      // Resolve the best window to focus: session-specific → focused → active
+      const targetWin =
+        (sessionId ? windowManager.getWindowForSession(sessionId) : undefined) ??
+        windowManager.getFocusedWindow() ??
+        windowManager.getActiveWindow();
+
+      if (targetWin && !targetWin.isDestroyed()) {
+        if (targetWin.isMinimized()) targetWin.restore();
+        targetWin.show();
+        targetWin.focus();
       }
       onClick?.();
     });

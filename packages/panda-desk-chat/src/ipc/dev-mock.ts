@@ -398,6 +398,38 @@ export class DevMockRelay {
     console.log(`[DevMock] setWindowPosition: ${x},${y} ${w}x${h}`);
   }
 
+  /** Simulate opening a new window — in dev mode, creates a new tab. */
+  openNewWindow(): { windowId: number } {
+    console.log('[DevMock] openNewWindow');
+    const { id } = this.createSession('/Users/panda/project', 'New Window');
+    // Dynamically import tabStore to avoid circular deps
+    import('../stores/tabStore').then(({ useTabStore }) => {
+      useTabStore.getState().addTab(id, 'New Window');
+    });
+    return { windowId: -1 };
+  }
+
+  /** Simulate opening a session in a window — focus or create tab. */
+  openSessionInWindow(sessionId: string): { windowId: number; reused: boolean } {
+    console.log(`[DevMock] openSessionInWindow: ${sessionId}`);
+    import('../stores/tabStore').then(({ useTabStore }) => {
+      const store = useTabStore.getState();
+      const existing = store.getTabBySessionId(sessionId);
+      if (existing) {
+        store.setActive(existing.id);
+      } else {
+        const session = this.sessions.find((s) => s.id === sessionId);
+        store.addTab(sessionId, session?.name ?? 'Session');
+      }
+    });
+    return { windowId: -1, reused: false };
+  }
+
+  /** Return a mock window id for dev mode. */
+  getWindowId(): number {
+    return -1;
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────
 
   private emit(event: string, payload: unknown): void {

@@ -654,7 +654,7 @@ export class CLIManager {
 
       // Notify when assistant message completes and no window is focused
       if (!windowManager.isAnyWindowFocused()) {
-        notificationManager.notify('Panda Code', 'New message from assistant');
+        notificationManager.notify('Panda Code', 'New message from assistant', undefined, session.id);
         notificationManager.incrementUnread();
       }
     });

@@ -235,7 +235,7 @@ app.whenReady().then(() => {
   createTray();
 
   // Auto-updater
-  appUpdater.init(mainWindow);
+  appUpdater.init();
   if (app.isPackaged) {
     setTimeout(() => appUpdater.checkForUpdates(), 5000);
   }

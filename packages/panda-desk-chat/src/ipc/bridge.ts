@@ -24,6 +24,7 @@ import type {
   FsListResponse,
   SlashCommandsResponse,
   ModelListResponse,
+  WindowInitPayload,
 } from './types';
 import {
   DevMockRelay,
@@ -390,4 +391,16 @@ export async function openNewWindow(): Promise<{ windowId: number } | void> {
 export async function openSessionInWindow(sessionId: string): Promise<{ windowId: number; reused: boolean } | void> {
   if (IS_DEV) return;
   return getPandaAPI().window.openSessionInWindow(sessionId);
+}
+
+/** Get the BrowserWindow id of the current renderer window. */
+export async function getWindowId(): Promise<number> {
+  if (IS_DEV) return -1;
+  return getPandaAPI().window.getWindowId();
+}
+
+/** Subscribe to window:init events (sent after did-finish-load). */
+export function onWindowInit(callback: (payload: WindowInitPayload) => void): Unsubscribe {
+  if (IS_DEV) return () => {};
+  return getPandaAPI().window.onWindowInit(callback);
 }

@@ -6,7 +6,6 @@
 
 import { autoUpdater } from 'electron-updater';
 import type { UpdateInfo, ProgressInfo } from 'electron-updater';
-import type { BrowserWindow } from 'electron';
 import { windowManager } from './window-manager';
 
 // ---------------------------------------------------------------------------
@@ -24,7 +23,7 @@ class AppUpdater {
    * Initialise the updater.
    * Call once after window creation in app.whenReady().
    */
-  init(_win?: BrowserWindow): void {
+  init(): void {
 
     // --- Configuration ---
     autoUpdater.autoDownload = false;

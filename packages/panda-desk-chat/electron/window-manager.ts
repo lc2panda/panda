@@ -4,8 +4,9 @@
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
-import { BrowserWindow, screen } from 'electron';
+import { BrowserWindow, screen, app } from 'electron';
 import { join, dirname } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +19,53 @@ const __dirname = dirname(__filename);
 class WindowManager {
   private windows: Map<number, BrowserWindow> = new Map();
   private windowToSession: Map<number, string> = new Map(); // windowId → sessionId
+  private windowKeyMap: Map<number, string> = new Map(); // windowId → persist key
+  private windowCounter = 0;
+  private stateFilePath: string | null = null;
+
+  // ── Window state persistence ───────────────────────────────────────
+
+  private getStateFilePath(): string {
+    if (!this.stateFilePath) {
+      this.stateFilePath = join(app.getPath('userData'), 'window-state.json');
+    }
+    return this.stateFilePath;
+  }
+
+  private readAllState(): Record<string, Electron.Rectangle> {
+    try {
+      const raw = readFileSync(this.getStateFilePath(), 'utf-8');
+      return JSON.parse(raw) as Record<string, Electron.Rectangle>;
+    } catch {
+      return {};
+    }
+  }
+
+  private writeAllState(state: Record<string, Electron.Rectangle>): void {
+    try {
+      const dir = dirname(this.getStateFilePath());
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(this.getStateFilePath(), JSON.stringify(state, null, 2), 'utf-8');
+    } catch {
+      // Non-critical — silently ignore write failures
+    }
+  }
+
+  private saveBounds(key: string, bounds: Electron.Rectangle): void {
+    const state = this.readAllState();
+    state[key] = bounds;
+    this.writeAllState(state);
+  }
+
+  private loadBounds(key: string): Electron.Rectangle | undefined {
+    const state = this.readAllState();
+    const b = state[key];
+    if (b && typeof b.x === 'number' && typeof b.y === 'number' &&
+        typeof b.width === 'number' && typeof b.height === 'number') {
+      return b;
+    }
+    return undefined;
+  }
 
   // ── Window creation ────────────────────────────────────────────────
 
@@ -30,11 +78,18 @@ class WindowManager {
       screen.getPrimaryDisplay().workAreaSize;
     const offset = this.windows.size * 30; // Cascade new windows
 
+    // Assign a persist key: first window is 'main', subsequent are 'window-N'
+    const persistKey = this.windowCounter === 0 ? 'main' : `window-${this.windowCounter}`;
+    this.windowCounter++;
+
+    // Restore persisted bounds if available (explicit bounds override persisted)
+    const saved = this.loadBounds(persistKey);
+
     const win = new BrowserWindow({
-      width: options?.bounds?.width ?? 1280,
-      height: options?.bounds?.height ?? 820,
-      x: options?.bounds?.x ?? Math.min(100 + offset, screenW - 1280),
-      y: options?.bounds?.y ?? Math.min(100 + offset, screenH - 820),
+      width: options?.bounds?.width ?? saved?.width ?? 1280,
+      height: options?.bounds?.height ?? saved?.height ?? 820,
+      x: options?.bounds?.x ?? saved?.x ?? Math.min(100 + offset, screenW - 1280),
+      y: options?.bounds?.y ?? saved?.y ?? Math.min(100 + offset, screenH - 820),
       titleBarStyle: 'hiddenInset',
       webPreferences: {
         preload: join(__dirname, 'preload/chat.js'),
@@ -46,6 +101,7 @@ class WindowManager {
     });
 
     this.windows.set(win.id, win);
+    this.windowKeyMap.set(win.id, persistKey);
 
     if (options?.sessionId) {
       this.windowToSession.set(win.id, options.sessionId);
@@ -69,9 +125,30 @@ class WindowManager {
       }
     }
 
+    // Notify renderer of its windowId + sessionId once content is ready
+    win.webContents.on('did-finish-load', () => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('panda:window:init', {
+          windowId: win.id,
+          sessionId: options?.sessionId ?? undefined,
+        });
+      }
+    });
+
+    // Persist window bounds before closing
+    win.on('close', () => {
+      if (!win.isDestroyed()) {
+        const key = this.windowKeyMap.get(win.id);
+        if (key) {
+          this.saveBounds(key, win.getBounds());
+        }
+      }
+    });
+
     win.on('closed', () => {
       this.windows.delete(win.id);
       this.windowToSession.delete(win.id);
+      this.windowKeyMap.delete(win.id);
     });
 
     return win;

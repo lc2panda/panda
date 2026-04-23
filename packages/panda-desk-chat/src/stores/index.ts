@@ -10,6 +10,7 @@ export { useUIStore } from './uiStore';
 export { useToastStore } from './toastStore';
 export { useProviderStore, setupProviderBridge } from './providerStore';
 export { useBuddyStore } from './buddyStore';
+export { useWindowStore } from './windowStore';
 
 // Re-export commonly used types
 export type {
@@ -29,6 +30,7 @@ export type { ModalType } from './uiStore';
 export type { Toast, ToastType } from './toastStore';
 export type { Provider, ModelInfo } from './providerStore';
 export type { BuddyEvent, BuddyMilestone, BuddyStats, BuddyEventType } from './buddyStore';
+export type { WindowState } from './windowStore';
 
 // ---------------------------------------------------------------------------
 // Unified bridge initialization

@@ -165,7 +165,16 @@ export interface PandaChatAPI {
   window: {
     newWindow(): Promise<{ windowId: number }>;
     openSessionInWindow(sessionId: string): Promise<{ windowId: number; reused: boolean }>;
+    getWindowId(): Promise<number>;
+    onWindowInit(cb: (payload: WindowInitPayload) => void): Unsubscribe;
   };
+}
+
+// ─── Window init event payload ────────────────────────────────────────────
+
+export interface WindowInitPayload {
+  windowId: number;
+  sessionId?: string;
 }
 
 // ─── Global augmentation for window.pandaAPI ────────────────────────────────

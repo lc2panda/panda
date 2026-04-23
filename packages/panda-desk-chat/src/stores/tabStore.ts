@@ -1,8 +1,9 @@
 // Input: User tab interactions (open, close, reorder, pin/unpin)
-// Output: Ordered tab list with active/pinned state
+// Output: Ordered tab list with active/pinned state, window-aware
 // Pos: State layer — drives tab bar component
 
 import { create } from 'zustand';
+import { useWindowStore } from './windowStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,6 +16,8 @@ export interface Tab {
   isActive: boolean;
   isPinned: boolean;
   order: number;
+  /** Owning window id. undefined = belongs to all windows (backward compat). */
+  windowId?: number;
 }
 
 export interface TabStore {
@@ -22,7 +25,7 @@ export interface TabStore {
   activeTabId: string | null;
 
   // Actions
-  addTab: (sessionId: string, title: string) => void;
+  addTab: (sessionId: string, title: string, windowId?: number) => void;
   removeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
@@ -32,6 +35,8 @@ export interface TabStore {
   closeOthers: (tabId: string) => void;
   closeAll: () => void;
   getTabBySessionId: (sessionId: string) => Tab | undefined;
+  /** Return tabs belonging to the given window (undefined windowId = all). */
+  getTabsForWindow: (windowId: number) => Tab[];
 }
 
 // ---------------------------------------------------------------------------
@@ -42,10 +47,15 @@ export const useTabStore = create<TabStore>()((set, get) => ({
   tabs: [],
   activeTabId: null,
 
-  addTab: (sessionId, title) =>
+  addTab: (sessionId, title, windowId?) =>
     set((state) => {
       // Deactivate all existing tabs
       const deactivated = state.tabs.map((t) => ({ ...t, isActive: false }));
+      // Resolve windowId: explicit arg > windowStore > undefined (all windows)
+      const resolvedWindowId =
+        windowId ?? (useWindowStore.getState().windowId > 0
+          ? useWindowStore.getState().windowId
+          : undefined);
       const newTab: Tab = {
         id: crypto.randomUUID(),
         sessionId,
@@ -53,6 +63,7 @@ export const useTabStore = create<TabStore>()((set, get) => ({
         isActive: true,
         isPinned: false,
         order: deactivated.length,
+        windowId: resolvedWindowId,
       };
       return {
         tabs: [...deactivated, newTab],
@@ -156,5 +167,9 @@ export const useTabStore = create<TabStore>()((set, get) => ({
 
   getTabBySessionId: (sessionId) => {
     return get().tabs.find((t) => t.sessionId === sessionId);
+  },
+
+  getTabsForWindow: (windowId) => {
+    return get().tabs.filter((t) => t.windowId === undefined || t.windowId === windowId);
   },
 }));

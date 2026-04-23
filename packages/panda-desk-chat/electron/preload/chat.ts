@@ -54,6 +54,8 @@ const CH = {
   // Window management
   WINDOW_NEW:           'panda:window:new',
   WINDOW_OPEN_SESSION:  'panda:window:open-session',
+  WINDOW_GET_ID:        'panda:window:get-id',
+  WINDOW_INIT:          'panda:window:init',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -149,5 +151,7 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     newWindow: () => ipcRenderer.invoke(CH.WINDOW_NEW),
     openSessionInWindow: (sessionId: string) =>
       ipcRenderer.invoke(CH.WINDOW_OPEN_SESSION, { sessionId }),
+    getWindowId: () => ipcRenderer.invoke(CH.WINDOW_GET_ID),
+    onWindowInit: createSubscription(CH.WINDOW_INIT),
   },
 });
