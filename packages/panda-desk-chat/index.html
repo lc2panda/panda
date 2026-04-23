@@ -3,10 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:1455 http://127.0.0.1:1456 http://127.0.0.1:1457 http://127.0.0.1:1458 http://127.0.0.1:1459 http://127.0.0.1:1460; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';"
-    />
+    <!-- CSP managed via Electron session header in electron/main.ts -->
     <title>Panda Chat</title>
     <!-- FOUC prevention: sync theme before first paint (external for CSP compliance) -->
     <script src="/fouc.js"></script>
