@@ -1,10 +1,12 @@
-// Input: Model name, token counts, connection state, permission mode, DND flag
-// Output: Bottom status bar showing live session metadata
+// Input: Model name, token counts, connection state, permission mode, DND flag, pet mood
+// Output: Bottom status bar showing live session metadata with pet mood indicator
 // Pos: Layout layer — bottom edge of center column, above PetStrip
 
 import { type ComponentType } from 'react';
 import { cn } from '@/lib/cn';
 import { StatusBarChips } from './StatusBarChips';
+import { PdPetMood } from '@/components/special/PdPetMood';
+import { useBuddyStore } from '@/stores/buddyStore';
 import {
   BellOff as _BellOff,
   Bell as _Bell,
@@ -57,6 +59,7 @@ export function PdStatusBar({
   dnd = false,
 }: PdStatusBarProps) {
   const conn = connectionMeta[connectionState];
+  const buddyLevel = useBuddyStore((s) => s.level);
 
   return (
     <div
@@ -69,8 +72,22 @@ export function PdStatusBar({
       )}
       style={{ height: 'var(--pd-layout-statusbar-height)' }}
     >
-      {/* -- Left: chips + model + tokens -- */}
+      {/* -- Left: pet mood + level + chips + model + tokens -- */}
       <div className="flex items-center gap-3">
+        {/* Pet mood indicator + Level badge */}
+        <div className="flex items-center gap-1">
+          <PdPetMood size="xs" />
+          <span
+            className={cn(
+              'rounded-full px-1.5 py-0 text-[10px] font-semibold',
+              'bg-[var(--pd-pet-level-badge)] text-white',
+            )}
+            title={`Buddy Level ${buddyLevel}`}
+          >
+            Lv.{buddyLevel}
+          </span>
+        </div>
+
         <StatusBarChips />
 
         {model && (

@@ -36,6 +36,7 @@ export function PdTabBarConnected() {
   const addTab = useTabStore((s) => s.addTab);
   const removeTab = useTabStore((s) => s.removeTab);
   const reorderTabs = useTabStore((s) => s.reorderTabs);
+  const renameTab = useTabStore((s) => s.renameTab);
   const pinTab = useTabStore((s) => s.pinTab);
   const unpinTab = useTabStore((s) => s.unpinTab);
   const closeOthers = useTabStore((s) => s.closeOthers);
@@ -141,6 +142,22 @@ export function PdTabBarConnected() {
     [tabs],
   );
 
+  // ── Rename handler (double-click) ──
+  const handleRename = useCallback(
+    (tabId: string, newTitle: string) => {
+      renameTab(tabId, newTitle);
+    },
+    [renameTab],
+  );
+
+  // ── Middle-click handler ──
+  const handleMiddleClick = useCallback(
+    (tabId: string) => {
+      handleClose(tabId);
+    },
+    [handleClose],
+  );
+
   const handlePin = useCallback(
     (tabId: string) => {
       const tab = tabs.find((t) => t.id === tabId);
@@ -192,6 +209,8 @@ export function PdTabBarConnected() {
         dragFromIndex={drag?.fromIndex ?? null}
         dropTargetIndex={dropTarget}
         onContextMenu={handleContextMenu}
+        onRename={handleRename}
+        onMiddleClick={handleMiddleClick}
       />
       {ctxMenu && (
         <TabContextMenu

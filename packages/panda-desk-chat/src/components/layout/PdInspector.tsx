@@ -1,5 +1,5 @@
 // Input: activeTab, onTabChange, onClose
-// Output: 右侧信息面板 320px，9 Tab（含 buddyLog）
+// Output: 右侧信息面板 320px，9 Tab（全部实装）
 // Pos: App 右栏，可隐藏
 
 import { type ComponentType, type ReactNode } from 'react';
@@ -9,6 +9,10 @@ import { FilesPanel } from './inspector/FilesPanel';
 import { DiffPanel } from './inspector/DiffPanel';
 import { AgentsPanel } from './inspector/AgentsPanel';
 import { BuddyLogPanel } from './inspector/BuddyLogPanel';
+import { TasksPanel } from './inspector/TasksPanel';
+import { PreviewPanel } from './inspector/PreviewPanel';
+import { SideChatPanel } from './inspector/SideChatPanel';
+import { PetStatePanel } from './inspector/PetStatePanel';
 
 type IconFC = ComponentType<{ className?: string; size?: number }>;
 const X = _X as IconFC;
@@ -44,6 +48,14 @@ function renderTabContent(tabId: string | undefined): ReactNode {
       return <AgentsPanel />;
     case 'buddyLog':
       return <BuddyLogPanel />;
+    case 'tasks':
+      return <TasksPanel />;
+    case 'preview':
+      return <PreviewPanel />;
+    case 'sideChat':
+      return <SideChatPanel />;
+    case 'petState':
+      return <PetStatePanel />;
     default:
       return (
         <div className="p-3">
