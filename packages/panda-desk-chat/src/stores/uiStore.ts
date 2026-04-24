@@ -16,6 +16,9 @@ export type ModalType =
   | 'mcp-add'
   | null;
 
+/** Which main view the center column renders (Sidebar-controlled) */
+export type ActiveView = 'chat' | 'scheduled';
+
 export interface Toast {
   id: string;
   type: 'info' | 'success' | 'warning' | 'error';
@@ -30,6 +33,9 @@ export interface UIStore {
   composerFocused: boolean;
   searchQuery: string;
 
+  /** Center-column main view (chat = default, scheduled = Sidebar "Scheduled" nav) */
+  activeView: ActiveView;
+
   // Inspector cross-component linkage (sidebar → App → PdInspector)
   inspectorTab: number;
   inspectorVisible: boolean;
@@ -43,6 +49,7 @@ export interface UIStore {
   setSidebarHovered: (hovered: boolean) => void;
   setComposerFocused: (focused: boolean) => void;
   setSearchQuery: (query: string) => void;
+  setActiveView: (view: ActiveView) => void;
   setInspectorTab: (tab: number) => void;
   setInspectorVisible: (visible: boolean) => void;
   openInspectorFile: (filePath: string) => void;
@@ -58,6 +65,7 @@ export const useUIStore = create<UIStore>()((set) => ({
   isSidebarHovered: false,
   composerFocused: false,
   searchQuery: '',
+  activeView: 'chat',
   inspectorTab: 0,
   inspectorVisible: false,
   inspectorHighlightFile: null,
@@ -81,6 +89,7 @@ export const useUIStore = create<UIStore>()((set) => ({
   setSidebarHovered: (isSidebarHovered) => set({ isSidebarHovered }),
   setComposerFocused: (composerFocused) => set({ composerFocused }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
+  setActiveView: (activeView) => set({ activeView }),
   setInspectorTab: (inspectorTab) => set({ inspectorTab }),
   setInspectorVisible: (inspectorVisible) => set({ inspectorVisible }),
   openInspectorFile: (filePath) =>

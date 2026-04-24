@@ -32,3 +32,13 @@ export type { PdSessionSwitcherProps, SessionItem } from "./PdSessionSwitcher";
 export { PdPetMood } from "./PdPetMood";
 export type { PdPetMoodProps } from "./PdPetMood";
 export type { PetMoodState, PetMoodConfig } from "./PdPetMood";
+
+export { PdFilePickerPopup } from "./PdFilePickerPopup";
+export type {
+  PdFilePickerPopupProps,
+  PdFileEntry,
+  PdFileEntryType,
+} from "./PdFilePickerPopup";
+
+export { PdSlashCommandPopup } from "./PdSlashCommandPopup";
+export type { PdSlashCommandPopupProps, PdSlashCommand } from "./PdSlashCommandPopup";
