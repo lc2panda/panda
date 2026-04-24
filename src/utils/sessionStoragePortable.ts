@@ -596,10 +596,13 @@ function processStraddle(
       if (hit?.hasPreservedSegment) {
         s.hasPreservedSegment = true
       } else if (hit) {
-        s.out.len = 0
-        s.boundaryStartOffset = s.bufFileOff
+        // Legacy boundaries (pre-preservedSegment) lack the field. Truncating
+        // here would silently drop all pre-boundary history — a regression that
+        // bit us twice (scar: compact-boundary-preserved-segment-missing).
+        // Keep the accumulated buffer; just mark hasPreservedSegment=false so
+        // callers treat this as "no boundary pruning applied" rather than
+        // "empty buffer intentional".
         s.hasPreservedSegment = false
-        s.lastSnapSrc = null
       }
     }
     sinkWrite(s.out, cb, 0, s.carryLen)
@@ -640,13 +643,11 @@ function scanChunkLines(
       if (hit?.hasPreservedSegment) {
         s.hasPreservedSegment = true // don't truncate; preserved msgs already in output
       } else if (hit) {
-        s.out.len = 0
-        s.boundaryStartOffset = s.bufFileOff + lineStart
+        // Legacy boundaries lack preservedSegment. Do NOT truncate — losing
+        // pre-boundary history here breaks --resume for sessions that crossed
+        // the 5MB SKIP_PRECOMPACT_THRESHOLD before boundaries started emitting
+        // preservedSegment. See scar: compact-boundary-preserved-segment-missing.
         s.hasPreservedSegment = false
-        s.lastSnapSrc = null
-        lastSnapStart = -1
-        s.straddleSnapCarryLen = 0
-        runStart = lineStart
       }
       boundaryAt = buf.indexOf(
         boundaryMarker,
