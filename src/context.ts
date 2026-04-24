@@ -143,6 +143,25 @@ function getTimeAwareness(): string {
   return `当前时段：${timeLabel}${isWorkHours ? '，工作时间' : '，非工作时间'}`
 }
 
+// Working-memory keys excluded from system-prompt injection because their
+// values change every turn (ISO timestamps) and contribute no information
+// the model can't get from timeInfo. proactiveEngine reads the storage layer
+// directly, so duration math based on these keys is unaffected.
+// Anthropic native channel untouched: we only filter dict entries BEFORE they
+// are handed to the system-prompt dict; addCacheBreakpoints semantics and
+// byte-level system-prompt framing are preserved.
+const VOLATILE_WM_KEYS = new Set([
+  'lastPromptTime',
+  'sessionStartTime',
+  // also skip per-task timestamps that some builtin-tasks write as value-objects
+  // containing epoch-ms — key names are stable but values churn:
+  'im-reverse-push-queue',
+  'last-skill-execution',
+])
+function filterVolatileWm<T extends { key: string }>(entries: readonly T[]): T[] {
+  return entries.filter(e => !VOLATILE_WM_KEYS.has(e.key))
+}
+
 function getPersonaContext(): string | null {
   const config = getGlobalConfig()
   let key = config.persona?.active
@@ -167,10 +186,10 @@ function getPersonaContext(): string | null {
     const mood = getMoodSense()
     if (mood && mood !== 'neutral') parts.push(`用户情绪：${mood}`)
   } catch {}
-  // Panda: inject working memory summary
+  // Panda: inject working memory summary (volatile keys filtered to preserve cache)
   try {
     const { getAllWorkingMemory } = require('./assistant/workingMemory.js')
-    const wm = getAllWorkingMemory()
+    const wm = filterVolatileWm(getAllWorkingMemory())
     if (Array.isArray(wm) && wm.length > 0) {
       const summary = wm.slice(0, 5).map((e: any) => `${e.key}: ${e.value}`).join('; ')
       parts.push(`当前工作记忆: ${summary}`)
@@ -314,7 +333,7 @@ export const getSystemContext = memoize(
     let workingMemoryContext: string | null = null
     try {
       const { getAllWorkingMemory } = require('./assistant/workingMemory.js')
-      const wm = getAllWorkingMemory()
+      const wm = filterVolatileWm(getAllWorkingMemory())
       if (wm && wm.length > 0) {
         const wmSummary = wm.slice(0, 10).map((e: { key: string; value: string }) => `- ${e.key}: ${e.value}`).join('\n')
         workingMemoryContext = `[Working Memory]\n${wmSummary}`
