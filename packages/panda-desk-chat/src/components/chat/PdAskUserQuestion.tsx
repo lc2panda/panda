@@ -68,21 +68,29 @@ export const PdAskUserQuestion: React.FC<PdAskUserQuestionProps> = React.memo(
     return (
       <div
         className={cn(
-          "rounded-[var(--pd-radius-md)] overflow-hidden border border-[var(--pd-color-border)]",
+          "rounded-[16px] border border-[var(--pd-color-border)] bg-[var(--pd-color-bg-elevated)] p-4",
           answered && "opacity-60",
           className,
         )}
         onKeyDown={handleKeyDown}
       >
-        {/* Question header */}
-        <div className="px-4 py-3 bg-[var(--pd-color-bg-subtle)] border-b border-b-[var(--pd-color-border)]">
-          <p className="m-0 text-[13px] text-[var(--pd-color-fg)] font-medium leading-[1.5]">
-            {question}
-          </p>
+        {/* Question header — Reference: cc-haha AskUserQuestion (design spec only) */}
+        <div className="flex items-center gap-2 mb-3">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--pd-color-accent)]">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--pd-color-accent)]">
+            Ask
+          </span>
         </div>
+        <p className="m-0 mb-4 text-[15px] text-[var(--pd-color-fg)] font-semibold leading-[1.4]">
+          {question}
+        </p>
 
         {/* Answer area */}
-        <div className="px-4 py-3 space-y-3">
+        <div className="space-y-3">
           {answered ? (
             /* Read-only answered state */
             <div className="flex items-center gap-2 text-[13px] text-[var(--pd-color-fg-muted)]">

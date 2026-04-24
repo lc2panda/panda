@@ -33,15 +33,13 @@ export const PdUserBubble: React.FC<PdUserBubbleProps> = React.memo(({
       style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--pd-space-3)' }}
     >
       <div
-        className={cn(
-          "relative group",
-        )}
+        className={cn("relative group")}
         style={{
-          background: 'var(--pd-color-surface-container, var(--pd-color-bg-elevated))',
-          borderRadius: '18px 4px 18px 18px',
+          background: 'var(--pd-color-bg-subtle)',
+          borderRadius: '16px',
           padding: '12px 16px',
-          maxWidth: '82%',
-          color: 'var(--pd-color-text-primary, var(--pd-color-fg))',
+          maxWidth: '70%',
+          color: 'var(--pd-color-fg)',
         }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -49,8 +47,8 @@ export const PdUserBubble: React.FC<PdUserBubbleProps> = React.memo(({
         {hovered && (
           <span
             className={cn(
-              "absolute top-2 right-3",
-              "text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)]",
+              "absolute -top-5 right-1",
+              "text-[11px] text-[var(--pd-color-fg-muted)]",
               "select-none pointer-events-none",
               "animate-[pd-fade-in-up_150ms_var(--pd-ease-decelerate)]",
             )}
@@ -60,10 +58,12 @@ export const PdUserBubble: React.FC<PdUserBubbleProps> = React.memo(({
         )}
         <p
           className={cn(
-            "text-[var(--pd-text-base)]",
-            "leading-[var(--pd-leading-body)]",
             "whitespace-pre-wrap break-words m-0",
           )}
+          style={{
+            fontSize: '15px',
+            lineHeight: 1.55,
+          }}
         >
           {content}
         </p>

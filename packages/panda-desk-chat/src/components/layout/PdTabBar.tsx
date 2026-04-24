@@ -27,6 +27,8 @@ export interface PdTabBarTab {
   isActive: boolean;
   isPinned: boolean;
   hasChanges?: boolean;
+  /** Session activity state — shown as a left-side dot (cc-haha style) */
+  statusDot?: 'running' | 'idle';
 }
 
 export interface PdTabBarProps {
@@ -268,6 +270,20 @@ export function PdTabBar({
                 <span
                   className="absolute inset-x-0 bottom-0"
                   style={{ height: '2px', background: 'var(--pd-color-accent)' }}
+                />
+              )}
+
+              {/* Session status dot — green = running, gray = idle (cc-haha visual language) */}
+              {tab.statusDot && (
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{
+                    background: tab.statusDot === 'running'
+                      ? 'var(--pd-color-success, #16A34A)'
+                      : 'var(--pd-color-fg-subtle, #A0A09D)',
+                    opacity: tab.statusDot === 'running' ? 1 : 0.6,
+                  }}
+                  aria-label={tab.statusDot === 'running' ? 'Running' : 'Idle'}
                 />
               )}
 

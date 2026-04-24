@@ -79,23 +79,25 @@ function computeUnifiedDiff(oldText: string, newText: string): DiffLine[] {
 /*  Line rendering styles                                                     */
 /* -------------------------------------------------------------------------- */
 
+// Reference: cc-haha/src/components/chat DiffViewer (design spec only, not source)
+// Light-mode diff tints matching Panda's cream base bg.
 const lineStyles: Record<DiffLineKind, { bg: string; gutter: string; text: string; prefix: string }> = {
   del: {
-    bg: "bg-[#3c1618]",
-    gutter: "text-[#dc2626] opacity-70",
-    text: "text-[#f87171]",
+    bg: "bg-[rgba(186,26,26,0.06)]",
+    gutter: "text-[#BA1A1A] opacity-80",
+    text: "text-[#8A1212]",
     prefix: "-",
   },
   add: {
-    bg: "bg-[#132a1a]",
-    gutter: "text-[#5a9e6f] opacity-70",
-    text: "text-[#6ee7b7]",
+    bg: "bg-[rgba(22,163,74,0.06)]",
+    gutter: "text-[#16A34A] opacity-80",
+    text: "text-[#136D37]",
     prefix: "+",
   },
   same: {
     bg: "",
-    gutter: "text-[var(--pd-color-fg-muted)] opacity-50",
-    text: "text-[var(--pd-color-fg)] opacity-80",
+    gutter: "text-[var(--pd-color-fg-muted)] opacity-55",
+    text: "text-[var(--pd-color-fg)] opacity-85",
     prefix: " ",
   },
 };
@@ -135,9 +137,9 @@ export const PdDiffViewer: React.FC<PdDiffViewerProps> = React.memo(
           </div>
         </div>
 
-        {/* Diff body */}
-        <div className="overflow-x-auto bg-[var(--pd-color-terminal-bg,#1a1a1a)]">
-          <pre className="m-0 text-[12px] leading-[1.6] font-[var(--pd-font-mono)]">
+        {/* Diff body — light bg aligned to Panda cream surface */}
+        <div className="overflow-x-auto bg-[var(--pd-color-bg-elevated)]">
+          <pre className="m-0 text-[13px] leading-[1.6] font-[family-name:var(--pd-font-mono)]">
             {diffLines.map((line, idx) => {
               const s = lineStyles[line.kind];
               return (

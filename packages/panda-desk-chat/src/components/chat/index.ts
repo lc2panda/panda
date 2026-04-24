@@ -55,3 +55,6 @@ export type { PdDiffViewerProps } from "./PdDiffViewer";
 
 export { PdAskUserQuestion } from "./PdAskUserQuestion";
 export type { PdAskUserQuestionProps } from "./PdAskUserQuestion";
+
+export { PdInlineTaskSummary } from "./PdInlineTaskSummary";
+export type { PdInlineTaskSummaryProps, PdTask, PdTaskStatus } from "./PdInlineTaskSummary";

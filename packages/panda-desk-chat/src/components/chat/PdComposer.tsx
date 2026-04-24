@@ -77,7 +77,7 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
       onStop,
       isStreaming,
       disabled = false,
-      placeholder = "Message Panda Code...",
+      placeholder = "Ask Panda to edit, debug or explain...",
     },
     ref,
   ) => {
@@ -544,15 +544,17 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
           />
         </div>
 
-        {/* -- Bottom bar --------------------------------------------------- */}
-        <div className="relative flex items-center gap-[var(--pd-space-1)] px-2 pb-2 pt-0">
-          {/* Attach button */}
+        {/* -- Bottom bar — Reference: cc-haha ChatInput footer (design spec only, not source) --- */}
+        {/*    Order: [+] · [Bypass ∨] · spacer · [✨ Model ∨] · [→ Run] */}
+        <div className="relative flex items-center gap-[var(--pd-space-1\.5)] px-2 pb-2 pt-0">
+          {/* 1. Attach button — rounded-full bg-subtle */}
           <button
             type="button"
             aria-label="Attach file"
             className={cn(
               "shrink-0 w-7 h-7 flex items-center justify-center",
-              "rounded-[var(--pd-radius-md)]",
+              "rounded-full",
+              "bg-[var(--pd-color-bg-subtle)]",
               "text-[var(--pd-color-fg-muted)]",
               "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
               "transition-colors duration-[var(--pd-duration-fast)]",
@@ -561,16 +563,70 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
             <AttachIcon />
           </button>
 
+          {/* 2. Permission mode selector — text-label with shield icon */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => { setShowPermMenu((v) => !v); setShowModelMenu(false); }}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 h-7",
+                "rounded-[var(--pd-radius-md)]",
+                "text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)]",
+                "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
+                "transition-colors duration-[var(--pd-duration-fast)]",
+                "font-[family-name:var(--pd-font-sans)]",
+              )}
+              title={`Permission: ${permissionMode}`}
+            >
+              <ShieldIcon />
+              <span>{PERM_OPTIONS.find((p) => p.value === permissionMode)?.label ?? "Default"}</span>
+              <ChevronDownIcon />
+            </button>
+            {showPermMenu && (
+              <div
+                className={cn(
+                  "absolute bottom-full left-0 mb-1",
+                  "min-w-[180px] py-1",
+                  "rounded-[var(--pd-radius-md)]",
+                  "border border-[var(--pd-color-border)]",
+                  "bg-[var(--pd-color-bg-elevated)]",
+                  "shadow-[var(--pd-shadow-lg)]",
+                  "z-[var(--pd-z-dropdown)]",
+                )}
+              >
+                {PERM_OPTIONS.map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => { setPermissionMode(p.value); setShowPermMenu(false); }}
+                    className={cn(
+                      "w-full px-3 py-1.5 text-left flex items-center gap-2",
+                      "text-[var(--pd-text-sm)]",
+                      "hover:bg-[var(--pd-color-bg-hover)]",
+                      "transition-colors duration-[var(--pd-duration-fast)]",
+                      p.value === permissionMode
+                        ? "text-[var(--pd-color-accent)] font-[var(--pd-font-medium)]"
+                        : "text-[var(--pd-color-fg)]",
+                    )}
+                  >
+                    <span aria-hidden="true">{p.icon}</span>
+                    <span>{p.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Model selector */}
+          {/* 3. Model selector — with sparkle accent */}
           <div className="relative">
             <button
               type="button"
               onClick={() => { setShowModelMenu((v) => !v); setShowPermMenu(false); }}
               className={cn(
-                "flex items-center gap-1 px-2 h-7",
+                "flex items-center gap-1.5 px-2.5 h-7",
                 "rounded-[var(--pd-radius-md)]",
                 "text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)]",
                 "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
@@ -578,8 +634,9 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
                 "font-[family-name:var(--pd-font-sans)]",
               )}
             >
+              <SparkleIcon />
               <span>{shortModelName(currentModel)}</span>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M2.5 4L5 6.5L7.5 4" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <ChevronDownIcon />
             </button>
             {showModelMenu && (
               <div
@@ -615,72 +672,23 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
             )}
           </div>
 
-          {/* Permission mode selector */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => { setShowPermMenu((v) => !v); setShowModelMenu(false); }}
-              className={cn(
-                "flex items-center gap-1 px-2 h-7",
-                "rounded-[var(--pd-radius-md)]",
-                "text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)]",
-                "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
-                "transition-colors duration-[var(--pd-duration-fast)]",
-              )}
-              title={`Permission: ${permissionMode}`}
-            >
-              <span>{PERM_OPTIONS.find((p) => p.value === permissionMode)?.icon ?? "\u{1F6E1}\u{FE0F}"}</span>
-            </button>
-            {showPermMenu && (
-              <div
-                className={cn(
-                  "absolute bottom-full right-0 mb-1",
-                  "min-w-[150px] py-1",
-                  "rounded-[var(--pd-radius-md)]",
-                  "border border-[var(--pd-color-border)]",
-                  "bg-[var(--pd-color-bg-elevated)]",
-                  "shadow-[var(--pd-shadow-lg)]",
-                  "z-[var(--pd-z-dropdown)]",
-                )}
-              >
-                {PERM_OPTIONS.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => { setPermissionMode(p.value); setShowPermMenu(false); }}
-                    className={cn(
-                      "w-full px-3 py-1.5 text-left flex items-center gap-2",
-                      "text-[var(--pd-text-sm)]",
-                      "hover:bg-[var(--pd-color-bg-hover)]",
-                      "transition-colors duration-[var(--pd-duration-fast)]",
-                      p.value === permissionMode
-                        ? "text-[var(--pd-color-accent)] font-[var(--pd-font-medium)]"
-                        : "text-[var(--pd-color-fg)]",
-                    )}
-                  >
-                    <span>{p.icon}</span>
-                    <span>{p.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Send / Stop button */}
+          {/* 4. Run / Stop button — pill with label */}
           {isStreaming ? (
             <button
               type="button"
               aria-label="Stop generation"
               onClick={onStop}
               className={cn(
-                "shrink-0 w-8 h-8 flex items-center justify-center",
-                "rounded-[var(--pd-radius-full)]",
+                "shrink-0 h-7 px-3 flex items-center justify-center gap-1.5",
+                "rounded-[var(--pd-radius-md)]",
                 "bg-[var(--pd-color-error)] text-white",
                 "transition-colors duration-[var(--pd-duration-quick)]",
                 "hover:opacity-90 active:opacity-80",
+                "text-[var(--pd-text-xs)] font-[var(--pd-font-medium)]",
               )}
             >
               <StopIcon />
+              <span>Stop</span>
             </button>
           ) : (
             <button
@@ -689,15 +697,17 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
               onClick={send}
               disabled={!canSend}
               className={cn(
-                "shrink-0 w-8 h-8 flex items-center justify-center",
-                "rounded-[var(--pd-radius-full)]",
+                "shrink-0 h-7 px-3 flex items-center justify-center gap-1.5",
+                "rounded-[var(--pd-radius-md)]",
                 "transition-colors duration-[var(--pd-duration-quick)]",
+                "text-[var(--pd-text-xs)] font-[var(--pd-font-medium)]",
                 canSend
                   ? "bg-[var(--pd-color-accent)] text-[var(--pd-color-fg-on-accent)] shadow-[var(--pd-shadow-button-primary)] hover:bg-[var(--pd-color-accent-hover)] active:bg-[var(--pd-color-accent-active)]"
                   : "bg-[var(--pd-color-bg-disabled)] text-[var(--pd-color-fg-disabled)] cursor-not-allowed",
               )}
             >
-              <SendIcon />
+              <ArrowRightIcon />
+              <span>Run</span>
             </button>
           )}
 
@@ -876,6 +886,39 @@ function MentionFileIcon() {
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" />
       <path d="M14 2V8H20" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+
+function SparkleIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--pd-color-accent)]">
+      <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+      <path d="M2.5 4L5 6.5L7.5 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14" />
+      <path d="M13 5l7 7-7 7" />
     </svg>
   );
 }

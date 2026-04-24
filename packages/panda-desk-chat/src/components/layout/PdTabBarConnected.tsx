@@ -193,6 +193,7 @@ export function PdTabBarConnected() {
     title: tab.title,
     isActive: tab.id === activeTabId,
     isPinned: tab.isPinned,
+    statusDot: isSessionStreaming(tab.sessionId) ? 'running' : 'idle',
   }));
 
   return (
