@@ -30,7 +30,7 @@ export function PdHeroComposer(_props: PdHeroComposerProps) {
       >
         <span
           style={{
-            fontFamily: 'var(--pd-font-sans)',
+            fontFamily: 'var(--pd-font-headline)',
             fontSize: 52,
             fontWeight: 800,
             color: 'var(--pd-color-accent)',
@@ -55,10 +55,10 @@ export function PdHeroComposer(_props: PdHeroComposerProps) {
         />
       </div>
 
-      {/* Title — 粗 sans-serif 40px (不使用 serif) */}
+      {/* Title — cc-haha headline: Manrope bold 40px */}
       <h1
         style={{
-          fontFamily: 'var(--pd-font-sans)',
+          fontFamily: 'var(--pd-font-headline)',
           fontSize: 40,
           fontWeight: 700,
           letterSpacing: '-0.02em',

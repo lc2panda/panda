@@ -21,9 +21,11 @@
    * open-source equivalents and CJK.
    * See monitor/20260424-anthropic-design-system-evidence.md
    */
-  --pd-font-sans: 'Anthropic Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Noto Sans SC', system-ui, sans-serif;
-  --pd-font-serif: 'Anthropic Serif', 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
-  --pd-font-mono: 'Anthropic Mono', ui-monospace, 'JetBrains Mono', 'Sarasa Mono SC', 'Menlo', monospace;
+  /* cc-haha 对齐（v3 override）：Manrope 标题 / Inter 正文 / JetBrains Mono 代码 */
+  --pd-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', system-ui, sans-serif;
+  --pd-font-serif: 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', system-ui, sans-serif;
+  --pd-font-mono: 'JetBrains Mono', ui-monospace, 'Sarasa Mono SC', 'Menlo', monospace;
+  --pd-font-headline: 'Manrope', 'Inter', sans-serif;
 
   /* ── Font Size Scale (12-step, base 14px) ────────────────────────────── */
   --pd-text-2xs: 0.625rem;   /* 10px */
@@ -95,7 +97,7 @@
   --pd-z-max: 9999;
 
   /* ── Layout Dimensions ───────────────────────────────────────────────── */
-  --pd-layout-sidebar-width: 300px;
+  --pd-layout-sidebar-width: 280px;
   --pd-layout-sidebar-rail: 72px;
   --pd-layout-tabbar-height: 40px;
   --pd-layout-statusbar-height: 32px;
@@ -182,42 +184,44 @@
    *   gray-0  #FFFFFF  |  gray-20 #F8F8F6 body bg  |  gray-30 #F4F4ED panel
    *   gray-40 #F1F0E9 hover  |  gray-50 #EDEBE0 selected
    */
-  --pd-color-bg: #F8F8F6;                                   /* claude.ai body bg (gray-20) */
-  --pd-color-bg-elevated: #FCFCF9;                          /* gray-10 */
-  --pd-color-bg-subtle: #F4F4ED;                            /* gray-30 sidebar panel */
-  --pd-color-bg-hover: #F1F0E9;                             /* gray-40 */
-  --pd-color-bg-selected: #EDEBE0;                          /* gray-50 */
-  --pd-color-bg-disabled: #F4F4ED;
-  --pd-color-surface-container: var(--pd-palette-cream-300); /* #EFEEEA card/sidebar */
-  --pd-color-surface-container-low: var(--pd-palette-cream-200); /* #F4F4F0 */
-  --pd-color-surface-container-high: var(--pd-palette-cream-350); /* #E9E8E4 */
-  --pd-color-user-message-bg: var(--pd-palette-cream-300);   /* #EFEEEA user bubble */
+  /* ── cc-haha Material You 配色（v3 全盘对齐） ─────────────────────────
+   * 数值来源：cc-haha/desktop/src/theme/globals.css @theme 段（HEX 为事实性数据，无版权）
+   */
+  --pd-color-bg: #FAF9F5;                                   /* surface / background */
+  --pd-color-bg-elevated: #FFFFFF;                          /* surface-container-lowest */
+  --pd-color-bg-subtle: #F4F4F0;                            /* surface-container-low — sidebar */
+  --pd-color-bg-hover: #E9E8E4;                             /* surface-container-high — hover */
+  --pd-color-bg-selected: #EFEEEA;                          /* surface-container — selected */
+  --pd-color-bg-disabled: #F4F4F0;
+  --pd-color-surface-container: #EFEEEA;
+  --pd-color-surface-container-low: #F4F4F0;
+  --pd-color-surface-container-high: #E9E8E4;
+  --pd-color-user-message-bg: #EFEEEA;
 
-  /* ── Semantic: Foreground (aligned to anthropic/skills brand + claude.ai) ── */
-  --pd-color-fg: #141413;                                   /* Anthropic brand Dark */
-  --pd-color-fg-muted: #5E5E5B;                             /* gray-550 */
-  --pd-color-fg-tertiary: #7A7771;                          /* gray-450 */
-  --pd-color-fg-subtle: #A8A49D;                            /* gray-300 */
+  /* ── Semantic: Foreground (cc-haha on-surface + variants) ── */
+  --pd-color-fg: #1B1C1A;                                   /* on-surface */
+  --pd-color-fg-muted: #54433E;                             /* on-surface-variant */
+  --pd-color-fg-tertiary: #87736D;                          /* outline */
+  --pd-color-fg-subtle: #B0A7A3;                            /* muted */
   --pd-color-fg-on-accent: #FFFFFF;
-  --pd-color-fg-inverse: var(--pd-palette-cream-100);
-  --pd-color-fg-disabled: var(--pd-palette-cream-400);
+  --pd-color-fg-inverse: #FFFFFF;
+  --pd-color-fg-disabled: #B0A7A3;
 
-  /* ── Semantic: Border (extremely subtle, claude.ai style) ─────────────── */
-  /* Warm border tinted with brand terracotta — matches cc-haha outline-variant vibe */
-  --pd-color-border: rgba(193, 119, 87, 0.16);               /* warm sand */
-  --pd-color-border-strong: rgba(193, 119, 87, 0.26);
-  --pd-color-border-focus: #D97757;                          /* brand accent */
-  --pd-color-border-subtle: rgba(193, 119, 87, 0.10);
-  --pd-color-border-variant: rgba(193, 119, 87, 0.18);
+  /* ── Semantic: Border (cc-haha outline-variant) ─────────────── */
+  --pd-color-border: #DAC1BA;                                /* outline-variant */
+  --pd-color-border-strong: #87736D;                         /* outline */
+  --pd-color-border-focus: #8F482F;                          /* primary */
+  --pd-color-border-subtle: rgba(218, 193, 186, 0.55);
+  --pd-color-border-variant: #DAC1BA;
 
-  /* ── Semantic: Accent (claude.ai --_brand-clay) ───────────────────────── */
-  --pd-color-accent: #D97757;                                /* brand-clay, Anthropic Orange */
-  --pd-color-accent-hover: #C1653A;                          /* brand-clay-emphasized */
-  --pd-color-accent-active: #A55130;                         /* darker pressed */
-  --pd-color-accent-subtle: rgba(217, 119, 87, 0.12);
-  --pd-color-accent-fg: #C1653A;
-  --pd-color-accent-container: #F3DACC;
-  --pd-color-link: #C1653A;                                  /* WCAG 4.5:1 vs #F8F8F6 */
+  /* ── Semantic: Accent (cc-haha primary / primary-container) ──── */
+  --pd-color-accent: #8F482F;                                /* primary */
+  --pd-color-accent-hover: #AD5F45;                          /* primary-container */
+  --pd-color-accent-active: #7A3D28;                         /* darker pressed */
+  --pd-color-accent-subtle: #FFDBD0;                         /* primary-fixed */
+  --pd-color-accent-fg: #8F482F;
+  --pd-color-accent-container: #FFDBD0;
+  --pd-color-link: #8F482F;
 
   /* ── Semantic: Status ────────────────────────────────────────────────── */
   --pd-color-success: #4F6237;

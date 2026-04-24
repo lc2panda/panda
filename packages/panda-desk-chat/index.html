@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- CSP managed via Electron session header in electron/main.ts -->
     <title>Panda Chat</title>
+
+    <!-- Web fonts — Manrope (headline) / Inter (body) / JetBrains Mono (code) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
+
     <!-- FOUC prevention: sync theme before first paint (external for CSP compliance) -->
     <script src="/fouc.js"></script>
   </head>

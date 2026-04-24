@@ -222,7 +222,7 @@ app.whenReady().then(() => {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:1455 http://127.0.0.1:1456 http://127.0.0.1:1457 http://127.0.0.1:1458 http://127.0.0.1:1459 http://127.0.0.1:1460 ws://localhost:5173 http://localhost:5173; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; connect-src 'self' http://127.0.0.1:1455 http://127.0.0.1:1456 http://127.0.0.1:1457 http://127.0.0.1:1458 http://127.0.0.1:1459 http://127.0.0.1:1460 ws://localhost:5173 http://localhost:5173; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';",
         ],
       },
     });
