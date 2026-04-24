@@ -223,15 +223,36 @@
   --pd-color-accent-container: #FFDBD0;
   --pd-color-link: #8F482F;
 
-  /* ── Semantic: Status ────────────────────────────────────────────────── */
-  --pd-color-success: #4F6237;
+  /* ── Semantic: Status (cc-haha aligned) ───────────────────────────────── */
+  --pd-color-success: #16A34A;
   --pd-color-success-bg: var(--pd-palette-bamboo-300);
-  --pd-color-warning: var(--pd-palette-amber-500);
+  --pd-color-warning: #CA8A04;
   --pd-color-warning-bg: var(--pd-palette-amber-200);
-  --pd-color-error: var(--pd-palette-ruby-500);
-  --pd-color-error-bg: var(--pd-palette-ruby-200);
+  --pd-color-error: #BA1A1A;
+  --pd-color-error-bg: #FFDAD6;
+  --pd-color-error-container: #FFDAD6;
+  --pd-color-on-error-container: #410002;
   --pd-color-info: var(--pd-palette-sky-500);
   --pd-color-info-bg: var(--pd-palette-sky-300);
+
+  /* ── Gradients + shadow (cc-haha --gradient-btn-primary / --shadow-button-primary) ── */
+  --pd-gradient-btn-primary: linear-gradient(135deg, #8F482F, #AD5F45);
+  --pd-gradient-btn-primary-hover: linear-gradient(135deg, #AD5F45, #8F482F);
+  --pd-shadow-button-terra: 0 8px 24px rgba(143, 72, 47, 0.18);
+  --pd-shadow-focus-ring: 0 0 0 1px rgba(143, 72, 47, 0.16);
+  --pd-shadow-dropdown: 0 4px 20px rgba(27, 28, 26, 0.04), 0 12px 40px rgba(27, 28, 26, 0.08);
+
+  /* ── Motion (cc-haha --motion-sidebar-*) ───────────────────────────────── */
+  --pd-motion-sidebar-duration: 280ms;
+  --pd-motion-sidebar-easing: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── Diff colors (cc-haha diff-* light) ──────────────────────────────── */
+  --pd-color-diff-added-bg: #E8F5E2;
+  --pd-color-diff-added-text: #1A7F37;
+  --pd-color-diff-removed-bg: #FDECEA;
+  --pd-color-diff-removed-text: #CF222E;
+  --pd-color-diff-title-bg: #F4F4F0;
+  --pd-color-diff-title-color: #87736D;
 
   /* ── Semantic: Shadow / Scrim ────────────────────────────────────────── */
   --pd-color-scrim: rgba(20, 20, 19, 0.4);

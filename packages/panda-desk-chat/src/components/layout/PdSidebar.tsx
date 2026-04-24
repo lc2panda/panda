@@ -409,7 +409,7 @@ function SessionItem({
         if (e.key === 'Enter') onSelect();
       }}
       className={cn(
-        'group flex w-full items-center gap-2 rounded-[var(--pd-radius-md)]',
+        'group flex w-full items-center gap-2.5 rounded-[8px]',
         'py-1.5 pl-4 pr-3 text-left transition-colors duration-200 cursor-pointer',
         active
           ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)]'
@@ -820,38 +820,40 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
       className={cn(
         'flex h-full flex-col overflow-hidden',
         'bg-[var(--pd-color-bg-subtle)]',
-        'transition-[width] duration-[var(--pd-duration-slow)] ease-[var(--pd-ease-spring)]',
       )}
       style={{
         width: expanded
           ? 'var(--pd-layout-sidebar-width)'
           : 'var(--pd-layout-sidebar-rail)',
         paddingTop: 44, // macOS traffic-light avoidance
+        transition: `width var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing)`,
       }}
     >
-      {/* cc-haha 风格 brand row: logomark + 文字 + GitHub + toggle */}
+      {/* Brand row — app-icon 32×32 rounded-lg + Manrope brand text + GitHub + toggle */}
       <div className={cn(
         'flex shrink-0 px-3 pb-2',
         expanded ? 'items-center justify-between gap-3' : 'flex-col items-center gap-2',
       )}>
         <div className={cn('flex min-w-0 items-center', expanded ? 'gap-2.5' : 'justify-center')}>
-          {/* Panda logomark（自研，非 app-icon.jpg）*/}
+          {/* Panda logomark — pure SVG, white base + brand P + decorative dot */}
           <div
-            className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center font-semibold"
+            className="h-8 w-8 rounded-lg flex-shrink-0"
             style={{
-              background: 'var(--pd-color-accent)',
-              color: 'var(--pd-color-fg-on-accent)',
-              fontFamily: 'var(--pd-font-serif, Georgia, serif)',
-              fontSize: 18,
+              filter:
+                'drop-shadow(0 2px 6px rgba(27,28,26,0.04)) drop-shadow(0 1px 2px rgba(27,28,26,0.04))',
             }}
             aria-hidden="true"
           >
-            P
+            <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="32" height="32" rx="7" fill="var(--pd-color-bg-elevated, #FFFFFF)" stroke="rgba(218,193,186,0.5)" strokeWidth="0.5" />
+              <path d="M9 7 H18 Q23.5 7 23.5 13 Q23.5 19 18 19 H13 V25 H9 Z M13 11 V15 H18 Q19.5 15 19.5 13 Q19.5 11 18 11 Z" fill="var(--pd-color-accent, #8F482F)" />
+              <circle cx="23" cy="24" r="1.9" fill="var(--pd-color-accent, #8F482F)" />
+            </svg>
           </div>
           {expanded && (
             <span
               className="text-[13px] font-semibold tracking-tight text-[var(--pd-color-fg)]"
-              style={{ fontFamily: 'var(--pd-font-sans)' }}
+              style={{ fontFamily: 'var(--pd-font-headline)' }}
             >
               Panda
             </span>
@@ -894,20 +896,20 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         </div>
       </div>
 
-      {/* cc-haha 2 项一级入口：New session + Scheduled */}
+      {/* 2 项一级入口：New session + Scheduled（nav-item spec: px-3 py-2 gap-2.5 icon 20 text-sm） */}
       <div className={cn('shrink-0 px-3 pb-3 flex flex-col', expanded ? 'gap-0.5' : 'items-center gap-2')}>
         <button
           type="button"
           onClick={handleNewSession}
           title="新建对话"
           className={cn(
-            'flex items-center rounded-[var(--pd-radius-md)] transition-colors',
-            expanded ? 'w-full gap-3 px-3 py-2' : 'h-9 w-9 justify-center',
+            'flex items-center rounded-[8px] transition-all duration-200',
+            expanded ? 'w-full gap-2.5 px-3 py-2' : 'h-10 w-10 justify-center',
             'text-[14px] text-[var(--pd-color-fg)]',
             'hover:bg-[var(--pd-color-bg-hover)]',
           )}
         >
-          <Plus size={16} className="shrink-0" />
+          <Plus size={20} className="shrink-0" />
           {expanded && <span>新建对话</span>}
         </button>
         <button
@@ -916,15 +918,15 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
           title="定时任务"
           aria-current={activeView === 'scheduled' ? 'page' : undefined}
           className={cn(
-            'flex items-center rounded-[var(--pd-radius-md)] transition-colors',
-            expanded ? 'w-full gap-3 px-3 py-2' : 'h-9 w-9 justify-center',
+            'flex items-center rounded-[8px] transition-all duration-200',
+            expanded ? 'w-full gap-2.5 px-3 py-2' : 'h-10 w-10 justify-center',
             'text-[14px]',
             activeView === 'scheduled'
-              ? 'bg-[var(--pd-color-bg-elevated)] text-[var(--pd-color-fg)]'
+              ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)] font-medium shadow-[0_8px_24px_rgba(15,23,42,0.08)]'
               : 'text-[var(--pd-color-fg)] hover:bg-[var(--pd-color-bg-hover)]',
           )}
         >
-          <Clock size={16} className="shrink-0" />
+          <Clock size={20} className="shrink-0" />
           {expanded && <span>定时任务</span>}
         </button>
       </div>
