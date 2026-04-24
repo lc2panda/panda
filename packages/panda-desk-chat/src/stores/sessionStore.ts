@@ -1,4 +1,4 @@
-// Input: Session metadata from CLI bridge (list, create, delete events) + IPC bridge sync
+// Input: Session metadata from CLI bridge (list, create, delete events) + IPC bridge sync + disk sessions
 // Output: Session list with metadata for sidebar rendering
 // Pos: State layer — drives sidebar session list, session switching
 
@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { storage } from '../lib/storage';
 import * as bridge from '../ipc/bridge';
 import { t } from '../i18n';
+import type { DiskSessionMeta } from '../ipc/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,6 +21,8 @@ export interface SessionMeta {
   messageCount: number;
   isPinned?: boolean;
   archived?: boolean;
+  /** Indicates session was loaded from .pandacc disk storage (not just localStorage). */
+  isDiskSession?: boolean;
 }
 
 export interface SessionStore {
@@ -50,6 +53,8 @@ export interface SessionStore {
   // Persistence
   loadSessions: () => void;
   saveSessions: () => void;
+  /** Load sessions from .pandacc disk via IPC, merge with localStorage list. */
+  loadSessionsFromDisk: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -210,6 +215,38 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
     const { sessions, activeId } = get();
     storage.set(SESSIONS_KEY, sessions);
     storage.set(ACTIVE_ID_KEY, activeId);
+  },
+
+  loadSessionsFromDisk: async () => {
+    try {
+      const diskSessions: DiskSessionMeta[] = await bridge.listAllSessions();
+      if (!diskSessions.length) return;
+
+      // Convert DiskSessionMeta → SessionMeta
+      const converted: SessionMeta[] = diskSessions.map((ds) => ({
+        id: ds.id,
+        name: ds.title,
+        cwd: ds.workDir ?? ds.projectPath,
+        createdAt: ds.lastModified, // disk doesn't track creation separately
+        lastActive: ds.lastModified,
+        messageCount: ds.messageCount,
+        isDiskSession: true,
+      }));
+
+      const { sessions: existing } = get();
+      // Merge: disk sessions take priority (by id), then append any local-only sessions
+      const diskIds = new Set(converted.map((s) => s.id));
+      const localOnly = existing.filter((s) => !diskIds.has(s.id));
+      const merged = [...converted, ...localOnly].sort(
+        (a, b) => new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime(),
+      );
+
+      set({ sessions: merged });
+      // Persist the merged list to localStorage as well
+      get().saveSessions();
+    } catch (err) {
+      console.error('[sessionStore] Failed to load sessions from disk:', err);
+    }
   },
 }));
 

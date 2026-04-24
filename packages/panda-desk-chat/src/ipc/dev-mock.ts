@@ -361,6 +361,48 @@ export class DevMockRelay {
     }
   }
 
+  // ── Disk-based session access (pd:sessions:*) ────────────────────────
+
+  async listAllSessions(): Promise<import('./types').DiskSessionMeta[]> {
+    return [
+      {
+        id: 'disk-mock-1',
+        title: '示例对话',
+        projectPath: '/Users/panda/project',
+        messageCount: 5,
+        lastModified: new Date().toISOString(),
+      },
+      {
+        id: 'disk-mock-2',
+        title: '代码审查',
+        projectPath: '/Users/panda/project',
+        messageCount: 10,
+        lastModified: new Date(Date.now() - 86400000).toISOString(),
+      },
+      {
+        id: 'disk-mock-3',
+        title: '架构讨论',
+        projectPath: '/Users/panda/other-project',
+        messageCount: 22,
+        lastModified: new Date(Date.now() - 172800000).toISOString(),
+      },
+    ];
+  }
+
+  async getSessionHistory(sessionId: string): Promise<import('./types').SessionDetail | null> {
+    return {
+      id: sessionId,
+      title: sessionId === 'disk-mock-1' ? '示例对话' : sessionId === 'disk-mock-2' ? '代码审查' : '架构讨论',
+      projectPath: '/Users/panda/project',
+      messageCount: 2,
+      lastModified: new Date().toISOString(),
+      messages: [
+        { role: 'user' as const, content: '你好', timestamp: new Date(Date.now() - 60000).toISOString() },
+        { role: 'assistant' as const, content: '你好！有什么可以帮你的吗？', timestamp: new Date().toISOString() },
+      ],
+    };
+  }
+
   // ── Config queries ───────────────────────────────────────────────────
 
   getModels(): typeof MOCK_MODELS {

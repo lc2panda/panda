@@ -585,9 +585,11 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
   const archiveSession = useSessionStore((s) => s.archiveSession);
   const projectFilter = useSessionStore((s) => s.projectFilter);
   const setProjectFilter = useSessionStore((s) => s.setProjectFilter);
+  const loadSessionsFromDisk = useSessionStore((s) => s.loadSessionsFromDisk);
 
   // Chat + Tab stores
   const setChatActiveSession = useChatStore((s) => s.setActiveSession);
+  const loadSessionHistory = useChatStore((s) => s.loadSessionHistory);
   const addTab = useTabStore((s) => s.addTab);
 
   // Collapsed date-group state
@@ -596,13 +598,20 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
+  // Load disk sessions on mount
+  useEffect(() => {
+    loadSessionsFromDisk();
+  }, [loadSessionsFromDisk]);
+
   // ── Handlers ──
   const handleSelectSession = useCallback(
     (sessionId: string) => {
       setActive(sessionId);
       setChatActiveSession(sessionId);
+      // Lazy-load history from disk — does NOT spawn CLI (lazy start on first message)
+      loadSessionHistory(sessionId);
     },
-    [setActive, setChatActiveSession],
+    [setActive, setChatActiveSession, loadSessionHistory],
   );
 
   const handleNewSession = useCallback(async () => {

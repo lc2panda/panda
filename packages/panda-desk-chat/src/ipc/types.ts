@@ -1,5 +1,5 @@
 // Input: Zod schemas from ./schemas.ts
-// Output: TypeScript types inferred from Zod + PandaChatAPI named interface (C-5) + UpdateStatus type
+// Output: TypeScript types inferred from Zod + PandaChatAPI named interface (C-5) + UpdateStatus type + DiskSessionMeta/SessionMessage/SessionDetail (pd:sessions:* IPC)
 // Pos: IPC type layer — consumed by bridge.ts, chat renderer components, and main process handlers
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -88,6 +88,28 @@ export type ModelSetPayload         = z.infer<typeof modelSetSchema>;
 export type PermissionModePayload   = z.infer<typeof permissionModeSetSchema>;
 export type ClipboardPastePayload   = z.infer<typeof clipboardPasteImageSchema>;
 
+// ─── Disk-based session types (pd:sessions:* IPC channels) ────────────────
+
+export interface DiskSessionMeta {
+  id: string;
+  title: string;
+  projectPath: string;
+  messageCount: number;
+  lastModified: string; // ISO date
+  workDir?: string;
+}
+
+export interface SessionMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: string;
+  uuid?: string;
+}
+
+export interface SessionDetail extends DiskSessionMeta {
+  messages: SessionMessage[];
+}
+
 // Connection lifecycle (session ready + history replay)
 export interface SessionReadyPayload {
   sessionId: string;
@@ -146,6 +168,10 @@ export interface PandaChatAPI {
     onUpdated(cb: (payload: SessionUpdatedPayload) => void): Unsubscribe;
     onReady(cb: (payload: SessionReadyPayload) => void): Unsubscribe;
     onMessageHistory(cb: (payload: MessageHistoryPayload) => void): Unsubscribe;
+    /** List all .pandacc sessions from disk (pd:sessions:list-all). */
+    listAllSessions(): Promise<DiskSessionMeta[]>;
+    /** Get session detail with messages (pd:sessions:get-history). */
+    getHistory(sessionId: string): Promise<SessionDetail | null>;
   };
   tool: {
     respondPermission(payload: ToolPermResponsePayload): Promise<void>;

@@ -1,6 +1,6 @@
 // Input: window.pandaAPI injected by preload/chat.ts via contextBridge (named API)
 //        In dev mode: DevMockRelay provides full simulated backend (chat + session + config + fs)
-// Output: Type-safe IPC client for chat renderer components (+ auto-update bridge)
+// Output: Type-safe IPC client for chat renderer components (+ auto-update bridge + disk session access)
 // Pos: IPC bridge layer — sole entry point for renderer → main communication
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -27,6 +27,8 @@ import type {
   SlashCommandsResponse,
   ModelListResponse,
   WindowInitPayload,
+  DiskSessionMeta,
+  SessionDetail,
 } from './types';
 import {
   DevMockRelay,
@@ -250,6 +252,20 @@ export function onMessageHistory(
     return () => relay.off('message:history', wrapped);
   }
   return getPandaAPI().session.onMessageHistory(callback);
+}
+
+// ─── Disk-based session access (pd:sessions:*) ──────────────────────────────
+
+/** List all sessions persisted in .pandacc on disk. */
+export async function listAllSessions(): Promise<DiskSessionMeta[]> {
+  if (IS_DEV) return getDevRelay().listAllSessions?.() ?? [];
+  return getPandaAPI().session.listAllSessions();
+}
+
+/** Get a specific session's detail (metadata + messages) from disk. */
+export async function getSessionHistory(sessionId: string): Promise<SessionDetail | null> {
+  if (IS_DEV) return getDevRelay().getSessionHistory?.(sessionId) ?? null;
+  return getPandaAPI().session.getHistory(sessionId);
 }
 
 // ─── Tool permissions ──────────────────────────────────────────────────────

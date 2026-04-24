@@ -1,4 +1,4 @@
-// Input: Chat events from IPC bridge (streaming deltas, tool calls, permissions)
+// Input: Chat events from IPC bridge (streaming deltas, tool calls, permissions) + disk session history
 // Output: Per-session chat state (messages, streaming buffers, tool status, permissions)
 // Pos: Core state layer — drives message list, composer, permission dialogs, status bar
 
@@ -251,6 +251,9 @@ export interface ChatStore {
   // Interaction enhancements (§11.4.2)
   setFeedback: (sessionId: string, messageId: string, feedback: MessageFeedback) => void;
   retryLastMessage: (sessionId: string) => void;
+
+  /** Load session history from disk via IPC and populate messages. */
+  loadSessionHistory: (sessionId: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatStore>()((set, get) => ({
@@ -298,7 +301,14 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       };
     }),
 
-  setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
+  setActiveSession: (sessionId) => {
+    set({ activeSessionId: sessionId });
+    // Lazy-load history from disk when switching to a session
+    const session = getSession(get().sessions, sessionId);
+    if (!session || session.messages.length === 0) {
+      get().loadSessionHistory(sessionId);
+    }
+  },
 
   // -- Message actions -------------------------------------------------------
 
@@ -718,6 +728,42 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
     // Re-send via the bridge (addUserMessage + bridge call)
     get().sendMessage(sessionId, lastUserContent);
+  },
+
+  loadSessionHistory: async (sessionId) => {
+    try {
+      const detail = await bridge.getSessionHistory(sessionId);
+      if (!detail || !detail.messages.length) return;
+
+      // Convert SessionMessage[] → UIMessage[]
+      const messages: UIMessage[] = detail.messages.map((msg) => ({
+        id: msg.uuid || crypto.randomUUID(),
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        timestamp: msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now(),
+      }));
+
+      set((state) => {
+        const existing = getSession(state.sessions, sessionId);
+        // If session already has live messages, skip disk-based load
+        if (existing && existing.messages.length > 0) return state;
+
+        const session: PerSessionState = existing ?? createEmptySession(sessionId);
+
+        return {
+          sessions: putSession(state.sessions, {
+            ...session,
+            messages,
+            // Don't set 'connected' — CLI hasn't spawned yet (lazy start)
+            connectionState: session.connectionState === 'connected'
+              ? 'connected'
+              : 'disconnected',
+          }),
+        };
+      });
+    } catch (err) {
+      console.error('[chatStore] Failed to load session history:', err);
+    }
   },
 }));
 
