@@ -13,56 +13,48 @@ export interface PdHeroComposerProps {
 
 export function PdHeroComposer(_props: PdHeroComposerProps) {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-6 px-6 select-none">
-      {/* Logomark — 白底浮起方块 + brand 色 P + 装饰点 */}
+    <div className="flex h-full w-full flex-col items-center justify-center gap-5 px-6 select-none">
+      {/* Logomark — pure SVG (no font dependency)，64px app-icon 比例 */}
       <div
-        className="relative grid place-items-center"
+        className="relative"
         style={{
-          width: 88,
-          height: 88,
-          background: 'var(--pd-color-bg-elevated, #FCFCF9)',
-          borderRadius: 20,
-          border: '1px solid rgba(0,0,0,0.04)',
-          boxShadow:
-            '0 10px 32px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)',
+          width: 64,
+          height: 64,
+          filter:
+            'drop-shadow(0 8px 24px rgba(27,28,26,0.06)) drop-shadow(0 2px 6px rgba(27,28,26,0.04))',
         }}
         aria-hidden="true"
       >
-        <span
-          style={{
-            fontFamily: 'var(--pd-font-headline)',
-            fontSize: 52,
-            fontWeight: 800,
-            color: 'var(--pd-color-accent)',
-            lineHeight: 1,
-            letterSpacing: '-0.04em',
-            transform: 'translateY(-1px)',
-          }}
-        >
-          P
-        </span>
-        <span
-          className="absolute"
-          style={{
-            right: 16,
-            bottom: 16,
-            width: 10,
-            height: 10,
-            borderRadius: 999,
-            background: 'var(--pd-color-accent)',
-            boxShadow: '0 2px 6px rgba(193,95,60,0.28)',
-          }}
-        />
+        <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          {/* Rounded-square base */}
+          <rect
+            x="0"
+            y="0"
+            width="64"
+            height="64"
+            rx="14"
+            fill="var(--pd-color-bg-elevated, #FFFFFF)"
+            stroke="rgba(218,193,186,0.5)"
+            strokeWidth="0.8"
+          />
+          {/* Stylized "P" mark — brand terracotta */}
+          <path
+            d="M18 12 H36 Q47 12 47 24 Q47 36 36 36 H26 V50 H18 Z M26 20 V28 H36 Q39 28 39 24 Q39 20 36 20 Z"
+            fill="var(--pd-color-accent, #8F482F)"
+          />
+          {/* Decorative dot (bottom-right) */}
+          <circle cx="46" cy="48" r="3.5" fill="var(--pd-color-accent, #8F482F)" />
+        </svg>
       </div>
 
-      {/* Title — cc-haha headline: Manrope bold 40px */}
+      {/* Title — Manrope bold 36px，tighter letter-spacing */}
       <h1
         style={{
           fontFamily: 'var(--pd-font-headline)',
-          fontSize: 40,
+          fontSize: 36,
           fontWeight: 700,
           letterSpacing: '-0.02em',
-          lineHeight: 1.1,
+          lineHeight: 1.15,
           color: 'var(--pd-color-fg)',
           margin: 0,
         }}
@@ -70,14 +62,15 @@ export function PdHeroComposer(_props: PdHeroComposerProps) {
         {t('composer.hero.title')}
       </h1>
 
-      {/* Subtitle — 16px muted，max-w 460 三行自然换行 */}
+      {/* Subtitle — 15px muted，max-w 440 */}
       <p
         className="text-center"
         style={{
-          fontSize: 16,
-          lineHeight: 1.6,
+          fontFamily: 'var(--pd-font-sans)',
+          fontSize: 15,
+          lineHeight: 1.55,
           color: 'var(--pd-color-fg-muted)',
-          maxWidth: 460,
+          maxWidth: 440,
           margin: 0,
         }}
       >
