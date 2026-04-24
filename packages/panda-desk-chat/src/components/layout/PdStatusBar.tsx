@@ -4,20 +4,11 @@
 
 import { type ComponentType } from 'react';
 import { cn } from '@/lib/cn';
-import { StatusBarChips } from './StatusBarChips';
-import { PdPetMood } from '@/components/special/PdPetMood';
-import { useBuddyStore } from '@/stores/buddyStore';
 import { useI18n } from '@/hooks/useI18n';
-import {
-  BellOff as _BellOff,
-  Bell as _Bell,
-  Circle as _Circle,
-} from 'lucide-react';
+import { Circle as _Circle } from 'lucide-react';
 
 // Re-type lucide icons for React 18 compat (hoisted @types/react@19 conflict)
 type IconFC = ComponentType<{ className?: string; size?: number; fill?: string; stroke?: string }>;
-const BellOff = _BellOff as IconFC;
-const Bell = _Bell as IconFC;
 const Circle = _Circle as IconFC;
 
 // ---------------------------------------------------------------------------
@@ -62,102 +53,35 @@ const connectionI18nKeys: Record<ConnectionState, string> = {
 // Component
 // ---------------------------------------------------------------------------
 export function PdStatusBar({
-  model,
-  tokenCount,
   connectionState = 'connected',
-  permissionMode,
-  dnd = false,
-  onPetClick,
 }: PdStatusBarProps) {
   const { t } = useI18n();
   const connColor = connectionColors[connectionState];
   const connLabel = t(connectionI18nKeys[connectionState] as any);
-  const buddyLevel = useBuddyStore((s) => s.level);
 
+  // cc-haha / Claude.ai 风格：无底部 StatusBar。仅保留一个右下角浮动连接
+  // 指示点（绝对定位，不占 layout）。model/tokens/permission/buddy 各自归位
+  // 到 Composer 或 Sidebar。
   return (
     <div
+      aria-hidden={connectionState === 'connected'}
       className={cn(
-        'flex shrink-0 items-center justify-between px-3',
-        'border-t border-[var(--pd-color-border-subtle)]',
-        'bg-[var(--pd-color-bg-subtle)]',
-        'text-[length:var(--pd-text-xs)] text-[var(--pd-color-fg-muted)]',
+        'pointer-events-none absolute bottom-2 right-3 z-10',
+        'flex items-center gap-1.5',
+        'text-[11px] text-[var(--pd-color-fg-muted)]',
         'select-none',
       )}
-      style={{ height: 'var(--pd-layout-statusbar-height)' }}
+      title={connLabel}
     >
-      {/* -- Left: pet mood + level + chips + model + tokens -- */}
-      <div className="flex items-center gap-3">
-        {/* Pet mood indicator + Level badge */}
-        <button
-          type="button"
-          onClick={onPetClick}
-          disabled={!onPetClick}
-          title={`Buddy Lv.${buddyLevel} — ${onPetClick ? 'Click to inspect' : ''}`}
-          className={cn(
-            'flex items-center gap-1 rounded-[var(--pd-radius-sm)] px-0.5',
-            onPetClick && 'cursor-pointer hover:bg-[var(--pd-color-bg-hover)] transition-colors',
-            !onPetClick && 'cursor-default',
-          )}
-        >
-          <PdPetMood size="xs" />
-          <span
-            className={cn(
-              'rounded-full px-1.5 py-0 text-[10px] font-semibold',
-              'bg-[var(--pd-pet-level-badge)] text-white',
-            )}
-            title={`Buddy Level ${buddyLevel}`}
-          >
-            Lv.{buddyLevel}
-          </span>
-        </button>
-
-        <StatusBarChips />
-
-        {model && (
-          <span
-            className={cn(
-              'rounded-[var(--pd-radius-sm)] px-1.5 py-0.5',
-              'text-[var(--pd-color-fg-muted)]',
-            )}
-          >
-            {model}
-          </span>
+      <Circle
+        size={7}
+        fill={connColor}
+        stroke="none"
+        className={cn(
+          (connectionState === 'connecting' || connectionState === 'error') && 'animate-pulse',
         )}
-
-        {tokenCount && (
-          <span className="tabular-nums">
-            {formatTokens(tokenCount.input)} in / {formatTokens(tokenCount.output)} out
-          </span>
-        )}
-      </div>
-
-      {/* -- Right: connection + DND -- */}
-      <div className="flex items-center gap-3">
-        {/* Connection indicator */}
-        <span className="flex items-center gap-1.5" title={connLabel}>
-          <Circle
-            size={8}
-            fill={connColor}
-            stroke="none"
-            className={cn(
-              (connectionState === 'connecting' || connectionState === 'error') && 'animate-pulse',
-            )}
-          />
-          <span>{connLabel}</span>
-        </span>
-
-        {/* DND toggle */}
-        <button
-          type="button"
-          title={dnd ? `${t('statusbar.dnd')} (on)` : `${t('statusbar.dnd')} (off)`}
-          className={cn(
-            'rounded-[var(--pd-radius-sm)] p-0.5 transition-colors',
-            'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
-          )}
-        >
-          {dnd ? <BellOff size={14} /> : <Bell size={14} />}
-        </button>
-      </div>
+      />
+      {connectionState !== 'connected' && <span>{connLabel}</span>}
     </div>
   );
 }

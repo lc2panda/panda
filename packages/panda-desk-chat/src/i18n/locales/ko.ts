@@ -4,7 +4,7 @@
 
 export default {
   // App
-  'app.name': 'Panda Code',
+  'app.name': 'Panda',
   'app.version': '버전',
 
   // Sidebar
@@ -50,8 +50,8 @@ export default {
   'chat.disconnected': '연결 끊김',
 
   // Composer
-  'composer.hero.title': '무엇을 도와드릴까요?',
-  'composer.hero.subtitle': 'Panda Code, 당신의 AI 코딩 파트너입니다',
+  'composer.hero.title': '새 대화',
+  'composer.hero.subtitle': '새로운 코딩 세션을 시작하세요. Panda가 빌드, 디버그, 설계를 함께합니다.',
   'composer.attachments': '첨부파일',
   'composer.slashCommands': '슬래시 명령',
   'composer.mentions': '멘션',

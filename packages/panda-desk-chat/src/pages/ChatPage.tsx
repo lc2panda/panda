@@ -12,7 +12,6 @@ import { PdSuperAssistBar } from '../components/chat/PdSuperAssistBar';
 import { PdStreamingIndicator } from '../components/chat/PdStreamingIndicator';
 import { PdPermissionDialog } from '../components/chat/PdPermissionDialog';
 import { PdRoutingBanner } from '../components/chat/PdRoutingBanner';
-import { PdPetCameo } from '../components/chat/PdPetCameo';
 import { useI18n } from '../hooks/useI18n';
 import { useChatStore } from '../stores/chatStore';
 import { useSessionStore } from '../stores/sessionStore';
@@ -56,7 +55,11 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
 
   const activeMeta = sessions.find((s: any) => s.id === activeId) ?? null;
   const hasActiveSession = !!activeMeta;
-  const showConversation = hasActiveSession && messages.length > 0;
+  // Show conversation view as soon as a session is active, even before any
+  // messages exist. Gating on messages.length > 0 made clicking historical
+  // sessions feel unresponsive — the hero kept showing until loadSessionHistory
+  // finished, and if the transcript was empty the UI never changed at all.
+  const showConversation = hasActiveSession;
   // Disk-sourced sessions start "disconnected" by design — the CLI is not
   // running yet and is only spawned when the user sends the first message.
   // Suppress the disconnected banner for them so the sidebar entry doesn't
@@ -184,14 +187,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
           />
         </>
       ) : (
-        <>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <PdPetCameo occasion="empty_state" />
-          </div>
-          <PdHeroComposer
-            onSend={activeId ? handleSend : handleNewSession}
-          />
-        </>
+        <PdHeroComposer
+          onSend={activeId ? handleSend : handleNewSession}
+        />
       )}
     </div>
   );

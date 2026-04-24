@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn';
 import { useSessionStore, type SessionMeta } from '@/stores/sessionStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useTabStore } from '@/stores/tabStore';
+import { useUIStore } from '@/stores/uiStore';
 import { openSessionInWindow } from '@/ipc/bridge';
 import { PdNavItem } from './PdNavItem';
 import { SearchPanel } from './sidebar/SearchPanel';
@@ -29,6 +30,16 @@ import {
   ArrowUpRight as _ArrowUpRight,
   ChevronDown as _ChevronDown,
   ChevronRight as _ChevronRight,
+  // @ts-ignore lucide-react bundled .d.ts misses Clock at top-level
+  Clock as _Clock,
+  // @ts-ignore lucide-react bundled .d.ts omissions
+  Folder as _Folder,
+  // @ts-ignore
+  Sparkles as _Sparkles,
+  // @ts-ignore
+  Wand2 as _Wand2,
+  // @ts-ignore
+  Download as _Download,
   // @ts-ignore lucide-react 0.511 ships Pin & FolderKanban at runtime but bundled .d.ts misses top-level named exports
   Pin as _Pin,
   // @ts-ignore same as above
@@ -56,6 +67,11 @@ const ExternalLink = _ArrowUpRight as IconFC;
 const PinIcon = _Pin as IconFC;
 const ChevronDown = _ChevronDown as IconFC;
 const ChevronRight = _ChevronRight as IconFC;
+const Clock = _Clock as IconFC;
+const Folder = _Folder as IconFC;
+const Sparkles = _Sparkles as IconFC;
+const Wand2 = _Wand2 as IconFC;
+const Download = _Download as IconFC;
 const FolderKanban = _FolderKanban as IconFC;
 const CopyIcon = _Copy as IconFC;
 const ArchiveIcon = _Archive as IconFC;
@@ -87,16 +103,10 @@ interface NavEntry {
   shortcut?: string;
 }
 
-const workspaceNav: NavEntry[] = [
-  { icon: <Search size={20} />,     label: '搜索',     shortcut: '⌘K' },
-  { icon: <FolderOpen size={20} />, label: '文件浏览', shortcut: '⌘0' },
-  { icon: <Brain size={20} />,      label: '记忆库' },
-  { icon: <GitBranch size={20} />,  label: '工作流' },
-];
-
+// cc-haha 风格：去掉工作区侧栏导航（搜索/文件/记忆/工作流）— 全部依赖 CommandPalette
+// 和 Inspector tab，不占 sidebar 空间。底部只保留单一 Settings。
 const bottomNav: NavEntry[] = [
   { icon: <Settings size={20} />, label: '设置' },
-  { icon: <User size={20} />,    label: '账户' },
 ];
 
 // Workspace panel mode type (matches workspaceNav order)
@@ -105,9 +115,10 @@ type WorkspaceMode = 'sessions' | 'search' | 'files' | 'memory' | 'workflow';
 const WORKSPACE_NAV_MODES: WorkspaceMode[] = ['search', 'files', 'memory', 'workflow'];
 
 // ---------------------------------------------------------------------------
-// Date grouping logic
+// cc-haha 风格分组：today / yesterday / last7days / last30days / older
+// Panda 保留 pinned/archived 作为特殊优先级前置/后置
 // ---------------------------------------------------------------------------
-type DateGroupKey = 'pinned' | 'today' | 'yesterday' | 'last7days' | 'older' | 'archived';
+type DateGroupKey = 'pinned' | 'today' | 'yesterday' | 'last7days' | 'last30days' | 'older' | 'archived';
 
 interface DateGroup {
   key: DateGroupKey;
@@ -116,55 +127,59 @@ interface DateGroup {
 }
 
 const GROUP_LABELS: Record<DateGroupKey, string> = {
-  pinned: '📌 已固定',
+  pinned: '已固定',
   today: '今天',
   yesterday: '昨天',
   last7days: '近 7 天',
+  last30days: '近 30 天',
   older: '更早',
-  archived: '📦 已归档',
+  archived: '已归档',
 };
 
-const GROUP_ORDER: DateGroupKey[] = ['pinned', 'today', 'yesterday', 'last7days', 'older', 'archived'];
+const GROUP_ORDER: DateGroupKey[] = ['pinned', 'today', 'yesterday', 'last7days', 'last30days', 'older', 'archived'];
 
 function groupSessionsByDate(sessions: SessionMeta[]): DateGroup[] {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const yesterdayStart = todayStart - 86_400_000;
   const last7daysStart = todayStart - 6 * 86_400_000;
+  const last30daysStart = todayStart - 29 * 86_400_000;
 
   const buckets: Record<DateGroupKey, SessionMeta[]> = {
-    pinned: [],
-    today: [],
-    yesterday: [],
-    last7days: [],
-    older: [],
-    archived: [],
+    pinned: [], today: [], yesterday: [], last7days: [], last30days: [], older: [], archived: [],
   };
-
   for (const s of sessions) {
-    if (s.archived) {
-      buckets.archived.push(s);
-      continue;
-    }
-    if (s.isPinned) {
-      buckets.pinned.push(s);
-      continue;
-    }
-    const ts = new Date(s.createdAt).getTime();
-    if (ts >= todayStart) {
-      buckets.today.push(s);
-    } else if (ts >= yesterdayStart) {
-      buckets.yesterday.push(s);
-    } else if (ts >= last7daysStart) {
-      buckets.last7days.push(s);
-    } else {
-      buckets.older.push(s);
-    }
+    if (s.archived) { buckets.archived.push(s); continue; }
+    if (s.isPinned) { buckets.pinned.push(s); continue; }
+    const ts = new Date(s.lastActive || s.createdAt).getTime();
+    if (ts >= todayStart) buckets.today.push(s);
+    else if (ts >= yesterdayStart) buckets.yesterday.push(s);
+    else if (ts >= last7daysStart) buckets.last7days.push(s);
+    else if (ts >= last30daysStart) buckets.last30days.push(s);
+    else buckets.older.push(s);
   }
-
   return GROUP_ORDER
     .filter((key) => buckets[key].length > 0)
     .map((key) => ({ key, label: GROUP_LABELS[key], sessions: buckets[key] }));
+}
+
+// cc-haha formatRelativeTime 等效：Xs ago / Xm ago / Xh ago / Xd ago
+function formatRelativeTime(iso: string | undefined): string {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  const diff = Math.max(0, Date.now() - t);
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}d`;
+  const mon = Math.floor(day / 30);
+  if (mon < 12) return `${mon}mo`;
+  return `${Math.floor(mon / 12)}y`;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,22 +208,22 @@ interface DateGroupHeaderProps {
   onToggle: () => void;
 }
 
-function DateGroupHeader({ label, collapsed, onToggle }: DateGroupHeaderProps) {
+function DateGroupHeader({ label, onToggle }: DateGroupHeaderProps) {
+  // Claude Desktop 风格：仅灰色小字分组头，无箭头，无 hover 态
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onToggle}
+      onKeyDown={(e) => { if (e.key === 'Enter') onToggle(); }}
       className={cn(
-        'flex w-full items-center gap-1.5 px-3 py-1 mt-1',
-        'text-xs text-[var(--pd-color-fg-muted)] uppercase tracking-wider',
-        'hover:text-[var(--pd-color-fg)] transition-colors cursor-pointer select-none',
+        'px-3 pt-5 pb-2',
+        'text-[12px] font-medium text-[var(--pd-color-fg-subtle)]',
+        'select-none',
       )}
     >
-      <span className="shrink-0 w-3.5">
-        {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-      </span>
-      <span>{label}</span>
-    </button>
+      {label}
+    </div>
   );
 }
 
@@ -240,19 +255,18 @@ function ProjectSelector({ projects, selected, onSelect }: ProjectSelectorProps)
   const displayName = selected ? extractProjectName(selected) : '全部项目';
 
   return (
-    <div ref={ref} className="relative shrink-0 px-3 pb-2">
+    <div ref={ref} className="relative shrink-0 px-4 pb-1">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          'flex w-full items-center gap-2 rounded-[var(--pd-radius-md)] px-3',
-          'bg-[var(--pd-color-bg-elevated)] border-b border-[var(--pd-color-border-subtle)]',
-          'text-sm text-[var(--pd-color-fg)] transition-colors cursor-pointer',
+          'flex w-full items-center gap-1.5 rounded-[6px] px-2',
+          'bg-transparent text-[14px] text-[var(--pd-color-fg)]',
+          'transition-colors cursor-pointer',
           'hover:bg-[var(--pd-color-bg-hover)]',
         )}
-        style={{ height: 36 }}
+        style={{ height: 32 }}
       >
-        <FolderKanban size={16} className="shrink-0 text-[var(--pd-color-fg-muted)]" />
         <span className="flex-1 truncate text-left">{displayName}</span>
         <ChevronDown
           size={14}
@@ -330,6 +344,7 @@ interface SessionItemProps {
   messageCount: number;
   isPinned?: boolean;
   archived?: boolean;
+  relativeTime?: string;
   onSelect: () => void;
   onDelete: () => void;
   onRename: (name: string) => void;
@@ -343,9 +358,10 @@ function SessionItem({
   name,
   active,
   expanded,
-  messageCount,
+  messageCount: _messageCount,
   isPinned,
   archived,
+  relativeTime,
   onSelect,
   onDelete,
   onRename,
@@ -393,17 +409,25 @@ function SessionItem({
         if (e.key === 'Enter') onSelect();
       }}
       className={cn(
-        'group flex w-full items-center gap-2 rounded-[var(--pd-radius-md)] px-3 py-1.5',
-        'text-[var(--pd-color-fg-muted)] transition-colors cursor-pointer',
-        'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
-        'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
-        active && 'bg-[var(--pd-color-accent-subtle)] text-[var(--pd-color-fg)]',
+        'group flex w-full items-center gap-2 rounded-[var(--pd-radius-md)]',
+        'py-1.5 pl-4 pr-3 text-left transition-colors duration-200 cursor-pointer',
+        active
+          ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)]'
+          : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)]',
         archived && 'opacity-50',
       )}
     >
-      <span className="shrink-0">
-        <MessageSquare size={16} />
-      </span>
+      {/* cc-haha 风格 1×1px 小圆点 marker */}
+      {expanded && (
+        <span
+          className="h-1 w-1 flex-shrink-0 rounded-full"
+          style={{
+            backgroundColor: active ? 'var(--pd-color-accent)' : 'var(--pd-color-fg-tertiary)',
+            opacity: active ? 1 : 0.5,
+          }}
+          aria-hidden="true"
+        />
+      )}
 
       {expanded && (
         <>
@@ -429,14 +453,15 @@ function SessionItem({
             </div>
           ) : (
             <>
-              <div className="flex flex-1 flex-col truncate">
-                <span className="truncate text-sm">{name}</span>
-                {messageCount > 0 && (
-                  <span className="text-[length:var(--pd-text-xs)] text-[var(--pd-color-fg-subtle)]">
-                    {messageCount} 条消息
-                  </span>
-                )}
+              <div className="flex-1 min-w-0">
+                <span className="block truncate text-sm leading-[1.45]">{name}</span>
               </div>
+              {/* cc-haha 风格：hover 时显示相对时间 */}
+              {relativeTime && (
+                <span className="flex-shrink-0 text-[10px] text-[var(--pd-color-fg-tertiary)] opacity-0 transition-opacity group-hover:opacity-100">
+                  {relativeTime}
+                </span>
+              )}
               {/* Pin — visible on hover or when pinned */}
               <span
                 role="button"
@@ -606,6 +631,7 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
   // ── Handlers ──
   const handleSelectSession = useCallback(
     (sessionId: string) => {
+      useUIStore.getState().setActiveView('chat');
       setActive(sessionId);
       setChatActiveSession(sessionId);
       // Lazy-load history from disk — does NOT spawn CLI (lazy start on first message)
@@ -614,11 +640,19 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
     [setActive, setChatActiveSession, loadSessionHistory],
   );
 
+  const activeView = useUIStore((s) => s.activeView);
+  const setActiveView = useUIStore((s) => s.setActiveView);
+
   const handleNewSession = useCallback(async () => {
+    setActiveView('chat');
     const session = await createSession();
     addTab(session.id, session.name);
     setChatActiveSession(session.id);
-  }, [createSession, addTab, setChatActiveSession]);
+  }, [createSession, addTab, setChatActiveSession, setActiveView]);
+
+  const handleOpenScheduled = useCallback(() => {
+    setActiveView('scheduled');
+  }, [setActiveView]);
 
   const handleDeleteSession = useCallback(
     (sessionId: string) => {
@@ -763,6 +797,7 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
           expanded={expanded}
           messageCount={session.messageCount}
           isPinned={session.isPinned}
+          relativeTime={formatRelativeTime(session.lastActive || session.createdAt)}
           onSelect={() => handleSelectSession(session.id)}
           onDelete={() => handleDeleteSession(session.id)}
           onRename={(name) => handleRenameSession(session.id, name)}
@@ -783,7 +818,7 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
   return (
     <aside
       className={cn(
-        'flex h-full flex-col overflow-hidden border-r border-[var(--pd-color-border)]',
+        'flex h-full flex-col overflow-hidden',
         'bg-[var(--pd-color-bg-subtle)]',
         'transition-[width] duration-[var(--pd-duration-slow)] ease-[var(--pd-ease-spring)]',
       )}
@@ -794,69 +829,133 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         paddingTop: 44, // macOS traffic-light avoidance
       }}
     >
-      {/* ── Toggle button ── */}
-      <div className="flex shrink-0 items-center px-3 py-2">
+      {/* cc-haha 风格 brand row: logomark + 文字 + GitHub + toggle */}
+      <div className={cn(
+        'flex shrink-0 px-3 pb-2',
+        expanded ? 'items-center justify-between gap-3' : 'flex-col items-center gap-2',
+      )}>
+        <div className={cn('flex min-w-0 items-center', expanded ? 'gap-2.5' : 'justify-center')}>
+          {/* Panda logomark（自研，非 app-icon.jpg）*/}
+          <div
+            className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center font-semibold"
+            style={{
+              background: 'var(--pd-color-accent)',
+              color: 'var(--pd-color-fg-on-accent)',
+              fontFamily: 'var(--pd-font-serif, Georgia, serif)',
+              fontSize: 18,
+            }}
+            aria-hidden="true"
+          >
+            P
+          </div>
+          {expanded && (
+            <span
+              className="text-[13px] font-semibold tracking-tight text-[var(--pd-color-fg)]"
+              style={{ fontFamily: 'var(--pd-font-sans)' }}
+            >
+              Panda
+            </span>
+          )}
+        </div>
+        <div className={cn('flex items-center', expanded ? 'gap-1.5' : 'flex-col gap-2')}>
+          {expanded && (
+            <a
+              href="https://github.com/lc2panda/panda"
+              target="_blank"
+              rel="noreferrer"
+              title="GitHub"
+              className={cn(
+                'inline-flex items-center justify-center rounded-md p-1',
+                'text-[var(--pd-color-fg-tertiary)] transition-colors',
+                'hover:text-[var(--pd-color-fg)] hover:bg-[var(--pd-color-bg-hover)]',
+                'no-underline',
+              )}
+              style={{ textDecoration: 'none' }}
+            >
+              <svg width={16} height={16} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38v-1.34c-2.22.48-2.69-1.07-2.69-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.51-1.08-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.21 2.2.82A7.64 7.64 0 0 1 8 3.9c.68 0 1.36.09 2 .27 1.53-1.03 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+              </svg>
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={onToggle}
+            title={expanded ? '折叠侧栏' : '展开侧栏'}
+            className={cn(
+              'flex items-center justify-center rounded-full h-8 w-8',
+              'text-[var(--pd-color-fg-tertiary)] transition-colors',
+              'hover:text-[var(--pd-color-fg)] hover:bg-[var(--pd-color-bg-hover)]',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--pd-color-border-focus)]',
+            )}
+            aria-label={expanded ? '折叠侧栏' : '展开侧栏'}
+          >
+            {expanded ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          </button>
+        </div>
+      </div>
+
+      {/* cc-haha 2 项一级入口：New session + Scheduled */}
+      <div className={cn('shrink-0 px-3 pb-3 flex flex-col', expanded ? 'gap-0.5' : 'items-center gap-2')}>
         <button
           type="button"
-          onClick={onToggle}
-          title={expanded ? '折叠侧栏' : '展开侧栏'}
+          onClick={handleNewSession}
+          title="新建对话"
           className={cn(
-            'flex items-center justify-center rounded-[var(--pd-radius-md)] p-1.5',
-            'text-[var(--pd-color-fg-muted)] transition-colors',
-            'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
+            'flex items-center rounded-[var(--pd-radius-md)] transition-colors',
+            expanded ? 'w-full gap-3 px-3 py-2' : 'h-9 w-9 justify-center',
+            'text-[14px] text-[var(--pd-color-fg)]',
+            'hover:bg-[var(--pd-color-bg-hover)]',
           )}
         >
-          {expanded ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+          <Plus size={16} className="shrink-0" />
+          {expanded && <span>新建对话</span>}
+        </button>
+        <button
+          type="button"
+          onClick={handleOpenScheduled}
+          title="定时任务"
+          aria-current={activeView === 'scheduled' ? 'page' : undefined}
+          className={cn(
+            'flex items-center rounded-[var(--pd-radius-md)] transition-colors',
+            expanded ? 'w-full gap-3 px-3 py-2' : 'h-9 w-9 justify-center',
+            'text-[14px]',
+            activeView === 'scheduled'
+              ? 'bg-[var(--pd-color-bg-elevated)] text-[var(--pd-color-fg)]'
+              : 'text-[var(--pd-color-fg)] hover:bg-[var(--pd-color-bg-hover)]',
+          )}
+        >
+          <Clock size={16} className="shrink-0" />
+          {expanded && <span>定时任务</span>}
         </button>
       </div>
 
-      {/* ── Project selector + New Chat + Search (expanded only) ── */}
+      {/* 项目筛选 + 搜索（仅展开时）— 对标 cc-haha */}
       {expanded && (
-        <div className="shrink-0 space-y-2">
-          {/* Project selector */}
-          {uniqueProjects.length > 1 && (
+        <>
+          <div className="shrink-0 px-3 pb-1 flex items-center justify-between">
             <ProjectSelector
               projects={uniqueProjects}
               selected={projectFilter}
               onSelect={setProjectFilter}
             />
-          )}
-
-          <div className="px-3 pb-2">
-            <button
-              type="button"
-              onClick={handleNewSession}
-              className={cn(
-                'flex w-full items-center gap-2 rounded-[var(--pd-radius-md)] px-3 py-2 mb-2',
-                'bg-[var(--pd-color-accent)] text-[var(--pd-color-fg-on-accent)]',
-                'text-sm font-medium transition-colors',
-                'hover:opacity-90',
-              )}
-            >
-              <Plus size={16} />
-              <span>新建会话</span>
-            </button>
-
-            <div className="relative">
-              <Search
-                size={14}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--pd-color-fg-subtle)]"
-              />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索会话..."
-                className={cn(
-                  'w-full rounded-[var(--pd-radius-md)] border border-[var(--pd-color-border)]',
-                  'bg-[var(--pd-color-bg)] py-1.5 pl-8 pr-3 text-sm',
-                  'text-[var(--pd-color-fg)] placeholder:text-[var(--pd-color-fg-subtle)]',
-                  'outline-none focus:border-[var(--pd-color-accent)]',
-                )}
-              />
-            </div>
           </div>
-        </div>
+          <div className="shrink-0 px-3 pb-2">
+            <input
+              id="sidebar-search"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜索会话..."
+              className={cn(
+                'w-full h-8 px-2.5 text-xs rounded-[var(--pd-radius-md)]',
+                'border border-[var(--pd-color-border)] bg-[var(--pd-color-bg)]',
+                'text-[var(--pd-color-fg)] placeholder:text-[var(--pd-color-fg-subtle)]',
+                'outline-none transition-colors',
+                'focus:border-[var(--pd-color-border-focus)]',
+              )}
+            />
+          </div>
+        </>
       )}
 
       {/* ── Session list (date-grouped) / Workspace panels + workspace nav ── */}
@@ -965,31 +1064,26 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
           </button>
         )}
 
-        <SidebarDivider />
-
-        {workspaceNav.map((item, idx) => (
-          <PdNavItem
-            key={item.label}
-            icon={item.icon}
-            label={item.label}
-            shortcut={item.shortcut}
-            collapsed={!expanded}
-            active={workspaceMode === WORKSPACE_NAV_MODES[idx]}
-            onClick={() => toggleWorkspaceMode(WORKSPACE_NAV_MODES[idx])}
-          />
-        ))}
       </div>
 
-      {/* ── Bottom (settings + account) ── */}
-      <div className="shrink-0 border-t border-[var(--pd-color-border-subtle)] px-2 py-2">
-        {bottomNav.map((item) => (
-          <PdNavItem
-            key={item.label}
-            icon={item.icon}
-            label={item.label}
-            collapsed={!expanded}
-          />
-        ))}
+      {/* cc-haha 风格底部：仅一个 Settings，border-top */}
+      <div className={cn(
+        'shrink-0 border-t border-[var(--pd-color-border)] p-3',
+        expanded ? '' : 'flex justify-center',
+      )}>
+        <button
+          type="button"
+          title="设置"
+          className={cn(
+            'flex items-center rounded-[var(--pd-radius-md)] transition-colors',
+            expanded ? 'w-full gap-3 px-3 py-2' : 'h-9 w-9 justify-center',
+            'text-[14px] text-[var(--pd-color-fg-muted)]',
+            'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
+          )}
+        >
+          <Settings size={18} className="shrink-0" />
+          {expanded && <span>设置</span>}
+        </button>
       </div>
 
       {/* ── PetStrip — reserved for panda-on-desk integration ── */}

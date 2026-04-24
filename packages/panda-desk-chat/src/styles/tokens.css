@@ -13,10 +13,17 @@
    ========================================================================== */
 
 :root {
-  /* ── Font Family ─────────────────────────────────────────────────────── */
-  --pd-font-sans: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
-  --pd-font-serif: 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
-  --pd-font-mono: 'JetBrains Mono', 'Sarasa Mono SC', 'Menlo', monospace;
+  /* ── Font Family ─────────────────────────────────────────────────────────
+   * Stack mirrors claude.ai production CSS (measured 2026-04-24 from
+   * https://claude.ai/new → --font-anthropic-sans / -serif / -mono). When the
+   * user's system has the proprietary Anthropic typeface installed (e.g. via
+   * the Claude desktop app) it's used directly; otherwise falls back through
+   * open-source equivalents and CJK.
+   * See monitor/20260424-anthropic-design-system-evidence.md
+   */
+  --pd-font-sans: 'Anthropic Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Noto Sans SC', system-ui, sans-serif;
+  --pd-font-serif: 'Anthropic Serif', 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
+  --pd-font-mono: 'Anthropic Mono', ui-monospace, 'JetBrains Mono', 'Sarasa Mono SC', 'Menlo', monospace;
 
   /* ── Font Size Scale (12-step, base 14px) ────────────────────────────── */
   --pd-text-2xs: 0.625rem;   /* 10px */
@@ -88,7 +95,7 @@
   --pd-z-max: 9999;
 
   /* ── Layout Dimensions ───────────────────────────────────────────────── */
-  --pd-layout-sidebar-width: 280px;
+  --pd-layout-sidebar-width: 300px;
   --pd-layout-sidebar-rail: 72px;
   --pd-layout-tabbar-height: 40px;
   --pd-layout-statusbar-height: 32px;
@@ -169,42 +176,47 @@
   --pd-palette-ruby-200: #F0CCCC;
   --pd-palette-ruby-500: #BA3D3D;
 
-  /* ── Semantic: Surface ───────────────────────────────────────────────── */
-  --pd-color-bg: var(--pd-palette-cream-100);               /* #FAF9F5 main bg */
-  --pd-color-bg-elevated: var(--pd-palette-cream-50);
-  --pd-color-bg-subtle: var(--pd-palette-cream-200);         /* #F4F4F0 */
-  --pd-color-bg-hover: var(--pd-palette-cream-350);          /* #E9E8E4 */
-  --pd-color-bg-selected: var(--pd-palette-cream-300);       /* #EFEEEA */
-  --pd-color-bg-disabled: var(--pd-palette-cream-200);
+  /* ── Semantic: Surface ─────────────────────────────────────────────────
+   * Values align with claude.ai production `_gray-*` CSS variables measured
+   * 2026-04-24 (see monitor/20260424-anthropic-design-system-evidence.md):
+   *   gray-0  #FFFFFF  |  gray-20 #F8F8F6 body bg  |  gray-30 #F4F4ED panel
+   *   gray-40 #F1F0E9 hover  |  gray-50 #EDEBE0 selected
+   */
+  --pd-color-bg: #F8F8F6;                                   /* claude.ai body bg (gray-20) */
+  --pd-color-bg-elevated: #FCFCF9;                          /* gray-10 */
+  --pd-color-bg-subtle: #F4F4ED;                            /* gray-30 sidebar panel */
+  --pd-color-bg-hover: #F1F0E9;                             /* gray-40 */
+  --pd-color-bg-selected: #EDEBE0;                          /* gray-50 */
+  --pd-color-bg-disabled: #F4F4ED;
   --pd-color-surface-container: var(--pd-palette-cream-300); /* #EFEEEA card/sidebar */
   --pd-color-surface-container-low: var(--pd-palette-cream-200); /* #F4F4F0 */
   --pd-color-surface-container-high: var(--pd-palette-cream-350); /* #E9E8E4 */
   --pd-color-user-message-bg: var(--pd-palette-cream-300);   /* #EFEEEA user bubble */
 
-  /* ── Semantic: Foreground ────────────────────────────────────────────── */
-  --pd-color-fg: var(--pd-palette-ink-900);                  /* #1B1C1A */
-  --pd-color-fg-muted: var(--pd-palette-warm-brown-700);     /* #54433E warm brown secondary */
-  --pd-color-fg-tertiary: var(--pd-palette-warm-brown-500);  /* #87736D warm brown tertiary */
-  --pd-color-fg-subtle: var(--pd-palette-stone-500);
+  /* ── Semantic: Foreground (aligned to anthropic/skills brand + claude.ai) ── */
+  --pd-color-fg: #141413;                                   /* Anthropic brand Dark */
+  --pd-color-fg-muted: #5E5E5B;                             /* gray-550 */
+  --pd-color-fg-tertiary: #7A7771;                          /* gray-450 */
+  --pd-color-fg-subtle: #A8A49D;                            /* gray-300 */
   --pd-color-fg-on-accent: #FFFFFF;
   --pd-color-fg-inverse: var(--pd-palette-cream-100);
   --pd-color-fg-disabled: var(--pd-palette-cream-400);
 
-  /* ── Semantic: Border ────────────────────────────────────────────────── */
-  --pd-color-border: var(--pd-palette-warm-brown-300, #DAC1BA); /* cc-haha 暖棕边框 */
-  --pd-color-border-strong: var(--pd-palette-warm-brown-400, #C4A99F); /* cc-haha 暖棕强边框 */
-  --pd-color-border-focus: var(--pd-palette-terra-500);       /* #B85A38 */
-  --pd-color-border-subtle: var(--pd-palette-cream-300);      /* #EFEEEA */
-  --pd-color-border-variant: var(--pd-palette-warm-brown-300); /* #DAC1BA */
+  /* ── Semantic: Border (extremely subtle, claude.ai style) ─────────────── */
+  --pd-color-border: rgba(0, 0, 0, 0.08);                    /* near-invisible */
+  --pd-color-border-strong: rgba(0, 0, 0, 0.15);
+  --pd-color-border-focus: #D97757;                          /* brand accent */
+  --pd-color-border-subtle: rgba(0, 0, 0, 0.05);
+  --pd-color-border-variant: rgba(0, 0, 0, 0.08);
 
-  /* ── Semantic: Accent ────────────────────────────────────────────────── */
-  --pd-color-accent: #C15F3C;                              /* Claude terracotta, WCAG AA 4.5:1 */
-  --pd-color-accent-hover: #D4714F;                        /* hover 提亮 (Claude 风格) */
-  --pd-color-accent-active: var(--pd-palette-terra-600);   /* #8F482F */
-  --pd-color-accent-subtle: rgba(184, 90, 56, 0.1);
-  --pd-color-accent-fg: var(--pd-palette-terra-500);       /* #B85A38 */
-  --pd-color-accent-container: var(--pd-palette-terra-300); /* #FFDBD0 */
-  --pd-color-link: var(--pd-palette-terra-500);
+  /* ── Semantic: Accent (claude.ai --_brand-clay) ───────────────────────── */
+  --pd-color-accent: #D97757;                                /* brand-clay, Anthropic Orange */
+  --pd-color-accent-hover: #C1653A;                          /* brand-clay-emphasized */
+  --pd-color-accent-active: #A55130;                         /* darker pressed */
+  --pd-color-accent-subtle: rgba(217, 119, 87, 0.12);
+  --pd-color-accent-fg: #C1653A;
+  --pd-color-accent-container: #F3DACC;
+  --pd-color-link: #C1653A;                                  /* WCAG 4.5:1 vs #F8F8F6 */
 
   /* ── Semantic: Status ────────────────────────────────────────────────── */
   --pd-color-success: #4F6237;

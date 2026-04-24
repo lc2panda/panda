@@ -4,7 +4,7 @@
 
 export default {
   // App
-  'app.name': 'Panda Code',
+  'app.name': 'Panda',
   'app.version': 'Version',
 
   // Sidebar
@@ -50,8 +50,8 @@ export default {
   'chat.disconnected': 'Disconnected',
 
   // Composer
-  'composer.hero.title': 'How can I help you?',
-  'composer.hero.subtitle': "I'm Panda Code, your AI coding companion",
+  'composer.hero.title': 'New chat',
+  'composer.hero.subtitle': 'Start a fresh coding session. Panda is ready to help you build, debug, and architect your project.',
   'composer.attachments': 'Attachments',
   'composer.slashCommands': 'Slash Commands',
   'composer.mentions': 'Mentions',

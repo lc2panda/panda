@@ -258,15 +258,35 @@ export function extractTitle(entries: RawEntry[]): string | undefined {
       if (textBlock?.text) text = textBlock.text;
     }
     if (text) {
-      const trimmed = text.trim();
-      if (!trimmed) continue;
-      return trimmed.length > TITLE_MAX_LENGTH
-        ? trimmed.slice(0, TITLE_MAX_LENGTH) + '...'
-        : trimmed;
+      const cleaned = sanitizeTitleText(text);
+      if (!cleaned) continue;
+      return cleaned.length > TITLE_MAX_LENGTH
+        ? cleaned.slice(0, TITLE_MAX_LENGTH) + '...'
+        : cleaned;
     }
   }
 
   return undefined;
+}
+
+/**
+ * Strip out CLI command wrappers and notification payloads that are not
+ * user-meaningful as session titles. Panda user messages frequently contain
+ * XML-like envelopes like `<command-name>/plu...</command-name>` or
+ * `<task-notification>…</task-notification>` as transport metadata; showing
+ * those in the sidebar makes every entry look identical and broken.
+ */
+function sanitizeTitleText(raw: string): string {
+  let text = raw;
+  // Drop any <tag>...</tag> blocks whose tag name looks like a CLI envelope.
+  text = text.replace(
+    /<(command-[a-z-]+|task-notification|local-command-[a-z-]+|system-reminder)[^>]*>[\s\S]*?<\/\1>/gi,
+    ' ',
+  );
+  // Drop orphan opening/closing tags if the paired tag got truncated.
+  text = text.replace(/<\/?(command-[a-z-]+|task-notification|local-command-[a-z-]+|system-reminder)[^>]*>/gi, ' ');
+  // Collapse whitespace and trim.
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 /**

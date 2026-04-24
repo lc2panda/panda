@@ -51,10 +51,13 @@ export interface SettingsStore extends PersistedSettings {
 // ---------------------------------------------------------------------------
 
 const defaults: PersistedSettings = {
-  theme: 'system',
+  // Default to light theme to match Claude's desktop aesthetic (cream bg + warm
+  // brown text). system-dark defaults produced a nearly-black UI that reads as
+  // broken; users can still opt into dark via /settings.
+  theme: 'light',
   locale: 'zh',
   permissionMode: 'default',
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-opus-4-7',
   fontSize: 14,
   sidebarExpanded: true,
   inspectorVisible: false,
@@ -134,7 +137,21 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 
   loadSettings: () => {
     const saved = storage.get<Partial<PersistedSettings>>(STORAGE_KEY, {});
-    set({ ...defaults, ...saved });
+    // One-shot migration: users who accepted the old 'system' default saw a
+    // near-black UI on macOS dark mode. Force them onto 'light' once so the
+    // Claude-style cream theme is the first impression. User-selected
+    // 'dark'/'light' are preserved.
+    const migratedTheme: Theme | undefined =
+      saved.theme === 'system' ? 'light' : saved.theme;
+    const merged: PersistedSettings = {
+      ...defaults,
+      ...saved,
+      ...(migratedTheme ? { theme: migratedTheme } : {}),
+    };
+    set(merged);
+    if (saved.theme === 'system') {
+      storage.set(STORAGE_KEY, pickPersisted(merged));
+    }
   },
 
   saveSettings: () => {

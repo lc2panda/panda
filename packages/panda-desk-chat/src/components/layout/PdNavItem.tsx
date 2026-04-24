@@ -26,12 +26,10 @@ export const PdNavItem = forwardRef<HTMLButtonElement, PdNavItemProps>(
       aria-label={label}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'group flex w-full items-center rounded-[var(--pd-radius-md)]',
+        'group flex w-full items-center rounded-[8px]',
         'transition-colors',
         'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
-        // Collapsed: center icon; Expanded: left-aligned with gap
-        collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2',
-        // Active: accent background highlight
+        collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-[10px]',
         active
           ? 'bg-[var(--pd-color-accent-subtle)] text-[var(--pd-color-fg)]'
           : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
@@ -46,7 +44,7 @@ export const PdNavItem = forwardRef<HTMLButtonElement, PdNavItemProps>(
       {/* Label + badge + shortcut (only when expanded) */}
       {!collapsed && (
         <>
-          <span className="truncate text-[length:var(--pd-text-sm)] text-left" style={{ flex: 1 }}>
+          <span className="truncate text-[14px] text-left" style={{ flex: 1 }}>
             {label}
           </span>
 

@@ -731,11 +731,26 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   },
 
   loadSessionHistory: async (sessionId) => {
+    // Always seed an empty session immediately so the conversation view has
+    // something to render while the IPC round-trip resolves.
+    set((state) => {
+      if (getSession(state.sessions, sessionId)) return state;
+      return {
+        sessions: putSession(state.sessions, createEmptySession(sessionId)),
+      };
+    });
+
     try {
       const detail = await bridge.getSessionHistory(sessionId);
-      if (!detail || !detail.messages.length) return;
+      if (!detail) {
+        console.warn('[chatStore] No session detail for', sessionId);
+        return;
+      }
+      if (!detail.messages.length) {
+        console.info('[chatStore] Session has no messages yet:', sessionId);
+        return;
+      }
 
-      // Convert SessionMessage[] → UIMessage[]
       const messages: UIMessage[] = detail.messages.map((msg) => ({
         id: msg.uuid || crypto.randomUUID(),
         role: msg.role as 'user' | 'assistant',
@@ -745,16 +760,13 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
       set((state) => {
         const existing = getSession(state.sessions, sessionId);
-        // If session already has live messages, skip disk-based load
         if (existing && existing.messages.length > 0) return state;
 
         const session: PerSessionState = existing ?? createEmptySession(sessionId);
-
         return {
           sessions: putSession(state.sessions, {
             ...session,
             messages,
-            // Don't set 'connected' — CLI hasn't spawned yet (lazy start)
             connectionState: session.connectionState === 'connected'
               ? 'connected'
               : 'disconnected',
