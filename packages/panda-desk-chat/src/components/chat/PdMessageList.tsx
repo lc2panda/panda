@@ -185,13 +185,33 @@ export const PdMessageList: React.FC<PdMessageListProps> = ({
         <div style={{ height: totalHeight, position: 'relative' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
             <div style={{ height: paddingTop }} />
-            {renderedItems.map((vi) => renderTimelineItem(vi.item))}
+            {renderedItems.map((vi) => {
+              const item = vi.item;
+              const k =
+                item.kind === 'buddy'
+                  ? `buddy-${item.event.id}`
+                  : `msg-${item.msg.id}`;
+              return (
+                <React.Fragment key={k}>
+                  {renderTimelineItem(item)}
+                </React.Fragment>
+              );
+            })}
             <div style={{ height: paddingBottom }} />
           </div>
         </div>
       ) : (
         /* Non-virtualized: render all items directly */
-        renderedItems.map((vi) => renderTimelineItem(vi.item))
+        renderedItems.map((vi) => {
+          const item = vi.item;
+          const k =
+            item.kind === 'buddy'
+              ? `buddy-${item.event.id}`
+              : `msg-${item.msg.id}`;
+          return (
+            <React.Fragment key={k}>{renderTimelineItem(item)}</React.Fragment>
+          );
+        })
       )}
 
       {/* Streaming placeholder when no assistant message exists yet */}

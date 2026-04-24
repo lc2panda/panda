@@ -140,7 +140,7 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
       for (const msg of msgs) {
         if (!msg.toolCalls) continue;
         for (const tc of msg.toolCalls) {
-          const inp = tc.input as Record<string, unknown>;
+          const inp = (tc.input ?? {}) as Record<string, unknown>;
           // Extract from common tool input fields
           const candidates = [inp.file_path, inp.path, inp.filePath];
           for (const v of candidates) {

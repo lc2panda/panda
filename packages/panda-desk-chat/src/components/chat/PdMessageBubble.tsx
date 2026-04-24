@@ -248,9 +248,9 @@ export const PdMessageBubble: React.FC<PdMessageBubbleProps> = React.memo(({
             </div>
           ) : (
             /* Normal / Verbose mode — individual chips */
-            toolCalls.map((tc) => (
+            toolCalls.map((tc, i) => (
               <div
-                key={tc.id}
+                key={tc.id ?? `tc-${i}`}
                 className={cn(
                   "inline-flex items-center gap-1.5",
                   "bg-[var(--pd-tool-use-bg)]",
