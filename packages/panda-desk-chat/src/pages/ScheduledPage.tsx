@@ -114,7 +114,7 @@ export const ScheduledPage: React.FC<ScheduledPageProps> = ({ className, tasks =
           </span>
         </div>
 
-        {/* Stats row */}
+        {/* Stats row — cc-haha StatCard spec: grid-3 gap-4, card px-4 py-3 rounded-lg bg surface-info, num text-2xl, label text-xs */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           {[
             { label: 'Total Tasks', value: total },
@@ -123,12 +123,13 @@ export const ScheduledPage: React.FC<ScheduledPageProps> = ({ className, tasks =
           ].map((card) => (
             <div
               key={card.label}
-              className="rounded-[12px] border border-[var(--pd-color-border)] bg-[var(--pd-color-bg-elevated)] p-4"
+              className="rounded-[12px] px-4 py-3"
+              style={{ background: 'var(--pd-color-bg-subtle, #F4F4F0)' }}
             >
-              <div className="text-[28px] font-[var(--pd-font-semibold)] text-[var(--pd-color-fg)] leading-tight">
+              <div className="text-[24px] font-[var(--pd-font-bold)] text-[var(--pd-color-fg)] leading-tight">
                 {card.value}
               </div>
-              <div className="text-[13px] text-[var(--pd-color-fg-muted)] mt-1">
+              <div className="text-[12px] text-[var(--pd-color-fg-muted)] mt-1">
                 {card.label}
               </div>
             </div>

@@ -58,14 +58,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ className, onClose }
         type="button"
         onClick={() => setActiveTab(tab.id)}
         className={cn(
-          'h-9 px-3 rounded-[8px] flex items-center gap-2.5 text-left w-full',
+          'w-full px-4 py-2.5 flex items-center gap-2.5 text-left rounded-[8px]',
           'text-[14px] transition-colors duration-150',
           isActive
-            ? 'bg-[var(--pd-color-bg-elevated)] text-[var(--pd-color-fg)] font-[var(--pd-font-medium)]'
+            ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)] font-[var(--pd-font-medium)]'
             : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
         )}
       >
-        <Icon size={16} />
+        <Icon size={18} />
         <span className="truncate">{tab.label}</span>
       </button>
     );
@@ -76,10 +76,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ className, onClose }
       className={cn('flex h-full', className)}
       style={{ background: 'var(--pd-color-bg)', color: 'var(--pd-color-fg)' }}
     >
-      {/* Left nav — Reference: cc-haha settings two-column layout */}
+      {/* Left nav — 180px bg surface border-right (cc-haha 规格) */}
       <aside
         className="flex shrink-0 flex-col border-r border-[var(--pd-color-border)]"
-        style={{ width: 220, background: 'var(--pd-color-bg-subtle)' }}
+        style={{ width: 180, background: 'var(--pd-color-bg)' }}
       >
         <div className="flex items-center justify-between px-3 py-3 border-b border-[var(--pd-color-border)]">
           <h2 className="text-[14px] font-[var(--pd-font-semibold)] text-[var(--pd-color-fg)]">
