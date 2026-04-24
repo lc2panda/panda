@@ -547,14 +547,13 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
         {/* -- Bottom bar — Reference: cc-haha ChatInput footer (design spec only, not source) --- */}
         {/*    Order: [+] · [Bypass ∨] · spacer · [✨ Model ∨] · [→ Run] */}
         <div className="relative flex items-center gap-[var(--pd-space-1\.5)] px-2 pb-2 pt-0">
-          {/* 1. Attach button — rounded-full bg-subtle */}
+          {/* 1. Attach button — p-1.5 icon 18px rounded-md (cc-haha plus) */}
           <button
             type="button"
             aria-label="Attach file"
             className={cn(
-              "shrink-0 w-7 h-7 flex items-center justify-center",
-              "rounded-full",
-              "bg-[var(--pd-color-bg-subtle)]",
+              "shrink-0 flex items-center justify-center",
+              "p-1.5 rounded-[8px]",
               "text-[var(--pd-color-fg-muted)]",
               "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
               "transition-colors duration-[var(--pd-duration-fast)]",
@@ -681,13 +680,18 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
               aria-label="Stop generation"
               onClick={onStop}
               className={cn(
-                "shrink-0 h-7 px-3 flex items-center justify-center gap-1.5",
-                "rounded-[var(--pd-radius-md)]",
-                "bg-[var(--pd-color-error)] text-white",
+                "shrink-0 flex items-center justify-center gap-1",
+                "rounded-[8px]",
                 "transition-colors duration-[var(--pd-duration-quick)]",
                 "hover:opacity-90 active:opacity-80",
-                "text-[var(--pd-text-xs)] font-[var(--pd-font-medium)]",
+                "text-[var(--pd-text-xs)] font-[var(--pd-font-semibold)]",
               )}
+              style={{
+                width: 112,
+                padding: '6px 12px',
+                background: 'var(--pd-color-error-container, #FFDAD6)',
+                color: 'var(--pd-color-on-error-container, #410002)',
+              }}
             >
               <StopIcon />
               <span>Stop</span>
@@ -699,34 +703,39 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
               onClick={send}
               disabled={!canSend}
               className={cn(
-                "shrink-0 h-7 px-3 flex items-center justify-center gap-1.5",
-                "rounded-[var(--pd-radius-md)]",
-                "transition-colors duration-[var(--pd-duration-quick)]",
-                "text-[var(--pd-text-xs)] font-[var(--pd-font-medium)]",
-                canSend
-                  ? "bg-[var(--pd-color-accent)] text-[var(--pd-color-fg-on-accent)] shadow-[var(--pd-shadow-button-primary)] hover:bg-[var(--pd-color-accent-hover)] active:bg-[var(--pd-color-accent-active)]"
-                  : "bg-[rgba(217,119,87,0.28)] text-[rgba(255,255,255,0.85)] cursor-not-allowed",
+                "shrink-0 flex items-center justify-center gap-1",
+                "rounded-[8px]",
+                "transition-all duration-[var(--pd-duration-quick)]",
+                "text-[var(--pd-text-xs)] font-[var(--pd-font-semibold)]",
+                canSend && "hover:brightness-110",
+                !canSend && "cursor-not-allowed opacity-60",
               )}
+              style={{
+                width: 112,
+                padding: '6px 12px',
+                background: 'var(--pd-gradient-btn-primary)',
+                color: 'var(--pd-color-fg-on-accent)',
+                boxShadow: canSend ? 'var(--pd-shadow-button-terra)' : 'none',
+              }}
             >
               <ArrowRightIcon />
               <span>Run</span>
             </button>
           )}
 
-          {/* -- Slash menu (absolute positioned above) -------------------- */}
+          {/* -- Slash menu (cc-haha spec: rounded-16 border shadow-dropdown, item px-4 py-2.5) - */}
           {slashOpen && filteredSlash.length > 0 && (
             <div
               className={cn(
-                "absolute bottom-full left-0 mb-[var(--pd-space-1)]",
-                "w-[240px]",
-                "rounded-[var(--pd-radius-md)]",
+                "absolute bottom-full left-0 right-0 mb-2",
+                "rounded-[16px]",
                 "border border-[var(--pd-color-border)]",
                 "bg-[var(--pd-color-bg-elevated)]",
-                "shadow-[var(--pd-shadow-lg)]",
-                "py-[var(--pd-space-1)]",
+                "py-1",
                 "z-[var(--pd-z-dropdown)]",
                 "overflow-hidden",
               )}
+              style={{ boxShadow: 'var(--pd-shadow-dropdown)' }}
             >
               {filteredSlash.map((item) => (
                 <button
@@ -734,8 +743,8 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
                   key={item.command}
                   onClick={() => handleSlashSelect(item.command)}
                   className={cn(
-                    "w-full flex items-center gap-[var(--pd-space-3)]",
-                    "px-[var(--pd-space-3)] py-[var(--pd-space-1\\.5)]",
+                    "w-full flex items-center gap-3",
+                    "px-4 py-2.5",
                     "text-[var(--pd-text-sm)] text-left",
                     "text-[var(--pd-color-fg)]",
                     "hover:bg-[var(--pd-color-bg-hover)]",
@@ -743,10 +752,10 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
                     "cursor-pointer",
                   )}
                 >
-                  <span className="font-[var(--pd-font-medium)] font-[family-name:var(--pd-font-mono)]">
+                  <span className="font-[var(--pd-font-semibold)]">
                     {item.command}
                   </span>
-                  <span className="text-[var(--pd-color-fg-muted)] truncate">
+                  <span className="text-[length:var(--pd-text-xs)] text-[var(--pd-color-fg-tertiary)] truncate">
                     {item.description}
                   </span>
                 </button>
@@ -839,7 +848,7 @@ function SendIcon() {
 
 function AttachIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 5v14" />
       <path d="M5 12h14" />
     </svg>

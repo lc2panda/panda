@@ -171,9 +171,9 @@ export function PdTabBar({
       className={cn(
         'relative flex shrink-0 items-stretch',
         'border-b border-[var(--pd-color-border)]',
-        'bg-[var(--pd-color-bg-subtle)]',
+        'bg-[var(--pd-color-surface-container)]',
       )}
-      style={{ height: 'var(--pd-layout-tabbar-height)' }}
+      style={{ minHeight: 37 }}
     >
       {/* ── Scroll-left arrow ── */}
       {canScrollLeft && (
@@ -250,17 +250,18 @@ export function PdTabBar({
               }}
               onDragEnd={() => onDragEnd?.()}
               className={cn(
-                'group relative flex shrink-0 items-center gap-2 px-3',
-                'min-w-[120px] max-w-[240px]',
+                'group relative flex shrink-0 items-center gap-1.5 px-3',
                 'transition-[colors,transform,opacity]',
                 'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
                 tab.isActive
-                  ? 'bg-[var(--pd-color-bg)] text-[var(--pd-color-fg)]'
+                  ? 'bg-[var(--pd-color-bg)] text-[var(--pd-color-fg)] font-[var(--pd-font-semibold)]'
                   : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)]',
               )}
               style={{
-                height: '36px',
-                fontSize: 'var(--pd-text-sm)',
+                width: 180,
+                maxWidth: 180,
+                height: 37,
+                fontSize: 12,
                 opacity: dragFromIndex === index ? 0.5 : 1,
                 transition: 'transform 0.2s ease, opacity 0.15s ease, background-color 0.15s ease',
               }}
