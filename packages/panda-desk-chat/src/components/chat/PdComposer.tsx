@@ -546,7 +546,7 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
 
         {/* -- Bottom bar — Reference: cc-haha ChatInput footer (design spec only, not source) --- */}
         {/*    Order: [+] · [Bypass ∨] · spacer · [✨ Model ∨] · [→ Run] */}
-        <div className="relative flex items-center gap-[var(--pd-space-1\.5)] px-2 pb-2 pt-0">
+        <div className="relative flex items-center gap-2 px-3 pb-3 pt-2 border-t border-[var(--pd-color-border-subtle)]">
           {/* 1. Attach button — p-1.5 icon 18px rounded-md (cc-haha plus) */}
           <button
             type="button"

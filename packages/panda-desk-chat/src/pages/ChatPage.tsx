@@ -55,11 +55,12 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
 
   const activeMeta = sessions.find((s: any) => s.id === activeId) ?? null;
   const hasActiveSession = !!activeMeta;
-  // Show conversation view as soon as a session is active, even before any
-  // messages exist. Gating on messages.length > 0 made clicking historical
-  // sessions feel unresponsive — the hero kept showing until loadSessionHistory
-  // finished, and if the transcript was empty the UI never changed at all.
-  const showConversation = hasActiveSession;
+  // Show Hero when session has no messages (prevents empty conversation-mode
+  // where only a thin bottom Composer shows on a mostly-blank area). Historical
+  // sessions with 0 messages show Hero too — that's a cleaner empty state than
+  // an empty message list.
+  const hasMessages = (activeSession?.messages?.length ?? 0) > 0;
+  const showConversation = hasActiveSession && (hasMessages || isStreaming);
   // Disk-sourced sessions start "disconnected" by design — the CLI is not
   // running yet and is only spawned when the user sends the first message.
   // Suppress the disconnected banner for them so the sidebar entry doesn't
@@ -188,18 +189,20 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
         </>
       ) : (
         <>
-          <div className="flex-1 flex items-center justify-center min-h-0">
+          <div className="flex-1 flex items-center justify-center min-h-0 px-6">
             <PdHeroComposer />
           </div>
-          <PdComposer
-            ref={composerRef}
-            sessionId={activeId ?? ''}
-            onSend={activeId ? handleSend : handleNewSession}
-            onStop={() => { /* no streaming in empty state */ }}
-            isStreaming={false}
-            placeholder={t('chat.placeholder')}
-          />
-          <ProjectPill cwd={(activeMeta as { cwd?: string } | null)?.cwd} />
+          <div className="shrink-0 w-full px-6 pb-4">
+            <PdComposer
+              ref={composerRef}
+              sessionId={activeId ?? ''}
+              onSend={activeId ? handleSend : handleNewSession}
+              onStop={() => { /* no streaming in empty state */ }}
+              isStreaming={false}
+              placeholder={t('chat.placeholder')}
+            />
+            <ProjectPill cwd={(activeMeta as { cwd?: string } | null)?.cwd} />
+          </div>
         </>
       )}
     </div>

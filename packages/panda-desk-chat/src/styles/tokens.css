@@ -336,11 +336,12 @@
   --pd-pet-species-border: var(--pd-palette-cream-400);
   --pd-pet-mood-glow: rgba(184, 90, 56, 0.3);
 
-  /* ── Glass Panel — cc-haha 实测数值（事实性 CSS 规格） ──────────────────── */
-  --pd-glass-bg: rgba(255, 255, 255, 0.84);
-  --pd-glass-border: rgba(218, 193, 186, 0.56);           /* 暖橙色边框（比 cc-haha 0.22 提高可见度）*/
-  --pd-glass-blur: 20px;
-  --pd-glass-shadow: 0 4px 20px rgba(27, 28, 26, 0.04), 0 12px 40px rgba(27, 28, 26, 0.08);
+  /* ── Glass Panel ─────────────────────────────────────────────────────── */
+  --pd-glass-bg: #FFFFFF;
+  --pd-glass-border: #DAC1BA;
+  --pd-glass-blur: 0px;
+  /* 深度分层阴影：保证 card 在 cream bg 上明显浮起 */
+  --pd-glass-shadow: 0 2px 4px rgba(27,28,26,0.06), 0 12px 28px rgba(27,28,26,0.10), 0 32px 64px rgba(27,28,26,0.10);
   --pd-glass-focus-ring: 0 0 0 1px rgba(143, 72, 47, 0.16);
 }
 
