@@ -35,10 +35,10 @@ export const PdUserBubble: React.FC<PdUserBubbleProps> = React.memo(({
       <div
         className={cn("relative group")}
         style={{
-          background: 'var(--pd-color-bg-subtle)',
-          borderRadius: '16px',
+          background: 'var(--pd-color-user-message-bg, var(--pd-color-surface-container, #EFEEEA))',
+          borderRadius: '18px 4px 18px 18px',
           padding: '12px 16px',
-          maxWidth: '70%',
+          maxWidth: '82%',
           color: 'var(--pd-color-fg)',
         }}
         onMouseEnter={() => setHovered(true)}

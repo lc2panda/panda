@@ -163,15 +163,18 @@ export const PdMessageBubble: React.FC<PdMessageBubbleProps> = React.memo(({
     <div
       className={cn(
         "relative group",
-        "mb-[var(--pd-space-4)]",
+        "mb-5",
         shouldAnimate && "pd-bubble-enter",
       )}
       style={{
         marginLeft: 40,
-        padding: '4px 16px 4px 0',
-        fontFamily: 'var(--pd-font-serif, Georgia, serif)',
-        fontSize: '15px',
-        lineHeight: 1.7,
+        padding: '12px 16px',
+        borderRadius: '20px 20px 20px 8px',
+        background: 'var(--pd-color-bg)',
+        border: '1px solid color-mix(in srgb, var(--pd-color-border) 60%, transparent)',
+        fontFamily: 'var(--pd-font-body, var(--pd-font-sans))',
+        fontSize: '14px',
+        lineHeight: 1.65,
         color: 'var(--pd-color-fg)',
       }}
       onMouseEnter={() => setHovered(true)}
