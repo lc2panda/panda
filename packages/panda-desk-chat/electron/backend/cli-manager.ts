@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { findSessionFile } from './disk-session-scanner';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -134,14 +135,47 @@ export class CLISession extends EventEmitter {
     this.state = 'starting';
     const cliPath = this.resolveCLIPath();
 
+    // Disk probe: does this sessionId already exist on disk?  If yes, use
+    // --resume so the CLI picks up the prior transcript (and enable
+    // --replay-user-messages so the renderer can rebuild its message list
+    // from the CLI's replay events).  Otherwise start a fresh session
+    // with --session-id.  findSessionFile is async; use void + a spawn
+    // deferred to the next microtask so start() stays sync-compatible with
+    // the existing call-sites (ensureSession, respawn).
+    void this.spawnWithDiskProbe(cliPath, options);
+  }
+
+  private async spawnWithDiskProbe(
+    cliPath: string,
+    options?: { model?: string; permissionMode?: string },
+  ): Promise<void> {
+    let isResume = false;
+    try {
+      const found = await findSessionFile(this.id);
+      isResume = !!found;
+    } catch (err) {
+      console.warn(`[CLISession:${this.id}] disk probe failed, treating as new:`, err);
+    }
+
+    // Bail if the session was stopped between start() and this microtask.
+    if (this.intentionalStop || this.state !== 'starting') {
+      return;
+    }
+
     const args = [
       cliPath,
       '--print',
       '--output-format', 'stream-json',
       '--input-format', 'stream-json',
+      '--include-partial-messages',
       '--verbose',
-      '--session-id', this.id,
     ];
+
+    if (isResume) {
+      args.push('--resume', this.id, '--replay-user-messages');
+    } else {
+      args.push('--session-id', this.id);
+    }
 
     if (options?.model) {
       args.push('--model', options.model);
@@ -150,7 +184,7 @@ export class CLISession extends EventEmitter {
       args.push('--permission-mode', options.permissionMode);
     }
 
-    console.log(`[CLISession:${this.id}] Spawning: bun ${args.join(' ')}`);
+    console.log(`[CLISession:${this.id}] Spawning${isResume ? ' (resume)' : ''}: bun ${args.join(' ')}`);
 
     this.process = spawn('bun', args, {
       cwd: this.cwd,

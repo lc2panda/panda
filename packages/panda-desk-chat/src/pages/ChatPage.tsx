@@ -54,8 +54,14 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
   const connectionState = activeSession?.connectionState ?? 'disconnected';
   const routingInfo = activeSession?.routingInfo ?? null;
 
-  const hasActiveSession = !!sessions.find((s: any) => s.id === activeId);
+  const activeMeta = sessions.find((s: any) => s.id === activeId) ?? null;
+  const hasActiveSession = !!activeMeta;
   const showConversation = hasActiveSession && messages.length > 0;
+  // Disk-sourced sessions start "disconnected" by design — the CLI is not
+  // running yet and is only spawned when the user sends the first message.
+  // Suppress the disconnected banner for them so the sidebar entry doesn't
+  // look broken; a genuine "connected then lost" still surfaces via 'error'.
+  const isDiskSession = Boolean((activeMeta as any)?.isDiskSession);
 
   const handleSend = useCallback(
     (content: string) => {
@@ -117,10 +123,16 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
               <span>{t('chat.connectionError') || 'Connection lost. Retrying...'}</span>
             </div>
           )}
-          {connectionState === 'disconnected' && showConversation && (
+          {connectionState === 'disconnected' && showConversation && !isDiskSession && (
             <div className="flex items-center gap-2 px-4 py-2 bg-[var(--pd-color-warning-subtle)] border-b border-[var(--pd-color-warning)] text-[var(--pd-text-sm)] text-[var(--pd-color-fg-muted)]">
               <span>🔌</span>
               <span>{t('statusbar.connection.disconnected' as any) || 'Disconnected'}</span>
+            </div>
+          )}
+          {connectionState === 'disconnected' && showConversation && isDiskSession && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-[var(--pd-color-info-subtle,rgba(180,150,110,0.12))] border-b border-[var(--pd-color-border)] text-[var(--pd-text-sm)] text-[var(--pd-color-fg-muted)]">
+              <span>📜</span>
+              <span>{t('chat.historicalSession' as any) || '历史会话 · 发送消息以激活'}</span>
             </div>
           )}
           {routingInfo && activeId && (

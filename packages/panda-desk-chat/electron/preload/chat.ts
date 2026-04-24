@@ -25,6 +25,8 @@ const CH = {
   SESSION_DELETE:      'panda:session:delete',
   SESSION_FOCUS:       'panda:session:focus',
   SESSION_UPDATED:     'panda:session:updated',
+  SESSION_LIST_ALL:    'panda:session:list-all',
+  SESSION_GET_HISTORY: 'panda:session:get-history',
   // Tool permissions
   TOOL_USE_START:      'panda:tool:use:start',
   TOOL_USE_END:        'panda:tool:use:end',
@@ -104,6 +106,8 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     onUpdated: createSubscription(CH.SESSION_UPDATED),
     onReady: createSubscription(CH.SESSION_READY),
     onMessageHistory: createSubscription(CH.MESSAGE_HISTORY),
+    listAllSessions: () => ipcRenderer.invoke(CH.SESSION_LIST_ALL),
+    getHistory: (sessionId: string) => ipcRenderer.invoke(CH.SESSION_GET_HISTORY, { sessionId }),
   },
   tool: {
     respondPermission: (payload: unknown) => ipcRenderer.invoke(CH.TOOL_PERM_RESPONSE, payload),

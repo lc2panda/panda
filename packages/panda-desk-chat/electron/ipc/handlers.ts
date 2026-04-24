@@ -8,6 +8,10 @@ import { ipcMain, BrowserWindow, clipboard, nativeImage, nativeTheme } from 'ele
 import { readdir, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { cliManager } from '../backend/cli-manager';
+import {
+  listAllSessions as diskListAllSessions,
+  getSessionDetail as diskGetSessionDetail,
+} from '../backend/disk-session-scanner';
 import { notificationManager } from '../notification';
 import { appUpdater } from '../updater';
 import { windowManager } from '../window-manager';
@@ -25,6 +29,8 @@ const CH = {
   SESSION_RENAME:      'panda:session:rename',
   SESSION_DELETE:       'panda:session:delete',
   SESSION_FOCUS:       'panda:session:focus',
+  SESSION_LIST_ALL:    'panda:session:list-all',
+  SESSION_GET_HISTORY: 'panda:session:get-history',
   TOOL_PERM_RESPONSE:  'panda:tool:permission:response',
   FS_SEARCH:           'panda:chat:fs:search',
   FS_LIST:             'panda:chat:fs:list',
@@ -128,6 +134,32 @@ export function registerIpcHandlers(): void {
     } catch (err) {
       console.error('[IPC] SESSION_FOCUS failed:', err);
       throw err;
+    }
+  });
+
+  // ── Disk-based session discovery (read ~/.pandacc/projects/**/*.jsonl) ──
+  // These handlers serve the "history" sidebar: the on-disk transcripts
+  // produced by past CLI sessions, independent of any running CLI process.
+  // Reference: monitor/tmp/cc-haha-0.1.5/src/server/services/sessionService.ts
+
+  ipcMain.handle(CH.SESSION_LIST_ALL, async () => {
+    try {
+      return await diskListAllSessions();
+    } catch (err) {
+      console.error('[IPC] SESSION_LIST_ALL failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(CH.SESSION_GET_HISTORY, async (_event, payload: { sessionId: string }) => {
+    try {
+      if (!payload?.sessionId || typeof payload.sessionId !== 'string') {
+        return null;
+      }
+      return await diskGetSessionDetail(payload.sessionId);
+    } catch (err) {
+      console.error('[IPC] SESSION_GET_HISTORY failed:', err);
+      return null;
     }
   });
 
