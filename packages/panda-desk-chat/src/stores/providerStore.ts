@@ -3,6 +3,7 @@
 // Pos: State layer — consumed by model selector dropdown, provider settings panel
 
 import { create } from 'zustand';
+import { storage } from '../lib/storage';
 import * as bridge from '../ipc/bridge';
 
 // ---------------------------------------------------------------------------
@@ -25,7 +26,17 @@ export interface Provider {
   type: 'anthropic' | 'openai' | 'bedrock' | 'vertex' | 'azure' | 'openrouter';
   isActive: boolean;
   models: ModelInfo[];
+  apiKey?: string;
+  baseUrl?: string;
+  endpoint?: string;
 }
+
+const PROVIDERS_STORAGE_KEY = 'providers';
+
+type PersistedProviderState = {
+  providers: Provider[];
+  activeProviderId: string | null;
+};
 
 export interface ProviderStore {
   providers: Provider[];
@@ -34,8 +45,13 @@ export interface ProviderStore {
   // Actions
   setProviders: (providers: Provider[]) => void;
   setActiveProvider: (providerId: string) => void;
+  updateProvider: (providerId: string, patch: Partial<Provider>) => void;
+  addProvider: (provider: Provider) => void;
+  removeProvider: (providerId: string) => void;
   getActiveProvider: () => Provider | null;
   getAvailableModels: () => ModelInfo[];
+  loadProviders: () => void;
+  saveProviders: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,9 +104,37 @@ export const useProviderStore = create<ProviderStore>()((set, get) => ({
   providers: [defaultProvider],
   activeProviderId: 'anthropic',
 
-  setProviders: (providers) => set({ providers }),
+  setProviders: (providers) => {
+    set({ providers });
+    get().saveProviders();
+  },
 
-  setActiveProvider: (providerId) => set({ activeProviderId: providerId }),
+  setActiveProvider: (providerId) => {
+    set({ activeProviderId: providerId });
+    get().saveProviders();
+  },
+
+  updateProvider: (providerId, patch) => {
+    set((state) => ({
+      providers: state.providers.map((p) => (p.id === providerId ? { ...p, ...patch } : p)),
+    }));
+    get().saveProviders();
+  },
+
+  addProvider: (provider) => {
+    set((state) => ({ providers: [...state.providers, provider] }));
+    get().saveProviders();
+  },
+
+  removeProvider: (providerId) => {
+    set((state) => {
+      const providers = state.providers.filter((p) => p.id !== providerId);
+      const activeProviderId =
+        state.activeProviderId === providerId ? providers[0]?.id ?? null : state.activeProviderId;
+      return { providers, activeProviderId };
+    });
+    get().saveProviders();
+  },
 
   getActiveProvider: () => {
     const { providers, activeProviderId } = get();
@@ -104,7 +148,24 @@ export const useProviderStore = create<ProviderStore>()((set, get) => ({
       .filter((p) => p.isActive)
       .flatMap((p) => p.models);
   },
+
+  loadProviders: () => {
+    const saved = storage.get<Partial<PersistedProviderState>>(PROVIDERS_STORAGE_KEY, {});
+    if (saved.providers && saved.providers.length > 0) {
+      set({
+        providers: saved.providers,
+        activeProviderId: saved.activeProviderId ?? saved.providers[0]?.id ?? null,
+      });
+    }
+  },
+
+  saveProviders: () => {
+    const { providers, activeProviderId } = get();
+    storage.set(PROVIDERS_STORAGE_KEY, { providers, activeProviderId });
+  },
 }));
+
+useProviderStore.getState().loadProviders();
 
 // ---------------------------------------------------------------------------
 // Bridge event wiring — loads models from backend at startup

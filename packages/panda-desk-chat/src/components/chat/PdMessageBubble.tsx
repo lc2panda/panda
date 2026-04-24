@@ -168,6 +168,8 @@ export const PdMessageBubble: React.FC<PdMessageBubbleProps> = React.memo(({
       )}
       style={{
         marginLeft: 40,
+        marginRight: 24,
+        maxWidth: 820,
         padding: '12px 16px',
         borderRadius: '20px 20px 20px 8px',
         background: 'var(--pd-color-bg)',

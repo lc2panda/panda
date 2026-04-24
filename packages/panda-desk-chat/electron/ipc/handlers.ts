@@ -1,6 +1,6 @@
-// Input: ipcMain handle registrations + CLI backend manager (W7-2), WindowManager, notificationManager, appUpdater
-// Output: IPC request handlers for all 24 channels — connected to CLIManager + WindowManager + nativeTheme + notifications + updater
-// Pos: Main process IPC layer — routes renderer requests to CLI backend
+// Input: ipcMain handle registrations + CLI backend manager (W7-2), WindowManager, notificationManager, appUpdater, cronScheduler
+// Output: IPC request handlers (CLI backend + window manager + scheduled tasks) — connected to CLIManager + WindowManager + nativeTheme + notifications + updater + CronScheduler
+// Pos: Main process IPC layer — routes renderer requests to backend services
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
@@ -12,6 +12,7 @@ import {
   listAllSessions as diskListAllSessions,
   getSessionDetail as diskGetSessionDetail,
 } from '../backend/disk-session-scanner';
+import { cronScheduler, type CreateTaskInput, type ScheduledTask } from '../backend/cron-scheduler';
 import { notificationManager } from '../notification';
 import { appUpdater } from '../updater';
 import { windowManager } from '../window-manager';
@@ -52,6 +53,15 @@ const CH = {
   WINDOW_NEW:           'panda:window:new',
   WINDOW_OPEN_SESSION:  'panda:window:open-session',
   WINDOW_GET_ID:        'panda:window:get-id',
+  // Scheduled tasks
+  SCHEDULE_LIST:        'panda:schedule:list',
+  SCHEDULE_CREATE:      'panda:schedule:create',
+  SCHEDULE_UPDATE:      'panda:schedule:update',
+  SCHEDULE_DELETE:      'panda:schedule:delete',
+  SCHEDULE_RUN_NOW:     'panda:schedule:run-now',
+  SCHEDULE_TOGGLE:      'panda:schedule:toggle',
+  SCHEDULE_VALIDATE:    'panda:schedule:validate-cron',
+  SCHEDULE_UPDATED:     'panda:schedule:update', // M→R push on tasks change
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -312,7 +322,101 @@ export function registerIpcHandlers(): void {
     return win?.id ?? -1;
   });
 
-  console.log('[IPC] Registered 24 invoke handlers (CLI backend + window manager connected)');
+  // ── Scheduled tasks ────────────────────────────────────────────────
+  registerScheduleHandlers();
+
+  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule connected)');
+}
+
+// ---------------------------------------------------------------------------
+// Schedule-specific handlers + scheduler bootstrap
+// ---------------------------------------------------------------------------
+
+let scheduleInitialized = false;
+
+function registerScheduleHandlers(): void {
+  if (scheduleInitialized) return;
+  scheduleInitialized = true;
+
+  // Wire scheduler events → broadcast to all renderers
+  cronScheduler.on('tasks:updated', (tasks: ScheduledTask[]) => {
+    windowManager.broadcast(CH.SCHEDULE_UPDATED, { tasks });
+  });
+
+  // Register the executor: a fired task creates (or reuses) a session and
+  // injects the prompt as a user message.  Failures bubble up as log errors.
+  cronScheduler.setExecutor(async (task) => {
+    try {
+      const sessionInfo = await cliManager.createSession(
+        task.cwd || process.cwd(),
+        `[schedule] ${task.name}`,
+      );
+      await cliManager.sendMessage(sessionInfo.id, task.prompt);
+      return { ok: true };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[schedule] Task "${task.name}" failed:`, msg);
+      return { ok: false, error: msg };
+    }
+  });
+
+  // Initialize from disk (~/.pandacc/scheduled_tasks.json)
+  void cronScheduler.init().catch((err) => {
+    console.error('[schedule] init failed:', err);
+  });
+
+  ipcMain.handle(CH.SCHEDULE_LIST, async () => {
+    return cronScheduler.list();
+  });
+
+  ipcMain.handle(
+    CH.SCHEDULE_CREATE,
+    async (_event, payload: CreateTaskInput) => {
+      if (!payload || typeof payload.name !== 'string' || typeof payload.cron !== 'string' || typeof payload.prompt !== 'string') {
+        throw new Error('schedule:create requires { name, cron, prompt }');
+      }
+      return cronScheduler.create(payload);
+    },
+  );
+
+  ipcMain.handle(
+    CH.SCHEDULE_UPDATE,
+    async (
+      _event,
+      payload: { id: string; updates: Partial<Pick<ScheduledTask, 'name' | 'description' | 'cron' | 'prompt' | 'cwd' | 'status'>> },
+    ) => {
+      if (!payload?.id || !payload.updates) {
+        throw new Error('schedule:update requires { id, updates }');
+      }
+      return cronScheduler.update(payload.id, payload.updates);
+    },
+  );
+
+  ipcMain.handle(CH.SCHEDULE_DELETE, async (_event, payload: { id: string }) => {
+    if (!payload?.id) throw new Error('schedule:delete requires { id }');
+    return cronScheduler.remove(payload.id);
+  });
+
+  ipcMain.handle(CH.SCHEDULE_RUN_NOW, async (_event, payload: { id: string }) => {
+    if (!payload?.id) throw new Error('schedule:run-now requires { id }');
+    return cronScheduler.runNow(payload.id);
+  });
+
+  ipcMain.handle(CH.SCHEDULE_TOGGLE, async (_event, payload: { id: string }) => {
+    if (!payload?.id) throw new Error('schedule:toggle requires { id }');
+    return cronScheduler.toggle(payload.id);
+  });
+
+  ipcMain.handle(CH.SCHEDULE_VALIDATE, async (_event, payload: { cron: string }) => {
+    if (!payload?.cron || typeof payload.cron !== 'string') return { valid: false };
+    const { isValidCron, nextCronRunMs } = await import('../backend/cron-scheduler');
+    const valid = isValidCron(payload.cron);
+    const nextMs = valid ? nextCronRunMs(payload.cron, Date.now()) : null;
+    return {
+      valid,
+      nextRunAt: nextMs ? new Date(nextMs).toISOString() : null,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

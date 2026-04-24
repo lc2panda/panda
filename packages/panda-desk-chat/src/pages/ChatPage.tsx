@@ -9,6 +9,7 @@ import { PdComposer } from '../components/chat/PdComposer';
 import type { PdComposerHandle } from '../components/chat/PdComposer';
 import { PdHeroComposer } from '../components/chat/PdHeroComposer';
 import { PdSuperAssistBar } from '../components/chat/PdSuperAssistBar';
+import { PdPetCameo } from '../components/chat/PdPetCameo';
 import { PdStreamingIndicator } from '../components/chat/PdStreamingIndicator';
 import { PdPermissionDialog } from '../components/chat/PdPermissionDialog';
 import { PdRoutingBanner } from '../components/chat/PdRoutingBanner';
@@ -171,36 +172,55 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
               }
             />
           )}
-          <PdSuperAssistBar
-            onSendCommand={handleAssistCommand}
-            onToggleThinking={handleToggleThinking}
-            onOpenSlashMenu={handleOpenSlashMenu}
-            onOpenBuddyLog={handleOpenBuddyLog}
-          />
-          <PdComposer
-            ref={composerRef}
-            sessionId={activeId!}
-            onSend={handleSend}
-            onStop={() => activeId && cancelStream(activeId)}
-            isStreaming={isStreaming}
-            placeholder={t('chat.placeholder')}
-            disabled={isStreaming}
-          />
+          <div
+            className="shrink-0 w-full flex flex-col items-center"
+            style={{ padding: '0 24px 24px' }}
+          >
+            <div style={{ width: '100%', maxWidth: 860 }}>
+              <PdSuperAssistBar
+                onSendCommand={handleAssistCommand}
+                onToggleThinking={handleToggleThinking}
+                onOpenSlashMenu={handleOpenSlashMenu}
+                onOpenBuddyLog={handleOpenBuddyLog}
+              />
+              <PdComposer
+                ref={composerRef}
+                sessionId={activeId!}
+                onSend={handleSend}
+                onStop={() => activeId && cancelStream(activeId)}
+                isStreaming={isStreaming}
+                placeholder={t('chat.placeholder')}
+                disabled={isStreaming}
+              />
+            </div>
+          </div>
         </>
       ) : (
         <>
-          <div className="flex-1 flex items-center justify-center min-h-0 px-6">
+          <div className="flex-1 flex flex-col items-center justify-center min-h-0 px-6 gap-4">
+            <PdPetCameo occasion="empty_state" />
             <PdHeroComposer />
           </div>
-          <div className="shrink-0 w-full px-6 pb-4">
-            <PdComposer
-              ref={composerRef}
-              sessionId={activeId ?? ''}
-              onSend={activeId ? handleSend : handleNewSession}
-              onStop={() => { /* no streaming in empty state */ }}
-              isStreaming={false}
-              placeholder={t('chat.placeholder')}
-            />
+          <div
+            className="shrink-0 w-full flex flex-col items-center"
+            style={{ padding: '0 24px 24px' }}
+          >
+            <div style={{ width: '100%', maxWidth: 860 }}>
+              <PdSuperAssistBar
+                onSendCommand={handleAssistCommand}
+                onToggleThinking={handleToggleThinking}
+                onOpenSlashMenu={handleOpenSlashMenu}
+                onOpenBuddyLog={handleOpenBuddyLog}
+              />
+              <PdComposer
+                ref={composerRef}
+                sessionId={activeId ?? ''}
+                onSend={activeId ? handleSend : handleNewSession}
+                onStop={() => { /* no streaming in empty state */ }}
+                isStreaming={false}
+                placeholder={t('chat.placeholder')}
+              />
+            </div>
             <ProjectPill cwd={(activeMeta as { cwd?: string } | null)?.cwd} />
           </div>
         </>

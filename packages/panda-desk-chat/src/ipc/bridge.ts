@@ -29,6 +29,12 @@ import type {
   WindowInitPayload,
   DiskSessionMeta,
   SessionDetail,
+  ScheduledTask,
+  ScheduledTaskRunLog,
+  CreateScheduledTaskInput,
+  UpdateScheduledTaskInput,
+  ValidateCronResult,
+  ScheduledTasksUpdatedPayload,
 } from './types';
 import {
   DevMockRelay,
@@ -451,4 +457,56 @@ export async function getWindowId(): Promise<number> {
 export function onWindowInit(callback: (payload: WindowInitPayload) => void): Unsubscribe {
   if (IS_DEV) return () => {};
   return getPandaAPI().window.onWindowInit(callback);
+}
+
+// ─── Scheduled tasks (panda:schedule:*) ────────────────────────────────────
+
+/** List all scheduled tasks persisted to ~/.pandacc/scheduled_tasks.json. */
+export async function listScheduledTasks(): Promise<ScheduledTask[]> {
+  if (IS_DEV) return [];
+  return getPandaAPI().schedule.list();
+}
+
+/** Create a scheduled task. Validates cron expression server-side. */
+export async function createScheduledTask(input: CreateScheduledTaskInput): Promise<ScheduledTask | null> {
+  if (IS_DEV) return null;
+  return getPandaAPI().schedule.create(input);
+}
+
+/** Update an existing task (partial). Returns the updated task or null if not found. */
+export async function updateScheduledTask(input: UpdateScheduledTaskInput): Promise<ScheduledTask | null> {
+  if (IS_DEV) return null;
+  return getPandaAPI().schedule.update(input);
+}
+
+/** Delete a task by id. Returns true if a task was removed. */
+export async function deleteScheduledTask(id: string): Promise<boolean> {
+  if (IS_DEV) return false;
+  return getPandaAPI().schedule.delete({ id });
+}
+
+/** Fire the task immediately and record the run log. */
+export async function runScheduledTaskNow(id: string): Promise<ScheduledTaskRunLog | null> {
+  if (IS_DEV) return null;
+  return getPandaAPI().schedule.runNow({ id });
+}
+
+/** Flip between active and disabled state. */
+export async function toggleScheduledTask(id: string): Promise<ScheduledTask | null> {
+  if (IS_DEV) return null;
+  return getPandaAPI().schedule.toggle({ id });
+}
+
+/** Validate a cron string and return the next run timestamp. */
+export async function validateCron(cron: string): Promise<ValidateCronResult> {
+  if (IS_DEV) return { valid: false };
+  return getPandaAPI().schedule.validateCron({ cron });
+}
+
+/** Subscribe to scheduled-tasks updates pushed from main. */
+export function onScheduledTasksUpdated(
+  callback: (payload: ScheduledTasksUpdatedPayload) => void,
+): Unsubscribe {
+  if (IS_DEV) return () => {};
+  return getPandaAPI().schedule.onUpdated(callback);
 }

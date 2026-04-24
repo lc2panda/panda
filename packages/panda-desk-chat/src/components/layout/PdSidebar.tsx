@@ -409,11 +409,12 @@ function SessionItem({
         if (e.key === 'Enter') onSelect();
       }}
       className={cn(
-        'group flex w-full items-center gap-2.5 rounded-[8px]',
-        'py-1.5 pl-4 pr-3 text-left transition-colors duration-200 cursor-pointer',
+        'group flex w-full items-center gap-2 rounded-[6px]',
+        'h-8 py-1.5 pl-3 pr-2 text-left transition-colors duration-[35ms] ease-[cubic-bezier(0.4,0,0.2,1)] cursor-pointer',
+        'text-[12px] leading-[16px]',
         active
           ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)]'
-          : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)]',
+          : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
         archived && 'opacity-50',
       )}
     >
@@ -654,6 +655,10 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
     setActiveView('scheduled');
   }, [setActiveView]);
 
+  const handleOpenSettings = useCallback(() => {
+    setActiveView('settings');
+  }, [setActiveView]);
+
   const handleDeleteSession = useCallback(
     (sessionId: string) => {
       deleteSession(sessionId);
@@ -846,8 +851,8 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
           >
             <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
               <rect x="0" y="0" width="32" height="32" rx="7" fill="var(--pd-color-bg-elevated, #FFFFFF)" stroke="rgba(218,193,186,0.5)" strokeWidth="0.5" />
-              <path d="M9 7 H18 Q23.5 7 23.5 13 Q23.5 19 18 19 H13 V25 H9 Z M13 11 V15 H18 Q19.5 15 19.5 13 Q19.5 11 18 11 Z" fill="var(--pd-color-accent, #8F482F)" />
-              <circle cx="23" cy="24" r="1.9" fill="var(--pd-color-accent, #8F482F)" />
+              <path d="M9 7 H18 Q23.5 7 23.5 13 Q23.5 19 18 19 H13 V25 H9 Z M13 11 V15 H18 Q19.5 15 19.5 13 Q19.5 11 18 11 Z" fill="var(--pd-color-accent, #D97757)" />
+              <circle cx="23" cy="24" r="1.9" fill="var(--pd-color-accent, #D97757)" />
             </svg>
           </div>
           {expanded && (
@@ -1075,12 +1080,16 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
       )}>
         <button
           type="button"
+          onClick={handleOpenSettings}
           title="设置"
+          aria-current={activeView === 'settings' ? 'page' : undefined}
           className={cn(
-            'flex items-center rounded-[var(--pd-radius-md)] transition-colors',
+            'flex items-center rounded-[var(--pd-radius-md)] transition-colors cursor-pointer',
             expanded ? 'w-full gap-3 px-3 py-2' : 'h-9 w-9 justify-center',
-            'text-[14px] text-[var(--pd-color-fg-muted)]',
-            'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
+            'text-[14px]',
+            activeView === 'settings'
+              ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)] font-medium'
+              : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
           )}
         >
           <Settings size={18} className="shrink-0" />

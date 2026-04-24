@@ -40,10 +40,10 @@ export function PdHeroComposer(_props: PdHeroComposerProps) {
           {/* Stylized "P" mark — brand terracotta */}
           <path
             d="M18 12 H36 Q47 12 47 24 Q47 36 36 36 H26 V50 H18 Z M26 20 V28 H36 Q39 28 39 24 Q39 20 36 20 Z"
-            fill="var(--pd-color-accent, #8F482F)"
+            fill="var(--pd-color-accent, #D97757)"
           />
           {/* Decorative dot (bottom-right) */}
-          <circle cx="46" cy="48" r="3.5" fill="var(--pd-color-accent, #8F482F)" />
+          <circle cx="46" cy="48" r="3.5" fill="var(--pd-color-accent, #D97757)" />
         </svg>
       </div>
 

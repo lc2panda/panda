@@ -20,6 +20,7 @@ import { useToastStore } from './stores/toastStore';
 import { useUIStore } from './stores/uiStore';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useThemeEffect } from './hooks/useThemeEffect';
+import { useFontSizeEffect } from './hooks/useFontSizeEffect';
 import { openNewWindow, getWindowId, onWindowInit } from './ipc/bridge';
 
 // --- Part C: Lazy-load non-first-screen components for faster cold start ---
@@ -28,10 +29,7 @@ const ScheduledPage = lazy(() => import('./pages/ScheduledPage'));
 const PdCommandPalette = lazy(() => import('./components/special/PdCommandPalette').then(m => ({ default: m.PdCommandPalette })));
 const PdSessionSwitcher = lazy(() => import('./components/special/PdSessionSwitcher').then(m => ({ default: m.PdSessionSwitcher })));
 
-type Page = 'chat' | 'settings';
-
 export function App() {
-  const [page, setPage] = useState<Page>('chat');
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [inspectorTab, setInspectorTab] = useState(0);
@@ -88,8 +86,9 @@ export function App() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- Read uiStore active view (controlled by Sidebar Scheduled button) ---
+  // --- Read uiStore active view (controlled by Sidebar Scheduled/Settings buttons) ---
   const activeView = useUIStore((s) => s.activeView);
+  const setActiveView = useUIStore((s) => s.setActiveView);
 
   // --- Sync uiStore inspector state → local state (sidebar → inspector linkage) ---
   const uiInspectorTab = useUIStore((s) => s.inspectorTab);
@@ -120,7 +119,7 @@ export function App() {
     newWindow: useCallback(() => {
       openNewWindow();
     }, []),
-    openSettings: useCallback(() => setPage('settings'), []),
+    openSettings: useCallback(() => setActiveView('settings'), [setActiveView]),
     toggleCommandPalette: useCallback(() => setCommandPaletteOpen((p) => !p), []),
     toggleSessionSwitcher: useCallback(() => setSessionSwitcherOpen((p) => !p), []),
   });
@@ -155,7 +154,7 @@ export function App() {
       group: 'App',
       shortcut: '⌘,',
       action: () => {
-        setPage('settings');
+        setActiveView('settings');
         setCommandPaletteOpen(false);
       },
     },
@@ -204,6 +203,8 @@ export function App() {
 
   // --- Theme: apply data-pd-theme to <html> based on user preference ---
   useThemeEffect();
+  // --- Font size: apply --pd-font-size-base and <html> style.fontSize ---
+  useFontSizeEffect();
 
   return (
     <div
@@ -226,9 +227,9 @@ export function App() {
 
         {/* Content - flex */}
         <div className="relative flex-1 overflow-hidden">
-          {page === 'settings' ? (
+          {activeView === 'settings' ? (
             <Suspense fallback={<div style={{ padding: 'var(--pd-space-4)', opacity: 0.5 }}>Loading...</div>}>
-              <SettingsPage onClose={() => setPage('chat')} />
+              <SettingsPage onClose={() => setActiveView('chat')} />
             </Suspense>
           ) : activeView === 'scheduled' ? (
             <Suspense fallback={<div style={{ padding: 'var(--pd-space-4)', opacity: 0.5 }}>Loading...</div>}>

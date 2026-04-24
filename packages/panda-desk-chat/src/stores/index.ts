@@ -11,6 +11,7 @@ export { useToastStore } from './toastStore';
 export { useProviderStore, setupProviderBridge } from './providerStore';
 export { useBuddyStore } from './buddyStore';
 export { useWindowStore } from './windowStore';
+export { useScheduleStore, setupScheduleBridge } from './scheduleStore';
 
 // Re-export commonly used types
 export type {
@@ -40,6 +41,7 @@ import { setupBridgeListeners } from './chatStore';
 import { setupSessionBridge } from './sessionStore';
 import { setupSettingsBridge } from './settingsStore';
 import { setupProviderBridge } from './providerStore';
+import { setupScheduleBridge } from './scheduleStore';
 
 /**
  * Wire all IPC bridge listeners and sync initial state.
@@ -50,4 +52,5 @@ export function setupAllBridges(): void {
   setupSessionBridge();
   setupSettingsBridge();
   setupProviderBridge();
+  setupScheduleBridge();
 }

@@ -108,11 +108,17 @@ export default {
 
   // Settings
   'settings.title': '设置',
+  'settings.tabGeneral': '通用',
+  'settings.tabAppearance': '外观',
+  'settings.tabProviders': 'Providers',
+  'settings.tabShortcuts': '快捷键',
+  'settings.tabAbout': '关于',
   'settings.general': '通用',
   'settings.model': '模型',
   'settings.appearance': '外观',
   'settings.advanced': '高级',
   'settings.language': '语言',
+  'settings.languageDesc': '界面显示语言',
   'settings.workingDir': '工作目录',
   'settings.workingDirDesc': '设置默认工作目录，新会话将在此目录下运行',
   'settings.workingDirPlaceholder': '选择工作目录…',
@@ -124,6 +130,12 @@ export default {
   'settings.theme.matrix': 'Matrix',
   'settings.notifications': '系统通知',
   'settings.notificationsDesc': '收到新消息时显示系统通知',
+  'settings.fontSize': '字号',
+  'settings.reset': '恢复默认',
+  'settings.resetDesc': '将所有设置恢复为默认值',
+  'settings.resetBtn': '恢复默认',
+  'settings.apiKeyPlaceholder': '输入 API Key',
+  'settings.noProviders': '未配置任何 Provider',
 
   // Settings > About > Update
   'settings.about.checkUpdate': '检查更新',

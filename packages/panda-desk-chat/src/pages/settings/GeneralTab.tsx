@@ -15,15 +15,21 @@ import { SettingRow } from './SettingRow';
 
 export const GeneralTab: React.FC = () => {
   const { t, locale, changeLocale } = useI18n();
-  const { loadSettings, workingDirectory, setWorkingDirectory, notificationsEnabled, setNotificationsEnabled } = useSettingsStore(
+  const { resetSettings, workingDirectory, setWorkingDirectory, notificationsEnabled, setNotificationsEnabled } = useSettingsStore(
     useShallow((s) => ({
-      loadSettings: s.loadSettings,
+      resetSettings: s.resetSettings,
       workingDirectory: s.workingDirectory,
       setWorkingDirectory: s.setWorkingDirectory,
       notificationsEnabled: s.notificationsEnabled,
       setNotificationsEnabled: s.setNotificationsEnabled,
     })),
   );
+
+  const handleReset = () => {
+    if (window.confirm('确定要恢复默认设置吗？此操作不可撤销。')) {
+      resetSettings();
+    }
+  };
   return (
     <div>
       <SettingRow label={t('settings.workingDir')} description={t('settings.workingDirDesc')}>
@@ -45,7 +51,7 @@ export const GeneralTab: React.FC = () => {
         <PdSwitch checked={notificationsEnabled} onChange={setNotificationsEnabled} />
       </SettingRow>
       <SettingRow label={t('settings.reset')} description={t('settings.resetDesc')}>
-        <PdButton variant="danger" size="sm" onClick={loadSettings}>{t('settings.resetBtn')}</PdButton>
+        <PdButton variant="danger" size="sm" onClick={handleReset}>{t('settings.resetBtn')}</PdButton>
       </SettingRow>
     </div>
   );

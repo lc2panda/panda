@@ -264,10 +264,25 @@ export function setupSessionBridge(): void {
   if (sessionBridgeInitialized) return;
   sessionBridgeInitialized = true;
 
-  // Listen for session-list updates pushed from main process
+  // Listen for session-list updates pushed from main process.
+  // IMPORTANT: cliManager.listSessions() only tracks *live CLI processes* —
+  // replacing the full list would wipe disk sessions loaded by
+  // loadSessionsFromDisk(). Merge CLI state into the existing list instead,
+  // preserving disk-only (isDiskSession=true) and local-only entries.
   bridge.onSessionUpdated((payload) => {
-    const { sessions } = payload as { sessions: SessionMeta[] };
-    useSessionStore.getState().setSessions(sessions);
+    const { sessions: cliSessions } = (payload ?? {}) as { sessions?: SessionMeta[] };
+    if (!Array.isArray(cliSessions)) return;
+    const store = useSessionStore.getState();
+    const existing = Array.isArray(store.sessions) ? store.sessions : [];
+    const cliIds = new Set(cliSessions.map((s) => s.id));
+    // CLI-reported entries take precedence (latest metadata); keep the rest.
+    const merged = [
+      ...cliSessions,
+      ...existing.filter((s) => !cliIds.has(s.id)),
+    ].sort(
+      (a, b) => new Date(b.lastActive ?? 0).getTime() - new Date(a.lastActive ?? 0).getTime(),
+    );
+    store.setSessions(merged);
   });
 
   // In production, fetch initial session list from backend
@@ -275,7 +290,19 @@ export function setupSessionBridge(): void {
     bridge.listSessions()
       .then((list) => {
         if (list.length > 0) {
-          useSessionStore.getState().setSessions(list as unknown as SessionMeta[]);
+          // Merge CLI-reported live sessions with anything already loaded
+          // (localStorage restore + disk sessions loaded by the sidebar).
+          const store = useSessionStore.getState();
+          const existing = Array.isArray(store.sessions) ? store.sessions : [];
+          const cliList = list as unknown as SessionMeta[];
+          const cliIds = new Set(cliList.map((s) => s.id));
+          const merged = [
+            ...cliList,
+            ...existing.filter((s) => !cliIds.has(s.id)),
+          ].sort(
+            (a, b) => new Date(b.lastActive ?? 0).getTime() - new Date(a.lastActive ?? 0).getTime(),
+          );
+          store.setSessions(merged);
         } else {
           // Backend has no sessions (fresh restart) but frontend may have
           // persisted sessions from a previous run.  Focus the active one so

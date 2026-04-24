@@ -152,7 +152,7 @@ h1, h2,
   background: var(--pd-glass-bg);
   backdrop-filter: blur(var(--pd-glass-blur));
   -webkit-backdrop-filter: blur(var(--pd-glass-blur));
-  border: 1px solid var(--pd-glass-border);
+  border: 1.5px solid var(--pd-glass-border);
   box-shadow: var(--pd-glass-shadow);
 }
 

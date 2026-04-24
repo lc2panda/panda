@@ -1,5 +1,5 @@
 // Input: Zod schemas from ./schemas.ts
-// Output: TypeScript types inferred from Zod + PandaChatAPI named interface (C-5) + UpdateStatus type + DiskSessionMeta/SessionMessage/SessionDetail (pd:sessions:* IPC)
+// Output: TypeScript types inferred from Zod + PandaChatAPI named interface (C-5) + UpdateStatus type + DiskSessionMeta/SessionMessage/SessionDetail (pd:sessions:* IPC) + ScheduledTask types (panda:schedule:* IPC)
 // Pos: IPC type layer — consumed by bridge.ts, chat renderer components, and main process handlers
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -210,6 +210,16 @@ export interface PandaChatAPI {
     getWindowId(): Promise<number>;
     onWindowInit(cb: (payload: WindowInitPayload) => void): Unsubscribe;
   };
+  schedule: {
+    list(): Promise<ScheduledTask[]>;
+    create(payload: CreateScheduledTaskInput): Promise<ScheduledTask>;
+    update(payload: UpdateScheduledTaskInput): Promise<ScheduledTask | null>;
+    delete(payload: { id: string }): Promise<boolean>;
+    runNow(payload: { id: string }): Promise<ScheduledTaskRunLog | null>;
+    toggle(payload: { id: string }): Promise<ScheduledTask | null>;
+    validateCron(payload: { cron: string }): Promise<ValidateCronResult>;
+    onUpdated(cb: (payload: ScheduledTasksUpdatedPayload) => void): Unsubscribe;
+  };
 }
 
 // ─── Window init event payload ────────────────────────────────────────────
@@ -217,6 +227,57 @@ export interface PandaChatAPI {
 export interface WindowInitPayload {
   windowId: number;
   sessionId?: string;
+}
+
+// ─── Scheduled tasks (panda:schedule:*) ────────────────────────────────────
+
+export type ScheduledTaskStatus = 'active' | 'disabled';
+export type ScheduledRunStatus = 'completed' | 'failed' | 'running';
+
+export interface ScheduledTaskRunLog {
+  id: string;
+  status: ScheduledRunStatus;
+  startedAt: string;
+  finishedAt?: string;
+  durationMs?: number;
+  error?: string;
+}
+
+export interface ScheduledTask {
+  id: string;
+  name: string;
+  description: string;
+  cron: string;
+  prompt: string;
+  cwd: string;
+  status: ScheduledTaskStatus;
+  createdAt: string;
+  lastRunAt?: string;
+  nextRunAt?: string;
+  runCount: number;
+  logs: ScheduledTaskRunLog[];
+}
+
+export interface CreateScheduledTaskInput {
+  name: string;
+  description?: string;
+  cron: string;
+  prompt: string;
+  cwd?: string;
+}
+
+export interface UpdateScheduledTaskInput {
+  id: string;
+  updates: Partial<Pick<ScheduledTask, 'name' | 'description' | 'cron' | 'prompt' | 'cwd' | 'status'>>;
+}
+
+export interface ValidateCronResult {
+  valid: boolean;
+  nextRunAt?: string | null;
+}
+
+export interface ScheduledTasksUpdatedPayload {
+  tasks: ScheduledTask[];
 }
 
 // ─── Global augmentation for window.pandaAPI ────────────────────────────────

@@ -61,6 +61,15 @@ const CH = {
   // Connection lifecycle
   SESSION_READY:        'panda:session:ready',
   MESSAGE_HISTORY:      'panda:message:history',
+  // Scheduled tasks
+  SCHEDULE_LIST:        'panda:schedule:list',
+  SCHEDULE_CREATE:      'panda:schedule:create',
+  SCHEDULE_UPDATE:      'panda:schedule:update',
+  SCHEDULE_DELETE:      'panda:schedule:delete',
+  SCHEDULE_RUN_NOW:     'panda:schedule:run-now',
+  SCHEDULE_TOGGLE:      'panda:schedule:toggle',
+  SCHEDULE_VALIDATE:    'panda:schedule:validate-cron',
+  SCHEDULE_UPDATED:     'panda:schedule:update',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -162,5 +171,15 @@ contextBridge.exposeInMainWorld('pandaAPI', {
       ipcRenderer.invoke(CH.WINDOW_OPEN_SESSION, { sessionId }),
     getWindowId: () => ipcRenderer.invoke(CH.WINDOW_GET_ID),
     onWindowInit: createSubscription(CH.WINDOW_INIT),
+  },
+  schedule: {
+    list: () => ipcRenderer.invoke(CH.SCHEDULE_LIST),
+    create: (payload: unknown) => ipcRenderer.invoke(CH.SCHEDULE_CREATE, payload),
+    update: (payload: unknown) => ipcRenderer.invoke(CH.SCHEDULE_UPDATE, payload),
+    delete: (payload: unknown) => ipcRenderer.invoke(CH.SCHEDULE_DELETE, payload),
+    runNow: (payload: unknown) => ipcRenderer.invoke(CH.SCHEDULE_RUN_NOW, payload),
+    toggle: (payload: unknown) => ipcRenderer.invoke(CH.SCHEDULE_TOGGLE, payload),
+    validateCron: (payload: unknown) => ipcRenderer.invoke(CH.SCHEDULE_VALIDATE, payload),
+    onUpdated: createSubscription(CH.SCHEDULE_UPDATED),
   },
 });

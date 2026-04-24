@@ -776,7 +776,8 @@ export class CLIManager {
   // ── Broadcast session list to renderer ───────────────────────────────
 
   private broadcastSessionList(): void {
-    windowManager.broadcast(MR.SESSION_UPDATED, this.listSessions());
+    // schema sessionUpdatedSchema is { sessions: SessionMeta[] } — wrap to match
+    windowManager.broadcast(MR.SESSION_UPDATED, { sessions: this.listSessions() });
   }
 
   // ── Cleanup all sessions (app quit) ──────────────────────────────────

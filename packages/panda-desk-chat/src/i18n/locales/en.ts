@@ -108,11 +108,17 @@ export default {
 
   // Settings
   'settings.title': 'Settings',
+  'settings.tabGeneral': 'General',
+  'settings.tabAppearance': 'Appearance',
+  'settings.tabProviders': 'Providers',
+  'settings.tabShortcuts': 'Shortcuts',
+  'settings.tabAbout': 'About',
   'settings.general': 'General',
   'settings.model': 'Model',
   'settings.appearance': 'Appearance',
   'settings.advanced': 'Advanced',
   'settings.language': 'Language',
+  'settings.languageDesc': 'Interface display language',
   'settings.workingDir': 'Working Directory',
   'settings.workingDirDesc': 'Default working directory for new sessions',
   'settings.workingDirPlaceholder': 'Select working directory…',
@@ -124,6 +130,12 @@ export default {
   'settings.theme.matrix': 'Matrix',
   'settings.notifications': 'System Notifications',
   'settings.notificationsDesc': 'Show notifications when new messages arrive',
+  'settings.fontSize': 'Font size',
+  'settings.reset': 'Reset to defaults',
+  'settings.resetDesc': 'Restore all settings to their default values',
+  'settings.resetBtn': 'Reset',
+  'settings.apiKeyPlaceholder': 'Enter API key',
+  'settings.noProviders': 'No providers configured',
 
   // Settings > About > Update
   'settings.about.checkUpdate': 'Check for Updates',

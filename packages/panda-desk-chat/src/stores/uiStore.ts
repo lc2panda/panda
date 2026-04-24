@@ -17,7 +17,7 @@ export type ModalType =
   | null;
 
 /** Which main view the center column renders (Sidebar-controlled) */
-export type ActiveView = 'chat' | 'scheduled';
+export type ActiveView = 'chat' | 'scheduled' | 'settings';
 
 export interface Toast {
   id: string;

@@ -97,8 +97,11 @@
   --pd-z-max: 9999;
 
   /* ── Layout Dimensions ───────────────────────────────────────────────── */
-  --pd-layout-sidebar-width: 280px;
-  --pd-layout-sidebar-rail: 72px;
+  /* Anthropic claude.ai spec: sidebar expanded = 18rem (288px), rail = 3.05rem (48.8px).
+   * See monitor/20260425-cchaha-spec.md / Anthropic sidebar research §1.
+   */
+  --pd-layout-sidebar-width: 288px;
+  --pd-layout-sidebar-rail: 56px;
   --pd-layout-tabbar-height: 40px;
   --pd-layout-statusbar-height: 32px;
   --pd-layout-titlebar-mac: 28px;
@@ -160,13 +163,19 @@
   --pd-palette-warm-brown-700: #54433E;
   --pd-palette-warm-brown-900: #390C00;
 
-  /* ── Palette: Terra Cotta ────────────────────────────────────────────── */
-  --pd-palette-terra-300: #FFDBD0;
+  /* ── Palette: Terra Cotta / Clay (Anthropic official)
+   * Primary accent = clay #D97757 (official brand color, see
+   * monitor/20260425-anthropic-official-colors.md §2). cc-haha's darker
+   * #8F482F retained as --pd-palette-terra-deep for legacy Panda-warm tone
+   * if ever needed, but no longer mapped to --pd-color-accent.
+   */
+  --pd-palette-terra-300: #F4AE95;    /* orange-200 light clay hover bg */
   --pd-palette-terra-400: #E38B6E;
-  --pd-palette-terra-500: #B85A38;
-  --pd-palette-terra-600: #8F482F;
-  --pd-palette-terra-700: #B85A38;
-  --pd-palette-terra-800: #9C4B2E;
+  --pd-palette-terra-500: #D97757;    /* clay — official primary accent */
+  --pd-palette-terra-600: #C6613F;    /* clay-emphasized — hover/pressed */
+  --pd-palette-terra-700: #AF461D;    /* orange-500 — active */
+  --pd-palette-terra-800: #873312;    /* orange-600 — deepest */
+  --pd-palette-terra-deep: #8F482F;   /* cc-haha legacy tone (reserved) */
 
   /* ── Palette: Bamboo / Sky / Amber / Ruby ────────────────────────────── */
   --pd-palette-bamboo-300: #A8BC8A;
@@ -207,21 +216,26 @@
   --pd-color-fg-inverse: #FFFFFF;
   --pd-color-fg-disabled: #B0A7A3;
 
-  /* ── Semantic: Border (cc-haha outline-variant) ─────────────── */
-  --pd-color-border: #DAC1BA;                                /* outline-variant */
-  --pd-color-border-strong: #87736D;                         /* outline */
-  --pd-color-border-focus: #8F482F;                          /* primary */
-  --pd-color-border-subtle: rgba(218, 193, 186, 0.55);
-  --pd-color-border-variant: #DAC1BA;
+  /* ── Semantic: Border (Anthropic style: dark ink + low alpha) ─────────
+   * claude.ai light mode uses rgba(31,31,30,0.15) which is the official
+   * approach of storing a dark HSL and rendering with alpha; we keep one
+   * extra opaque variant (#DAC1BA) for places that explicitly cannot use
+   * transparency (e.g. Glass Panel edge on gradient bg).
+   */
+  --pd-color-border: rgba(31, 31, 30, 0.15);                 /* claude.ai border-300 */
+  --pd-color-border-strong: rgba(31, 31, 30, 0.30);
+  --pd-color-border-focus: #D97757;                          /* clay */
+  --pd-color-border-subtle: rgba(31, 31, 30, 0.08);
+  --pd-color-border-variant: #DAC1BA;                        /* opaque warm-brown for gradient bgs */
 
-  /* ── Semantic: Accent (cc-haha primary / primary-container) ──── */
-  --pd-color-accent: #8F482F;                                /* primary */
-  --pd-color-accent-hover: #AD5F45;                          /* primary-container */
-  --pd-color-accent-active: #7A3D28;                         /* darker pressed */
-  --pd-color-accent-subtle: #FFDBD0;                         /* primary-fixed */
-  --pd-color-accent-fg: #8F482F;
-  --pd-color-accent-container: #FFDBD0;
-  --pd-color-link: #8F482F;
+  /* ── Semantic: Accent (Anthropic clay = #D97757) ────────────────────── */
+  --pd-color-accent: #D97757;                                /* clay (official) */
+  --pd-color-accent-hover: #C6613F;                          /* clay-emphasized */
+  --pd-color-accent-active: #AF461D;                         /* orange-500 pressed */
+  --pd-color-accent-subtle: #F7D7CA;                         /* orange-100 light fill */
+  --pd-color-accent-fg: #D97757;
+  --pd-color-accent-container: #F9ECE7;                      /* orange-50 container */
+  --pd-color-link: #C6613F;                                  /* use emphasized for better link contrast */
 
   /* ── Semantic: Status (cc-haha aligned) ───────────────────────────────── */
   --pd-color-success: #16A34A;
@@ -235,11 +249,11 @@
   --pd-color-info: var(--pd-palette-sky-500);
   --pd-color-info-bg: var(--pd-palette-sky-300);
 
-  /* ── Gradients + shadow (cc-haha --gradient-btn-primary / --shadow-button-primary) ── */
-  --pd-gradient-btn-primary: linear-gradient(135deg, #8F482F, #AD5F45);
-  --pd-gradient-btn-primary-hover: linear-gradient(135deg, #AD5F45, #8F482F);
-  --pd-shadow-button-terra: 0 8px 24px rgba(143, 72, 47, 0.18);
-  --pd-shadow-focus-ring: 0 0 0 1px rgba(143, 72, 47, 0.16);
+  /* ── Gradients + shadow (Anthropic clay gradient) ────────────────────── */
+  --pd-gradient-btn-primary: linear-gradient(135deg, #D97757, #C6613F);
+  --pd-gradient-btn-primary-hover: linear-gradient(135deg, #C6613F, #AF461D);
+  --pd-shadow-button-terra: 0 8px 24px rgba(217, 119, 87, 0.22);
+  --pd-shadow-focus-ring: 0 0 0 1px rgba(217, 119, 87, 0.20);
   --pd-shadow-dropdown: 0 4px 20px rgba(27, 28, 26, 0.04), 0 12px 40px rgba(27, 28, 26, 0.08);
 
   /* ── Motion (cc-haha --motion-sidebar-*) ───────────────────────────────── */
@@ -256,9 +270,9 @@
 
   /* ── Semantic: Shadow / Scrim ────────────────────────────────────────── */
   --pd-color-scrim: rgba(20, 20, 19, 0.4);
-  --pd-color-selection: rgba(184, 90, 56, 0.15);
-  --pd-color-selection-bg: rgba(255, 219, 208, 0.9);
-  --pd-color-selection-text: var(--pd-palette-warm-brown-900);  /* #390C00 */
+  --pd-color-selection: rgba(217, 119, 87, 0.16);
+  --pd-color-selection-bg: rgba(247, 215, 202, 0.9);
+  --pd-color-selection-text: #5B230B;  /* orange-700 */
 
   /* ── Semantic: Glass / Frost ─────────────────────────────────────────── */
   --pd-glass-surface: rgba(255, 255, 255, 0.84);
@@ -270,7 +284,7 @@
   --pd-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.04);
   --pd-shadow-lg: 0 10px 15px rgba(20, 20, 19, 0.08), 0 4px 6px rgba(20, 20, 19, 0.04);
   --pd-shadow-xl: 0 20px 25px rgba(20, 20, 19, 0.10), 0 8px 10px rgba(20, 20, 19, 0.04);
-  --pd-shadow-focus: 0 0 0 3px rgba(184, 90, 56, 0.3);
+  --pd-shadow-focus: 0 0 0 3px rgba(217, 119, 87, 0.3);
   --pd-shadow-focus-danger: 0 0 0 3px rgba(186, 61, 61, 0.3);
   --pd-shadow-button-primary: 0 1px 2px rgba(20, 20, 19, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 
@@ -317,7 +331,7 @@
   --pd-terminal-bg: #1A1918;
   --pd-terminal-fg: #E8E6DC;
   --pd-terminal-cursor: var(--pd-palette-terra-500);
-  --pd-terminal-selection: rgba(184, 90, 56, 0.25);
+  --pd-terminal-selection: rgba(217, 119, 87, 0.25);
   --pd-terminal-black: #2F2E2C;
   --pd-terminal-red: #BA3D3D;
   --pd-terminal-green: #6B8A47;
@@ -334,15 +348,15 @@
   --pd-pet-xp-bg: var(--pd-palette-cream-300);
   --pd-pet-level-badge: var(--pd-palette-amber-500);
   --pd-pet-species-border: var(--pd-palette-cream-400);
-  --pd-pet-mood-glow: rgba(184, 90, 56, 0.3);
+  --pd-pet-mood-glow: rgba(217, 119, 87, 0.3);
 
-  /* ── Glass Panel ─────────────────────────────────────────────────────── */
+  /* ── Glass Panel — 高对比度 card 视觉 ─────────────────────────────────── */
   --pd-glass-bg: #FFFFFF;
-  --pd-glass-border: #DAC1BA;
+  --pd-glass-border: rgba(31, 31, 30, 0.12);                /* claude.ai style subtle dark border */
   --pd-glass-blur: 0px;
-  /* 深度分层阴影：保证 card 在 cream bg 上明显浮起 */
-  --pd-glass-shadow: 0 2px 4px rgba(27,28,26,0.06), 0 12px 28px rgba(27,28,26,0.10), 0 32px 64px rgba(27,28,26,0.10);
-  --pd-glass-focus-ring: 0 0 0 1px rgba(143, 72, 47, 0.16);
+  /* 深度分层阴影：保证 card 在 cream bg 上明显浮起（不透明度 ×1.4） */
+  --pd-glass-shadow: 0 2px 4px rgba(27,28,26,0.08), 0 12px 32px rgba(27,28,26,0.12), 0 32px 64px rgba(27,28,26,0.12);
+  --pd-glass-focus-ring: 0 0 0 1px rgba(217, 119, 87, 0.20);
 }
 
 /* ==========================================================================

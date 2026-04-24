@@ -12,7 +12,7 @@ import * as bridge from '../ipc/bridge';
 
 export type Theme = 'light' | 'dark' | 'system';
 export type PermissionMode = 'default' | 'plan' | 'auto' | 'bypassPermissions';
-export type Locale = 'zh' | 'en' | 'ko';
+export type Locale = 'zh' | 'en' | 'ja' | 'ko';
 export type EffortLevel = 'auto' | 'low' | 'medium' | 'high';
 
 const STORAGE_KEY = 'settings';
@@ -44,6 +44,7 @@ export interface SettingsStore extends PersistedSettings {
   toggleInspector: () => void;
   loadSettings: () => void;
   saveSettings: () => void;
+  resetSettings: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +157,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 
   saveSettings: () => {
     storage.set(STORAGE_KEY, pickPersisted(get()));
+  },
+
+  resetSettings: () => {
+    storage.set(STORAGE_KEY, pickPersisted(defaults));
+    set({ ...defaults });
   },
 }));
 
