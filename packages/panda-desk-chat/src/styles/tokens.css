@@ -103,7 +103,7 @@
   --pd-layout-titlebar-win: 32px;
   --pd-layout-main-max-width: 1200px;
   --pd-layout-main-padding-x: 24px;
-  --pd-layout-composer-max-width: 840px;
+  --pd-layout-composer-max-width: 1080px;
   --pd-layout-right-panel: 320px;
   --pd-layout-pet-strip: 56px;
   --pd-layout-pet-rail: 48px;
@@ -203,11 +203,12 @@
   --pd-color-fg-disabled: var(--pd-palette-cream-400);
 
   /* ── Semantic: Border (extremely subtle, claude.ai style) ─────────────── */
-  --pd-color-border: rgba(0, 0, 0, 0.08);                    /* near-invisible */
-  --pd-color-border-strong: rgba(0, 0, 0, 0.15);
+  /* Warm border tinted with brand terracotta — matches cc-haha outline-variant vibe */
+  --pd-color-border: rgba(193, 119, 87, 0.16);               /* warm sand */
+  --pd-color-border-strong: rgba(193, 119, 87, 0.26);
   --pd-color-border-focus: #D97757;                          /* brand accent */
-  --pd-color-border-subtle: rgba(0, 0, 0, 0.05);
-  --pd-color-border-variant: rgba(0, 0, 0, 0.08);
+  --pd-color-border-subtle: rgba(193, 119, 87, 0.10);
+  --pd-color-border-variant: rgba(193, 119, 87, 0.18);
 
   /* ── Semantic: Accent (claude.ai --_brand-clay) ───────────────────────── */
   --pd-color-accent: #D97757;                                /* brand-clay, Anthropic Orange */

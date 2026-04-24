@@ -570,9 +570,10 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
               onClick={() => { setShowPermMenu((v) => !v); setShowModelMenu(false); }}
               className={cn(
                 "flex items-center gap-1.5 px-2.5 h-7",
-                "rounded-[var(--pd-radius-md)]",
-                "text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)]",
-                "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
+                "rounded-full",
+                "bg-[var(--pd-color-bg-subtle)]",
+                "text-[var(--pd-text-xs)] text-[var(--pd-color-fg)]",
+                "hover:bg-[var(--pd-color-bg-hover)]",
                 "transition-colors duration-[var(--pd-duration-fast)]",
                 "font-[family-name:var(--pd-font-sans)]",
               )}
@@ -627,9 +628,10 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
               onClick={() => { setShowModelMenu((v) => !v); setShowPermMenu(false); }}
               className={cn(
                 "flex items-center gap-1.5 px-2.5 h-7",
-                "rounded-[var(--pd-radius-md)]",
-                "text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)]",
-                "hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]",
+                "rounded-full",
+                "bg-[var(--pd-color-bg-subtle)]",
+                "text-[var(--pd-text-xs)] text-[var(--pd-color-fg)]",
+                "hover:bg-[var(--pd-color-bg-hover)]",
                 "transition-colors duration-[var(--pd-duration-fast)]",
                 "font-[family-name:var(--pd-font-sans)]",
               )}
@@ -703,7 +705,7 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
                 "text-[var(--pd-text-xs)] font-[var(--pd-font-medium)]",
                 canSend
                   ? "bg-[var(--pd-color-accent)] text-[var(--pd-color-fg-on-accent)] shadow-[var(--pd-shadow-button-primary)] hover:bg-[var(--pd-color-accent-hover)] active:bg-[var(--pd-color-accent-active)]"
-                  : "bg-[var(--pd-color-bg-disabled)] text-[var(--pd-color-fg-disabled)] cursor-not-allowed",
+                  : "bg-[rgba(217,119,87,0.28)] text-[rgba(255,255,255,0.85)] cursor-not-allowed",
               )}
             >
               <ArrowRightIcon />

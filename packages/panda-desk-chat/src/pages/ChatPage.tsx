@@ -187,12 +187,46 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
           />
         </>
       ) : (
-        <PdHeroComposer
-          onSend={activeId ? handleSend : handleNewSession}
-        />
+        <>
+          <div className="flex-1 flex items-center justify-center min-h-0">
+            <PdHeroComposer />
+          </div>
+          <PdComposer
+            ref={composerRef}
+            sessionId={activeId ?? ''}
+            onSend={activeId ? handleSend : handleNewSession}
+            onStop={() => { /* no streaming in empty state */ }}
+            isStreaming={false}
+            placeholder={t('chat.placeholder')}
+          />
+          <ProjectPill cwd={(activeMeta as { cwd?: string } | null)?.cwd} />
+        </>
       )}
     </div>
   );
 };
+
+/** Project pill — Reference: cc-haha 01_full_ui bottom pill (design spec only, not source) */
+function ProjectPill({ cwd }: { cwd?: string }) {
+  if (!cwd) return null;
+  const base = cwd.replace(/\/$/, '').split('/').filter(Boolean).slice(-2).join('/');
+  return (
+    <div className="flex justify-center pt-2 pb-4 select-none">
+      <button
+        type="button"
+        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-[var(--pd-color-bg-subtle)] text-[12px] text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)] transition-colors cursor-pointer"
+        title={cwd}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+        </svg>
+        <span>{base || cwd}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M2.5 4L5 6.5L7.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+    </div>
+  );
+}
 
 export default ChatPage;
