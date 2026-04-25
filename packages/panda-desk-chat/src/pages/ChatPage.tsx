@@ -38,6 +38,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
     s.activeSessionId ? s.sessions.get(s.activeSessionId) ?? null : null,
   );
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const setChatActiveSession = useChatStore((s) => s.setActiveSession);
   const cancelStream = useChatStore((s) => s.cancelStream);
   const respondPermission = useChatStore((s) => s.respondPermission);
   const dismissRouting = useChatStore((s) => s.dismissRouting);
@@ -84,9 +85,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
     async (content: string) => {
       if (!content.trim()) return;
       const session = await createSession();
+      setChatActiveSession(session.id);
       sendMessage(session.id, content);
     },
-    [createSession, sendMessage],
+    [createSession, setChatActiveSession, sendMessage],
   );
 
   /* -- SuperAssistBar callbacks -- */
