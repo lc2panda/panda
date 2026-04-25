@@ -211,10 +211,10 @@ export function App() {
       {/* -- Left: Sidebar (280px expanded / 72px rail) -- */}
       <PdSidebar expanded={sidebarExpanded} onToggle={() => setSidebarExpanded((p) => !p)} />
 
-      {/* -- Center: Main content (flex, max 1200px) -- */}
+      {/* -- Center: Main content (flex 占满剩余空间，内部组件自行控制 max-width) -- */}
       <div
         className="flex flex-1 flex-col overflow-hidden"
-        style={{ maxWidth: 'var(--pd-main-max-width, 1200px)', minWidth: 0 }}
+        style={{ minWidth: 0 }}
       >
         {/* TabBar - 40px */}
         <PdTabBarConnected />
