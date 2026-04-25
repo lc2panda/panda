@@ -468,7 +468,7 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
           "mx-auto",
           "rounded-[var(--pd-radius-2xl)]",
           "transition-shadow duration-[var(--pd-duration-quick)]",
-          "focus-within:shadow-[0_0_0_2px_rgba(193,95,60,0.2)]",
+          "focus-within:shadow-[0_0_0_2px_rgba(217,119,87,0.22)]",
           "focus-within:border-[var(--pd-color-border-focus)]",
         )}
         onDragEnter={handleDragEnter}
