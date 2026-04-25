@@ -48,6 +48,9 @@ export const PermissionsTab: React.FC = () => {
         <h2 className="text-[18px] font-[var(--pd-font-semibold)] text-[var(--pd-color-fg)]">
           {t('settings.permissions.title')}
         </h2>
+        <p className="mt-1 text-[13px] text-[var(--pd-color-fg-muted)]">
+          {t('settings.permissions.subtitle' as any) || '选择 AI 工具调用的批准策略'}
+        </p>
       </div>
 
       <div className="space-y-3">
@@ -60,32 +63,42 @@ export const PermissionsTab: React.FC = () => {
               type="button"
               onClick={() => setPermissionMode(opt.mode)}
               className={cn(
-                'w-full text-left rounded-[12px] border px-4 py-3 transition-colors cursor-pointer',
+                'group w-full text-left rounded-[12px] border-[1.5px] px-4 py-3.5 cursor-pointer',
                 'flex items-start gap-3',
+                'transition-all duration-200 ease-out',
                 isActive
-                  ? 'border-[var(--pd-color-accent)] bg-[var(--pd-color-bg-selected)]'
-                  : 'border-[var(--pd-color-border)] bg-[var(--pd-color-bg-subtle)] hover:bg-[var(--pd-color-bg-hover)]',
+                  ? 'border-[var(--pd-color-accent)] bg-[var(--pd-color-bg-elevated)] shadow-[0_0_0_3px_rgba(217,119,87,0.12),0_2px_6px_rgba(27,28,26,0.06)]'
+                  : 'border-[var(--pd-color-border)] bg-[var(--pd-color-bg-elevated)] shadow-[0_1px_2px_rgba(27,28,26,0.04)] hover:border-[var(--pd-color-border-strong)] hover:shadow-[0_2px_8px_rgba(27,28,26,0.08)] hover:-translate-y-px',
               )}
               aria-pressed={isActive}
             >
               <span
                 className={cn(
-                  'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px]',
+                  'mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]',
+                  'transition-colors duration-200',
                   isActive
                     ? 'bg-[var(--pd-color-accent)] text-[var(--pd-color-fg-on-accent,#fff)]'
-                    : 'bg-[var(--pd-color-bg)] text-[var(--pd-color-fg-muted)]',
+                    : 'bg-[var(--pd-color-bg-subtle)] text-[var(--pd-color-fg-muted)] group-hover:text-[var(--pd-color-accent)]',
                 )}
               >
-                <Icon size={14} />
+                <Icon size={18} />
               </span>
               <div className="flex-1 min-w-0">
-                <div className="text-[14px] font-[var(--pd-font-semibold)] text-[var(--pd-color-fg)]">
+                <div className="text-[15px] font-[var(--pd-font-semibold)] text-[var(--pd-color-fg)]">
                   {t(opt.labelKey)}
                 </div>
-                <div className="mt-0.5 text-[12px] text-[var(--pd-color-fg-muted)]">
+                <div className="mt-1 text-[13px] leading-relaxed text-[var(--pd-color-fg-muted)]">
                   {t(opt.descKey)}
                 </div>
               </div>
+              {/* Active indicator dot */}
+              {isActive && (
+                <span
+                  className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ background: 'var(--pd-color-accent)' }}
+                  aria-hidden="true"
+                />
+              )}
             </button>
           );
         })}

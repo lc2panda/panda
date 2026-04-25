@@ -173,23 +173,34 @@ export const ScheduledPage: React.FC<ScheduledPageProps> = ({ className }) => {
           </div>
         )}
 
-        {/* Stats row */}
+        {/* Stats row — cc-haha style: elevated cards with icon + value + label */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           {[
-            { label: 'Total Tasks', value: total },
-            { label: 'Active',      value: active },
-            { label: 'Disabled',    value: disabled },
-          ].map((card) => (
+            { label: 'Total Tasks', value: total,    Icon: FileText, color: 'var(--pd-color-fg-muted)',  bg: 'var(--pd-color-bg-subtle)' },
+            { label: 'Active',      value: active,   Icon: Check,    color: 'var(--pd-color-success,#16A34A)', bg: 'rgba(22,163,74,0.10)' },
+            { label: 'Disabled',    value: disabled, Icon: Pause,    color: 'var(--pd-color-fg-tertiary)', bg: 'var(--pd-color-bg-subtle)' },
+          ].map(({ label, value, Icon, color, bg }) => (
             <div
-              key={card.label}
-              className="rounded-[12px] px-4 py-3"
-              style={{ background: 'var(--pd-color-bg-subtle, #F4F4F0)' }}
+              key={label}
+              className="rounded-[12px] px-4 py-4 flex items-center gap-3 border border-[var(--pd-color-border)]"
+              style={{
+                background: 'var(--pd-color-bg-elevated)',
+                boxShadow: '0 1px 2px rgba(27,28,26,0.04)',
+              }}
             >
-              <div className="text-[24px] font-[var(--pd-font-bold)] text-[var(--pd-color-fg)] leading-tight">
-                {card.value}
-              </div>
-              <div className="text-[12px] text-[var(--pd-color-fg-muted)] mt-1">
-                {card.label}
+              <span
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px]"
+                style={{ background: bg, color }}
+              >
+                <Icon size={18} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[24px] font-[var(--pd-font-bold)] text-[var(--pd-color-fg)] leading-none">
+                  {value}
+                </div>
+                <div className="text-[12px] text-[var(--pd-color-fg-muted)] mt-1.5">
+                  {label}
+                </div>
               </div>
             </div>
           ))}

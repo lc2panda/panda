@@ -116,6 +116,7 @@ export default {
   'settings.tabPermissions': '权限',
   'settings.tabModel': '模型',
   'settings.permissions.title': '工具权限',
+  'settings.permissions.subtitle': '选择 AI 工具调用的批准策略',
   'settings.model.title': '模型选择',
   'settings.model.search': '搜索模型...',
   'settings.model.noModels': '暂无可用模型',
