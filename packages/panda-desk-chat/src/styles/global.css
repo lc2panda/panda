@@ -140,13 +140,36 @@ h1, h2,
   animation: pd-bubble-enter 0.4s var(--pd-ease-spring) both;
 }
 
-/* ── Glass Panel utility ────────────────────────────────────────────── */
+/* ── Glass Panel utility (cc-haha aligned: blur 20px + transparent bg) ── */
 .pd-glass-panel {
   background: var(--pd-glass-bg);
-  backdrop-filter: blur(var(--pd-glass-blur));
-  -webkit-backdrop-filter: blur(var(--pd-glass-blur));
-  border: 1.5px solid var(--pd-glass-border);
+  backdrop-filter: blur(var(--pd-glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--pd-glass-blur)) saturate(180%);
+  border: 1px solid var(--pd-glass-border);
   box-shadow: var(--pd-glass-shadow);
+}
+.pd-glass-panel:focus-within {
+  box-shadow: var(--pd-glass-focus-ring), var(--pd-glass-shadow);
+}
+
+/* ── Elevated card utility (solid white + dropdown shadow + warm border) ──
+ * Use this for cards that need maximum visual lift without glass dependency
+ * (e.g. Hero card, Settings rows, permission cards, scheduled task rows).
+ */
+.pd-card-elevated {
+  background: var(--pd-color-bg-elevated);
+  border: 1px solid var(--pd-color-border);
+  border-radius: var(--pd-radius-xl);
+  box-shadow:
+    0 1px 2px rgba(27, 28, 26, 0.04),
+    0 4px 16px rgba(27, 28, 26, 0.06);
+  transition: box-shadow 200ms var(--pd-ease-emphasized), border-color 200ms var(--pd-ease-emphasized);
+}
+.pd-card-elevated:hover {
+  border-color: var(--pd-color-border-strong);
+  box-shadow:
+    0 1px 2px rgba(27, 28, 26, 0.04),
+    0 8px 28px rgba(27, 28, 26, 0.10);
 }
 
 /* ── Thinking pulse dots ────────────────────────────────────────────── */

@@ -50,38 +50,51 @@ const connectionI18nKeys: Record<ConnectionState, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Component
+// Component — cc-haha StatusBar spec: 36px height, JetBrains Mono 11px,
+// border-top, justify-between, content: project | model
 // ---------------------------------------------------------------------------
 export function PdStatusBar({
+  model,
+  tokenCount,
   connectionState = 'connected',
 }: PdStatusBarProps) {
   const { t } = useI18n();
   const connColor = connectionColors[connectionState];
   const connLabel = t(connectionI18nKeys[connectionState] as any);
 
-  // cc-haha / Claude.ai 风格：无底部 StatusBar。仅保留一个右下角浮动连接
-  // 指示点（绝对定位，不占 layout）。model/tokens/permission/buddy 各自归位
-  // 到 Composer 或 Sidebar。
   return (
     <div
-      aria-hidden={connectionState === 'connected'}
       className={cn(
-        'pointer-events-none absolute bottom-2 right-3 z-10',
-        'flex items-center gap-1.5',
+        'shrink-0 flex items-center justify-between',
+        'h-[var(--pd-layout-statusbar-height)] px-4',
+        'border-t border-[var(--pd-color-border)]',
+        'bg-[var(--pd-color-bg-subtle)]',
         'text-[11px] text-[var(--pd-color-fg-muted)]',
-        'select-none',
+        'font-[family-name:var(--pd-font-mono)] select-none',
       )}
-      title={connLabel}
     >
-      <Circle
-        size={7}
-        fill={connColor}
-        stroke="none"
-        className={cn(
-          (connectionState === 'connecting' || connectionState === 'error') && 'animate-pulse',
+      {/* Left: connection dot + label */}
+      <div className="flex items-center gap-2">
+        <Circle
+          size={8}
+          fill={connColor}
+          stroke="none"
+          className={cn(
+            (connectionState === 'connecting' || connectionState === 'error') && 'animate-pulse',
+          )}
+        />
+        <span>{connLabel}</span>
+      </div>
+
+      {/* Right: model + tokens */}
+      <div className="flex items-center gap-3">
+        {model && <span className="text-[var(--pd-color-fg-tertiary)]">{model}</span>}
+        {tokenCount && (tokenCount.input > 0 || tokenCount.output > 0) && (
+          <span className="text-[var(--pd-color-fg-tertiary)]">
+            ↑{formatTokens(tokenCount.input)} ↓{formatTokens(tokenCount.output)}
+          </span>
         )}
-      />
-      {connectionState !== 'connected' && <span>{connLabel}</span>}
+      </div>
     </div>
   );
 }

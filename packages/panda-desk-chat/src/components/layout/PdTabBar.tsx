@@ -257,25 +257,22 @@ export function PdTabBar({
                 'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
                 'min-w-[140px] max-w-[200px]',
                 tab.isActive
-                  ? 'bg-[var(--pd-color-bg)] text-[var(--pd-color-fg)] font-[var(--pd-font-medium)]'
-                  : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)]',
+                  ? 'bg-[var(--pd-color-bg)] text-[var(--pd-color-fg)] font-[var(--pd-font-semibold)]'
+                  : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
               )}
               style={{
                 width: 180,
                 maxWidth: 180,
                 height: 37,
-                fontSize: 12,
+                fontSize: 13,  // cc-haha tab font-size 13px
                 opacity: dragFromIndex === index ? 0.5 : 1,
                 transition: 'transform 0.2s ease, opacity 0.15s ease, background-color 0.15s ease',
+                ...(tab.isActive && {
+                  boxShadow: 'inset 0 2px 0 var(--pd-color-accent), 0 1px 0 var(--pd-color-bg)',
+                }),
               }}
             >
-              {/* Active indicator — 2px accent bottom border */}
-              {tab.isActive && (
-                <span
-                  className="absolute inset-x-0 bottom-0"
-                  style={{ height: '2px', background: 'var(--pd-color-accent)' }}
-                />
-              )}
+              {/* Active indicator — top inset 2px accent + bottom seam covers tabbar border */}
 
               {/* Session status dot — green = running, gray = idle (cc-haha visual language) */}
               {tab.statusDot && (

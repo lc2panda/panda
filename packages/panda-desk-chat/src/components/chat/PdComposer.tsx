@@ -466,9 +466,10 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(
           "relative",
           "w-full max-w-[var(--pd-layout-composer-max-width)]",
           "mx-auto",
-          "rounded-[var(--pd-radius-2xl)]",
-          "transition-shadow duration-[var(--pd-duration-quick)]",
-          "focus-within:shadow-[0_0_0_2px_rgba(217,119,87,0.22)]",
+          "rounded-[12px]",  // cc-haha radius-lg = 12px (not 16px)
+          "transition-all duration-[var(--pd-duration-quick)]",
+          "hover:shadow-[0_2px_4px_rgba(27,28,26,0.06),0_8px_24px_rgba(27,28,26,0.10),0_20px_48px_rgba(27,28,26,0.08)]",
+          "focus-within:shadow-[0_0_0_2px_rgba(217,119,87,0.20),0_2px_4px_rgba(27,28,26,0.05),0_12px_36px_rgba(27,28,26,0.10)]",
           "focus-within:border-[var(--pd-color-border-focus)]",
         )}
         onDragEnter={handleDragEnter}

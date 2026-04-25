@@ -209,7 +209,7 @@ interface DateGroupHeaderProps {
 }
 
 function DateGroupHeader({ label, onToggle }: DateGroupHeaderProps) {
-  // Claude Desktop 风格：仅灰色小字分组头，无箭头，无 hover 态
+  // cc-haha spec: section label 12px, font-medium, color text-fg-subtle, pt-5 pb-2 px-3
   return (
     <div
       role="button"
@@ -217,8 +217,8 @@ function DateGroupHeader({ label, onToggle }: DateGroupHeaderProps) {
       onClick={onToggle}
       onKeyDown={(e) => { if (e.key === 'Enter') onToggle(); }}
       className={cn(
-        'px-3 pt-5 pb-2',
-        'text-[12px] font-medium text-[var(--pd-color-fg-subtle)]',
+        'px-3 pt-5 pb-1.5',
+        'text-[12px] font-[var(--pd-font-medium)] text-[var(--pd-color-fg-subtle)]',
         'select-none',
       )}
     >
@@ -409,11 +409,11 @@ function SessionItem({
         if (e.key === 'Enter') onSelect();
       }}
       className={cn(
-        'group flex w-full items-center gap-2 rounded-[6px]',
-        'h-8 py-1.5 pl-3 pr-2 text-left transition-colors duration-[35ms] ease-[cubic-bezier(0.4,0,0.2,1)] cursor-pointer',
-        'text-[12px] leading-[16px]',
+        'group flex w-full items-center gap-2.5 rounded-[8px]',
+        'min-h-9 py-2 pl-3 pr-2 text-left transition-colors duration-[60ms] ease-[cubic-bezier(0.4,0,0.2,1)] cursor-pointer',
+        'text-[13px] leading-[18px]',
         active
-          ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)]'
+          ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)] font-[var(--pd-font-medium)]'
           : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
         archived && 'opacity-50',
       )}
@@ -837,7 +837,7 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         maxWidth: expanded
           ? 'var(--pd-layout-sidebar-width)'
           : 'var(--pd-layout-sidebar-rail)',
-        paddingTop: 44, // macOS traffic-light avoidance
+        paddingTop: 28, // macOS traffic-light 让位 (cc-haha 风格 sidebar 含顶部空间)
         transition: `width var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing), min-width var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing), max-width var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing)`,
       }}
     >
@@ -864,10 +864,10 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
           </div>
           {expanded && (
             <span
-              className="text-[13px] font-semibold tracking-tight text-[var(--pd-color-fg)]"
+              className="text-[15px] font-[var(--pd-font-medium)] tracking-tight text-[var(--pd-color-fg)] truncate"
               style={{ fontFamily: 'var(--pd-font-headline)' }}
             >
-              Panda
+              Panda Code <span className="text-[var(--pd-color-accent)]">Desk</span>
             </span>
           )}
         </div>
@@ -908,20 +908,20 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         </div>
       </div>
 
-      {/* 2 项一级入口：New session + Scheduled（nav-item spec: px-3 py-2 gap-2.5 icon 20 text-sm） */}
-      <div className={cn('shrink-0 px-3 pb-3 flex flex-col', expanded ? 'gap-0.5' : 'items-center gap-2')}>
+      {/* 2 项一级入口（cc-haha spec: h-9 px-3 gap-3 icon 18 text-[14px]/leading-5）*/}
+      <div className={cn('shrink-0 px-3 pb-3 flex flex-col', expanded ? 'gap-1' : 'items-center gap-2')}>
         <button
           type="button"
           onClick={handleNewSession}
           title="新建对话"
           className={cn(
             'flex items-center rounded-[8px] transition-all duration-200',
-            expanded ? 'w-full gap-2.5 px-3 py-2' : 'h-10 w-10 justify-center',
-            'text-[14px] text-[var(--pd-color-fg)]',
+            expanded ? 'w-full gap-3 px-3 h-9' : 'h-10 w-10 justify-center',
+            'text-[14px] leading-5 text-[var(--pd-color-fg)]',
             'hover:bg-[var(--pd-color-bg-hover)]',
           )}
         >
-          <Plus size={20} className="shrink-0" />
+          <Plus size={18} className="shrink-0" />
           {expanded && <span>新建对话</span>}
         </button>
         <button
@@ -931,14 +931,14 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
           aria-current={activeView === 'scheduled' ? 'page' : undefined}
           className={cn(
             'flex items-center rounded-[8px] transition-all duration-200',
-            expanded ? 'w-full gap-2.5 px-3 py-2' : 'h-10 w-10 justify-center',
-            'text-[14px]',
+            expanded ? 'w-full gap-3 px-3 h-9' : 'h-10 w-10 justify-center',
+            'text-[14px] leading-5',
             activeView === 'scheduled'
-              ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)] font-medium shadow-[0_8px_24px_rgba(15,23,42,0.08)]'
+              ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)] font-[var(--pd-font-medium)]'
               : 'text-[var(--pd-color-fg)] hover:bg-[var(--pd-color-bg-hover)]',
           )}
         >
-          <Clock size={20} className="shrink-0" />
+          <Clock size={18} className="shrink-0" />
           {expanded && <span>定时任务</span>}
         </button>
       </div>
@@ -961,11 +961,11 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索会话..."
               className={cn(
-                'w-full h-8 px-2.5 text-xs rounded-[var(--pd-radius-md)]',
-                'border border-[var(--pd-color-border)] bg-[var(--pd-color-bg)]',
+                'w-full h-9 px-3 text-[13px] rounded-[8px]',
+                'border border-[var(--pd-color-border)] bg-[var(--pd-color-bg-elevated)]',
                 'text-[var(--pd-color-fg)] placeholder:text-[var(--pd-color-fg-subtle)]',
                 'outline-none transition-colors',
-                'focus:border-[var(--pd-color-border-focus)]',
+                'focus:border-[var(--pd-color-border-focus)] focus:shadow-[0_0_0_3px_rgba(217,119,87,0.12)]',
               )}
             />
           </div>

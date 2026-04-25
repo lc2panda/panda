@@ -208,24 +208,19 @@ export function App() {
         'font-[var(--pd-font-sans)] text-[length:var(--pd-text-sm)]',
       )}
     >
-      {/* -- Left: Sidebar (280px expanded / 72px rail) -- */}
+      {/* -- Left: Sidebar (含顶部 traffic-light 区，cc-haha 结构) -- */}
       <PdSidebar expanded={sidebarExpanded} onToggle={() => setSidebarExpanded((p) => !p)} />
 
-      {/* -- Center: Main content (flex 占满剩余空间，内部组件自行控制 max-width) -- */}
+      {/* -- Center: Main content (TabBar + content + StatusBar) -- */}
       <div
         className="flex flex-1 flex-col overflow-hidden"
         style={{ minWidth: 0 }}
       >
-        {/* TabBar - 40px */}
+        {/* TabBar 仅在 main 上方 */}
         <PdTabBarConnected />
 
-        {/* Content - flex */}
         <div className="relative flex-1 overflow-hidden">
-          {activeView === 'settings' ? (
-            <Suspense fallback={<div style={{ padding: 'var(--pd-space-4)', opacity: 0.5 }}>Loading...</div>}>
-              <SettingsPage onClose={() => setActiveView('chat')} />
-            </Suspense>
-          ) : activeView === 'scheduled' ? (
+          {activeView === 'scheduled' ? (
             <Suspense fallback={<div style={{ padding: 'var(--pd-space-4)', opacity: 0.5 }}>Loading...</div>}>
               <ScheduledPage />
             </Suspense>
@@ -239,7 +234,6 @@ export function App() {
           )}
         </div>
 
-        {/* StatusBar - 32px */}
         <PdStatusBar
           model={activeSession?.statusVerb || undefined}
           tokenCount={
@@ -258,6 +252,30 @@ export function App() {
           onTabChange={setInspectorTab}
           onClose={() => setInspectorOpen(false)}
         />
+      )}
+
+      {/* -- Settings as modal overlay (cc-haha 风格) -- */}
+      {activeView === 'settings' && (
+        <Suspense fallback={null}>
+          <div
+            className="fixed inset-0 z-[var(--pd-z-modal)] flex items-center justify-center"
+            style={{ background: 'rgba(20, 20, 19, 0.32)', backdropFilter: 'blur(2px)' }}
+            onClick={() => setActiveView('chat')}
+          >
+            <div
+              className="rounded-[16px] overflow-hidden bg-[var(--pd-color-bg-elevated)]"
+              style={{
+                width: 'min(1080px, 92vw)',
+                height: 'min(720px, 88vh)',
+                boxShadow: '0 24px 64px rgba(27,28,26,0.18), 0 8px 24px rgba(27,28,26,0.12)',
+                border: '1px solid var(--pd-color-border)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <SettingsPage onClose={() => setActiveView('chat')} />
+            </div>
+          </div>
+        </Suspense>
       )}
 
       {/* -- Overlays -- */}

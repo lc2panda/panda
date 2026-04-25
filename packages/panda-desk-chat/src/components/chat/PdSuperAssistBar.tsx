@@ -82,11 +82,12 @@ export const PdSuperAssistBar: React.FC<PdSuperAssistBarProps> = ({
     <div
       className="pd-super-assist-bar w-full"
       style={{
-        height: 36,
+        height: 44,
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: 8,
-        padding: '0 16px',
+        padding: '4px 0 8px',
         overflowX: 'auto',
         scrollbarWidth: 'none',       /* Firefox */
       }}
@@ -103,30 +104,34 @@ export const PdSuperAssistBar: React.FC<PdSuperAssistBarProps> = ({
             type="button"
             onClick={() => handleClick(btn.id)}
             className={cn(
-              // Shape & spacing
-              'shrink-0 inline-flex items-center gap-[5px]',
-              'rounded-[18px] px-[14px] py-[6px]',
+              // Shape & spacing — pill chip with subtle elevation
+              'shrink-0 inline-flex items-center gap-1.5',
+              'h-8 px-3.5 rounded-full',
               'text-[13px] leading-none whitespace-nowrap',
               'cursor-pointer select-none',
-              'transition-colors duration-[var(--pd-duration-quick,150ms)]',
-              // Default state
+              'transition-all duration-[var(--pd-duration-quick,150ms)]',
+              // Default state — elevated white chip with warm border
               !isActive && [
-                'bg-transparent',
+                'bg-[var(--pd-color-bg-elevated)]',
                 'border border-[var(--pd-color-border)]',
                 'text-[var(--pd-color-fg-muted)]',
-                'hover:bg-[var(--pd-color-bg-subtle)]',
+                'shadow-[0_1px_2px_rgba(27,28,26,0.04)]',
                 'hover:border-[var(--pd-color-accent)]',
+                'hover:text-[var(--pd-color-fg)]',
+                'hover:-translate-y-px',
+                'hover:shadow-[0_2px_8px_rgba(27,28,26,0.06)]',
               ],
-              // Active state (thinking toggle ON)
+              // Active state (thinking toggle ON) — clay accent
               isActive && [
                 'bg-[var(--pd-color-accent)]',
                 'border border-[var(--pd-color-accent)]',
                 'text-white',
+                'shadow-[var(--pd-shadow-button-terra)]',
               ],
             )}
           >
             <span className="text-[14px] leading-none">{btn.emoji}</span>
-            <span>{btn.label}</span>
+            <span style={{ fontWeight: isActive ? 600 : 500 }}>{btn.label}</span>
           </button>
         );
       })}

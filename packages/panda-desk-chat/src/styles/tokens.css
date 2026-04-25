@@ -100,15 +100,16 @@
   /* Anthropic claude.ai spec: sidebar expanded = 18rem (288px), rail = 3.05rem (48.8px).
    * See monitor/20260425-cchaha-spec.md / Anthropic sidebar research §1.
    */
-  --pd-layout-sidebar-width: 288px;
-  --pd-layout-sidebar-rail: 56px;
-  --pd-layout-tabbar-height: 40px;
-  --pd-layout-statusbar-height: 32px;
+  /* cc-haha aligned: sidebar 280, rail 72, tabbar 37, statusbar 36, composer 768 */
+  --pd-layout-sidebar-width: 280px;
+  --pd-layout-sidebar-rail: 72px;
+  --pd-layout-tabbar-height: 37px;
+  --pd-layout-statusbar-height: 36px;
   --pd-layout-titlebar-mac: 28px;
   --pd-layout-titlebar-win: 32px;
   --pd-layout-main-max-width: 1200px;
   --pd-layout-main-padding-x: 24px;
-  --pd-layout-composer-max-width: 860px;
+  --pd-layout-composer-max-width: 768px;
   --pd-layout-right-panel: 320px;
   --pd-layout-pet-strip: 56px;
   --pd-layout-pet-rail: 48px;
@@ -196,20 +197,23 @@
   /* ── cc-haha Material You 配色（v3 全盘对齐） ─────────────────────────
    * 数值来源：cc-haha/desktop/src/theme/globals.css @theme 段（HEX 为事实性数据，无版权）
    */
-  /* 加大 sidebar 与 main 的亮度差，避免视觉融合 (cc-haha 风格 Material You).
-   * main = cream 暖白 #FAF9F5 (最亮)
-   * sidebar = ivory-medium #F0EEE6 (比 main 明显更深，warm undertone)
-   * hover/selected 进一步加深，让交互态可见。
+  /* cc-haha 全套 surface 层次（数值来自 cc-haha/desktop/src/theme/globals.css，事实性数据无版权）.
+   * main = surface #FAF9F5 (最亮 cream，与 claude.ai 同源)
+   * sidebar = container-low #F4F4F0 (比 main 略深的暖白)
+   * hover = container-high #E9E8E4 (明显深)
+   * selected = #DDD9C9 (强烈选中态)
+   * elevated = #FFFFFF (浮起卡片纯白)
+   * 关键：sidebar 与 main 通过 1px ink-15% border 分隔，加上更深的 hover/selected 让交互可见。
    */
-  --pd-color-bg: #FAF9F5;                                   /* surface / 主内容背景 */
-  --pd-color-bg-elevated: #FFFFFF;                          /* card / 浮起容器 */
-  --pd-color-bg-subtle: #F0EEE6;                            /* sidebar / surface-container */
-  --pd-color-bg-hover: #E8E6DC;                             /* hover (cloud-light) */
-  --pd-color-bg-selected: #DDD9C9;                          /* active item 明显高亮 */
+  --pd-color-bg: #FAF9F5;                                   /* surface (main) */
+  --pd-color-bg-elevated: #FFFFFF;                          /* card / composer / modal */
+  --pd-color-bg-subtle: #F4F4F0;                            /* sidebar / container-low */
+  --pd-color-bg-hover: #E9E8E4;                             /* hover state */
+  --pd-color-bg-selected: #DDD9C9;                          /* active session/tab */
   --pd-color-bg-disabled: #F0EEE6;
-  --pd-color-surface-container: #EFEEEA;
-  --pd-color-surface-container-low: #F0EEE6;
-  --pd-color-surface-container-high: #E8E6DC;
+  --pd-color-surface-container: #EFEEEA;                    /* tabbar bg */
+  --pd-color-surface-container-low: #F4F4F0;
+  --pd-color-surface-container-high: #E9E8E4;
   --pd-color-user-message-bg: #EFEEEA;
 
   /* ── Semantic: Foreground (cc-haha on-surface + variants) ── */
@@ -227,11 +231,14 @@
    * extra opaque variant (#DAC1BA) for places that explicitly cannot use
    * transparency (e.g. Glass Panel edge on gradient bg).
    */
-  --pd-color-border: rgba(31, 31, 30, 0.15);                 /* claude.ai border-300 */
-  --pd-color-border-strong: rgba(31, 31, 30, 0.30);
-  --pd-color-border-focus: #D97757;                          /* clay */
-  --pd-color-border-subtle: rgba(31, 31, 30, 0.08);
-  --pd-color-border-variant: #DAC1BA;                        /* opaque warm-brown for gradient bgs */
+  /* cc-haha 用 #DAC1BA (warm brown) 作为 border，比 claude.ai 的 ink-15% 更明显。
+   * 我们采用 cc-haha border 数值（事实性 HEX，无版权），让 sidebar/main/card 边界清晰。
+   */
+  --pd-color-border: #DAC1BA;                                /* cc-haha border (warm brown) */
+  --pd-color-border-strong: #C5A89F;                         /* darker brown for emphasis */
+  --pd-color-border-focus: #D97757;                          /* clay accent */
+  --pd-color-border-subtle: rgba(218, 193, 186, 0.5);        /* half-alpha for inner dividers */
+  --pd-color-border-variant: #DAC1BA;
 
   /* ── Semantic: Accent (Anthropic clay = #D97757) ────────────────────── */
   --pd-color-accent: #D97757;                                /* clay (official) */
@@ -355,16 +362,18 @@
   --pd-pet-species-border: var(--pd-palette-cream-400);
   --pd-pet-mood-glow: rgba(217, 119, 87, 0.3);
 
-  /* ── Glass Panel — 高对比度 card 视觉 ─────────────────────────────────── */
-  --pd-glass-bg: #FFFFFF;
-  --pd-glass-border: rgba(31, 31, 30, 0.10);                /* claude.ai style subtle dark border */
-  --pd-glass-blur: 0px;
-  /* 深度三层阴影：让 Composer / Hero card 在 cream bg 上明显浮起 */
+  /* ── Glass Panel — cc-haha glass-panel + dropdown shadow ───────────────
+   * cc-haha: bg=rgba(255,255,255,0.84) blur=20px border=rgba(218,193,186,0.22)
+   * 我们采用 cc-haha 数值，配合 dropdown 双层 shadow 让 Composer 真正浮起。
+   */
+  --pd-glass-bg: rgba(255, 255, 255, 0.92);                 /* slightly less transparent for clarity */
+  --pd-glass-border: rgba(218, 193, 186, 0.55);             /* warm brown subtle border */
+  --pd-glass-blur: 20px;                                     /* enable backdrop blur */
   --pd-glass-shadow:
-    0 1px 2px rgba(27,28,26,0.04),
-    0 4px 12px rgba(27,28,26,0.06),
-    0 16px 40px rgba(27,28,26,0.08);
-  --pd-glass-focus-ring: 0 0 0 1px rgba(217, 119, 87, 0.20);
+    0 1px 2px rgba(27,28,26,0.05),
+    0 4px 20px rgba(27,28,26,0.06),
+    0 12px 40px rgba(27,28,26,0.10);
+  --pd-glass-focus-ring: 0 0 0 2px rgba(217, 119, 87, 0.20);
 }
 
 /* ==========================================================================
