@@ -31,8 +31,6 @@ const PdSessionSwitcher = lazy(() => import('./components/special/PdSessionSwitc
 
 export function App() {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
-  const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [inspectorTab, setInspectorTab] = useState(0);
   const [sideChatOpen, setSideChatOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [sessionSwitcherOpen, setSessionSwitcherOpen] = useState(false);
@@ -90,15 +88,11 @@ export function App() {
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
 
-  // --- Sync uiStore inspector state → local state (sidebar → inspector linkage) ---
-  const uiInspectorTab = useUIStore((s) => s.inspectorTab);
-  const uiInspectorVisible = useUIStore((s) => s.inspectorVisible);
-  useEffect(() => {
-    if (uiInspectorVisible) {
-      setInspectorOpen(true);
-      setInspectorTab(uiInspectorTab);
-    }
-  }, [uiInspectorTab, uiInspectorVisible]);
+  // --- Inspector state: store-driven (no local React state) ---
+  const inspectorTab = useUIStore((s) => s.inspectorTab);
+  const inspectorOpen = useUIStore((s) => s.inspectorVisible);
+  const setInspectorTab = useUIStore((s) => s.setInspectorTab);
+  const setInspectorOpen = useUIStore((s) => s.setInspectorVisible);
 
   // --- Session / Tab actions for shortcuts ---
   const createSession = useSessionStore((s) => s.createSession);
@@ -109,7 +103,7 @@ export function App() {
   // --- Global keyboard shortcuts (Cmd+B / Cmd+\ / Cmd+; / Cmd+N / Cmd+Shift+N / Cmd+,) ---
   useGlobalShortcuts({
     toggleSidebar: useCallback(() => setSidebarExpanded((p) => !p), []),
-    toggleInspector: useCallback(() => setInspectorOpen((p) => !p), []),
+    toggleInspector: useCallback(() => setInspectorOpen(!inspectorOpen), []),
     toggleSideChat: useCallback(() => setSideChatOpen((p) => !p), []),
     newChat: useCallback(async () => {
       const session = await createSession();
@@ -174,7 +168,7 @@ export function App() {
       group: 'View',
       shortcut: '⌘\\',
       action: () => {
-        setInspectorOpen((p) => !p);
+        setInspectorOpen(!inspectorOpen);
         setCommandPaletteOpen(false);
       },
     },
