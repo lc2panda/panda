@@ -53,4 +53,17 @@ export function setupAllBridges(): void {
   setupSettingsBridge();
   setupProviderBridge();
   setupScheduleBridge();
+
+  // Dev-only: expose stores on window for CDP / DevTools introspection.
+  if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+    const w = window as unknown as Record<string, unknown>;
+    void import('./chatStore').then((m) => { w.useChatStore = m.useChatStore; });
+    void import('./sessionStore').then((m) => { w.useSessionStore = m.useSessionStore; });
+    void import('./tabStore').then((m) => { w.useTabStore = m.useTabStore; });
+    void import('./settingsStore').then((m) => { w.useSettingsStore = m.useSettingsStore; });
+    void import('./uiStore').then((m) => { w.useUIStore = m.useUIStore; });
+    void import('./providerStore').then((m) => { w.useProviderStore = m.useProviderStore; });
+    void import('./buddyStore').then((m) => { w.useBuddyStore = m.useBuddyStore; });
+    void import('./scheduleStore').then((m) => { w.useScheduleStore = m.useScheduleStore; });
+  }
 }
