@@ -39,38 +39,37 @@ export const PdStreamingIndicator: React.FC<PdStreamingIndicatorProps> = ({
   const elapsedDisplay = formatElapsed(elapsed);
 
   return (
-    <span
+    <div
       className={cn(
-        "inline-flex items-center gap-2 px-3 py-1 rounded-full",
-        "bg-[var(--pd-color-bg-float)] text-[var(--pd-color-fg-muted)]",
-        "text-xs font-medium select-none",
+        'mx-auto my-3 max-w-[820px] px-1',
         className,
       )}
     >
-      {/* Shimmer cursor (original) */}
-      <span className="inline-block w-2 h-4 rounded-sm bg-[var(--pd-color-accent)] animate-pulse" />
-
-      {/* 3-dot pulse — uses pd-pulse-dot keyframe from global.css */}
-      <span className="inline-flex items-center gap-1" aria-hidden="true">
-        <span className="pd-thinking-dot" />
-        <span className="pd-thinking-dot" />
-        <span className="pd-thinking-dot" />
-      </span>
-
-      <span className="text-[var(--pd-color-fg-muted)]">
-        正在输入...
-      </span>
-
-      <span className="text-[var(--pd-color-accent-fg)] opacity-70">
-        {verb} · {elapsedDisplay}
-      </span>
-
-      {tokens !== undefined && tokens > 0 && (
-        <span className="text-[var(--pd-color-accent-fg)] opacity-70">
-          {tokens.toLocaleString()} tokens
+      <span
+        className={cn(
+          'inline-flex items-center gap-2 px-3 py-1.5 rounded-full',
+          'bg-[var(--pd-color-bg-subtle)] border border-[var(--pd-color-border-subtle)]',
+          'text-[12px] font-[var(--pd-font-medium)] text-[var(--pd-color-fg-muted)] select-none',
+        )}
+      >
+        <span className="inline-flex items-center gap-1" aria-hidden="true">
+          <span className="pd-thinking-dot" />
+          <span className="pd-thinking-dot" />
+          <span className="pd-thinking-dot" />
         </span>
-      )}
-    </span>
+        <span>{verb || '正在思考'}</span>
+        <span className="text-[var(--pd-color-fg-subtle)]">·</span>
+        <span className="font-[family-name:var(--pd-font-mono)] tabular-nums">{elapsedDisplay}</span>
+        {tokens !== undefined && tokens > 0 && (
+          <>
+            <span className="text-[var(--pd-color-fg-subtle)]">·</span>
+            <span className="font-[family-name:var(--pd-font-mono)] tabular-nums">
+              {tokens.toLocaleString()} tok
+            </span>
+          </>
+        )}
+      </span>
+    </div>
   );
 };
 
