@@ -176,15 +176,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
           )}
           <div
             className="shrink-0 w-full flex flex-col items-center"
-            style={{ padding: '0 24px 24px' }}
+            style={{ padding: '0 24px 16px' }}
           >
-            <div style={{ width: '100%', maxWidth: 860 }}>
-              <PdSuperAssistBar
-                onSendCommand={handleAssistCommand}
-                onToggleThinking={handleToggleThinking}
-                onOpenSlashMenu={handleOpenSlashMenu}
-                onOpenBuddyLog={handleOpenBuddyLog}
-              />
+            <div style={{ width: '100%', maxWidth: 768 }}>
               <PdComposer
                 ref={composerRef}
                 sessionId={activeId!}
@@ -195,6 +189,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
                 disabled={isStreaming}
               />
             </div>
+            <ProjectPill cwd={(activeMeta as { cwd?: string } | null)?.cwd} />
           </div>
         </>
       ) : (
@@ -205,15 +200,9 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className, onOpenBuddyLog })
           </div>
           <div
             className="shrink-0 w-full flex flex-col items-center"
-            style={{ padding: '0 24px 24px' }}
+            style={{ padding: '0 24px 16px' }}
           >
-            <div style={{ width: '100%', maxWidth: 860 }}>
-              <PdSuperAssistBar
-                onSendCommand={handleAssistCommand}
-                onToggleThinking={handleToggleThinking}
-                onOpenSlashMenu={handleOpenSlashMenu}
-                onOpenBuddyLog={handleOpenBuddyLog}
-              />
+            <div style={{ width: '100%', maxWidth: 768 }}>
               <PdComposer
                 ref={composerRef}
                 sessionId={activeId ?? ''}

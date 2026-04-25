@@ -66,7 +66,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ className, onClose }
         type="button"
         onClick={() => setActiveTab(tab.id)}
         className={cn(
-          'w-full px-4 py-2.5 flex items-center gap-2.5 text-left rounded-[8px]',
+          'w-full px-4 py-2.5 flex items-center gap-2.5 text-left',
           'text-[14px] transition-colors duration-150',
           isActive
             ? 'bg-[var(--pd-color-bg-selected)] text-[var(--pd-color-fg)] font-[var(--pd-font-medium)]'
@@ -81,40 +81,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ className, onClose }
 
   return (
     <div
-      className={cn('flex h-full', className)}
+      className={cn('flex h-full overflow-hidden', className)}
       style={{ background: 'var(--pd-color-bg)', color: 'var(--pd-color-fg)' }}
     >
-      {/* Left nav — 180px bg surface border-right (cc-haha 规格) */}
+      {/* Left nav — 180px (cc-haha spec: w-[180px] border-r py-3) */}
       <aside
-        className="flex shrink-0 flex-col border-r border-[var(--pd-color-border)]"
-        style={{ width: 180, background: 'var(--pd-color-bg)' }}
+        className="flex shrink-0 flex-col border-r border-[var(--pd-color-border)] py-3"
+        style={{ width: 180 }}
       >
-        <div className="flex items-center justify-between px-3 py-3 border-b border-[var(--pd-color-border)]">
-          <h2 className="text-[14px] font-[var(--pd-font-semibold)] text-[var(--pd-color-fg)]">
-            {t('settings.title')}
-          </h2>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close settings"
-              className="h-6 w-6 rounded-md flex items-center justify-center text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]"
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+        <nav className="flex-1 overflow-y-auto">
           {topTabs.map(renderNavItem)}
         </nav>
-        <div className="border-t border-[var(--pd-color-border)] p-2">
+        <div>
           {renderNavItem(aboutTab)}
         </div>
       </aside>
 
-      {/* Right content */}
+      {/* Right content — fills remaining width (cc-haha spec: flex-1 px-8 py-6) */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[920px] mx-auto px-8 py-6">
+        <div className="px-10 py-8">
           {activeContent}
         </div>
       </div>

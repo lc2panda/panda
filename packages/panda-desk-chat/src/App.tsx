@@ -224,6 +224,10 @@ export function App() {
             <Suspense fallback={<div style={{ padding: 'var(--pd-space-4)', opacity: 0.5 }}>Loading...</div>}>
               <ScheduledPage />
             </Suspense>
+          ) : activeView === 'settings' ? (
+            <Suspense fallback={<div style={{ padding: 'var(--pd-space-4)', opacity: 0.5 }}>Loading...</div>}>
+              <SettingsPage />
+            </Suspense>
           ) : (
             <ChatPage
               onOpenBuddyLog={() => {
@@ -252,30 +256,6 @@ export function App() {
           onTabChange={setInspectorTab}
           onClose={() => setInspectorOpen(false)}
         />
-      )}
-
-      {/* -- Settings as modal overlay (cc-haha 风格) -- */}
-      {activeView === 'settings' && (
-        <Suspense fallback={null}>
-          <div
-            className="fixed inset-0 z-[var(--pd-z-modal)] flex items-center justify-center"
-            style={{ background: 'rgba(20, 20, 19, 0.32)', backdropFilter: 'blur(2px)' }}
-            onClick={() => setActiveView('chat')}
-          >
-            <div
-              className="rounded-[16px] overflow-hidden bg-[var(--pd-color-bg-elevated)]"
-              style={{
-                width: 'min(1080px, 92vw)',
-                height: 'min(720px, 88vh)',
-                boxShadow: '0 24px 64px rgba(27,28,26,0.18), 0 8px 24px rgba(27,28,26,0.12)',
-                border: '1px solid var(--pd-color-border)',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <SettingsPage onClose={() => setActiveView('chat')} />
-            </div>
-          </div>
-        </Suspense>
       )}
 
       {/* -- Overlays -- */}

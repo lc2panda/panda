@@ -6,6 +6,7 @@ import { useCallback, useState } from 'react';
 import { useTabStore } from '@/stores/tabStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useChatStore } from '@/stores/chatStore';
+import { useUIStore } from '@/stores/uiStore';
 import { PdTabBar, type PdTabBarTab } from './PdTabBar';
 import { TabContextMenu } from './PdTabContextMenu';
 
@@ -187,21 +188,74 @@ export function PdTabBarConnected() {
     closeAll();
   }, [closeAll]);
 
+  // ── View tabs (cc-haha pattern: settings/scheduled rendered as system tabs) ──
+  const activeView = useUIStore((s) => s.activeView);
+  const setActiveView = useUIStore((s) => s.setActiveView);
+
   // ── Map store tabs to PdTabBarTab props ──
-  const tabBarTabs: PdTabBarTab[] = sorted.map((tab) => ({
+  const sessionTabBarTabs: PdTabBarTab[] = sorted.map((tab) => ({
     id: tab.id,
     title: tab.title,
-    isActive: tab.id === activeTabId,
+    isActive: activeView === 'chat' && tab.id === activeTabId,
     isPinned: tab.isPinned,
     statusDot: isSessionStreaming(tab.sessionId) ? 'running' : 'idle',
   }));
+
+  // Inject system view tabs (Settings / Scheduled) when their views are active
+  const tabBarTabs: PdTabBarTab[] = [
+    ...sessionTabBarTabs,
+    ...(activeView === 'settings' ? [{
+      id: '__settings__',
+      title: '设置',
+      isActive: true,
+      isPinned: false,
+      systemType: 'settings' as const,
+    }] : []),
+    ...(activeView === 'scheduled' ? [{
+      id: '__scheduled__',
+      title: '定时任务',
+      isActive: true,
+      isPinned: false,
+      systemType: 'scheduled' as const,
+    }] : []),
+  ];
+
+  // Wrap select to handle system tabs
+  const handleSelectWrapped = useCallback(
+    (tabId: string) => {
+      if (tabId === '__settings__') {
+        setActiveView('settings');
+        return;
+      }
+      if (tabId === '__scheduled__') {
+        setActiveView('scheduled');
+        return;
+      }
+      // Session tab: switch back to chat view + select
+      setActiveView('chat');
+      handleSelect(tabId);
+    },
+    [setActiveView, handleSelect],
+  );
+
+  // Wrap close to handle system tabs (close = back to chat)
+  const handleCloseWrapped = useCallback(
+    (tabId: string) => {
+      if (tabId === '__settings__' || tabId === '__scheduled__') {
+        setActiveView('chat');
+        return;
+      }
+      handleClose(tabId);
+    },
+    [setActiveView, handleClose],
+  );
 
   return (
     <>
       <PdTabBar
         tabs={tabBarTabs}
-        onSelect={handleSelect}
-        onClose={handleClose}
+        onSelect={handleSelectWrapped}
+        onClose={handleCloseWrapped}
         onNewTab={handleNewTab}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}

@@ -9,6 +9,10 @@ import {
   Plus as _Plus,
   ChevronLeft as _ChevronLeft,
   ChevronRight as _ChevronRight,
+  // @ts-ignore lucide-react bundled .d.ts
+  Settings as _Settings,
+  // @ts-ignore
+  Clock as _Clock,
 } from 'lucide-react';
 
 // Re-type lucide icons for React 18 compat (hoisted @types/react@19 conflict)
@@ -17,6 +21,8 @@ const X = _X as IconFC;
 const Plus = _Plus as IconFC;
 const ChevronLeft = _ChevronLeft as IconFC;
 const ChevronRight = _ChevronRight as IconFC;
+const SettingsIcon = _Settings as IconFC;
+const ClockIcon = _Clock as IconFC;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,6 +35,8 @@ export interface PdTabBarTab {
   hasChanges?: boolean;
   /** Session activity state — shown as a left-side dot (cc-haha style) */
   statusDot?: 'running' | 'idle';
+  /** System tab type — shows a tab-type icon instead of dot */
+  systemType?: 'settings' | 'scheduled';
 }
 
 export interface PdTabBarProps {
@@ -274,8 +282,16 @@ export function PdTabBar({
             >
               {/* Active indicator — top inset 2px accent + bottom seam covers tabbar border */}
 
+              {/* System type icon (settings/scheduled) — cc-haha pattern */}
+              {tab.systemType === 'settings' && (
+                <SettingsIcon size={14} className="shrink-0 text-[var(--pd-color-fg-tertiary)]" />
+              )}
+              {tab.systemType === 'scheduled' && (
+                <ClockIcon size={14} className="shrink-0 text-[var(--pd-color-fg-tertiary)]" />
+              )}
+
               {/* Session status dot — green = running, gray = idle (cc-haha visual language) */}
-              {tab.statusDot && (
+              {!tab.systemType && tab.statusDot && (
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{
@@ -438,19 +454,8 @@ export function PdTabBar({
         </div>
       )}
 
-      {/* ── New tab button ── */}
-      <button
-        type="button"
-        onClick={onNewTab}
-        className={cn(
-          'flex shrink-0 items-center justify-center px-3',
-          'text-[var(--pd-color-fg-muted)] transition-colors',
-          'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
-        )}
-        aria-label="New tab"
-      >
-        <Plus size={16} />
-      </button>
+      {/* cc-haha aligned: no explicit + button on tabbar; new sessions
+       * created via Sidebar "新建对话" / Cmd+N. */}
     </div>
   );
 }
