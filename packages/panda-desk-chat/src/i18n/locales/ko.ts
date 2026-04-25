@@ -116,6 +116,7 @@ export default {
   'settings.tabPermissions': '권한',
   'settings.tabModel': '모델',
   'settings.permissions.title': '도구 권한',
+  'settings.permissions.subtitle': 'AI 도구 호출의 승인 정책 선택',
   'settings.model.title': '모델 선택',
   'settings.model.search': '모델 검색...',
   'settings.model.noModels': '사용 가능한 모델 없음',

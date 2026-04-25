@@ -116,6 +116,7 @@ export default {
   'settings.tabPermissions': 'Permissions',
   'settings.tabModel': 'Model',
   'settings.permissions.title': 'Tool permissions',
+  'settings.permissions.subtitle': 'Choose how AI tool calls are approved',
   'settings.model.title': 'Model selection',
   'settings.model.search': 'Search models...',
   'settings.model.noModels': 'No models available',
