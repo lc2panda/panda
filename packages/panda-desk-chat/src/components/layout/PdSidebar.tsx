@@ -825,6 +825,7 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
       className={cn(
         'flex h-full flex-col overflow-hidden shrink-0',
         'bg-[var(--pd-color-bg-subtle)]',
+        'border-r border-[var(--pd-color-border)]',
       )}
       style={{
         width: expanded
