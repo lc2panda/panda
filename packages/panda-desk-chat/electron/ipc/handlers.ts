@@ -1,5 +1,5 @@
 // Input: ipcMain handle registrations + CLI backend manager (W7-2), WindowManager, notificationManager, appUpdater, cronScheduler
-// Output: IPC request handlers (CLI backend + window manager + scheduled tasks) — connected to CLIManager + WindowManager + nativeTheme + notifications + updater + CronScheduler
+// Output: IPC request handlers (CLI backend + window manager + scheduled tasks + pandacc scanner) — connected to CLIManager + WindowManager + nativeTheme + notifications + updater + CronScheduler + pandacc-scanner
 // Pos: Main process IPC layer — routes renderer requests to backend services
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -7,12 +7,47 @@
 import { ipcMain, BrowserWindow, clipboard, nativeImage, nativeTheme } from 'electron';
 import { readdir, stat } from 'node:fs/promises';
 import { join, basename } from 'node:path';
+import { spawn as childSpawn } from 'node:child_process';
 import { cliManager } from '../backend/cli-manager';
 import {
   listAllSessions as diskListAllSessions,
   getSessionDetail as diskGetSessionDetail,
+  getSessionLaunchInfo as diskGetSessionLaunchInfo,
 } from '../backend/disk-session-scanner';
+import {
+  scanLearningPlans as scanLearningPlansBackend,
+  scanFlashcards as scanFlashcardsBackend,
+  readPlan as readLearningPlan,
+  readFlashcards as readLearningFlashcards,
+} from '../backend/learning-scanner';
 import { cronScheduler, type CreateTaskInput, type ScheduledTask } from '../backend/cron-scheduler';
+// Comdr 指令: IM Wechat — IM Adapter 启停管理（feishu/telegram/wechat）
+import { adapterManager, type AdapterPlatform } from '../backend/adapter-manager';
+// Comdr 指令: 超级助手 Wechat DB — 微信本地 db 解密链路
+import {
+  getWechatDbStatus,
+  setWechatConfig,
+  setWechatProactive,
+  triggerWechatDecrypt,
+  type WechatConfigPatch,
+  type WechatProactivePatch,
+} from '../backend/wechat-db-manager';
+// Comdr 指令: ~/.pandacc 实际配置目录扫描器（Skills/Agents/Plugins/Env/ComputerUse）
+// Comdr 指令: ComputerUse 完整实现 - cc-haha 对标 — 加 4 个 ComputerUse handler
+import {
+  listSkills as scanSkills,
+  listAgents as scanAgents,
+  listPlugins as scanPlugins,
+  getPandaEnv as readPandaEnv,
+  setPandaEnvKey as writePandaEnvKey,
+  getComputerUseStatusEx as scanComputerUse,
+  listInstalledApps as scanInstalledApps,
+  getAuthorizedApps as readAuthorizedApps,
+  setAuthorizedApps as writeAuthorizedApps,
+  openSystemPrivacySettings as openSysPrivacy,
+  type AuthorizedApp,
+  type ComputerUseGrantFlags,
+} from '../backend/pandacc-scanner';
 import { notificationManager } from '../notification';
 import { appUpdater } from '../updater';
 import { windowManager } from '../window-manager';
@@ -32,6 +67,8 @@ const CH = {
   SESSION_FOCUS:       'panda:session:focus',
   SESSION_LIST_ALL:    'panda:session:list-all',
   SESSION_GET_HISTORY: 'panda:session:get-history',
+  // 遗留 IPC 修复 #1: cc-haha sessionsApi.getGitInfo 对齐
+  SESSION_GIT_INFO:    'panda:session:git-info',
   TOOL_PERM_RESPONSE:  'panda:tool:permission:response',
   FS_SEARCH:           'panda:chat:fs:search',
   FS_LIST:             'panda:chat:fs:list',
@@ -62,6 +99,32 @@ const CH = {
   SCHEDULE_TOGGLE:      'panda:schedule:toggle',
   SCHEDULE_VALIDATE:    'panda:schedule:validate-cron',
   SCHEDULE_UPDATED:     'panda:schedule:update', // M→R push on tasks change
+  // Comdr 指令: 6 个 pandacc Settings sub-tab IPC channels
+  PANDA_SKILLS_LIST:        'panda:skills:list',
+  PANDA_AGENTS_LIST:        'panda:agents:list',
+  PANDA_PLUGINS_LIST:       'panda:plugins:list',
+  PANDA_ENV_GET:            'panda:env:get',
+  PANDA_ENV_SET:            'panda:env:set',
+  PANDA_COMPUTER_USE_STATUS:           'panda:computer-use:status',
+  // Comdr 指令: ComputerUse 完整实现 - cc-haha 对标 (4 个新 channel)
+  PANDA_COMPUTER_USE_INSTALLED_APPS:   'panda:computer-use:installed-apps',
+  PANDA_COMPUTER_USE_AUTHORIZED_APPS:  'panda:computer-use:authorized-apps',
+  PANDA_COMPUTER_USE_SET_AUTHORIZED:   'panda:computer-use:set-authorized-apps',
+  PANDA_COMPUTER_USE_OPEN_SETTINGS:    'panda:computer-use:open-settings',
+  // Comdr 指令: IM Wechat / 任务 B — IM Adapter 启停 (3 个 channel)
+  ADAPTER_START:        'panda:adapter:start',
+  ADAPTER_STOP:         'panda:adapter:stop',
+  ADAPTER_STATUS:       'panda:adapter:status',
+  // Comdr 指令: 超级助手 Wechat DB / 任务 C — 微信本地 db 解密 (4 个 channel)
+  WECHAT_STATUS:        'panda:wechat:status',
+  WECHAT_SET_CONFIG:    'panda:wechat:set-config',
+  WECHAT_SET_PROACTIVE: 'panda:wechat:set-proactive',
+  WECHAT_DECRYPT:       'panda:wechat:decrypt',
+  // Comdr 指令: 学习助手 — panda CLI /learn 落盘数据扫描 (4 个 channel)
+  LEARNING_LIST_PLANS:        'panda:learning:list-plans',
+  LEARNING_LIST_FLASHCARDS:   'panda:learning:list-flashcards',
+  LEARNING_READ_PLAN:         'panda:learning:read-plan',
+  LEARNING_READ_FLASHCARDS:   'panda:learning:read-flashcards',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -172,6 +235,27 @@ export function registerIpcHandlers(): void {
       return null;
     }
   });
+
+  // 遗留 IPC 修复 #1: git-info — cc-haha sessions.ts L208-267 1:1 对齐
+  // 输入: { sessionId } 或 { cwd } 任一；输出 { branch, repoName, workDir, changedFiles }
+  // sessionId 优先级:
+  //   1. cliManager 内 live session 的 cwd
+  //   2. disk session 的 workDir（从 .pandacc 历史 jsonl 解析）
+  //   3. 显式传入的 cwd
+  ipcMain.handle(
+    CH.SESSION_GIT_INFO,
+    async (_event, payload: { sessionId?: string; cwd?: string }) => {
+      const fallback: GitInfoResult = { branch: null, repoName: null, workDir: '', changedFiles: 0 };
+      try {
+        const workDir = await resolveWorkDir(payload?.sessionId, payload?.cwd);
+        if (!workDir) return fallback;
+        return await readGitInfo(workDir);
+      } catch (err) {
+        console.error('[IPC] SESSION_GIT_INFO failed:', err);
+        return fallback;
+      }
+    },
+  );
 
   // ── Tool permissions ───────────────────────────────────────────────
 
@@ -325,7 +409,240 @@ export function registerIpcHandlers(): void {
   // ── Scheduled tasks ────────────────────────────────────────────────
   registerScheduleHandlers();
 
-  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule connected)');
+  // ── Comdr 指令: pandacc 真实数据扫描 ──────────────────────────────
+  // 6 个 channel：~/.pandacc/{skills,agents,plugins,settings.json,computer-use}
+  ipcMain.handle(CH.PANDA_SKILLS_LIST, async () => {
+    try {
+      return await scanSkills();
+    } catch (err) {
+      console.error('[IPC] PANDA_SKILLS_LIST failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(CH.PANDA_AGENTS_LIST, async () => {
+    try {
+      return await scanAgents();
+    } catch (err) {
+      console.error('[IPC] PANDA_AGENTS_LIST failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(CH.PANDA_PLUGINS_LIST, async () => {
+    try {
+      return await scanPlugins();
+    } catch (err) {
+      console.error('[IPC] PANDA_PLUGINS_LIST failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(CH.PANDA_ENV_GET, async () => {
+    try {
+      return await readPandaEnv();
+    } catch (err) {
+      console.error('[IPC] PANDA_ENV_GET failed:', err);
+      return {};
+    }
+  });
+
+  ipcMain.handle(
+    CH.PANDA_ENV_SET,
+    async (_event, payload: { key: string; value: string | null }) => {
+      if (!payload || typeof payload.key !== 'string') {
+        throw new Error('panda:env:set requires { key, value }');
+      }
+      try {
+        await writePandaEnvKey(payload.key, payload.value);
+        return { ok: true };
+      } catch (err) {
+        console.error('[IPC] PANDA_ENV_SET failed:', err);
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+  );
+
+  ipcMain.handle(CH.PANDA_COMPUTER_USE_STATUS, async () => {
+    try {
+      return await scanComputerUse();
+    } catch (err) {
+      console.error('[IPC] PANDA_COMPUTER_USE_STATUS failed:', err);
+      // Comdr 指令: ComputerUse 完整实现 - cc-haha 对标 — 失败 fallback 与新 schema 对齐
+      return {
+        platform: process.platform,
+        supported: false,
+        grantsExist: false,
+        grantsPath: '',
+        grantedApps: [] as AuthorizedApp[],
+        permissions: { accessibility: null, screenRecording: null },
+      };
+    }
+  });
+
+  // Comdr 指令: ComputerUse 完整实现 - cc-haha 对标 — 4 个新 handler
+  ipcMain.handle(CH.PANDA_COMPUTER_USE_INSTALLED_APPS, async () => {
+    try {
+      return await scanInstalledApps();
+    } catch (err) {
+      console.error('[IPC] PANDA_COMPUTER_USE_INSTALLED_APPS failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(CH.PANDA_COMPUTER_USE_AUTHORIZED_APPS, async () => {
+    try {
+      return await readAuthorizedApps();
+    } catch (err) {
+      console.error('[IPC] PANDA_COMPUTER_USE_AUTHORIZED_APPS failed:', err);
+      return {
+        authorizedApps: [] as AuthorizedApp[],
+        grantFlags: { clipboardRead: true, clipboardWrite: true, systemKeyCombos: true } as ComputerUseGrantFlags,
+      };
+    }
+  });
+
+  ipcMain.handle(
+    CH.PANDA_COMPUTER_USE_SET_AUTHORIZED,
+    async (_event, payload: { authorizedApps?: AuthorizedApp[]; grantFlags?: Partial<ComputerUseGrantFlags> }) => {
+      if (!payload || !Array.isArray(payload.authorizedApps)) {
+        return { ok: false, error: 'panda:computer-use:set-authorized-apps requires { authorizedApps: AuthorizedApp[] }' };
+      }
+      try {
+        await writeAuthorizedApps({
+          authorizedApps: payload.authorizedApps,
+          grantFlags: payload.grantFlags,
+        });
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[IPC] PANDA_COMPUTER_USE_SET_AUTHORIZED failed:', msg);
+        return { ok: false, error: msg };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    CH.PANDA_COMPUTER_USE_OPEN_SETTINGS,
+    async (_event, payload: { pane: 'accessibility' | 'screen-recording' }) => {
+      if (!payload?.pane) {
+        return { ok: false, error: 'pane is required (accessibility | screen-recording)' };
+      }
+      try {
+        await openSysPrivacy(payload.pane);
+        return { ok: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[IPC] PANDA_COMPUTER_USE_OPEN_SETTINGS failed:', msg);
+        return { ok: false, error: msg };
+      }
+    },
+  );
+
+  // ── Comdr 指令: IM Wechat / 任务 B — Adapter 启停 ─────────────────
+  ipcMain.handle(CH.ADAPTER_START, async (_event, payload: { platform: AdapterPlatform }) => {
+    if (!payload?.platform) {
+      return { ok: false, error: 'platform is required', errorCode: 'INVALID_PLATFORM' as const };
+    }
+    return adapterManager.start(payload.platform);
+  });
+
+  ipcMain.handle(CH.ADAPTER_STOP, async (_event, payload: { platform: AdapterPlatform }) => {
+    if (!payload?.platform) {
+      return { ok: false, error: 'platform is required' };
+    }
+    return adapterManager.stop(payload.platform);
+  });
+
+  ipcMain.handle(CH.ADAPTER_STATUS, async (_event, payload: { platform: AdapterPlatform }) => {
+    if (!payload?.platform) {
+      throw new Error('panda:adapter:status requires { platform }');
+    }
+    return adapterManager.status(payload.platform);
+  });
+
+  // ── Comdr 指令: 超级助手 Wechat DB / 任务 C — 微信本地 db 解密 ────
+  ipcMain.handle(CH.WECHAT_STATUS, async () => {
+    try {
+      return await getWechatDbStatus();
+    } catch (err) {
+      console.error('[IPC] WECHAT_STATUS failed:', err);
+      throw err;
+    }
+  });
+
+  ipcMain.handle(CH.WECHAT_SET_CONFIG, async (_event, payload: WechatConfigPatch) => {
+    if (!payload || typeof payload !== 'object') {
+      return { ok: false, error: 'panda:wechat:set-config requires patch object' };
+    }
+    return setWechatConfig(payload);
+  });
+
+  ipcMain.handle(CH.WECHAT_SET_PROACTIVE, async (_event, payload: WechatProactivePatch) => {
+    if (!payload || typeof payload !== 'object') {
+      return { ok: false, error: 'panda:wechat:set-proactive requires patch object' };
+    }
+    return setWechatProactive(payload);
+  });
+
+  ipcMain.handle(CH.WECHAT_DECRYPT, async () => {
+    return triggerWechatDecrypt();
+  });
+
+  // ── Comdr 指令: 学习助手 — panda CLI /learn 落盘数据扫描 ─────────────
+  // 数据来源 (panda CLI bundled skill src/skills/bundled/learn.ts)：
+  //   /learn plan <topic> → <project_cwd>/working/learning-plans/<slug>.md
+  //   /learn from <file>  → <project_cwd>/working/flashcards/<topic>.json
+  //   复习日志             → <project_cwd>/working/flashcards/.review-log.json
+  ipcMain.handle(CH.LEARNING_LIST_PLANS, async () => {
+    try {
+      return await scanLearningPlansBackend();
+    } catch (err) {
+      console.error('[IPC] LEARNING_LIST_PLANS failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(CH.LEARNING_LIST_FLASHCARDS, async () => {
+    try {
+      return await scanFlashcardsBackend();
+    } catch (err) {
+      console.error('[IPC] LEARNING_LIST_FLASHCARDS failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(
+    CH.LEARNING_READ_PLAN,
+    async (_event, payload: { projectSlug: string; slug: string }) => {
+      if (!payload || typeof payload.projectSlug !== 'string' || typeof payload.slug !== 'string') {
+        return null;
+      }
+      try {
+        return await readLearningPlan(payload.projectSlug, payload.slug);
+      } catch (err) {
+        console.error('[IPC] LEARNING_READ_PLAN failed:', err);
+        return null;
+      }
+    },
+  );
+
+  ipcMain.handle(
+    CH.LEARNING_READ_FLASHCARDS,
+    async (_event, payload: { projectSlug: string; topic: string }) => {
+      if (!payload || typeof payload.projectSlug !== 'string' || typeof payload.topic !== 'string') {
+        return null;
+      }
+      try {
+        return await readLearningFlashcards(payload.projectSlug, payload.topic);
+      } catch (err) {
+        console.error('[IPC] LEARNING_READ_FLASHCARDS failed:', err);
+        return null;
+      }
+    },
+  );
+
+  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning connected)');
 }
 
 // ---------------------------------------------------------------------------
@@ -432,4 +749,107 @@ export function sendToRenderer(
   if (win && !win.isDestroyed()) {
     win.webContents.send(channel, ...args);
   }
+}
+
+// ---------------------------------------------------------------------------
+// 遗留 IPC 修复 #1: git-info helpers
+// cc-haha desktop server/api/sessions.ts L208-267 — 1:1 行为对齐：
+//   - 优先 sessionId (live cli-manager session 的 cwd)
+//   - 回退 sessionId 在磁盘上的 jsonl 历史 workDir
+//   - 最后回退显式传入 cwd
+// 命令一律走 child_process.spawn（Electron 主进程，无 Bun.spawn）。
+// ---------------------------------------------------------------------------
+
+interface GitInfoResult {
+  branch: string | null;
+  repoName: string | null;
+  workDir: string;
+  changedFiles: number;
+}
+
+async function resolveWorkDir(sessionId?: string, fallbackCwd?: string): Promise<string | null> {
+  if (sessionId && typeof sessionId === 'string') {
+    // Live session 优先（cli-manager 内 SessionInfo.cwd）
+    try {
+      const live = cliManager.listSessions().find((s) => s.id === sessionId);
+      if (live?.cwd) return live.cwd;
+    } catch { /* 忽略 — 进入下一回退 */ }
+
+    // Disk session 历史 workDir
+    try {
+      const launch = await diskGetSessionLaunchInfo(sessionId);
+      if (launch?.workDir) return launch.workDir;
+    } catch { /* 忽略 — 进入下一回退 */ }
+  }
+  if (fallbackCwd && typeof fallbackCwd === 'string' && fallbackCwd.trim()) {
+    return fallbackCwd;
+  }
+  return null;
+}
+
+function spawnGit(args: string[], cwd: string, timeoutMs = 1500): Promise<string> {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let settled = false;
+    const finalize = (value: string) => {
+      if (!settled) {
+        settled = true;
+        resolve(value);
+      }
+    };
+    try {
+      const proc = childSpawn('git', args, { cwd, stdio: ['ignore', 'pipe', 'ignore'] });
+      const timer = setTimeout(() => {
+        try { proc.kill('SIGKILL'); } catch { /* noop */ }
+        finalize('');
+      }, timeoutMs);
+      proc.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8'); });
+      proc.on('error', () => {
+        clearTimeout(timer);
+        finalize('');
+      });
+      proc.on('close', () => {
+        clearTimeout(timer);
+        finalize(stdout);
+      });
+    } catch {
+      finalize('');
+    }
+  });
+}
+
+async function readGitInfo(workDir: string): Promise<GitInfoResult> {
+  // Branch
+  const branchRaw = (await spawnGit(['rev-parse', '--abbrev-ref', 'HEAD'], workDir)).trim();
+  const branch = branchRaw && branchRaw !== 'HEAD' ? branchRaw : null;
+
+  // Repo name — 优先 origin remote URL；否则 workDir 末段
+  let repoName: string | null = null;
+  const remoteRaw = (await spawnGit(['remote', 'get-url', 'origin'], workDir)).trim();
+  if (remoteRaw) {
+    // 匹配 git@github.com:user/repo(.git) 或 https://...repo(.git)
+    const m = remoteRaw.match(/[/:]([^/:]+\/[^/:]+?)(?:\.git)?$/) || remoteRaw.match(/\/([^/]+?)(?:\.git)?$/);
+    if (m && m[1]) {
+      // cc-haha 行为：第一个正则命中 user/repo，第二个命中 repo（兜底）
+      repoName = m[1];
+    }
+  }
+  if (!repoName) {
+    const parts = workDir.split('/').filter(Boolean);
+    repoName = parts.length > 0 ? parts[parts.length - 1]! : null;
+  }
+
+  // Changed files (porcelain)
+  const statusRaw = await spawnGit(['status', '--porcelain'], workDir);
+  const changedFiles = statusRaw
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean).length;
+
+  // 当 branch / 任意 git 调用全部失败 → 视为非 git 仓库
+  if (branch === null && remoteRaw === '' && statusRaw === '') {
+    return { branch: null, repoName: null, workDir, changedFiles: 0 };
+  }
+
+  return { branch, repoName, workDir, changedFiles };
 }

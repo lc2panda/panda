@@ -35,6 +35,23 @@ import type {
   UpdateScheduledTaskInput,
   ValidateCronResult,
   ScheduledTasksUpdatedPayload,
+  GitInfo,
+  // Comdr 指令: pandacc Settings sub-tab IPC 类型
+  PandaccSkillItem,
+  PandaccAgentItem,
+  PandaccPluginItem,
+  PandaccComputerUseStatus,
+  PandaEnvSetResult,
+  // Comdr 指令: ComputerUse 完整实现 - cc-haha 对标
+  ComputerUseInstalledApp,
+  ComputerUseGrantsFile,
+  SetAuthorizedAppsInput,
+  ComputerUsePane,
+  ComputerUseOpResult,
+  // Comdr 指令: 学习助手 — panda CLI /learn 落盘数据
+  LearningPlanMeta,
+  LearningFlashcardSet,
+  LearningPlanDetail,
 } from './types';
 import {
   DevMockRelay,
@@ -272,6 +289,19 @@ export async function listAllSessions(): Promise<DiskSessionMeta[]> {
 export async function getSessionHistory(sessionId: string): Promise<SessionDetail | null> {
   if (IS_DEV) return getDevRelay().getSessionHistory?.(sessionId) ?? null;
   return getPandaAPI().session.getHistory(sessionId);
+}
+
+// 遗留 IPC 修复 #1: cc-haha desktop sessionsApi.getGitInfo 1:1 — 取 git branch / repoName / changedFiles。
+// dev mode 无后端，返回安全空值；renderer 自行降级到仅显示 workDir。
+export async function getGitInfo(sessionId: string, cwd?: string): Promise<GitInfo> {
+  const empty: GitInfo = { branch: null, repoName: null, workDir: cwd ?? '', changedFiles: 0 };
+  if (IS_DEV) return empty;
+  try {
+    return await getPandaAPI().session.getGitInfo(sessionId, cwd);
+  } catch (err) {
+    console.warn('[bridge] getGitInfo failed:', err);
+    return empty;
+  }
 }
 
 // ─── Tool permissions ──────────────────────────────────────────────────────
@@ -590,4 +620,198 @@ export function onScheduledTasksUpdated(
     return () => { devScheduleListeners.delete(callback); };
   }
   return getPandaAPI().schedule.onUpdated(callback);
+}
+
+// ─── Comdr 指令: ~/.pandacc 真实配置目录扫描（Settings sub-tabs） ────────────
+
+/** 列 ~/.pandacc/skills/ 下所有 skill 目录（含 SKILL.md frontmatter）。dev 返回空。 */
+export async function listSkillsPandacc(): Promise<PandaccSkillItem[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().pandacc.listSkills();
+  } catch (err) {
+    console.warn('[bridge] listSkillsPandacc failed:', err);
+    return [];
+  }
+}
+
+/** 列 ~/.pandacc/agents/*.md 解析 frontmatter（name/description/tools/model）。dev 返回空。 */
+export async function listAgentsPandacc(): Promise<PandaccAgentItem[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().pandacc.listAgents();
+  } catch (err) {
+    console.warn('[bridge] listAgentsPandacc failed:', err);
+    return [];
+  }
+}
+
+/** 读 ~/.pandacc/plugins/installed_plugins.json 解析所有已装插件实例。dev 返回空。 */
+export async function listPluginsPandacc(): Promise<PandaccPluginItem[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().pandacc.listPlugins();
+  } catch (err) {
+    console.warn('[bridge] listPluginsPandacc failed:', err);
+    return [];
+  }
+}
+
+/** 读 ~/.pandacc/settings.json 的 env 字段。dev 返回空 record。 */
+export async function getPandaEnv(): Promise<Record<string, string>> {
+  if (IS_DEV) return {};
+  try {
+    return await getPandaAPI().pandacc.getEnv();
+  } catch (err) {
+    console.warn('[bridge] getPandaEnv failed:', err);
+    return {};
+  }
+}
+
+/** Merge-set 单个 env key（value === null|'' 时删除）。dev 返回 ok:true 但不落盘。 */
+export async function setPandaEnv(
+  key: string,
+  value: string | null,
+): Promise<PandaEnvSetResult> {
+  if (IS_DEV) return { ok: true };
+  try {
+    return await getPandaAPI().pandacc.setEnv(key, value);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[bridge] setPandaEnv failed:', msg);
+    return { ok: false, error: msg };
+  }
+}
+
+/** 检测 Computer Use 平台支持情况 + grants 文件存在状态。dev 返回 stub false。 */
+// Comdr 指令: ComputerUse 完整实现 - cc-haha 对标 — 加 permissions 字段 fallback
+export async function getComputerUseStatusPandacc(): Promise<PandaccComputerUseStatus> {
+  const fallback: PandaccComputerUseStatus = {
+    platform: typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? 'darwin' : 'unknown',
+    supported: false,
+    grantsExist: false,
+    grantsPath: '',
+    grantedApps: [],
+    permissions: { accessibility: null, screenRecording: null },
+  };
+  if (IS_DEV) return fallback;
+  try {
+    return await getPandaAPI().pandacc.getComputerUseStatus();
+  } catch (err) {
+    console.warn('[bridge] getComputerUseStatusPandacc failed:', err);
+    return fallback;
+  }
+}
+
+// ─── Comdr 指令: ComputerUse 完整实现 - cc-haha 对标 (5 个 bridge 函数) ──────
+
+/** 列已装 macOS 应用（用 system_profiler 扫）。dev 模式返回空。 */
+export async function listComputerUseInstalledApps(): Promise<ComputerUseInstalledApp[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().computerUse.getInstalledApps();
+  } catch (err) {
+    console.warn('[bridge] listComputerUseInstalledApps failed:', err);
+    return [];
+  }
+}
+
+/** 读 ~/.pandacc/computer-use/grants.json（authorizedApps + grantFlags）。dev 模式返回默认空。 */
+export async function getComputerUseAuthorizedApps(): Promise<ComputerUseGrantsFile> {
+  const empty: ComputerUseGrantsFile = {
+    authorizedApps: [],
+    grantFlags: { clipboardRead: true, clipboardWrite: true, systemKeyCombos: true },
+  };
+  if (IS_DEV) return empty;
+  try {
+    return await getPandaAPI().computerUse.getAuthorizedApps();
+  } catch (err) {
+    console.warn('[bridge] getComputerUseAuthorizedApps failed:', err);
+    return empty;
+  }
+}
+
+/** 写 grants.json（首次自动 mkdir）。dev 模式返回 ok:true 但不落盘。 */
+export async function setComputerUseAuthorizedApps(
+  input: SetAuthorizedAppsInput,
+): Promise<ComputerUseOpResult> {
+  if (IS_DEV) return { ok: true };
+  try {
+    return await getPandaAPI().computerUse.setAuthorizedApps(input);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[bridge] setComputerUseAuthorizedApps failed:', msg);
+    return { ok: false, error: msg };
+  }
+}
+
+/** 跳 macOS 系统设置 — 隐私&安全性 → accessibility / screen-recording。dev 模式 no-op ok。 */
+export async function openComputerUseSettings(
+  pane: ComputerUsePane,
+): Promise<ComputerUseOpResult> {
+  if (IS_DEV) return { ok: true };
+  try {
+    return await getPandaAPI().computerUse.openSettings({ pane });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[bridge] openComputerUseSettings failed:', msg);
+    return { ok: false, error: msg };
+  }
+}
+
+// ─── Comdr 指令: 学习助手 — panda CLI /learn 落盘数据 (4 函数) ─────────────
+//
+// 数据来源：
+//   /learn plan <topic>  →  <project_cwd>/working/learning-plans/<slug>.md
+//   /learn from <file>   →  <project_cwd>/working/flashcards/<topic>.json
+// 项目级 — 扫描 ~/.pandacc/projects/<slug>/ 反 sanitize 出原 cwd 后扫 working/。
+
+/** 列所有 panda CLI 项目下的学习计划。dev 模式返回空（无落盘可读）。 */
+export async function listLearningPlans(): Promise<LearningPlanMeta[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().learning.listPlans();
+  } catch (err) {
+    console.warn('[bridge] listLearningPlans failed:', err);
+    return [];
+  }
+}
+
+/** 列所有 panda CLI 项目下的闪卡集（含 dueCount/learningCount/totalCount）。dev 模式返回空。 */
+export async function listLearningFlashcards(): Promise<LearningFlashcardSet[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().learning.listFlashcards();
+  } catch (err) {
+    console.warn('[bridge] listLearningFlashcards failed:', err);
+    return [];
+  }
+}
+
+/** 读取单个学习计划详情（markdown 全文 + 阶段 + 素材引用）。dev 模式 / 不存在均返回 null。 */
+export async function readLearningPlan(
+  projectSlug: string,
+  slug: string,
+): Promise<LearningPlanDetail | null> {
+  if (IS_DEV) return null;
+  try {
+    return await getPandaAPI().learning.readPlan(projectSlug, slug);
+  } catch (err) {
+    console.warn('[bridge] readLearningPlan failed:', err);
+    return null;
+  }
+}
+
+/** 读取单个闪卡集（含完整 cards 数组 + 项目级 reviewLog）。dev 模式 / 不存在均返回 null。 */
+export async function readLearningFlashcards(
+  projectSlug: string,
+  topic: string,
+): Promise<LearningFlashcardSet | null> {
+  if (IS_DEV) return null;
+  try {
+    return await getPandaAPI().learning.readFlashcards(projectSlug, topic);
+  } catch (err) {
+    console.warn('[bridge] readLearningFlashcards failed:', err);
+    return null;
+  }
 }

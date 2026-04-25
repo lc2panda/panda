@@ -1,5 +1,5 @@
 // Input: Electron contextBridge + ipcRenderer APIs
-// Output: window.pandaAPI — type-safe IPC client matching PandaChatAPI interface (27 channels + update + window namespaces)
+// Output: window.pandaAPI — type-safe IPC client matching PandaChatAPI interface (27 channels + update + window + pandacc namespaces)
 // Pos: Electron preload script — sole bridge between renderer and main process
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -27,6 +27,8 @@ const CH = {
   SESSION_UPDATED:     'panda:session:updated',
   SESSION_LIST_ALL:    'panda:session:list-all',
   SESSION_GET_HISTORY: 'panda:session:get-history',
+  // 遗留 IPC 修复 #1: cc-haha sessionsApi.getGitInfo 对齐
+  SESSION_GIT_INFO:    'panda:session:git-info',
   // Tool permissions
   TOOL_USE_START:      'panda:tool:use:start',
   TOOL_USE_END:        'panda:tool:use:end',
@@ -70,6 +72,32 @@ const CH = {
   SCHEDULE_TOGGLE:      'panda:schedule:toggle',
   SCHEDULE_VALIDATE:    'panda:schedule:validate-cron',
   SCHEDULE_UPDATED:     'panda:schedule:update',
+  // Comdr 指令: 6 个 pandacc Settings sub-tab IPC channels
+  PANDA_SKILLS_LIST:        'panda:skills:list',
+  PANDA_AGENTS_LIST:        'panda:agents:list',
+  PANDA_PLUGINS_LIST:       'panda:plugins:list',
+  PANDA_ENV_GET:            'panda:env:get',
+  PANDA_ENV_SET:            'panda:env:set',
+  PANDA_COMPUTER_USE_STATUS:           'panda:computer-use:status',
+  // Comdr 指令: ComputerUse 完整实现 - cc-haha 对标 (4 个新 channel)
+  PANDA_COMPUTER_USE_INSTALLED_APPS:   'panda:computer-use:installed-apps',
+  PANDA_COMPUTER_USE_AUTHORIZED_APPS:  'panda:computer-use:authorized-apps',
+  PANDA_COMPUTER_USE_SET_AUTHORIZED:   'panda:computer-use:set-authorized-apps',
+  PANDA_COMPUTER_USE_OPEN_SETTINGS:    'panda:computer-use:open-settings',
+  // Comdr 指令: IM Wechat / 任务 B — IM Adapter 启停 (3 个 channel)
+  ADAPTER_START:        'panda:adapter:start',
+  ADAPTER_STOP:         'panda:adapter:stop',
+  ADAPTER_STATUS:       'panda:adapter:status',
+  // Comdr 指令: 超级助手 Wechat DB / 任务 C — 微信本地 db 解密 (4 个 channel)
+  WECHAT_STATUS:        'panda:wechat:status',
+  WECHAT_SET_CONFIG:    'panda:wechat:set-config',
+  WECHAT_SET_PROACTIVE: 'panda:wechat:set-proactive',
+  WECHAT_DECRYPT:       'panda:wechat:decrypt',
+  // Comdr 指令: 学习助手 — panda CLI /learn 落盘数据扫描 (4 个 channel)
+  LEARNING_LIST_PLANS:        'panda:learning:list-plans',
+  LEARNING_LIST_FLASHCARDS:   'panda:learning:list-flashcards',
+  LEARNING_READ_PLAN:         'panda:learning:read-plan',
+  LEARNING_READ_FLASHCARDS:   'panda:learning:read-flashcards',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -117,6 +145,9 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     onMessageHistory: createSubscription(CH.MESSAGE_HISTORY),
     listAllSessions: () => ipcRenderer.invoke(CH.SESSION_LIST_ALL),
     getHistory: (sessionId: string) => ipcRenderer.invoke(CH.SESSION_GET_HISTORY, { sessionId }),
+    // 遗留 IPC 修复 #1: cc-haha sessionsApi.getGitInfo 对齐
+    getGitInfo: (sessionId: string, cwd?: string) =>
+      ipcRenderer.invoke(CH.SESSION_GIT_INFO, { sessionId, cwd }),
   },
   tool: {
     respondPermission: (payload: unknown) => ipcRenderer.invoke(CH.TOOL_PERM_RESPONSE, payload),
@@ -181,5 +212,50 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     toggle: (payload: unknown) => ipcRenderer.invoke(CH.SCHEDULE_TOGGLE, payload),
     validateCron: (payload: unknown) => ipcRenderer.invoke(CH.SCHEDULE_VALIDATE, payload),
     onUpdated: createSubscription(CH.SCHEDULE_UPDATED),
+  },
+  // Comdr 指令: ~/.pandacc 配置目录扫描 — Skills/Agents/Plugins/Env/ComputerUse
+  pandacc: {
+    listSkills:   () => ipcRenderer.invoke(CH.PANDA_SKILLS_LIST),
+    listAgents:   () => ipcRenderer.invoke(CH.PANDA_AGENTS_LIST),
+    listPlugins:  () => ipcRenderer.invoke(CH.PANDA_PLUGINS_LIST),
+    getEnv:       () => ipcRenderer.invoke(CH.PANDA_ENV_GET),
+    setEnv:       (key: string, value: string | null) =>
+      ipcRenderer.invoke(CH.PANDA_ENV_SET, { key, value }),
+    getComputerUseStatus: () => ipcRenderer.invoke(CH.PANDA_COMPUTER_USE_STATUS),
+  },
+  // Comdr 指令: ComputerUse 完整实现 - cc-haha 对标 — 独立 namespace
+  computerUse: {
+    getStatus:           () => ipcRenderer.invoke(CH.PANDA_COMPUTER_USE_STATUS),
+    getInstalledApps:    () => ipcRenderer.invoke(CH.PANDA_COMPUTER_USE_INSTALLED_APPS),
+    getAuthorizedApps:   () => ipcRenderer.invoke(CH.PANDA_COMPUTER_USE_AUTHORIZED_APPS),
+    setAuthorizedApps:   (input: unknown) =>
+      ipcRenderer.invoke(CH.PANDA_COMPUTER_USE_SET_AUTHORIZED, input),
+    openSettings:        (input: unknown) =>
+      ipcRenderer.invoke(CH.PANDA_COMPUTER_USE_OPEN_SETTINGS, input),
+  },
+  // Comdr 指令: IM Wechat / 任务 B — IM Adapter 启停 namespace
+  adapter: {
+    start:  (platform: 'feishu' | 'telegram' | 'wechat') =>
+      ipcRenderer.invoke(CH.ADAPTER_START, { platform }),
+    stop:   (platform: 'feishu' | 'telegram' | 'wechat') =>
+      ipcRenderer.invoke(CH.ADAPTER_STOP, { platform }),
+    status: (platform: 'feishu' | 'telegram' | 'wechat') =>
+      ipcRenderer.invoke(CH.ADAPTER_STATUS, { platform }),
+  },
+  // Comdr 指令: 超级助手 Wechat DB / 任务 C — 微信本地 db 解密 namespace
+  wechat: {
+    getStatus:    () => ipcRenderer.invoke(CH.WECHAT_STATUS),
+    setConfig:    (patch: unknown) => ipcRenderer.invoke(CH.WECHAT_SET_CONFIG, patch),
+    setProactive: (patch: unknown) => ipcRenderer.invoke(CH.WECHAT_SET_PROACTIVE, patch),
+    decrypt:      () => ipcRenderer.invoke(CH.WECHAT_DECRYPT),
+  },
+  // Comdr 指令: 学习助手 — panda CLI /learn 落盘数据扫描 namespace
+  learning: {
+    listPlans:       () => ipcRenderer.invoke(CH.LEARNING_LIST_PLANS),
+    listFlashcards:  () => ipcRenderer.invoke(CH.LEARNING_LIST_FLASHCARDS),
+    readPlan:        (projectSlug: string, slug: string) =>
+      ipcRenderer.invoke(CH.LEARNING_READ_PLAN, { projectSlug, slug }),
+    readFlashcards:  (projectSlug: string, topic: string) =>
+      ipcRenderer.invoke(CH.LEARNING_READ_FLASHCARDS, { projectSlug, topic }),
   },
 });
