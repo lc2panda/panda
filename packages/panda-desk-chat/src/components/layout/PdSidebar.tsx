@@ -823,15 +823,21 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
   return (
     <aside
       className={cn(
-        'flex h-full flex-col overflow-hidden',
+        'flex h-full flex-col overflow-hidden shrink-0',
         'bg-[var(--pd-color-bg-subtle)]',
       )}
       style={{
         width: expanded
           ? 'var(--pd-layout-sidebar-width)'
           : 'var(--pd-layout-sidebar-rail)',
+        minWidth: expanded
+          ? 'var(--pd-layout-sidebar-width)'
+          : 'var(--pd-layout-sidebar-rail)',
+        maxWidth: expanded
+          ? 'var(--pd-layout-sidebar-width)'
+          : 'var(--pd-layout-sidebar-rail)',
         paddingTop: 44, // macOS traffic-light avoidance
-        transition: `width var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing)`,
+        transition: `width var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing), min-width var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing), max-width var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing)`,
       }}
     >
       {/* Brand row — app-icon 32×32 rounded-lg + Manrope brand text + GitHub + toggle */}

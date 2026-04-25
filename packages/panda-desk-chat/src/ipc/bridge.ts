@@ -461,45 +461,123 @@ export function onWindowInit(callback: (payload: WindowInitPayload) => void): Un
 
 // ─── Scheduled tasks (panda:schedule:*) ────────────────────────────────────
 
+// Dev-mode in-memory store for scheduled tasks. Persisted to localStorage so
+// reloading the browser preserves the state across HMR cycles.
+const DEV_SCHEDULE_KEY = 'panda-dev-scheduled-tasks';
+const devScheduleListeners = new Set<(p: ScheduledTasksUpdatedPayload) => void>();
+
+function devReadTasks(): ScheduledTask[] {
+  try {
+    const raw = window.localStorage.getItem(DEV_SCHEDULE_KEY);
+    return raw ? (JSON.parse(raw) as ScheduledTask[]) : [];
+  } catch { return []; }
+}
+function devWriteTasks(tasks: ScheduledTask[]): void {
+  try { window.localStorage.setItem(DEV_SCHEDULE_KEY, JSON.stringify(tasks)); } catch { /* noop */ }
+  for (const cb of devScheduleListeners) cb({ tasks });
+}
+function devValidateCron(cron: string): ValidateCronResult {
+  const fields = cron.trim().split(/\s+/);
+  if (fields.length !== 5) return { valid: false };
+  const ok = fields.every((f) => /^(\*|\d+|\d+-\d+|\*\/\d+|\d+(,\d+)+)$/.test(f));
+  if (!ok) return { valid: false };
+  return { valid: true, nextRunAt: new Date(Date.now() + 60_000).toISOString() };
+}
+
 /** List all scheduled tasks persisted to ~/.pandacc/scheduled_tasks.json. */
 export async function listScheduledTasks(): Promise<ScheduledTask[]> {
-  if (IS_DEV) return [];
+  if (IS_DEV) return devReadTasks();
   return getPandaAPI().schedule.list();
 }
 
 /** Create a scheduled task. Validates cron expression server-side. */
 export async function createScheduledTask(input: CreateScheduledTaskInput): Promise<ScheduledTask | null> {
-  if (IS_DEV) return null;
+  if (IS_DEV) {
+    const tasks = devReadTasks();
+    const now = new Date().toISOString();
+    const task: ScheduledTask = {
+      id: `dev-${Date.now()}`,
+      name: input.name,
+      description: input.description ?? '',
+      cron: input.cron,
+      prompt: input.prompt,
+      cwd: input.cwd ?? '',
+      status: 'active',
+      createdAt: now,
+      nextRunAt: devValidateCron(input.cron).nextRunAt ?? undefined,
+      runCount: 0,
+      logs: [],
+    };
+    tasks.push(task);
+    devWriteTasks(tasks);
+    return task;
+  }
   return getPandaAPI().schedule.create(input);
 }
 
 /** Update an existing task (partial). Returns the updated task or null if not found. */
 export async function updateScheduledTask(input: UpdateScheduledTaskInput): Promise<ScheduledTask | null> {
-  if (IS_DEV) return null;
+  if (IS_DEV) {
+    const tasks = devReadTasks();
+    const idx = tasks.findIndex((t) => t.id === input.id);
+    if (idx < 0) return null;
+    tasks[idx] = { ...tasks[idx], ...input.updates };
+    devWriteTasks(tasks);
+    return tasks[idx];
+  }
   return getPandaAPI().schedule.update(input);
 }
 
 /** Delete a task by id. Returns true if a task was removed. */
 export async function deleteScheduledTask(id: string): Promise<boolean> {
-  if (IS_DEV) return false;
+  if (IS_DEV) {
+    const tasks = devReadTasks();
+    const next = tasks.filter((t) => t.id !== id);
+    if (next.length === tasks.length) return false;
+    devWriteTasks(next);
+    return true;
+  }
   return getPandaAPI().schedule.delete({ id });
 }
 
 /** Fire the task immediately and record the run log. */
 export async function runScheduledTaskNow(id: string): Promise<ScheduledTaskRunLog | null> {
-  if (IS_DEV) return null;
+  if (IS_DEV) {
+    const tasks = devReadTasks();
+    const t = tasks.find((x) => x.id === id);
+    if (!t) return null;
+    const run: ScheduledTaskRunLog = {
+      id: `run-${Date.now()}`,
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      status: 'completed',
+      durationMs: 0,
+    };
+    t.logs = [run, ...(t.logs ?? [])].slice(0, 20);
+    t.lastRunAt = run.startedAt;
+    t.runCount = (t.runCount ?? 0) + 1;
+    devWriteTasks(tasks);
+    return run;
+  }
   return getPandaAPI().schedule.runNow({ id });
 }
 
 /** Flip between active and disabled state. */
 export async function toggleScheduledTask(id: string): Promise<ScheduledTask | null> {
-  if (IS_DEV) return null;
+  if (IS_DEV) {
+    const tasks = devReadTasks();
+    const t = tasks.find((x) => x.id === id);
+    if (!t) return null;
+    t.status = t.status === 'active' ? 'disabled' : 'active';
+    devWriteTasks(tasks);
+    return t;
+  }
   return getPandaAPI().schedule.toggle({ id });
 }
 
 /** Validate a cron string and return the next run timestamp. */
 export async function validateCron(cron: string): Promise<ValidateCronResult> {
-  if (IS_DEV) return { valid: false };
+  if (IS_DEV) return devValidateCron(cron);
   return getPandaAPI().schedule.validateCron({ cron });
 }
 
@@ -507,6 +585,9 @@ export async function validateCron(cron: string): Promise<ValidateCronResult> {
 export function onScheduledTasksUpdated(
   callback: (payload: ScheduledTasksUpdatedPayload) => void,
 ): Unsubscribe {
-  if (IS_DEV) return () => {};
+  if (IS_DEV) {
+    devScheduleListeners.add(callback);
+    return () => { devScheduleListeners.delete(callback); };
+  }
   return getPandaAPI().schedule.onUpdated(callback);
 }

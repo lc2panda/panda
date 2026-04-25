@@ -4,6 +4,8 @@
 - GeneralTab.tsx — 通用设置（语言、工作目录、重置）
 - AppearanceTab.tsx — 外观设置（主题、字号）
 - ProvidersTab.tsx — AI Provider 配置（API Key 管理）
+- ModelTab.tsx — 模型选择（按 provider 列出可用模型 + 搜索过滤）
+- PermissionsTab.tsx — 工具权限模式（Default / Plan / Auto / Bypass）
 - ShortcutsTab.tsx — 快捷键一览
 - AboutTab.tsx — 关于信息（版本号、品牌）
 - index.ts — barrel export

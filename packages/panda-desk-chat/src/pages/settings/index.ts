@@ -7,5 +7,7 @@ export { AppearanceTab } from './AppearanceTab';
 export { ProvidersTab } from './ProvidersTab';
 export { ShortcutsTab } from './ShortcutsTab';
 export { AboutTab } from './AboutTab';
+export { PermissionsTab } from './PermissionsTab';
+export { ModelTab } from './ModelTab';
 export { SettingRow } from './SettingRow';
 export type { SettingRowProps } from './SettingRow';

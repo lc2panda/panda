@@ -16,10 +16,14 @@ import {
   Keyboard as _Keyboard,
   // @ts-ignore
   Info as _Info,
+  // @ts-ignore
+  Shield as _Shield,
+  // @ts-ignore
+  Cpu as _Cpu,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { useI18n } from '../hooks/useI18n';
-import { GeneralTab, AppearanceTab, ProvidersTab, ShortcutsTab, AboutTab } from './settings';
+import { GeneralTab, AppearanceTab, ProvidersTab, ShortcutsTab, AboutTab, PermissionsTab, ModelTab } from './settings';
 
 type IconFC = ComponentType<{ className?: string; size?: number }>;
 const Sliders = _Sliders as IconFC;
@@ -27,6 +31,8 @@ const Palette = _Palette as IconFC;
 const Server = _Server as IconFC;
 const Keyboard = _Keyboard as IconFC;
 const Info = _Info as IconFC;
+const Shield = _Shield as IconFC;
+const Cpu = _Cpu as IconFC;
 const X = _X as IconFC;
 
 export interface SettingsPageProps {
@@ -41,6 +47,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ className, onClose }
   // Top tabs (sit above About in sidebar)
   const topTabs: Array<{ id: string; label: string; icon: IconFC; content: React.ReactNode }> = [
     { id: 'providers', label: t('settings.tabProviders'), icon: Server, content: <ProvidersTab /> },
+    { id: 'model', label: t('settings.tabModel'), icon: Cpu, content: <ModelTab /> },
+    { id: 'permissions', label: t('settings.tabPermissions'), icon: Shield, content: <PermissionsTab /> },
     { id: 'general', label: t('settings.tabGeneral'), icon: Sliders, content: <GeneralTab /> },
     { id: 'appearance', label: t('settings.tabAppearance'), icon: Palette, content: <AppearanceTab /> },
     { id: 'shortcuts', label: t('settings.tabShortcuts'), icon: Keyboard, content: <ShortcutsTab /> },
