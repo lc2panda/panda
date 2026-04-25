@@ -172,8 +172,9 @@ export function PdTabBar({
         'relative flex shrink-0 items-stretch',
         'border-b border-[var(--pd-color-border)]',
         'bg-[var(--pd-color-surface-container)]',
+        'shadow-[inset_0_-1px_0_rgba(31,31,30,0.04)]',
       )}
-      style={{ minHeight: 37 }}
+      style={{ minHeight: 38 }}
     >
       {/* ── Scroll-left arrow ── */}
       {canScrollLeft && (
@@ -250,11 +251,13 @@ export function PdTabBar({
               }}
               onDragEnd={() => onDragEnd?.()}
               className={cn(
-                'group relative flex shrink-0 items-center gap-1.5 px-3',
+                'group relative flex shrink-0 items-center gap-2 px-4',
+                'border-r border-[var(--pd-color-border-subtle)]',
                 'transition-[colors,transform,opacity]',
                 'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
+                'min-w-[140px] max-w-[200px]',
                 tab.isActive
-                  ? 'bg-[var(--pd-color-bg)] text-[var(--pd-color-fg)] font-[var(--pd-font-semibold)]'
+                  ? 'bg-[var(--pd-color-bg)] text-[var(--pd-color-fg)] font-[var(--pd-font-medium)]'
                   : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)]',
               )}
               style={{

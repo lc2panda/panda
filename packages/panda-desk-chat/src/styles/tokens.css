@@ -196,15 +196,20 @@
   /* ── cc-haha Material You 配色（v3 全盘对齐） ─────────────────────────
    * 数值来源：cc-haha/desktop/src/theme/globals.css @theme 段（HEX 为事实性数据，无版权）
    */
-  --pd-color-bg: #FAF9F5;                                   /* surface / background */
-  --pd-color-bg-elevated: #FFFFFF;                          /* surface-container-lowest */
-  --pd-color-bg-subtle: #F4F4F0;                            /* surface-container-low — sidebar */
-  --pd-color-bg-hover: #E9E8E4;                             /* surface-container-high — hover */
-  --pd-color-bg-selected: #EFEEEA;                          /* surface-container — selected */
-  --pd-color-bg-disabled: #F4F4F0;
+  /* 加大 sidebar 与 main 的亮度差，避免视觉融合 (cc-haha 风格 Material You).
+   * main = cream 暖白 #FAF9F5 (最亮)
+   * sidebar = ivory-medium #F0EEE6 (比 main 明显更深，warm undertone)
+   * hover/selected 进一步加深，让交互态可见。
+   */
+  --pd-color-bg: #FAF9F5;                                   /* surface / 主内容背景 */
+  --pd-color-bg-elevated: #FFFFFF;                          /* card / 浮起容器 */
+  --pd-color-bg-subtle: #F0EEE6;                            /* sidebar / surface-container */
+  --pd-color-bg-hover: #E8E6DC;                             /* hover (cloud-light) */
+  --pd-color-bg-selected: #DDD9C9;                          /* active item 明显高亮 */
+  --pd-color-bg-disabled: #F0EEE6;
   --pd-color-surface-container: #EFEEEA;
-  --pd-color-surface-container-low: #F4F4F0;
-  --pd-color-surface-container-high: #E9E8E4;
+  --pd-color-surface-container-low: #F0EEE6;
+  --pd-color-surface-container-high: #E8E6DC;
   --pd-color-user-message-bg: #EFEEEA;
 
   /* ── Semantic: Foreground (cc-haha on-surface + variants) ── */
@@ -352,10 +357,13 @@
 
   /* ── Glass Panel — 高对比度 card 视觉 ─────────────────────────────────── */
   --pd-glass-bg: #FFFFFF;
-  --pd-glass-border: rgba(31, 31, 30, 0.12);                /* claude.ai style subtle dark border */
+  --pd-glass-border: rgba(31, 31, 30, 0.10);                /* claude.ai style subtle dark border */
   --pd-glass-blur: 0px;
-  /* 深度分层阴影：保证 card 在 cream bg 上明显浮起（不透明度 ×1.4） */
-  --pd-glass-shadow: 0 2px 4px rgba(27,28,26,0.08), 0 12px 32px rgba(27,28,26,0.12), 0 32px 64px rgba(27,28,26,0.12);
+  /* 深度三层阴影：让 Composer / Hero card 在 cream bg 上明显浮起 */
+  --pd-glass-shadow:
+    0 1px 2px rgba(27,28,26,0.04),
+    0 4px 12px rgba(27,28,26,0.06),
+    0 16px 40px rgba(27,28,26,0.08);
   --pd-glass-focus-ring: 0 0 0 1px rgba(217, 119, 87, 0.20);
 }
 
