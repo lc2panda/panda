@@ -1103,16 +1103,32 @@ export function PdSidebar({ expanded, onToggle }: PdSidebarProps) {
         </button>
       </div>
 
-      {/* ── PetStrip — reserved for panda-on-desk integration ── */}
-      <div
+      {/* ── PetStrip — Panda 特色：点击打开 Inspector petState 面板 ── */}
+      <button
+        type="button"
+        onClick={() => {
+          useUIStore.getState().setInspectorTab(8);
+          useUIStore.getState().setInspectorVisible(true);
+        }}
+        title="打开宠物面板"
         className={cn(
-          'flex shrink-0 items-center justify-center',
+          'flex shrink-0 items-center justify-center gap-2 cursor-pointer',
           'border-t border-[var(--pd-color-border-subtle)]',
-          'text-[length:var(--pd-text-xs)] text-[var(--pd-color-fg-subtle)]',
+          'text-[11px] text-[var(--pd-color-fg-subtle)]',
+          'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg-muted)]',
+          'transition-colors duration-150',
         )}
         style={{ height: 'var(--pd-layout-pet-strip)' }}
-        aria-hidden="true"
-      />
+      >
+        {expanded ? (
+          <>
+            <span aria-hidden="true">🐼</span>
+            <span>Panda · LV1</span>
+          </>
+        ) : (
+          <span aria-hidden="true" className="text-[16px]">🐼</span>
+        )}
+      </button>
     </aside>
   );
 }
