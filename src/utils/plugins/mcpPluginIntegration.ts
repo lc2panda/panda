@@ -1,5 +1,6 @@
 import { join } from 'path'
 import { expandEnvVarsInString } from '../../services/mcp/envExpansion.js'
+import { execFileNoThrowWithCwd } from '../execFileNoThrow.js'
 import {
   type McpServerConfig,
   McpServerConfigSchema,
@@ -124,6 +125,41 @@ async function loadMcpServersFromMcpb(
 }
 
 /**
+ * Ensure a plugin's bun/npm deps are installed before loading its MCP servers.
+ *
+ * Some plugins (e.g. lc2panda-plugins/wechat) ship with package.json but no
+ * node_modules — their MCP server then fails with "Cannot find module" the
+ * first time it spawns. Plugin install pipeline doesn't chain postinstall,
+ * so we bootstrap on first load when node_modules is missing.
+ *
+ * No-op if package.json doesn't exist (plugin isn't an npm/bun project) or
+ * node_modules already exists. Failure is logged but doesn't block — the
+ * downstream MCP spawn will still surface a clear error.
+ */
+async function ensurePluginDependencies(plugin: LoadedPlugin): Promise<void> {
+  const fs = getFsImplementation()
+  const pkgJsonPath = join(plugin.path, 'package.json')
+  const nodeModulesPath = join(plugin.path, 'node_modules')
+  if (!fs.existsSync(pkgJsonPath)) return
+  if (fs.existsSync(nodeModulesPath)) return
+  logForDebugging(
+    `Plugin ${plugin.name}: bootstrapping deps via 'bun install'`,
+    { level: 'info' },
+  )
+  const result = await execFileNoThrowWithCwd(
+    'bun',
+    ['install', '--silent', '--no-summary'],
+    { cwd: plugin.path },
+  )
+  if (result.code !== 0) {
+    logForDebugging(
+      `Plugin ${plugin.name}: 'bun install' failed (exit ${result.code}): ${result.stderr}`,
+      { level: 'error' },
+    )
+  }
+}
+
+/**
  * Load MCP servers from a plugin's manifest
  * This function loads MCP server configurations from various sources within the plugin
  * including manifest entries, .mcp.json files, and .mcpb files
@@ -132,6 +168,7 @@ export async function loadPluginMcpServers(
   plugin: LoadedPlugin,
   errors: PluginError[] = [],
 ): Promise<Record<string, McpServerConfig> | undefined> {
+  await ensurePluginDependencies(plugin)
   let servers: Record<string, McpServerConfig> = {}
 
   // Check for .mcp.json in plugin directory first (lowest priority)

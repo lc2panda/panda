@@ -16,7 +16,7 @@ package-v2.1.88
 monitor
 docs
 data
-plugins
+/plugins/
 PC命令使用手册.md
 RECORD.md
 SECURITY.md

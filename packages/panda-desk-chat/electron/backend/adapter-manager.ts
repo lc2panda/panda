@@ -18,6 +18,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { resolveBunPath } from './binPath';
 
 export type AdapterPlatform = 'feishu' | 'telegram' | 'wechat';
 
@@ -119,7 +120,7 @@ class AdapterManager {
         };
       }
       try {
-        const proc = spawn('bun', [r.entry], {
+        const proc = spawn(resolveBunPath(), [r.entry], {
           cwd: join(r.entry, '..', '..', '..'), // .../wechat/<ver>/
           stdio: ['ignore', 'pipe', 'pipe'],
           env: { ...process.env },

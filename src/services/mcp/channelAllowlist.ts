@@ -34,13 +34,26 @@ const ChannelAllowlistSchema = lazySchema(() =>
   ),
 )
 
+/**
+ * Panda-local allowlist additions. Anthropic's GrowthBook ledger
+ * `tengu_harbor_ledger` only knows about official marketplaces, but panda
+ * ships with first-party support for `lc2panda-plugins/{wechat,feishu}` —
+ * those entries are merged in below so `--channels plugin:X@lc2panda-plugins`
+ * doesn't trigger the dev-channels confirmation dialog.
+ */
+const PANDA_LOCAL_ALLOWLIST: ChannelAllowlistEntry[] = [
+  { marketplace: 'lc2panda-plugins', plugin: 'wechat' },
+  { marketplace: 'lc2panda-plugins', plugin: 'feishu' },
+]
+
 export function getChannelAllowlist(): ChannelAllowlistEntry[] {
   const raw = getFeatureValue_CACHED_MAY_BE_STALE<unknown>(
     'tengu_harbor_ledger',
     [],
   )
   const parsed = ChannelAllowlistSchema().safeParse(raw)
-  return parsed.success ? parsed.data : []
+  const remote = parsed.success ? parsed.data : []
+  return [...remote, ...PANDA_LOCAL_ALLOWLIST]
 }
 
 /**

@@ -12,6 +12,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { findSessionFile } from './disk-session-scanner';
+import { resolveBunPath } from './binPath';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -192,7 +193,7 @@ export class CLISession extends EventEmitter {
 
     console.log(`[CLISession:${this.id}] Spawning${isResume ? ' (resume)' : ''}: bun ${args.join(' ')}`);
 
-    this.process = spawn('bun', args, {
+    this.process = spawn(resolveBunPath(), args, {
       cwd: this.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
