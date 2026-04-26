@@ -198,10 +198,26 @@ const BUILTIN_SLASH_COMMANDS = [
   { name: '/memory',  description: 'Edit CLAUDE.md memory files' },
 ];
 
+// Source of truth: panda CLI src/utils/model/configs.ts ALL_MODEL_CONFIGS
+//   每个 entry 的 id 对齐 firstParty 字段。panda CLI 增删模型时同步更新此列表
+//   （CLI 的 configs.ts 依赖 model.js/providers.js 类型系统，vite-plugin-electron
+//   直接 import 会拖入 CLI 全套类型，故 1:1 抄常量值更轻量）。
 const AVAILABLE_MODELS = [
-  { id: 'claude-sonnet-4-20250514',  name: 'Claude Sonnet 4',  provider: 'anthropic' },
-  { id: 'claude-opus-4-20250514',    name: 'Claude Opus 4',    provider: 'anthropic' },
-  { id: 'claude-haiku-235-20241022', name: 'Claude Haiku 3.5', provider: 'anthropic' },
+  // Opus 家族（旗舰，倒序排列）
+  { id: 'claude-opus-4-7',            name: 'Claude Opus 4.7',   provider: 'anthropic' },
+  { id: 'claude-opus-4-6',            name: 'Claude Opus 4.6',   provider: 'anthropic' },
+  { id: 'claude-opus-4-5-20251101',   name: 'Claude Opus 4.5',   provider: 'anthropic' },
+  { id: 'claude-opus-4-1-20250805',   name: 'Claude Opus 4.1',   provider: 'anthropic' },
+  { id: 'claude-opus-4-20250514',     name: 'Claude Opus 4',     provider: 'anthropic' },
+  // Sonnet 家族
+  { id: 'claude-sonnet-4-6',          name: 'Claude Sonnet 4.6', provider: 'anthropic' },
+  { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
+  { id: 'claude-sonnet-4-20250514',   name: 'Claude Sonnet 4',   provider: 'anthropic' },
+  { id: 'claude-3-7-sonnet-20250219', name: 'Claude Sonnet 3.7', provider: 'anthropic' },
+  { id: 'claude-3-5-sonnet-20241022', name: 'Claude Sonnet 3.5', provider: 'anthropic' },
+  // Haiku 家族
+  { id: 'claude-haiku-4-5-20251001',  name: 'Claude Haiku 4.5',  provider: 'anthropic' },
+  { id: 'claude-3-5-haiku-20241022',  name: 'Claude Haiku 3.5',  provider: 'anthropic' },
 ];
 
 // ---------------------------------------------------------------------------
