@@ -610,10 +610,10 @@ function extractUsage(
   result: Anthropic.Beta.Messages.BetaMessage,
 ): ClassifierUsage {
   return {
-    inputTokens: result.usage.input_tokens,
-    outputTokens: result.usage.output_tokens,
-    cacheReadInputTokens: result.usage.cache_read_input_tokens ?? 0,
-    cacheCreationInputTokens: result.usage.cache_creation_input_tokens ?? 0,
+    inputTokens: result.usage?.input_tokens ?? 0,
+    outputTokens: result.usage?.output_tokens ?? 0,
+    cacheReadInputTokens: result.usage?.cache_read_input_tokens ?? 0,
+    cacheCreationInputTokens: result.usage?.cache_creation_input_tokens ?? 0,
   }
 }
 
@@ -1166,10 +1166,10 @@ export async function classifyYoloAction(
 
     // Extract usage for overhead telemetry
     const usage = {
-      inputTokens: result.usage.input_tokens,
-      outputTokens: result.usage.output_tokens,
-      cacheReadInputTokens: result.usage.cache_read_input_tokens ?? 0,
-      cacheCreationInputTokens: result.usage.cache_creation_input_tokens ?? 0,
+      inputTokens: result.usage?.input_tokens ?? 0,
+      outputTokens: result.usage?.output_tokens ?? 0,
+      cacheReadInputTokens: result.usage?.cache_read_input_tokens ?? 0,
+      cacheCreationInputTokens: result.usage?.cache_creation_input_tokens ?? 0,
     }
     // Actual total input tokens the classifier API consumed (uncached + cache)
     const classifierInputTokens =
