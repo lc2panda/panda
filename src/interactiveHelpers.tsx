@@ -252,10 +252,26 @@ export async function showSetupScreens(root: Root, permissionMode: PermissionMod
     }
     if (devChannels && devChannels.length > 0) {
       const [{
-        isChannelsEnabled
+        isChannelsEnabled,
+        isChannelAllowlisted
       }, {
         getClaudeAIOAuthTokens
       }] = await Promise.all([import('./services/mcp/channelAllowlist.js'), import('./utils/auth.js')]);
+      // panda-local: dev entries that are already in the panda allowlist
+      // (e.g. lc2panda-plugins/{wechat,feishu}) are first-party trusted —
+      // skip the safety dialog entirely. Comdr's --dangerously-load-development-channels
+      // path otherwise re-prompts every launch.
+      const allTrustedByPandaAllowlist = devChannels.every(c =>
+        c.kind === 'plugin' && isChannelAllowlisted(`${c.name}@${c.marketplace}`)
+      );
+      if (allTrustedByPandaAllowlist) {
+        setAllowedChannels([...getAllowedChannels(), ...devChannels.map(c => ({
+          ...c,
+          dev: true
+        }))]);
+        setHasDevChannels(true);
+        return;
+      }
       // Skip the dialog when channels are blocked (tengu_harbor off or no
       // OAuth) — accepting then immediately seeing "not available" in
       // ChannelsNotice is worse than no dialog. Append entries anyway so
