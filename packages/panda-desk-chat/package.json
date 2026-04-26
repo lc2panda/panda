@@ -34,8 +34,18 @@
       "category": "public.app-category.developer-tools"
     },
     "win": {
-      "target": ["nsis", "zip"],
-      "icon": "public/icon.png"
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "Panda"
     },
     "linux": {
       "target": ["AppImage", "deb"],
