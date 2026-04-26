@@ -162,11 +162,46 @@ function buildHookSchemas() {
       .describe('If true, hook runs once and is removed after execution'),
   })
 
+  // mcp_tool handler — calls a tool exposed by an already-connected MCP server
+  // (parity with upstream v2.1.118). Argument values may reference hook input
+  // fields via ${tool_input.x}, ${tool_response.y}, ${session_id} etc; only
+  // string-typed values undergo template substitution.
+  const McpToolHookSchema = z.object({
+    type: z.literal('mcp_tool').describe('MCP server tool hook type'),
+    mcpServer: z
+      .string()
+      .describe('Name of an already-connected MCP server (matches appState.mcp.clients[].name)'),
+    tool: z
+      .string()
+      .describe('Tool name exposed by the MCP server (the short name, not the mcp__server__tool composite)'),
+    arguments: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        'Argument object passed to MCP tool. String values support ${tool_input.x} / ${tool_response.y} / ${session_id} template substitution against the hook input.',
+      ),
+    if: IfConditionSchema(),
+    timeout: z
+      .number()
+      .positive()
+      .optional()
+      .describe('Timeout in seconds for the MCP tool call'),
+    statusMessage: z
+      .string()
+      .optional()
+      .describe('Custom status message to display in spinner while hook runs'),
+    once: z
+      .boolean()
+      .optional()
+      .describe('If true, hook runs once and is removed after execution'),
+  })
+
   return {
     BashCommandHookSchema,
     PromptHookSchema,
     HttpHookSchema,
     AgentHookSchema,
+    McpToolHookSchema,
   }
 }
 
@@ -179,12 +214,14 @@ export const HookCommandSchema = lazySchema(() => {
     PromptHookSchema,
     AgentHookSchema,
     HttpHookSchema,
+    McpToolHookSchema,
   } = buildHookSchemas()
   return z.discriminatedUnion('type', [
     BashCommandHookSchema,
     PromptHookSchema,
     AgentHookSchema,
     HttpHookSchema,
+    McpToolHookSchema,
   ])
 })
 
@@ -218,5 +255,6 @@ export type BashCommandHook = Extract<HookCommand, { type: 'command' }>
 export type PromptHook = Extract<HookCommand, { type: 'prompt' }>
 export type AgentHook = Extract<HookCommand, { type: 'agent' }>
 export type HttpHook = Extract<HookCommand, { type: 'http' }>
+export type McpToolHook = Extract<HookCommand, { type: 'mcp_tool' }>
 export type HookMatcher = z.infer<ReturnType<typeof HookMatcherSchema>>
 export type HooksSettings = Partial<Record<HookEvent, HookMatcher[]>>

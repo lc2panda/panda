@@ -441,6 +441,11 @@ export const PostToolUseHookInputSchema = lazySchema(() =>
       tool_input: z.unknown(),
       tool_response: z.unknown(),
       tool_use_id: z.string(),
+      // Wall-clock duration of the tool's actual `tool.call()` execution in
+      // milliseconds (parity with upstream v2.1.119). Excludes PreToolUse
+      // hook latency and permission-prompt time. Optional for backwards
+      // compatibility — older callers omit it entirely.
+      duration_ms: z.number().optional(),
     }),
   ),
 )
@@ -454,6 +459,9 @@ export const PostToolUseFailureHookInputSchema = lazySchema(() =>
       tool_use_id: z.string(),
       error: z.string(),
       is_interrupt: z.boolean().optional(),
+      // Wall-clock duration in ms of the failed/cancelled tool execution
+      // (parity with upstream v2.1.119). Populated even on user interrupt.
+      duration_ms: z.number().optional(),
     }),
   ),
 )

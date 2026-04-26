@@ -8,7 +8,7 @@
 import { feature } from 'bun:bundle';
 if (typeof globalThis.MACRO === "undefined") {
     (globalThis as any).MACRO = {
-        VERSION: "2.1.92",
+        VERSION: "2.1.120",
         BUILD_TIME: new Date().toISOString(),
         FEEDBACK_CHANNEL: "",
         ISSUES_EXPLAINER: "",

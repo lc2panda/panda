@@ -46,6 +46,13 @@ export async function* runPostToolUseHooks<Input extends AnyObject, Output>(
   requestId: string | undefined,
   mcpServerType: McpServerType,
   mcpServerBaseUrl: string | undefined,
+  /**
+   * Wall-clock duration of the tool's actual `tool.call()` execution in
+   * milliseconds. Forwarded into the hook input JSON as `duration_ms`
+   * (parity with upstream v2.1.119). Optional for backwards compatibility
+   * with callers that haven't been updated to pass it.
+   */
+  toolDurationMs?: number,
 ): AsyncGenerator<PostToolUseHooksResult<Output>> {
   const postToolStartTime = Date.now()
   try {
@@ -61,6 +68,8 @@ export async function* runPostToolUseHooks<Input extends AnyObject, Output>(
       toolUseContext,
       permissionMode,
       toolUseContext.abortController.signal,
+      undefined, // timeoutMs default
+      toolDurationMs,
     )) {
       try {
         // Check if we were aborted during hook execution
@@ -201,6 +210,13 @@ export async function* runPostToolUseFailureHooks<Input extends AnyObject>(
   requestId: string | undefined,
   mcpServerType: McpServerType,
   mcpServerBaseUrl: string | undefined,
+  /**
+   * Wall-clock duration of the failed/cancelled tool execution in milliseconds.
+   * Forwarded into the hook input JSON as `duration_ms` (parity with upstream
+   * v2.1.119). Still populated on AbortError so observers can see how long the
+   * user let the tool run before interrupting.
+   */
+  toolDurationMs?: number,
 ): AsyncGenerator<
   MessageUpdateLazy<AttachmentMessage | ProgressMessage<HookProgress>>
 > {
@@ -218,6 +234,8 @@ export async function* runPostToolUseFailureHooks<Input extends AnyObject>(
       isInterrupt,
       permissionMode,
       toolUseContext.abortController.signal,
+      undefined, // timeoutMs default
+      toolDurationMs,
     )) {
       try {
         // Check if we were aborted during hook execution

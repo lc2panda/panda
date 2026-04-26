@@ -58,6 +58,15 @@ export function isHookEqual(
       return b.type === 'agent' && a.prompt === b.prompt && sameIf(a, b)
     case 'http':
       return b.type === 'http' && a.url === b.url && sameIf(a, b)
+    case 'mcp_tool':
+      return (
+        b.type === 'mcp_tool' &&
+        a.mcpServer === b.mcpServer &&
+        a.tool === b.tool &&
+        JSON.stringify(a.arguments ?? {}) ===
+          JSON.stringify(b.arguments ?? {}) &&
+        sameIf(a, b)
+      )
     case 'function':
       // Function hooks can't be compared (no stable identifier)
       return false
@@ -82,6 +91,8 @@ export function getHookDisplayText(
       return hook.prompt
     case 'http':
       return hook.url
+    case 'mcp_tool':
+      return `${hook.mcpServer}::${hook.tool}`
     case 'callback':
       return 'callback'
     case 'function':

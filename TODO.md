@@ -144,3 +144,42 @@ W16 进行中 (4/5 完成):
 ### Wave G — P2 功能完善
 - [x] G-1: Sidebar duplicate + archive (本次)
 - [x] G-5: Streaming 3-dot pulse (本次)
+
+---
+
+## 上游 v2.1.88 → v2.1.120 迁移路线图（2026-04-26）
+
+> 完整方案：`monitor/migration-plan-2026-04-26.md`（526 行）
+> 调研依据：3 份落盘报告（version-features / features-deep-dive / panda-cli-capability-snapshot）
+> Gap 分类：A=47 已覆盖｜B=26 部分｜C=19 缺失｜D=8 不做
+
+### Top-3 P0/P1（3 天交付，Score 排序）
+- [ ] **#1 `/recap` slash 收尾** Score 8.10 — P0 0.5 天
+  - 路径：`src/commands/recap/index.ts` 特例新建 `[NEW-FILE:#20260426-01]` + `commands.ts` 注册
+  - 复用：`src/services/awaySummary.ts` + `src/hooks/useAwaySummary.ts`（自动版已 100% 实现）
+- [ ] **#6 Hooks v2 字段补齐** Score 6.95 — P1 1.5 天
+  - 缺：`mcp_tool` handler 类型 + `duration_ms` PostToolUse 字段
+  - 路径：`src/utils/hooks/execMcpToolHook.ts` 特例新建 `[NEW-FILE:#20260426-02]` + 5 处现有文件改造
+- [ ] **#2 `/usage` 合并入口** Score 6.85 — P1 1 天
+  - `/cost` `/stats` 改 thin shim 跳转 `/usage` tab，零新建文件
+
+### B 类后续批次（19 条，按版本分组）
+- [ ] B 批次①（v2.1.118）：`/fork` 写盘验证、`prUrlTemplate`、Vim Visual+jk、`config` 优先级链
+- [ ] B 批次②（v2.1.110+）：`PreCompact` exit code 2 阻断、`headersHelper` MCP 元数据、自定义命名主题
+- [ ] B 批次③（其它）：Auto Mode 默认开启、`/proactive` ↔ `/loop` 互通、Skill 描述上限、Bedrock/Vertex 安装向导
+
+### C 类完全缺失（19 条，按 Score 排序，待决）
+- [ ] `/tui` 全屏模式、`/focus` 专注视图、`prUrlTemplate`、`CLAUDE_CODE_HIDE_CWD`
+- [ ] `managed-settings.d/` drop-in、`disableDeepLinkRegistration`、`SUBPROCESS_ENV_SCRUB`
+- [ ] `--from-pr` 多平台、`blockedMarketplaces`、插件 `monitors` / `bin/` / `tag`
+- [ ] `ENABLE_PROMPT_CACHING_1H` / `FORCE_PROMPT_CACHING_5M` env
+- [ ] `/team-onboarding` `/powerup` `${CLAUDE_EFFORT}` 变量
+- [ ] `sandbox.failIfUnavailable` 策略字段
+
+### 关键风险（执行前必带补丁）
+- ⚠️ CLAUDE.md 被忽略回归（上游 issue #53040）
+- ⚠️ Forked subagents 写盘膨胀（v2.1.118 修复"指针式"）
+- ⚠️ Focus mode 吞 system status lines（v2.1.110 修复）
+
+### D 类不迁移（已知禁用）
+- 企业 Console 鉴权 / Bedrock Mantle / OTEL 全家桶 / Datadog / Slacked / Perforce / 远程 settings 强刷 / channels 插件白名单

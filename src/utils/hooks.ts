@@ -153,6 +153,7 @@ import { execPromptHook } from './hooks/execPromptHook.js'
 import type { Message, AssistantMessage } from '../types/message.js'
 import { execAgentHook } from './hooks/execAgentHook.js'
 import { execHttpHook } from './hooks/execHttpHook.js'
+import { execMcpToolHook } from './hooks/execMcpToolHook.js'
 import type { ShellCommand } from './ShellCommand.js'
 import {
   getSessionHooks,
@@ -1879,6 +1880,31 @@ export async function getMatchingHooks(
           ]),
       ).values(),
     )
+    const uniqueMcpToolHooks = Array.from(
+      new Map(
+        matchedHooks
+          .filter(m => m.hook.type === 'mcp_tool')
+          .map(m => {
+            const h = m.hook as {
+              mcpServer: string
+              tool: string
+              arguments?: Record<string, unknown>
+              if?: string
+            }
+            // mcp_tool identity = mcpServer + tool + arguments + if condition.
+            // Two hooks pointing at the same server::tool with different
+            // arguments are distinct (e.g. notify-success vs notify-failure).
+            const argSig = h.arguments ? jsonStringify(h.arguments) : ''
+            return [
+              hookDedupKey(
+                m,
+                `${h.mcpServer}\0${h.tool}\0${argSig}\0${getIfCondition(h)}`,
+              ),
+              m,
+            ]
+          }),
+      ).values(),
+    )
     const callbackHooks = matchedHooks.filter(m => m.hook.type === 'callback')
     // Function hooks don't need deduplication - each callback is unique
     const functionHooks = matchedHooks.filter(m => m.hook.type === 'function')
@@ -1887,6 +1913,7 @@ export async function getMatchingHooks(
       ...uniquePromptHooks,
       ...uniqueAgentHooks,
       ...uniqueHttpHooks,
+      ...uniqueMcpToolHooks,
       ...callbackHooks,
       ...functionHooks,
     ]
@@ -1899,7 +1926,8 @@ export async function getMatchingHooks(
         (h.hook.type === 'command' ||
           h.hook.type === 'prompt' ||
           h.hook.type === 'agent' ||
-          h.hook.type === 'http') &&
+          h.hook.type === 'http' ||
+          h.hook.type === 'mcp_tool') &&
         (h.hook as { if?: string }).if,
     )
     const ifMatcher = hasIfCondition
@@ -1910,7 +1938,8 @@ export async function getMatchingHooks(
         h.hook.type !== 'command' &&
         h.hook.type !== 'prompt' &&
         h.hook.type !== 'agent' &&
-        h.hook.type !== 'http'
+        h.hook.type !== 'http' &&
+        h.hook.type !== 'mcp_tool'
       ) {
         return true
       }
@@ -2526,6 +2555,60 @@ async function* executeHooks({
           return
         }
 
+        return
+      }
+
+      if (hook.type === 'mcp_tool') {
+        if (!toolUseContext) {
+          throw new Error(
+            'ToolUseContext is required for mcp_tool hooks. This is a bug.',
+          )
+        }
+        emitHookStarted(hookId, hookName, hookEvent)
+        const mcpResult = await execMcpToolHook(
+          hook,
+          hookName,
+          hookEvent,
+          jsonInput,
+          abortSignal,
+          toolUseContext,
+          toolUseID,
+        )
+        // Inject timing fields for hook visibility (parity with prompt/agent paths)
+        if (mcpResult.message?.type === 'attachment') {
+          const att = mcpResult.message.attachment
+          if (
+            att.type === 'hook_success' ||
+            att.type === 'hook_non_blocking_error'
+          ) {
+            att.command = hookCommand
+            att.durationMs = Date.now() - hookStartMs
+          }
+        }
+        // Emit a synthetic response event so observability tooling sees mcp_tool hooks.
+        if (mcpResult.message?.type === 'attachment') {
+          const att = mcpResult.message.attachment
+          const stdout = ('stdout' in att && att.stdout) || ''
+          const stderr = ('stderr' in att && att.stderr) || ''
+          const exitCode = 'exitCode' in att ? att.exitCode : 0
+          emitHookResponse({
+            hookId,
+            hookName,
+            hookEvent,
+            output: stdout || stderr,
+            stdout,
+            stderr,
+            exitCode,
+            outcome:
+              mcpResult.outcome === 'success'
+                ? 'success'
+                : mcpResult.outcome === 'cancelled'
+                  ? 'cancelled'
+                  : 'error',
+          })
+        }
+        yield mcpResult
+        cleanup?.()
         return
       }
 
@@ -3291,6 +3374,19 @@ async function executeHooksOutsideREPL({
         }
       }
 
+      // mcp_tool hooks need a live connected MCP client, which only exists in
+      // REPL/agent runtime contexts. Mirror the prompt/agent stub so callers
+      // that hit SessionStart/Setup in -p mode get a clear no-op rather than
+      // a fall-through into the command path below.
+      if (hook.type === 'mcp_tool') {
+        return {
+          command: `${hook.mcpServer}::${hook.tool}`,
+          succeeded: false,
+          output: 'mcp_tool hooks are not yet supported outside REPL',
+          blocked: false,
+        }
+      }
+
       // Function hooks require messages array (only available in REPL context)
       // For -p mode Stop hooks, use executeStopHooks which supports function hooks
       if (hook.type === 'function') {
@@ -3580,6 +3676,14 @@ export async function* executePostToolHooks<ToolInput, ToolResponse>(
   permissionMode?: string,
   signal?: AbortSignal,
   timeoutMs: number = TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+  /**
+   * Wall-clock duration of the tool's actual `tool.call()` execution in
+   * milliseconds (parity with upstream v2.1.119). Excludes PreToolUse hook
+   * latency and permission-prompt time. When undefined the field is omitted
+   * from the hook input JSON for backwards compatibility with handlers that
+   * never read it.
+   */
+  durationMs?: number,
 ): AsyncGenerator<AggregatedHookResult> {
   const appState = toolUseContext.getAppState()
   const sessionId = toolUseContext.agentId ?? getSessionId()
@@ -3594,6 +3698,8 @@ export async function* executePostToolHooks<ToolInput, ToolResponse>(
     tool_input: toolInput,
     tool_response: toolResponse,
     tool_use_id: toolUseID,
+    ...(typeof durationMs === 'number' &&
+      Number.isFinite(durationMs) && { duration_ms: durationMs }),
   }
 
   yield* executeHooks({
@@ -3629,6 +3735,13 @@ export async function* executePostToolUseFailureHooks<ToolInput>(
   permissionMode?: string,
   signal?: AbortSignal,
   timeoutMs: number = TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+  /**
+   * Wall-clock duration of the failed/cancelled tool execution in milliseconds
+   * (parity with upstream v2.1.119). Excludes PreToolUse / permission time;
+   * still populated on AbortError so observers can see how long the user let
+   * the tool run before interrupting.
+   */
+  durationMs?: number,
 ): AsyncGenerator<AggregatedHookResult> {
   const appState = toolUseContext.getAppState()
   const sessionId = toolUseContext.agentId ?? getSessionId()
@@ -3644,6 +3757,8 @@ export async function* executePostToolUseFailureHooks<ToolInput>(
     tool_use_id: toolUseID,
     error,
     is_interrupt: isInterrupt,
+    ...(typeof durationMs === 'number' &&
+      Number.isFinite(durationMs) && { duration_ms: durationMs }),
   }
 
   yield* executeHooks({
@@ -5153,8 +5268,12 @@ function getHookDefinitionsForTelemetry(
       return { type: 'command', command: hook.command }
     } else if (hook.type === 'prompt') {
       return { type: 'prompt', prompt: hook.prompt }
+    } else if (hook.type === 'agent') {
+      return { type: 'agent', prompt: hook.prompt }
     } else if (hook.type === 'http') {
       return { type: 'http', command: hook.url }
+    } else if (hook.type === 'mcp_tool') {
+      return { type: 'mcp_tool', name: `${hook.mcpServer}::${hook.tool}` }
     } else if (hook.type === 'function') {
       return { type: 'function', name: 'function' }
     } else if (hook.type === 'callback') {

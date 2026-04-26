@@ -129,6 +129,7 @@ import thinkbackPlay from './commands/thinkback-play/index.js'
 import persona from './commands/persona/index.js'
 import routing from './commands/routing.js'
 import privacy from './commands/privacy.js'
+import recap from './commands/recap/index.js'
 import permissions from './commands/permissions/index.js'
 import plan from './commands/plan/index.js'
 import fast from './commands/fast/index.js'
@@ -300,6 +301,7 @@ const COMMANDS = memoize((): Command[] => [
   persona,
   routing,
   privacy,
+  recap,
   remoteEnv,
   plugin,
   pr_comments,
@@ -666,7 +668,10 @@ export const BRIDGE_SAFE_COMMANDS: Set<Command> = new Set(
   [
     compact, // Shrink context — useful mid-session from a phone
     clear, // Wipe transcript
-    cost, // Show session cost
+    // cost — moved out: now a 'local-jsx' thin shim into UnifiedUsage screen.
+    // Bridge clients should still be able to read session cost via the
+    // CostPanel inside /usage when the unified UI is supported, or fall back
+    // to formatTotalCost() in cost-tracker for text-only contexts.
     summary, // Summarize conversation
     releaseNotes, // Show changelog
     files, // List tracked files

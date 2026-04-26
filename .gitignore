@@ -9,6 +9,7 @@ coverage
 .vscode
 *.suo
 *.lock
+*.tsbuildinfo
 
 # Non-source artifacts
 package-v2.1.88

@@ -177,6 +177,8 @@ function getContentFieldLabel(config: IndividualHookConfig['config']): string {
       return 'Prompt';
     case 'http':
       return 'URL';
+    case 'mcp_tool':
+      return 'MCP Tool';
   }
 }
 
@@ -194,5 +196,7 @@ function getContentFieldValue(config: IndividualHookConfig['config']): string {
       return config.prompt;
     case 'http':
       return config.url;
+    case 'mcp_tool':
+      return `${config.mcpServer}::${config.tool}`;
   }
 }
