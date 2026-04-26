@@ -139,8 +139,9 @@ describe('chatStore', () => {
 
       const session = useChatStore.getState().sessions.get(SID)!;
       expect(session.messages).toHaveLength(1);
-      expect(session.messages[0].role).toBe('user');
-      expect(session.messages[0].content).toBe('Hi there');
+      const m = session.messages[0];
+      expect(m.type).toBe('user');
+      expect(m.content).toBe('Hi there');
       expect(session.chatState).toBe('thinking');
     });
 
@@ -150,9 +151,10 @@ describe('chatStore', () => {
 
       const session = useChatStore.getState().sessions.get(SID)!;
       expect(session.messages).toHaveLength(1);
-      expect(session.messages[0].role).toBe('assistant');
-      expect(session.messages[0].id).toBe('msg-1');
-      expect(session.messages[0].content).toBe('');
+      const m = session.messages[0];
+      expect(m.type).toBe('assistant');
+      expect(m.id).toBe('msg-1');
+      expect(m.type === 'assistant' && m.content === '').toBe(true);
       expect(session.chatState).toBe('streaming');
     });
 
@@ -165,8 +167,12 @@ describe('chatStore', () => {
 
       const session = useChatStore.getState().sessions.get(SID)!;
       expect(session.chatState).toBe('idle');
-      expect(session.messages[0].finishReason).toBe('end_turn');
-      expect(session.messages[0].tokenUsage).toEqual(usage);
+      const m = session.messages[0];
+      expect(m.type).toBe('assistant');
+      if (m.type === 'assistant') {
+        expect(m.finishReason).toBe('end_turn');
+        expect(m.tokenUsage).toEqual(usage);
+      }
       // Cumulative token usage
       expect(session.tokenUsage.input).toBe(100);
       expect(session.tokenUsage.output).toBe(50);
@@ -201,7 +207,7 @@ describe('chatStore', () => {
   // ── Tool actions ───────────────────────────────────────────────────────
 
   describe('tool actions', () => {
-    it('startToolUse adds a tool call to the last assistant message', () => {
+    it('startToolUse pushes a standalone tool_use MessageEntry (cc-haha shape)', () => {
       useChatStore.getState().initSession(SID);
       useChatStore.getState().startStreaming(SID, 'msg-1');
 
@@ -212,13 +218,18 @@ describe('chatStore', () => {
       expect(session.activeToolUseId).toBe('tool-1');
       expect(session.activeToolName).toBe('BashTool');
 
-      const toolCalls = session.messages[0].toolCalls!;
-      expect(toolCalls).toHaveLength(1);
-      expect(toolCalls[0].id).toBe('tool-1');
-      expect(toolCalls[0].status).toBe('running');
+      // [0] = assistant placeholder, [1] = tool_use entry
+      expect(session.messages).toHaveLength(2);
+      const toolMsg = session.messages[1];
+      expect(toolMsg.type).toBe('tool_use');
+      if (toolMsg.type === 'tool_use') {
+        expect(toolMsg.toolUseId).toBe('tool-1');
+        expect(toolMsg.toolName).toBe('BashTool');
+        expect(toolMsg.status).toBe('running');
+      }
     });
 
-    it('endToolUse updates the tool call result and resets chatState', () => {
+    it('endToolUse appends a standalone tool_result MessageEntry and updates tool_use status', () => {
       useChatStore.getState().initSession(SID);
       useChatStore.getState().startStreaming(SID, 'msg-1');
       useChatStore.getState().startToolUse(SID, 'tool-1', 'BashTool', { cmd: 'ls' });
@@ -230,22 +241,37 @@ describe('chatStore', () => {
       expect(session.activeToolUseId).toBeNull();
       expect(session.activeToolName).toBeNull();
 
-      const tc = session.messages[0].toolCalls![0];
-      expect(tc.result).toBe('file1.txt\nfile2.txt');
-      expect(tc.isError).toBe(false);
-      expect(tc.status).toBe('success');
+      // [0]=assistant, [1]=tool_use, [2]=tool_result
+      expect(session.messages).toHaveLength(3);
+      const toolMsg = session.messages[1];
+      const resultMsg = session.messages[2];
+      expect(toolMsg.type).toBe('tool_use');
+      expect(resultMsg.type).toBe('tool_result');
+      if (toolMsg.type === 'tool_use') {
+        expect(toolMsg.status).toBe('success');
+      }
+      if (resultMsg.type === 'tool_result') {
+        expect(resultMsg.toolUseId).toBe('tool-1');
+        expect(resultMsg.content).toBe('file1.txt\nfile2.txt');
+        expect(resultMsg.isError).toBe(false);
+      }
     });
 
-    it('endToolUse marks error tool calls correctly', () => {
+    it('endToolUse marks errored tool_result correctly and tool_use becomes error', () => {
       useChatStore.getState().initSession(SID);
       useChatStore.getState().startStreaming(SID, 'msg-1');
       useChatStore.getState().startToolUse(SID, 'tool-1', 'BashTool', { cmd: 'bad' });
 
       useChatStore.getState().endToolUse(SID, 'tool-1', 'command not found', true);
 
-      const tc = useChatStore.getState().sessions.get(SID)!.messages[0].toolCalls![0];
-      expect(tc.isError).toBe(true);
-      expect(tc.status).toBe('error');
+      const session = useChatStore.getState().sessions.get(SID)!;
+      const toolMsg = session.messages[1];
+      const resultMsg = session.messages[2];
+      if (toolMsg.type === 'tool_use') expect(toolMsg.status).toBe('error');
+      if (resultMsg.type === 'tool_result') {
+        expect(resultMsg.isError).toBe(true);
+        expect(resultMsg.content).toBe('command not found');
+      }
     });
   });
 

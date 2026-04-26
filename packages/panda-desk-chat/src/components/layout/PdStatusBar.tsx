@@ -1,67 +1,23 @@
-// Input: Model name, token counts, connection state, permission mode, DND flag, pet mood
-// Output: Bottom status bar showing live session metadata with pet mood indicator
-// Pos: Layout layer — bottom edge of center column, above PetStrip
+// Input: model name, connection state
+// Output: cc-haha 极简 StatusBar — 仅左侧空 / 右侧模型名
+// Pos: 主区底部 36px 状态栏
+//
+// cc-haha 100% 对标重写：
+//  - 删除：连接状态圆点+label / token count / 宠物点击
+//  - 保留：model 名 + JetBrains Mono 11px / 36px height / border-top
 
-import { type ComponentType } from 'react';
 import { cn } from '@/lib/cn';
-import { useI18n } from '@/hooks/useI18n';
-import { Circle as _Circle } from 'lucide-react';
 
-// Re-type lucide icons for React 18 compat (hoisted @types/react@19 conflict)
-type IconFC = ComponentType<{ className?: string; size?: number; fill?: string; stroke?: string }>;
-const Circle = _Circle as IconFC;
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 export type ConnectionState = 'connected' | 'disconnected' | 'connecting' | 'error';
 
 export interface PdStatusBarProps {
   model?: string;
+  /** 保留 prop 供旧调用兼容，cc-haha 视觉中不显示 */
   tokenCount?: { input: number; output: number };
   connectionState?: ConnectionState;
-  permissionMode?: string;
-  dnd?: boolean;
-  /** Callback when pet mood/level badge is clicked (e.g. open Inspector petState tab) */
-  onPetClick?: () => void;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
-
-const connectionColors: Record<ConnectionState, string> = {
-  connected:    'var(--pd-color-success)',
-  disconnected: 'var(--pd-color-error)',
-  connecting:   'var(--pd-color-warning)',
-  error:        'var(--pd-color-error)',
-};
-
-const connectionI18nKeys: Record<ConnectionState, string> = {
-  connected:    'statusbar.connection.connected',
-  disconnected: 'statusbar.connection.disconnected',
-  connecting:   'statusbar.connection.connecting',
-  error:        'statusbar.connection.error',
-};
-
-// ---------------------------------------------------------------------------
-// Component — cc-haha StatusBar spec: 36px height, JetBrains Mono 11px,
-// border-top, justify-between, content: project | model
-// ---------------------------------------------------------------------------
-export function PdStatusBar({
-  model,
-  tokenCount,
-  connectionState = 'connected',
-}: PdStatusBarProps) {
-  const { t } = useI18n();
-  const connColor = connectionColors[connectionState];
-  const connLabel = t(connectionI18nKeys[connectionState] as any);
-
+export function PdStatusBar({ model }: PdStatusBarProps) {
   return (
     <div
       className={cn(
@@ -73,27 +29,9 @@ export function PdStatusBar({
         'font-[family-name:var(--pd-font-mono)] select-none',
       )}
     >
-      {/* Left: connection dot + label */}
-      <div className="flex items-center gap-2">
-        <Circle
-          size={8}
-          fill={connColor}
-          stroke="none"
-          className={cn(
-            (connectionState === 'connecting' || connectionState === 'error') && 'animate-pulse',
-          )}
-        />
-        <span>{connLabel}</span>
-      </div>
-
-      {/* Right: model + tokens */}
-      <div className="flex items-center gap-3">
+      <div />
+      <div className="flex items-center">
         {model && <span className="text-[var(--pd-color-fg-tertiary)]">{model}</span>}
-        {tokenCount && (tokenCount.input > 0 || tokenCount.output > 0) && (
-          <span className="text-[var(--pd-color-fg-tertiary)]">
-            ↑{formatTokens(tokenCount.input)} ↓{formatTokens(tokenCount.output)}
-          </span>
-        )}
       </div>
     </div>
   );

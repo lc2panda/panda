@@ -1,260 +1,321 @@
-// Input: Tool permission request from IPC
-// Output: User's permission decision (allow/allow_session/deny)
-// Pos: Chat layer — security-critical user consent UI
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { cn } from "@/lib/cn";
-import { PdDialog } from "../containers/PdDialog";
+// Input:  toolName / input / requestId/toolUseId / description? + (panda compat) visible / tier / onDecision
+// Output: 内联 permission 卡（header tool icon + tier chip + tool details preview + [Allow / Allow session / Deny]）
+// Pos:    Chat layer — security-critical user consent UI rendered inline in the message stream
+//
+// Source 1:1: cc-haha desktop/src/components/chat/PermissionDialog.tsx (L1-L262)
+//   - className 转换：var(--color-*) → var(--pd-color-*)
+//   - cc-haha shared/Button → panda shared/PdButton（1:1 等价）
+//   - cc-haha DiffViewer → panda PdDiffViewer（同任务 S4 已有）
+//   - cc-haha respondToPermission(tabId, requestId, true|false, {rule:'always'}?) → panda respondPermission(sid, toolUseId, 'allow'|'allow_session'|'deny')
+//     panda 不支持 cc-haha rule:'always' 第 4 参形态；用 'allow_session' 决策即等价 cc-haha session-scope grant；
+//   - panda 调用方现仍以 visible/tier/onDecision 形态使用（ActiveSession.tsx）；保留旧 props 作为兼容签名，
+//     若提供 onDecision 则走旧路径，否则走 cc-haha 1:1 chatStore 寻址。
+import { useState } from 'react';
+import { useChatStore } from '../../stores/chatStore';
+import { t } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
+import { PdButton } from '../shared/PdButton';
+import { PdDiffViewer } from './PdDiffViewer';
 
-/* -------------------------------------------------------------------------- */
-/*  Types                                                                     */
-/* -------------------------------------------------------------------------- */
+export type PermissionTier = 'read' | 'write' | 'exec';
+export type PermissionDecision = 'allow' | 'allow_session' | 'deny';
 
-export type PermissionTier = "read" | "write" | "exec";
-export type PermissionDecision = "allow" | "allow_session" | "deny";
-
-export interface PdPermissionDialogProps {
-  visible: boolean;
+export type PdPermissionDialogProps = {
+  // cc-haha 原生 props（首选）
+  requestId?: string;
   toolName: string;
-  input: Record<string, unknown>;
-  tier: PermissionTier;
-  onDecision: (decision: PermissionDecision) => void;
+  input: unknown;
+  description?: string;
+  // panda 兼容旧 props（ActiveSession.tsx 调用）
+  visible?: boolean;
+  tier?: PermissionTier;
+  onDecision?: (decision: PermissionDecision) => void;
+};
+
+/**
+ * Icons for known tool types.
+ * Uses Material Symbols Outlined names.
+ */
+const TOOL_META: Record<string, { icon: string; label: string; color: string }> = {
+  Bash: { icon: 'terminal', label: 'Bash', color: 'var(--pd-color-warning)' },
+  Edit: { icon: 'edit_note', label: 'Edit File', color: 'var(--pd-color-brand)' },
+  Write: { icon: 'edit_document', label: 'Write File', color: 'var(--pd-color-success)' },
+  Read: { icon: 'description', label: 'Read File', color: 'var(--pd-color-secondary)' },
+  Glob: { icon: 'search', label: 'Glob Search', color: 'var(--pd-color-secondary)' },
+  Grep: { icon: 'find_in_page', label: 'Grep Search', color: 'var(--pd-color-secondary)' },
+  Agent: { icon: 'smart_toy', label: 'Agent', color: 'var(--pd-color-tertiary)' },
+  WebSearch: { icon: 'travel_explore', label: 'Web Search', color: 'var(--pd-color-secondary)' },
+  WebFetch: { icon: 'cloud_download', label: 'Web Fetch', color: 'var(--pd-color-secondary)' },
+  NotebookEdit: { icon: 'note', label: 'Notebook Edit', color: 'var(--pd-color-brand)' },
+  Skill: { icon: 'auto_awesome', label: 'Skill', color: 'var(--pd-color-tertiary)' },
+};
+
+/**
+ * Extract human-readable detail lines from tool input.
+ */
+function extractToolDetails(toolName: string, input: unknown, tt: (key: TranslationKey, params?: Record<string, string | number>) => string): { primary: string; secondary?: string } {
+  const obj = (input && typeof input === 'object') ? input as Record<string, unknown> : {};
+
+  switch (toolName) {
+    case 'Bash': {
+      const cmd = typeof obj.command === 'string' ? obj.command : '';
+      const desc = typeof obj.description === 'string' ? obj.description : undefined;
+      return { primary: cmd, secondary: desc };
+    }
+    case 'Edit': {
+      const filePath = typeof obj.file_path === 'string' ? obj.file_path : '';
+      return { primary: filePath, secondary: obj.old_string ? tt('permission.replacingContent') : undefined };
+    }
+    case 'Write': {
+      const filePath = typeof obj.file_path === 'string' ? obj.file_path : '';
+      return { primary: filePath };
+    }
+    case 'Read': {
+      const filePath = typeof obj.file_path === 'string' ? obj.file_path : '';
+      return { primary: filePath };
+    }
+    case 'Glob':
+      return { primary: typeof obj.pattern === 'string' ? obj.pattern : '' };
+    case 'Grep':
+      return { primary: typeof obj.pattern === 'string' ? obj.pattern : '' };
+    case 'Agent':
+      return { primary: typeof obj.description === 'string' ? obj.description : '' };
+    case 'WebSearch':
+      return { primary: typeof obj.query === 'string' ? obj.query : '' };
+    case 'WebFetch':
+      return { primary: typeof obj.url === 'string' ? obj.url : '' };
+    default:
+      return { primary: typeof input === 'string' ? input : JSON.stringify(input, null, 2) };
+  }
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Tier config                                                               */
-/* -------------------------------------------------------------------------- */
+function getPermissionTitle(toolName: string, input: unknown, tt: (key: TranslationKey, params?: Record<string, string | number>) => string) {
+  const obj = (input && typeof input === 'object') ? input as Record<string, unknown> : {};
+  const filePath = typeof obj.file_path === 'string' ? obj.file_path : '';
+  const fileName = filePath ? filePath.split('/').pop() || filePath : '';
 
-const TIER_CONFIG: Record<
-  PermissionTier,
-  { label: string; colorVar: string; badgeBg: string; icon: string }
-> = {
-  read: {
-    label: "Read",
-    colorVar: "var(--pd-color-info)",
-    badgeBg: "var(--pd-color-info-subtle, rgba(56,139,253,0.15))",
-    icon: "\u{1F50D}", // magnifying glass
-  },
-  write: {
-    label: "Write",
-    colorVar: "var(--pd-color-warning)",
-    badgeBg: "var(--pd-color-warning-subtle, rgba(210,153,34,0.15))",
-    icon: "\u270F\uFE0F", // pencil
-  },
-  exec: {
-    label: "Execute",
-    colorVar: "var(--pd-color-error)",
-    badgeBg: "var(--pd-color-error-subtle, rgba(248,81,73,0.15))",
-    icon: "\u26A0\uFE0F", // warning
-  },
-};
+  switch (toolName) {
+    case 'Edit':
+    case 'Write':
+      return fileName ? tt('permission.allowEditFile', { toolName, fileName }) : tt('permission.allowEditFileGeneric', { toolName: toolName.toLowerCase() });
+    case 'Bash':
+      return tt('permission.allowBash');
+    default:
+      return tt('permission.allowTool', { toolName });
+  }
+}
 
-const INPUT_COLLAPSE_THRESHOLD = 300;
+function renderPermissionPreview(toolName: string, input: unknown) {
+  const obj = (input && typeof input === 'object') ? input as Record<string, unknown> : {};
+  const filePath = typeof obj.file_path === 'string' ? obj.file_path : 'file';
 
-/* -------------------------------------------------------------------------- */
-/*  PdPermissionDialog                                                       */
-/* -------------------------------------------------------------------------- */
+  if (toolName === 'Edit' && typeof obj.old_string === 'string' && typeof obj.new_string === 'string') {
+    return <PdDiffViewer filePath={filePath} oldString={obj.old_string} newString={obj.new_string} />;
+  }
 
-export const PdPermissionDialog: React.FC<PdPermissionDialogProps> = ({
-  visible,
+  if (toolName === 'Write' && typeof obj.content === 'string') {
+    return <PdDiffViewer filePath={filePath} oldString="" newString={obj.content} />;
+  }
+
+  if (toolName === 'Bash' && typeof obj.command === 'string') {
+    return (
+      <div className="overflow-x-auto rounded-[var(--pd-radius-md)] bg-[var(--pd-color-terminal-bg)] px-3 py-2.5">
+        <pre className="font-[var(--pd-font-mono)] text-[11px] leading-[1.3] text-[var(--pd-color-terminal-fg)] whitespace-pre-wrap break-words">
+          <span className="text-[var(--pd-color-terminal-accent)] select-none">$ </span>{obj.command}
+        </pre>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+export function PdPermissionDialog({
+  requestId,
   toolName,
   input,
-  tier,
+  description,
+  visible,
   onDecision,
-}) => {
-  const [expanded, setExpanded] = useState(false);
-  const config = TIER_CONFIG[tier];
-
-  const inputJson = useMemo(
-    () => JSON.stringify(input, null, 2),
-    [input],
+}: PdPermissionDialogProps) {
+  const respondPermission = useChatStore((s) => s.respondPermission);
+  const activeSessionId = useChatStore((s) => s.activeSessionId);
+  const pendingPermission = useChatStore((s) =>
+    activeSessionId ? s.sessions.get(activeSessionId)?.pendingPermission ?? null : null,
   );
-  const isLong = inputJson.length > INPUT_COLLAPSE_THRESHOLD;
+  const [showRaw, setShowRaw] = useState(false);
 
-  /* -- Keyboard shortcuts ------------------------------------------------ */
-  useEffect(() => {
-    if (!visible) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && e.shiftKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        onDecision("allow_session");
-      } else if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        onDecision("allow");
-      }
-      // Esc is handled by PdDialog's built-in Escape handler
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [visible, onDecision]);
+  // 兼容路径：旧 panda props（visible+onDecision）→ 视为永远 pending；新 cc-haha 路径用 store pendingPermission 寻址。
+  const compatMode = onDecision !== undefined;
+  const effectiveRequestId = requestId ?? pendingPermission?.toolUseId ?? '';
+  const isPending = compatMode
+    ? visible !== false
+    : pendingPermission?.toolUseId === effectiveRequestId;
 
-  /* -- Title with tier badge --------------------------------------------- */
-  const title = (
-    <span className="flex items-center gap-[var(--pd-space-2)]">
-      <span>Permission Required</span>
-      <span
-        className={cn(
-          "inline-flex items-center gap-1",
-          "px-[var(--pd-space-2)] py-[var(--pd-space-0\\.5)]",
-          "rounded-[var(--pd-radius-full)]",
-          "text-[var(--pd-text-xs)]",
-          "font-[var(--pd-font-semibold)]",
-        )}
-        style={{
-          color: config.colorVar,
-          backgroundColor: config.badgeBg,
-        }}
-      >
-        {config.icon} {config.label}
-      </span>
-    </span>
-  );
+  const meta = TOOL_META[toolName] || { icon: 'shield', label: toolName, color: 'var(--pd-color-text-tertiary)' };
+  const details = extractToolDetails(toolName, input, t as (key: TranslationKey, params?: Record<string, string | number>) => string);
+  const rawInput = typeof input === 'string' ? input : JSON.stringify(input, null, 2);
+  const preview = renderPermissionPreview(toolName, input);
+  const title = getPermissionTitle(toolName, input, t as (key: TranslationKey, params?: Record<string, string | number>) => string);
+  const allowRawToggle = !preview;
 
-  /* -- Footer buttons ---------------------------------------------------- */
-  const footer = (
-    <>
-      <button
-        type="button"
-        onClick={() => onDecision("deny")}
-        className={cn(
-          "px-[var(--pd-space-4)] py-[var(--pd-space-2)]",
-          "rounded-[var(--pd-radius-md)]",
-          "text-[var(--pd-text-sm)]",
-          "font-[var(--pd-font-medium)]",
-          "text-[var(--pd-color-error)]",
-          "bg-transparent",
-          "border border-transparent",
-          "hover:bg-[var(--pd-color-error-subtle,rgba(248,81,73,0.1))]",
-          "transition-colors duration-[var(--pd-duration-fast)]",
-        )}
-      >
-        Deny <span className="ml-1 opacity-50 text-[var(--pd-text-xs)]">Esc</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => onDecision("allow_session")}
-        className={cn(
-          "px-[var(--pd-space-4)] py-[var(--pd-space-2)]",
-          "rounded-[var(--pd-radius-md)]",
-          "text-[var(--pd-text-sm)]",
-          "font-[var(--pd-font-medium)]",
-          "text-[var(--pd-color-fg)]",
-          "bg-[var(--pd-color-bg-subtle)]",
-          "border border-[var(--pd-color-border)]",
-          "hover:bg-[var(--pd-color-bg-hover)]",
-          "transition-colors duration-[var(--pd-duration-fast)]",
-        )}
-      >
-        Allow for Session{" "}
-        <span className="ml-1 opacity-50 text-[var(--pd-text-xs)]">Shift+Enter</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => onDecision("allow")}
-        className={cn(
-          "px-[var(--pd-space-4)] py-[var(--pd-space-2)]",
-          "rounded-[var(--pd-radius-md)]",
-          "text-[var(--pd-text-sm)]",
-          "font-[var(--pd-font-semibold)]",
-          "text-[var(--pd-color-fg-on-accent)]",
-          "bg-[var(--pd-color-accent)]",
-          "shadow-[var(--pd-shadow-button-primary)]",
-          "hover:bg-[var(--pd-color-accent-hover)]",
-          "active:bg-[var(--pd-color-accent-active)]",
-          "transition-colors duration-[var(--pd-duration-fast)]",
-        )}
-      >
-        Allow <span className="ml-1 opacity-60 text-[var(--pd-text-xs)]">Enter</span>
-      </button>
-    </>
-  );
+  const handleAllow = () => {
+    if (compatMode) {
+      onDecision!('allow');
+      return;
+    }
+    if (activeSessionId && effectiveRequestId) respondPermission(activeSessionId, effectiveRequestId, 'allow');
+  };
+
+  const handleAllowSession = () => {
+    if (compatMode) {
+      onDecision!('allow_session');
+      return;
+    }
+    if (activeSessionId && effectiveRequestId) respondPermission(activeSessionId, effectiveRequestId, 'allow_session');
+  };
+
+  const handleDeny = () => {
+    if (compatMode) {
+      onDecision!('deny');
+      return;
+    }
+    if (activeSessionId && effectiveRequestId) respondPermission(activeSessionId, effectiveRequestId, 'deny');
+  };
 
   return (
-    <PdDialog
-      open={visible}
-      onClose={() => onDecision("deny")}
-      title={title as unknown as string}
-      size="md"
-      destructive={tier === "exec"}
-      footer={footer}
-    >
-      {/* Tool name */}
-      <div className="mb-[var(--pd-space-3)]">
-        <span className="text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)] uppercase tracking-wider">
-          Tool
-        </span>
-        <p
-          className={cn(
-            "mt-[var(--pd-space-1)]",
-            "text-[var(--pd-text-base)]",
-            "font-[var(--pd-font-semibold)]",
-            "font-[family-name:var(--pd-font-mono)]",
-            "text-[var(--pd-color-fg)]",
-          )}
+    <div className={`mb-4 overflow-hidden rounded-[var(--pd-radius-lg)] border ${
+      isPending
+        ? 'border-[var(--pd-color-warning)] bg-[var(--pd-color-surface-container-lowest)]'
+        : 'border-[var(--pd-color-outline-variant)]/40 bg-[var(--pd-color-surface-container-low)] opacity-70'
+    }`}>
+      {/* Header */}
+      <div className={`flex items-center gap-3 px-4 py-3 ${
+        isPending
+          ? 'bg-[var(--pd-color-surface-container)]'
+          : 'bg-[var(--pd-color-surface-container-low)]'
+      }`}>
+        <div
+          className="flex items-center justify-center w-8 h-8 rounded-[var(--pd-radius-md)]"
+          style={{ backgroundColor: `${meta.color}18` }}
         >
-          {toolName}
-        </p>
+          <span
+            className="material-symbols-outlined text-[18px]"
+            style={{ color: meta.color }}
+          >
+            {meta.icon}
+          </span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-[var(--pd-color-text-primary)]">
+              {title}
+            </span>
+            {isPending && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--pd-color-warning)]/15 text-[var(--pd-color-warning)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--pd-color-warning)] animate-pulse-dot" />
+                {t('permission.awaitingApproval')}
+              </span>
+            )}
+            {!isPending && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--pd-color-surface-container-high)] text-[var(--pd-color-text-tertiary)]">
+                {t('permission.responded')}
+              </span>
+            )}
+          </div>
+          {description && (
+            <p className="mt-0.5 text-xs text-[var(--pd-color-text-secondary)] truncate">{description}</p>
+          )}
+        </div>
       </div>
 
-      {/* Input summary */}
-      <div>
-        <span className="text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)] uppercase tracking-wider">
-          Input
-        </span>
-        <pre
-          className={cn(
-            "mt-[var(--pd-space-1)]",
-            "p-[var(--pd-space-3)]",
-            "rounded-[var(--pd-radius-md)]",
-            "bg-[var(--pd-color-bg-inset)]",
-            "border border-[var(--pd-color-border-subtle)]",
-            "text-[var(--pd-text-xs)]",
-            "font-[family-name:var(--pd-font-mono)]",
-            "text-[var(--pd-color-fg-muted)]",
-            "overflow-x-auto whitespace-pre-wrap break-all",
-            !expanded && isLong && "max-h-[120px] overflow-hidden",
-          )}
-        >
-          {inputJson}
-        </pre>
-        {isLong && (
+      {/* Tool details */}
+      <div className="border-t border-[var(--pd-color-outline-variant)]/20 px-4 py-3">
+        {preview ? (
+          <div className="space-y-2">
+            {details.primary && toolName !== 'Bash' ? (
+              <div className="flex items-center gap-2 rounded-[var(--pd-radius-md)] bg-[var(--pd-color-surface-container)] px-3 py-2 text-xs font-[var(--pd-font-mono)] text-[var(--pd-color-text-secondary)]">
+                <span className="material-symbols-outlined text-[14px] text-[var(--pd-color-outline)] flex-shrink-0">
+                  folder_open
+                </span>
+                <span className="truncate">{details.primary}</span>
+              </div>
+            ) : null}
+            {preview}
+          </div>
+        ) : details.primary ? (
+          <div className="mb-2">
+            <div className="flex items-center gap-2 rounded-[var(--pd-radius-md)] bg-[var(--pd-color-surface-container)] px-3 py-2 text-xs font-[var(--pd-font-mono)] text-[var(--pd-color-text-secondary)]">
+              <span className="material-symbols-outlined text-[14px] text-[var(--pd-color-outline)] flex-shrink-0">
+                {toolName === 'Glob' || toolName === 'Grep' ? 'search' : 'folder_open'}
+              </span>
+              <span className="truncate">{details.primary}</span>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Secondary detail */}
+        {details.secondary && (
+          <p className="mt-2 text-xs text-[var(--pd-color-text-tertiary)]">{details.secondary}</p>
+        )}
+
+        {allowRawToggle && (
           <button
-            type="button"
-            onClick={() => setExpanded((p) => !p)}
-            className={cn(
-              "mt-[var(--pd-space-1)] text-[var(--pd-text-xs)]",
-              "text-[var(--pd-color-accent)] hover:underline",
-            )}
+            onClick={() => setShowRaw(!showRaw)}
+            className="mt-2 flex cursor-pointer items-center gap-1 text-[11px] text-[var(--pd-color-text-accent)] hover:underline"
           >
-            {expanded ? "Collapse" : "Show more"}
+            <span className="material-symbols-outlined text-[14px]">
+              {showRaw ? 'expand_less' : 'expand_more'}
+            </span>
+            {showRaw ? t('permission.hideDetails') : t('permission.showFullInput')}
           </button>
+        )}
+
+        {allowRawToggle && showRaw && (
+          <pre className="mt-2 max-h-[220px] overflow-y-auto overflow-x-auto rounded-[var(--pd-radius-md)] bg-[var(--pd-color-terminal-bg)] px-3 py-2.5 font-[var(--pd-font-mono)] text-[11px] leading-[1.3] text-[var(--pd-color-terminal-fg)] whitespace-pre-wrap break-words">
+            {rawInput}
+          </pre>
         )}
       </div>
 
-      {/* Exec tier warning */}
-      {tier === "exec" && (
-        <div
-          className={cn(
-            "mt-[var(--pd-space-3)]",
-            "flex items-start gap-[var(--pd-space-2)]",
-            "p-[var(--pd-space-3)]",
-            "rounded-[var(--pd-radius-md)]",
-            "bg-[var(--pd-color-error-subtle,rgba(248,81,73,0.08))]",
-            "border border-[var(--pd-color-error,#f85149)]",
-            "text-[var(--pd-text-xs)]",
-            "text-[var(--pd-color-error)]",
-          )}
-        >
-          <span className="shrink-0 mt-0.5">{TIER_CONFIG.exec.icon}</span>
-          <span>
-            This tool will <strong>execute code</strong> on your system. Review the
-            input carefully before allowing.
-          </span>
+      {/* Action buttons */}
+      {isPending && (
+        <div className="flex items-center gap-2 border-t border-[var(--pd-color-outline-variant)]/20 bg-[var(--pd-color-surface-container-low)] px-4 py-3">
+          <PdButton
+            variant="primary"
+            size="sm"
+            onClick={handleAllow}
+            icon={
+              <span className="material-symbols-outlined text-[14px]">check</span>
+            }
+          >
+            {t('permission.allow')}
+          </PdButton>
+          <PdButton
+            variant="ghost"
+            size="sm"
+            onClick={handleAllowSession}
+            icon={
+              <span className="material-symbols-outlined text-[14px]">verified</span>
+            }
+          >
+            {t('permission.allowForSession')}
+          </PdButton>
+          <div className="flex-1" />
+          <PdButton
+            variant="danger"
+            size="sm"
+            onClick={handleDeny}
+            icon={
+              <span className="material-symbols-outlined text-[14px]">close</span>
+            }
+          >
+            {t('permission.deny')}
+          </PdButton>
         </div>
       )}
-    </PdDialog>
+    </div>
   );
-};
+}
 
-PdPermissionDialog.displayName = "PdPermissionDialog";
+PdPermissionDialog.displayName = 'PdPermissionDialog';

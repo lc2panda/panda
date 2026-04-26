@@ -9,14 +9,17 @@ export { useSettingsStore, setupSettingsBridge } from './settingsStore';
 export { useUIStore } from './uiStore';
 export { useToastStore } from './toastStore';
 export { useProviderStore, setupProviderBridge } from './providerStore';
-export { useBuddyStore } from './buddyStore';
 export { useWindowStore } from './windowStore';
 export { useScheduleStore, setupScheduleBridge } from './scheduleStore';
 
 // Re-export commonly used types
 export type {
   UIMessage,
-  UIToolCall,
+  UIUserMessage,
+  UIAssistantMessage,
+  UISystemMessage,
+  UIToolUseMessage,
+  UIToolResultMessage,
   TokenUsage,
   ChatState,
   ConnectionState,
@@ -30,7 +33,6 @@ export type { Theme, PermissionMode, Locale, EffortLevel } from './settingsStore
 export type { ModalType } from './uiStore';
 export type { Toast, ToastType } from './toastStore';
 export type { Provider, ModelInfo } from './providerStore';
-export type { BuddyEvent, BuddyMilestone, BuddyStats, BuddyEventType } from './buddyStore';
 export type { WindowState } from './windowStore';
 
 // ---------------------------------------------------------------------------
@@ -63,7 +65,6 @@ export function setupAllBridges(): void {
     void import('./settingsStore').then((m) => { w.useSettingsStore = m.useSettingsStore; });
     void import('./uiStore').then((m) => { w.useUIStore = m.useUIStore; });
     void import('./providerStore').then((m) => { w.useProviderStore = m.useProviderStore; });
-    void import('./buddyStore').then((m) => { w.useBuddyStore = m.useBuddyStore; });
     void import('./scheduleStore').then((m) => { w.useScheduleStore = m.useScheduleStore; });
   }
 }

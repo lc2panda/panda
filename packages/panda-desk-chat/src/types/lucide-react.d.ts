@@ -29,19 +29,19 @@ declare module 'lucide-react' {
   // PdHeroComposer.tsx
   export const ArrowUp: LucideIcon;
 
-  // PdDrawer.tsx, PdSearchInput.tsx, PdTabBar.tsx, PdInspector.tsx
+  // PdDrawer.tsx, PdSearchInput.tsx, PdTabBar.tsx
   export const X: LucideIcon;
 
-  // PdCommandPalette.tsx, PdSearchInput.tsx, PdSessionSwitcher.tsx, PdSidebar.tsx
+  // PdSearchInput.tsx, PdSidebar.tsx
   export const Search: LucideIcon;
 
-  // PdCommandPalette.tsx
+  // (reserved)
   export const Command: LucideIcon;
 
   // PdDirectoryPicker.tsx, PdSidebar.tsx
   export const FolderOpen: LucideIcon;
 
-  // PdSessionSwitcher.tsx, PdSidebar.tsx
+  // PdSidebar.tsx
   export const MessageSquare: LucideIcon;
 
   // PdSidebar.tsx

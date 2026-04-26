@@ -4,18 +4,24 @@
  * Pos:    stylesheet root — imported by main.tsx
  */
 
+/* CRITICAL: 所有 @import 必须先于其他规则，否则被浏览器丢弃。
+ * cc-haha self-host 4 套字体（Inter / Manrope / JetBrains Mono / Material Symbols Outlined），
+ * 已通过 fonts.css @font-face 实现自托管。
+ */
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "./fonts.css";
 @import "./tokens.css";
 @import "./highlight.css";
 @import "./matrix-theme.css";
 
-/* Global resets */
-*,
-*::before,
-*::after {
+/* Global resets — cc-haha 1:1 (globals.css L421-423)
+ * 关键纪律：只 box-sizing，**不重置 padding/margin**。
+ * panda 旧版用 `* { padding:0; margin:0 }` 全局 reset，但这个会覆盖所有 Tailwind utility（.px-3 .py-2 .gap-2 等），
+ * 导致 NavItem/MessageList/Composer 间距全部坍塌为 0 — 这是"视觉散文感"的根本原因（V1 audit 73 deviation 主因）。
+ * Tailwind v4 自带 preflight 已处理必要的 normalize，不需要 panda 自创 reset。 */
+* {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 html,
@@ -62,6 +68,22 @@ a:hover {
 }
 
 .no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* cc-haha 1:1: data-attribute drag region (Electron 等价 Tauri data-tauri-drag-region) */
+[data-drag-region],
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+[data-drag-region] button,
+[data-drag-region] input,
+[data-drag-region] textarea,
+[data-drag-region] select,
+[data-drag-region] a,
+[data-drag-region] [role="button"],
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] input {
   -webkit-app-region: no-drag;
 }
 
@@ -140,11 +162,22 @@ h1, h2,
   animation: pd-bubble-enter 0.4s var(--pd-ease-spring) both;
 }
 
-/* ── Glass Panel utility (cc-haha aligned: blur 20px + transparent bg) ── */
+/* ── Glass Panel utility — cc-haha .glass-panel exact spec ───────────────
+ * Source: cc-haha/desktop/src/theme/globals.css L425-435
+ *   .glass-panel {
+ *     background: var(--color-surface-glass);              // rgba(255,255,255,0.84)
+ *     border: 1px solid var(--color-surface-glass-border); // rgba(218,193,186,0.22)
+ *     backdrop-filter: blur(20px);                         // no saturate
+ *     box-shadow: var(--shadow-dropdown);                  // dual-layer 4px/12px
+ *   }
+ *   .glass-panel:focus-within {
+ *     box-shadow: var(--shadow-focus-ring), var(--shadow-dropdown); // 1px ring + dropdown
+ *   }
+ */
 .pd-glass-panel {
   background: var(--pd-glass-bg);
-  backdrop-filter: blur(var(--pd-glass-blur)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--pd-glass-blur)) saturate(180%);
+  backdrop-filter: blur(var(--pd-glass-blur));
+  -webkit-backdrop-filter: blur(var(--pd-glass-blur));
   border: 1px solid var(--pd-glass-border);
   box-shadow: var(--pd-glass-shadow);
 }
@@ -152,27 +185,65 @@ h1, h2,
   box-shadow: var(--pd-glass-focus-ring), var(--pd-glass-shadow);
 }
 
-/* ── Elevated card utility (solid white + dropdown shadow + warm border) ──
- * Use this for cards that need maximum visual lift without glass dependency
- * (e.g. Hero card, Settings rows, permission cards, scheduled task rows).
- */
-.pd-card-elevated {
-  background: var(--pd-color-bg-elevated);
-  border: 1px solid var(--pd-color-border);
-  border-radius: var(--pd-radius-xl);
-  box-shadow:
-    0 1px 2px rgba(27, 28, 26, 0.04),
-    0 4px 16px rgba(27, 28, 26, 0.06);
-  transition: box-shadow 200ms var(--pd-ease-emphasized), border-color 200ms var(--pd-ease-emphasized);
+/* cc-haha alias — drop-in equivalence so existing class names keep working */
+.glass-panel {
+  background: var(--pd-glass-bg);
+  backdrop-filter: blur(var(--pd-glass-blur));
+  -webkit-backdrop-filter: blur(var(--pd-glass-blur));
+  border: 1px solid var(--pd-glass-border);
+  box-shadow: var(--pd-glass-shadow);
 }
-.pd-card-elevated:hover {
-  border-color: var(--pd-color-border-strong);
-  box-shadow:
-    0 1px 2px rgba(27, 28, 26, 0.04),
-    0 8px 28px rgba(27, 28, 26, 0.10);
+.glass-panel:focus-within {
+  box-shadow: var(--pd-glass-focus-ring), var(--pd-glass-shadow);
 }
 
-/* ── Thinking pulse dots ────────────────────────────────────────────── */
+/* cc-haha custom-shadow utility (L421-423) */
+.custom-shadow {
+  box-shadow: var(--pd-shadow-dropdown);
+}
+
+/* ── Sidebar shell + toggle (cc-haha L437-529) ──────────────────────────── */
+.pd-sidebar-shell {
+  width: var(--pd-layout-sidebar-width);
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing);
+  will-change: width;
+}
+.pd-sidebar-shell[data-state="closed"] {
+  width: var(--pd-layout-sidebar-rail);
+}
+.pd-sidebar-panel {
+  width: var(--pd-layout-sidebar-width);
+  min-width: var(--pd-layout-sidebar-width);
+  transition:
+    background-color var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing),
+    border-color var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing);
+}
+.pd-sidebar-panel[data-state="closed"] {
+  width: var(--pd-layout-sidebar-rail);
+  min-width: var(--pd-layout-sidebar-rail);
+}
+.pd-sidebar-toggle-button {
+  color: color-mix(in srgb, var(--pd-color-fg-muted) 72%, transparent);
+  background: transparent;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms ease;
+  border: 0;
+  box-shadow: none;
+}
+.pd-sidebar-toggle-button:hover {
+  color: color-mix(in srgb, var(--pd-color-fg) 88%, transparent);
+  background: color-mix(in srgb, var(--pd-color-bg-hover) 34%, transparent);
+}
+.pd-sidebar-toggle-button:active {
+  transform: translateY(0.5px);
+  background: color-mix(in srgb, var(--pd-color-bg-hover) 54%, transparent);
+}
+
+/* ── Thinking pulse dots（panda 自创，cc-haha 等价为 ThinkingBlock 内联 thinking-cursor，保留兼容） */
 @keyframes pd-pulse-dot {
   0%, 80%, 100% { opacity: 0.3; }
   40% { opacity: 1; }
@@ -190,6 +261,187 @@ h1, h2,
 .pd-thinking-dot:nth-child(1) { animation-delay: 0s; }
 .pd-thinking-dot:nth-child(2) { animation-delay: 0.2s; }
 .pd-thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* ── Session header（panda 自留：sticky glass header；cc-haha 用普通 border-b
+ *    保留为 panda 增强项，未来按需替换为 cc-haha L158-198 的 border-outline-variant/10 简化样式 */
+.pd-session-header {
+  background: color-mix(in srgb, var(--pd-color-bg) 92%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid color-mix(in srgb, var(--pd-color-border) 70%, transparent);
+}
+
+/* ── cc-haha 1:1：sidebar-toggle-icon / chevron / sidebar-copy / sidebar-section
+ *    来源：cc-haha desktop/src/theme/globals.css L540-609
+ *    panda token 前缀替换：var(--color-X) → var(--pd-color-X); var(--motion-sidebar-X) → var(--pd-motion-sidebar-X)
+ * ──────────────────────────────────────────────────────────────────────── */
+.sidebar-toggle-icon {
+  overflow: visible;
+}
+
+.sidebar-toggle-chevron {
+  stroke: currentColor;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  vector-effect: non-scaling-stroke;
+}
+
+.sidebar-toggle-chevron {
+  opacity: 0.95;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.85;
+  transform-origin: 50% 50%;
+}
+
+.sidebar-toggle-icon--open .sidebar-toggle-chevron {
+  transform: translateX(-0.2px);
+}
+
+.sidebar-toggle-button--collapsed .sidebar-toggle-chevron {
+  stroke-width: 2;
+  transform: translateX(0.4px);
+}
+
+.sidebar-copy {
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing),
+    opacity calc(var(--pd-motion-sidebar-duration) - 40ms) ease,
+    transform var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing);
+}
+
+.sidebar-copy--visible {
+  max-width: 240px;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sidebar-copy--hidden {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-10px);
+}
+
+.sidebar-section {
+  overflow: hidden;
+  transition:
+    max-height var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing),
+    opacity calc(var(--pd-motion-sidebar-duration) - 40ms) ease,
+    transform var(--pd-motion-sidebar-duration) var(--pd-motion-sidebar-easing);
+}
+
+.sidebar-section--visible {
+  max-height: 1200px;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sidebar-section--hidden {
+  max-height: 0;
+  opacity: 0;
+  transform: translateX(-12px);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-shell,
+  .sidebar-panel,
+  .sidebar-copy,
+  .sidebar-section,
+  .pd-sidebar-shell,
+  .pd-sidebar-panel {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── cc-haha 1:1：markdown-prose table styling
+ *    来源：cc-haha L620-631 */
+.markdown-prose .md-table-wrap table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.markdown-prose .md-table-wrap tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.markdown-prose a code {
+  color: inherit;
+}
+
+/* ── cc-haha 1:1：sidebar-scroll-area scrollbar
+ *    来源：cc-haha L639-659 */
+.sidebar-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--pd-color-outline) 72%, transparent) transparent;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--pd-color-outline) 78%, transparent);
+  border-radius: 9999px;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--pd-color-outline) 92%, transparent);
+}
+
+/* ── cc-haha 1:1：Material Symbols Outlined utility class
+ *    来源：cc-haha L402-418
+ *    用法：<span class="material-symbols-outlined">add</span>
+ *    V4 修复（cc-haha 视觉对齐）：包进 @layer base，让 Tailwind utility (@layer utilities)
+ *    在 cascade 上天然胜出，使 `text-[18px]` / `text-[16px]` 等任意值类生效。
+ *    panda global.css 引入顺序晚于 @import "tailwindcss"，若不分 layer 则 source-order
+ *    后写赢，从而把 fontSize 锁死在 24px。 */
+@layer base {
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    vertical-align: middle;
+  }
+}
+
+/* ── cc-haha 1:1：animations（shimmer/spin/pulse-dot/progress-fill）
+ *    来源：cc-haha L662-680 */
+@keyframes shimmer {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes progress-fill {
+  from { width: 0%; }
+}
+.animate-shimmer { animation: shimmer 1.5s ease-in-out infinite; }
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
 
 /* ── Tab close animation ────────────────────────────────────────────── */
 .pd-tab-closing {

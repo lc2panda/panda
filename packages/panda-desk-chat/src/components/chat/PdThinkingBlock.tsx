@@ -1,8 +1,12 @@
-// Input: Thinking content from assistant
-// Output: Collapsible thinking block with timing + pulse animation
-// Pos: Chat layer — displays model reasoning process
+// Input: thinking content string, isActive flag (cc-haha 接口), legacy isStreaming/defaultExpanded/forceCollapsed
+// Output: cc-haha 1:1 ThinkingBlock — ▸/▾ caret + italic label + 3-dot pulse + monospace expanded panel
+// Pos: Chat layer — displays model reasoning trace inline above assistant body.
+//
+// Reference: monitor/tmp/cc-haha/desktop/src/components/chat/ThinkingBlock.tsx L1-87
+// 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 import React, { useState, useRef, useEffect } from "react";
 import { cn } from "../../lib/cn";
+import { t } from "../../i18n";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -10,20 +14,15 @@ import { cn } from "../../lib/cn";
 
 export interface PdThinkingBlockProps {
   content: string;
+  /** cc-haha 主接口名 — true 时跑 thinking-dots 动画 + 内联光标. */
+  isActive?: boolean;
+  /** Legacy alias for isActive — kept for prop compat with older callers. */
   isStreaming?: boolean;
+  /** Open expanded panel by default (verbose transcript mode). */
   defaultExpanded?: boolean;
   /** When true, the block is not rendered at all (summary mode). */
   forceCollapsed?: boolean;
   className?: string;
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Helpers                                                                   */
-/* -------------------------------------------------------------------------- */
-
-function preview(text: string, maxLen = 140): string {
-  const oneLine = text.replace(/\n/g, " ").trim();
-  return oneLine.length > maxLen ? `${oneLine.slice(0, maxLen)}…` : oneLine;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -32,107 +31,121 @@ function preview(text: string, maxLen = 140): string {
 
 export const PdThinkingBlock = React.memo(function PdThinkingBlock({
   content,
-  isStreaming = false,
+  isActive,
+  isStreaming,
   defaultExpanded = false,
   forceCollapsed = false,
   className,
 }: PdThinkingBlockProps) {
+  const active = isActive ?? isStreaming ?? false;
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  /* -- Timing ------------------------------------------------------------ */
-  const startTimeRef = useRef<number | null>(null);
-  const [elapsedSecs, setElapsedSecs] = useState<number | null>(null);
-
-  // Record start time when streaming begins
+  // 1:1 cc-haha L9-13: auto-scroll expanded panel to bottom while active
   useEffect(() => {
-    if (isStreaming && startTimeRef.current === null) {
-      startTimeRef.current = Date.now();
+    if (expanded && active && contentRef.current) {
+      contentRef.current.scrollTop = contentRef.current.scrollHeight;
     }
-  }, [isStreaming]);
-
-  // Calculate elapsed time when streaming ends
-  useEffect(() => {
-    if (!isStreaming && startTimeRef.current !== null) {
-      const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
-      setElapsedSecs(elapsed);
-    }
-  }, [isStreaming]);
-
-  // Update elapsed time while streaming (live counter)
-  useEffect(() => {
-    if (!isStreaming) return;
-    const timer = setInterval(() => {
-      if (startTimeRef.current !== null) {
-        setElapsedSecs(Math.round((Date.now() - startTimeRef.current) / 1000));
-      }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [isStreaming]);
+  }, [content, expanded, active]);
 
   if (forceCollapsed) return null;
 
-  const headerLabel = isStreaming
-    ? "思考中"
-    : elapsedSecs !== null
-      ? `思考了 ${elapsedSecs}s`
-      : "思考";
+  // 1:1 cc-haha L15-18: preview = first non-empty line, slice(0,80) + '...'
+  const lines = content.split("\n").filter((l) => l.trim());
+  const firstLine = lines[0]?.replace(/\s+/g, " ").trim() || "";
+  const preview = firstLine.length > 80 ? firstLine.slice(0, 80) + "..." : firstLine;
+
+  // cc-haha L31: t('thinking.label') — panda i18n 已有 chat.thinking key（"思考中..."）
+  // 注意 cc-haha 文案是 "Thinking" + 单独的 thinking-dots 动画拼出 "..." → panda
+  // 把 "..." 作为静态尾缀已经在 catalog 中，这里我们把 "..." 切掉再交给 dots 动画。
+  const rawLabel = t("chat.thinking");
+  const labelText = rawLabel.replace(/\.{3,}$/, "").replace(/\u2026$/, "");
 
   return (
-    <div
-      className={cn(
-        "rounded-[var(--pd-radius-md)]",
-        "border-l-2 border-[var(--pd-color-border-subtle)]",
-        "bg-[var(--pd-color-bg-subtle)]",
-        "overflow-hidden",
-        className,
-      )}
-    >
-      {/* Header / Toggle */}
+    <div className={cn("mb-1", className)}>
+      <style>{thinkingStyles}</style>
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
         className={cn(
-          "flex w-full items-center gap-[var(--pd-space-1\\.5)] px-3 py-2",
-          "text-[var(--pd-text-xs)] text-[var(--pd-color-fg-muted)]",
-          "hover:bg-[var(--pd-color-bg-hover)]",
-          "transition-colors duration-[var(--pd-duration-fast)]",
-          "select-none cursor-pointer",
+          "flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left",
+          "text-[12px] text-[var(--pd-color-text-tertiary)]",
+          "transition-colors hover:text-[var(--pd-color-text-secondary)]",
         )}
       >
-        <span
-          className={cn(
-            "transition-transform duration-[var(--pd-duration-quick)]",
-            expanded && "rotate-90",
-          )}
-        >
-          ▸
+        <span className="text-[10px] text-[var(--pd-color-outline)]">
+          {expanded ? "\u25BE" : "\u25B8"}
         </span>
-        <span className="font-[var(--pd-font-medium)]">{headerLabel}</span>
-        {isStreaming && (
-          <span className="inline-flex items-center gap-[3px] ml-1">
-            <span className="pd-thinking-dot" />
-            <span className="pd-thinking-dot" />
-            <span className="pd-thinking-dot" />
+        <span className="shrink-0 font-medium italic">
+          {labelText}
+          {active && <span className="thinking-dots" />}
+        </span>
+        {!expanded && preview && (
+          <span className="min-w-0 flex-1 truncate font-[var(--pd-font-mono)] text-[11px] text-[var(--pd-color-text-tertiary)]">
+            {preview}
+            {active && <span className="thinking-inline-cursor" />}
           </span>
         )}
       </button>
-
-      {/* Content */}
-      <div
-        className={cn(
-          "px-3 pb-3",
-          !expanded && "hidden",
-        )}
-      >
-        <p className="whitespace-pre-wrap text-[var(--pd-text-sm)] text-[var(--pd-color-fg-muted)]">
-          {expanded ? content : preview(content)}
-          {isStreaming && (
-            <span className="animate-pulse ml-0.5">▊</span>
+      {expanded && (
+        <div
+          ref={contentRef}
+          className={cn(
+            "mt-1 max-h-[300px] overflow-y-auto",
+            "rounded-lg border border-[var(--pd-color-border)]/40",
+            "bg-[var(--pd-color-surface-container-lowest)]",
+            "p-2.5",
+            "font-[var(--pd-font-mono)] text-[11px] leading-[1.35]",
+            "text-[var(--pd-color-text-secondary)]",
+            "whitespace-pre-wrap break-words",
           )}
-        </p>
-      </div>
+        >
+          {content}
+          {active && <span className="thinking-cursor" />}
+        </div>
+      )}
     </div>
   );
 });
 
 PdThinkingBlock.displayName = "PdThinkingBlock";
+
+/* -------------------------------------------------------------------------- */
+/*  Inline styles — 1:1 cc-haha ThinkingBlock L54-87 thinkingStyles            */
+/*  panda 仅做 token 前缀替换：var(--color-X) → var(--pd-color-X)              */
+/* -------------------------------------------------------------------------- */
+
+const thinkingStyles = `
+@keyframes thinking-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes thinking-dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
+}
+.thinking-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--pd-color-text-tertiary);
+  vertical-align: middle;
+  margin-left: 1px;
+  animation: thinking-cursor-blink 1s step-end infinite;
+}
+.thinking-inline-cursor {
+  display: inline-block;
+  width: 1px;
+  height: 0.95em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: var(--pd-color-text-tertiary);
+  animation: thinking-cursor-blink 1s step-end infinite;
+}
+.thinking-dots::after {
+  content: '';
+  animation: thinking-dots 1.4s steps(1, end) infinite;
+}
+`;

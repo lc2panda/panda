@@ -1,3 +1,7 @@
 node_modules/
 dist/
 dist-electron/
+release/
+*.dmg
+*.dmg.blockmap
+public/icon.iconset/

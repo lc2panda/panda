@@ -1,24 +1,21 @@
 // Input:  DOM root element (#root)
-// Output: mounted React application
-// Pos:    application entry point — bootstraps React tree
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import { App } from "./App";
-import { setupAllBridges } from "./stores";
-import './styles/fonts.css';
-import './styles/tokens.css';
+// Output: mounted React application + IPC bridge wired
+// Pos:    application entry — cc-haha 1:1 with Electron bridge bootstrap
+//
+// Source: cc-haha desktop/src/main.tsx L1-13；保留 panda 必要 IPC bridge bootstrap。
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { App } from './App';
+import { setupAllBridges } from './stores';
+// 单一 CSS 入口：global.css 内部用 @import 串联 tailwindcss + fonts + tokens + highlight + matrix-theme。
+// 不要在 main.tsx 重复 import 子 CSS — Tailwind 4 + Vite 双重 import 会破坏 utility class context，
+// 导致 bg-[var(--pd-color-X)] 等任意值类无法被处理（cc-haha 1:1 复刻视觉失效根因）。
 import './styles/global.css';
-import './styles/highlight.css';
-import './styles/matrix-theme.css';
 
-// Wire IPC bridge events → Zustand stores (dev mock or Electron preload)
 setupAllBridges();
 
-const root = document.getElementById("root");
-if (!root) throw new Error("Root element #root not found");
-
-createRoot(root).render(
-  <StrictMode>
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
     <App />
-  </StrictMode>,
+  </React.StrictMode>,
 );

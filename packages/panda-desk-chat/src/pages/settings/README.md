@@ -1,13 +1,13 @@
 # settings/
 
-- SettingRow.tsx — 共享设置行布局组件（label + description + control slot）
-- GeneralTab.tsx — 通用设置（语言、工作目录、重置）
-- AppearanceTab.tsx — 外观设置（主题、字号）
-- ProvidersTab.tsx — AI Provider 配置（API Key 管理）
-- ModelTab.tsx — 模型选择（按 provider 列出可用模型 + 搜索过滤）
-- PermissionsTab.tsx — 工具权限模式（Default / Plan / Auto / Bypass）
-- ShortcutsTab.tsx — 快捷键一览
-- AboutTab.tsx — 关于信息（版本号、品牌）
+- SettingRow.tsx — 共享设置行布局组件（label + description + control slot），仅 ProvidersTab 内部细化字段时复用
+- GeneralTab.tsx — 通用设置（主题、语言、Effort Level — cc-haha 满宽按钮组）
+- AppearanceTab.tsx — 外观设置（主题满宽按钮 + 字号 slider）
+- ProvidersTab.tsx — AI Provider 配置（cc-haha 极简卡片 + 圆点指示器）
+- PermissionsTab.tsx — 工具权限模式（4 项 cc-haha 极简 radio cards）
+- AboutTab.tsx — 关于信息（居中 max-w-lg + 80×80 图标 + 无背景）
+- PdPandaEnvSettings.tsx — Comdr 指令: 22 个 PANDA_* 环境变量配置（功能/Agent/Cache/OAuth/Skill 5 组）— 真实读写 ~/.pandacc/settings.json env
+- PdLearningSettings.tsx — Comdr 指令: 学习助手 settings sub-tab（写作/知识/学习/输出风格 4 子区块）— Output Styles 由顶级 tab 移入此处
 - index.ts — barrel export
 
 一旦这里的结构发生变化，请务必更新我... 就像重新标记领地一样。

@@ -1,49 +1,48 @@
-// Input: 无
-// Output: 空会话 Hero 视觉块 — 大号 app icon (rounded-22 ≈ Anthropic Squircle) + Manrope bold 标题 + body 副标题
-// Pos: ChatPage 空会话时渲染，仅内容层
-// Reference: cc-haha desktop EmptySession (design spec only, not source) —
-// cc-haha 数值: app-icon 80px rounded-[22px] + h1 30px font-extrabold Manrope +
-//                subtitle 15px text-secondary leading-relaxed.
-
+// Input:  无
+// Output: cc-haha hero 形态欢迎块 — 96×96 logomark + 30px Manrope title + 14px subtitle
+// Pos:    EmptySession 顶部欢迎区（独立块，与 PdComposer variant='hero' 解耦）
+//
+// Source: cc-haha 没有独立的 hero welcome block —— hero 状态由 ChatInput variant='hero' 直接呈现；
+// panda 业务把 hero 拆为「上方欢迎块 + 下方 PdComposer」两栈，此组件保留为 panda 自创欢迎块。
+// 与 cc-haha 复刻原则不冲突（不破坏 cc-haha className，不在 ChatInput 之上添装饰）。
 import { t } from '../../i18n';
 
-export interface PdHeroComposerProps {
-  /** Legacy prop — kept for type compat; Composer 不再由此组件渲染 */
+export type PdHeroComposerProps = {
   onSend?: (message: string) => void;
   onSlashCommand?: (cmd: string) => void;
-}
+};
 
-export function PdHeroComposer(_props: PdHeroComposerProps) {
+export function PdHeroComposer(_props: PdHeroComposerProps = {}) {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-6 px-6 select-none">
-      {/* Logomark — 80px app-icon Squircle (rounded-[22px] cc-haha spec) */}
+    <div className="flex max-w-md flex-col items-center text-center select-none">
+      {/* Logomark — 96×96 渐变 Squircle + clay 主色 P */}
       <div
-        className="relative"
+        className="mb-6 relative"
         style={{
-          width: 80,
-          height: 80,
+          width: 96,
+          height: 96,
           borderRadius: 22,
-          background: 'var(--pd-color-bg-elevated, #FFFFFF)',
-          border: '1px solid var(--pd-color-border, #DAC1BA)',
-          boxShadow:
-            '0 1px 2px rgba(27,28,26,0.04), 0 8px 24px rgba(27,28,26,0.08), 0 16px 40px rgba(27,28,26,0.06)',
+          background:
+            'linear-gradient(135deg, var(--pd-palette-terra-300, #F4AE95), var(--pd-color-accent, #D97757))',
+          boxShadow: '0 8px 24px rgba(217, 119, 87, 0.22), 0 2px 6px rgba(27,28,26,0.06)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}
         aria-hidden="true"
       >
-        <svg width="48" height="48" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <svg width="56" height="56" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <path
-            d="M18 12 H36 Q47 12 47 24 Q47 36 36 36 H26 V50 H18 Z M26 20 V28 H36 Q39 28 39 24 Q39 20 36 20 Z"
-            fill="var(--pd-color-accent, #D97757)"
+            d="M18 14 H36 Q48 14 48 26 Q48 38 36 38 H26 V52 H18 Z M26 22 V30 H36 Q40 30 40 26 Q40 22 36 22 Z"
+            fill="#FFFFFF"
           />
-          <circle cx="46" cy="48" r="3.5" fill="var(--pd-color-accent, #D97757)" />
+          <circle cx="46" cy="50" r="3.5" fill="#FFFFFF" />
         </svg>
       </div>
 
-      {/* Title — Manrope extrabold 30px */}
+      {/* Title — Manrope 30px font-extrabold */}
       <h1
+        className="mb-2"
         style={{
           fontFamily: 'var(--pd-font-headline)',
           fontSize: 30,
@@ -52,21 +51,20 @@ export function PdHeroComposer(_props: PdHeroComposerProps) {
           lineHeight: 1.2,
           color: 'var(--pd-color-fg)',
           margin: 0,
-          textAlign: 'center',
         }}
       >
         {t('composer.hero.title')}
       </h1>
 
-      {/* Subtitle — Inter 15px text-secondary */}
+      {/* Subtitle — 14px max-w-xs */}
       <p
-        className="text-center"
+        className="mx-auto"
         style={{
           fontFamily: 'var(--pd-font-sans)',
-          fontSize: 15,
-          lineHeight: 1.6,
+          fontSize: 14,
+          lineHeight: 1.55,
           color: 'var(--pd-color-fg-muted)',
-          maxWidth: 480,
+          maxWidth: 320,
           margin: 0,
         }}
       >

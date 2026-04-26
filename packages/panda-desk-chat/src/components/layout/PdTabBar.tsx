@@ -1,110 +1,61 @@
-// Input: Tab list, selection/close/new callbacks
-// Output: Chrome-style horizontal tab bar with overflow scroll
-// Pos: Layout layer — sits above main content area, within the center column
+// Input: tabStore + chatStore + i18n
+// Output: TabBar — 水平 tabs / 滚动 / 拖拽重排 / 中键关闭 / 右键菜单 / 关闭确认 / WindowControls
+// Pos: Layout layer — main 区上方，对标 cc-haha desktop/src/components/layout/TabBar.tsx
+//
+// Source: cc-haha desktop/src/components/layout/TabBar.tsx L1-421（421 行）
+//   panda 适配：
+//     - cc-haha @tauri-apps/api/window startDragging → Electron 拖拽通过 [data-drag-region] CSS 完成
+//     - cc-haha __TAURI_INTERNALS__ → 'electronAPI' in window
+//     - className 全部前缀替换：var(--color-*) → var(--pd-color-*)、var(--radius-*) → var(--pd-radius-*)、
+//       var(--shadow-*) → var(--pd-shadow-*)
+//     - data-tauri-drag-region → data-drag-region（保留 cc-haha 原属性供 CSS 双向兼容）
+//
+// 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
-import { type ComponentType, useRef, useState, useCallback, useEffect } from 'react';
-import { cn } from '@/lib/cn';
-import {
-  X as _X,
-  Plus as _Plus,
-  ChevronLeft as _ChevronLeft,
-  ChevronRight as _ChevronRight,
-  // @ts-ignore lucide-react bundled .d.ts
-  Settings as _Settings,
-  // @ts-ignore
-  Clock as _Clock,
-} from 'lucide-react';
+import { forwardRef, useRef, useState, useEffect, useCallback } from 'react';
+import { useTabStore, type Tab } from '../../stores/tabStore';
+import { useChatStore } from '../../stores/chatStore';
+import { t } from '../../i18n';
+import { PdWindowControls, showWindowControls } from './PdWindowControls';
 
-// Re-type lucide icons for React 18 compat (hoisted @types/react@19 conflict)
-type IconFC = ComponentType<{ className?: string; size?: number }>;
-const X = _X as IconFC;
-const Plus = _Plus as IconFC;
-const ChevronLeft = _ChevronLeft as IconFC;
-const ChevronRight = _ChevronRight as IconFC;
-const SettingsIcon = _Settings as IconFC;
-const ClockIcon = _Clock as IconFC;
+const TAB_WIDTH = 180;
+const DRAG_START_THRESHOLD = 4;
+const isElectron =
+  typeof window !== 'undefined' &&
+  ('electronAPI' in window || 'pandaAPI' in window);
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-export interface PdTabBarTab {
-  id: string;
-  title: string;
-  isActive: boolean;
-  isPinned: boolean;
-  hasChanges?: boolean;
-  /** Session activity state — shown as a left-side dot (cc-haha style) */
-  statusDot?: 'running' | 'idle';
-  /** System tab type — shows a tab-type icon instead of dot */
-  systemType?: 'settings' | 'scheduled';
-}
+export function PdTabBar() {
+  const tabs = useTabStore((s) => s.tabs);
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const setActiveTab = useTabStore((s) => s.setActiveTab);
+  const closeTab = useTabStore((s) => s.closeTab);
+  const disconnectSession = useChatStore((s) => s.disconnectSession);
 
-export interface PdTabBarProps {
-  tabs: PdTabBarTab[];
-  onSelect: (tabId: string) => void;
-  onClose: (tabId: string) => void;
-  onNewTab: () => void;
-  // Drag-reorder
-  onDragStart?: (index: number) => void;
-  onDragOver?: (index: number) => void;
-  onDragEnd?: () => void;
-  onDragLeave?: () => void;
-  dragFromIndex?: number | null;
-  dropTargetIndex?: number | null;
-  // Context menu
-  onContextMenu?: (tabId: string, x: number, y: number) => void;
-  // Double-click rename
-  onRename?: (tabId: string, newTitle: string) => void;
-  // Middle-click close
-  onMiddleClick?: (tabId: string) => void;
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-export function PdTabBar({
-  tabs,
-  onSelect,
-  onClose,
-  onNewTab,
-  onDragStart,
-  onDragOver,
-  onDragEnd,
-  onDragLeave,
-  dragFromIndex,
-  dropTargetIndex,
-  onContextMenu,
-  onRename,
-  onMiddleClick,
-}: PdTabBarProps) {
+  const moveTab = useTabStore((s) => s.moveTab);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-
-  // ── Editing state (double-click rename) ──
-  const [editingTabId, setEditingTabId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const editInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Overflow menu state ──
-  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
-  const overflowBtnRef = useRef<HTMLButtonElement>(null);
-  const overflowMenuRef = useRef<HTMLDivElement>(null);
-
-  // ── Tab close animation state ──
+  const [contextMenu, setContextMenu] = useState<{ sessionId: string; x: number; y: number } | null>(null);
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
+  const [dragOffsetX, setDragOffsetX] = useState(0);
+  const dragIndexRef = useRef<number | null>(null);
+  const pendingDragRef = useRef<{ index: number; startX: number; startY: number } | null>(null);
+  const suppressClickRef = useRef(false);
+  const tabRefs = useRef(new Map<string, HTMLDivElement | null>());
+  const startDraggingRef = useRef<(() => Promise<void>) | null>(null);
+  const tt = t;
 
-  const handleClose = useCallback((tabId: string) => {
-    setClosingTabId(tabId);
-    // Wait for the CSS animation to finish (~300ms) before actually closing
-    setTimeout(() => {
-      setClosingTabId(null);
-      onClose(tabId);
-    }, 300);
-  }, [onClose]);
+  useEffect(() => {
+    if (!isElectron) return;
+    // panda Electron：drag 由 -webkit-app-region: drag CSS 处理；保留 ref 结构
+    startDraggingRef.current = async () => {
+      /* noop — drag handled by [data-drag-region] CSS */
+    };
+  }, []);
 
-  // ── Overflow detection ──
-  const checkOverflow = useCallback(() => {
+  const updateScrollState = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     setCanScrollLeft(el.scrollLeft > 0);
@@ -112,350 +63,377 @@ export function PdTabBar({
   }, []);
 
   useEffect(() => {
-    checkOverflow();
+    updateScrollState();
     const el = scrollRef.current;
     if (!el) return;
-    el.addEventListener('scroll', checkOverflow, { passive: true });
-    const ro = new ResizeObserver(checkOverflow);
+    el.addEventListener('scroll', updateScrollState);
+    const ro = new ResizeObserver(updateScrollState);
     ro.observe(el);
     return () => {
-      el.removeEventListener('scroll', checkOverflow);
+      el.removeEventListener('scroll', updateScrollState);
       ro.disconnect();
     };
-  }, [checkOverflow, tabs.length]);
+  }, [updateScrollState, tabs.length]);
 
-  const scroll = useCallback((direction: 'left' | 'right') => {
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [contextMenu]);
+
+  const scroll = (direction: 'left' | 'right') => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollBy({ left: direction === 'left' ? -200 : 200, behavior: 'smooth' });
-  }, []);
+    el.scrollBy({ left: direction === 'left' ? -TAB_WIDTH : TAB_WIDTH, behavior: 'smooth' });
+  };
 
-  // ── Double-click rename helpers ──
-  const startEditing = useCallback((tabId: string, currentTitle: string) => {
-    setEditingTabId(tabId);
-    setEditValue(currentTitle);
-    // Focus the input on next tick after render
-    requestAnimationFrame(() => {
-      editInputRef.current?.focus();
-      editInputRef.current?.select();
-    });
-  }, []);
-
-  const commitRename = useCallback(() => {
-    if (editingTabId && editValue.trim()) {
-      onRename?.(editingTabId, editValue.trim());
+  const handleClose = (sessionId: string) => {
+    // Special tabs can always be closed directly
+    const tab = tabs.find((t) => t.sessionId === sessionId);
+    if (tab && tab.type !== 'session') {
+      closeTab(sessionId);
+      return;
     }
-    setEditingTabId(null);
-    setEditValue('');
-  }, [editingTabId, editValue, onRename]);
 
-  const cancelEditing = useCallback(() => {
-    setEditingTabId(null);
-    setEditValue('');
+    const sessionState = useChatStore.getState().sessions.get(sessionId);
+    const isRunning = sessionState && sessionState.chatState !== 'idle';
+
+    if (isRunning) {
+      setClosingTabId(sessionId);
+      return;
+    }
+
+    disconnectSession(sessionId);
+    closeTab(sessionId);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, sessionId: string) => {
+    e.preventDefault();
+    setContextMenu({ sessionId, x: e.clientX, y: e.clientY });
+  };
+
+  const handleCloseOthers = (sessionId: string) => {
+    setContextMenu(null);
+    const otherIds = tabs.filter((t) => t.sessionId !== sessionId).map((t) => t.sessionId);
+    for (const id of otherIds) {
+      disconnectSession(id);
+      closeTab(id);
+    }
+  };
+
+  const handleCloseLeft = (sessionId: string) => {
+    setContextMenu(null);
+    const idx = tabs.findIndex((t) => t.sessionId === sessionId);
+    const leftIds = tabs.slice(0, idx).map((t) => t.sessionId);
+    for (const id of leftIds) {
+      disconnectSession(id);
+      closeTab(id);
+    }
+  };
+
+  const handleCloseRight = (sessionId: string) => {
+    setContextMenu(null);
+    const idx = tabs.findIndex((t) => t.sessionId === sessionId);
+    const rightIds = tabs.slice(idx + 1).map((t) => t.sessionId);
+    for (const id of rightIds) {
+      disconnectSession(id);
+      closeTab(id);
+    }
+  };
+
+  const handleCloseAll = () => {
+    setContextMenu(null);
+    const allIds = tabs.map((t) => t.sessionId);
+    for (const id of allIds) {
+      disconnectSession(id);
+      closeTab(id);
+    }
+  };
+
+  const getTargetIndexFromClientX = useCallback((clientX: number) => {
+    for (let index = 0; index < tabs.length; index++) {
+      const tab = tabs[index];
+      if (!tab) continue;
+      const el = tabRefs.current.get(tab.sessionId);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (clientX < rect.left + rect.width / 2) return index;
+    }
+
+    return tabs.length > 0 ? tabs.length - 1 : null;
+  }, [tabs]);
+
+  const finalizeDrag = useCallback((targetIndex: number | null) => {
+    if (dragIndexRef.current !== null && targetIndex !== null && dragIndexRef.current !== targetIndex) {
+      moveTab(dragIndexRef.current, targetIndex);
+    }
+    dragIndexRef.current = null;
+    pendingDragRef.current = null;
+    setDraggingSessionId(null);
+    setDragOffsetX(0);
+    setDragOverIndex(null);
+  }, [moveTab]);
+
+  const handlePointerMove = useCallback((event: MouseEvent) => {
+    const pending = pendingDragRef.current;
+    if (!pending) return;
+
+    const deltaX = Math.abs(event.clientX - pending.startX);
+    const deltaY = Math.abs(event.clientY - pending.startY);
+
+    if (dragIndexRef.current === null) {
+      if (Math.max(deltaX, deltaY) < DRAG_START_THRESHOLD) return;
+      dragIndexRef.current = pending.index;
+      suppressClickRef.current = true;
+      setDraggingSessionId(tabs[pending.index]?.sessionId ?? null);
+    }
+
+    setDragOffsetX(event.clientX - pending.startX);
+
+    const targetIndex = getTargetIndexFromClientX(event.clientX);
+    if (targetIndex === null || targetIndex === dragIndexRef.current) {
+      setDragOverIndex(null);
+      return;
+    }
+
+    setDragOverIndex(targetIndex);
+  }, [getTargetIndexFromClientX, tabs]);
+
+  const handlePointerUp = useCallback(() => {
+    finalizeDrag(dragOverIndex);
+  }, [dragOverIndex, finalizeDrag]);
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+    };
+  }, [handlePointerMove, handlePointerUp]);
+
+  useEffect(() => {
+    if (!draggingSessionId) return;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = 'grabbing';
+    return () => {
+      document.body.style.cursor = previousCursor;
+    };
+  }, [draggingSessionId]);
+
+  const handleTabMouseDown = (event: React.MouseEvent, index: number) => {
+    if (event.button !== 0) return;
+    pendingDragRef.current = { index, startX: event.clientX, startY: event.clientY };
+  };
+
+  const handleTabClick = (sessionId: string) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    setActiveTab(sessionId);
+  };
+
+  const handleScrollRegionMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || event.target !== scrollRef.current) return;
+    const startDragging = startDraggingRef.current;
+    if (!startDragging) return;
+    void startDragging().catch(() => {});
   }, []);
 
-  // ── Close overflow menu on outside click ──
-  useEffect(() => {
-    if (!showOverflowMenu) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        overflowBtnRef.current?.contains(target) ||
-        overflowMenuRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setShowOverflowMenu(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showOverflowMenu]);
-
-  // ── Check if tabs overflow (for showing overflow menu button) ──
-  const hasOverflow = canScrollLeft || canScrollRight;
+  if (tabs.length === 0 && !showWindowControls) return null;
 
   return (
     <div
-      className={cn(
-        'relative flex shrink-0 items-stretch',
-        'border-b border-[var(--pd-color-border)]',
-        'bg-[var(--pd-color-surface-container)]',
-        'shadow-[inset_0_-1px_0_rgba(31,31,30,0.04)]',
-      )}
-      style={{ minHeight: 38 }}
+      data-testid="tab-bar"
+      className="flex items-stretch bg-[var(--pd-color-surface-container)] min-h-[37px] select-none border-b border-[var(--pd-color-border)]"
     >
-      {/* ── Scroll-left arrow ── */}
+
       {canScrollLeft && (
-        <button
-          type="button"
-          onClick={() => scroll('left')}
-          className={cn(
-            'absolute left-0 z-10 flex h-full w-6 items-center justify-center',
-            'bg-gradient-to-r from-[var(--pd-color-bg-subtle)] to-transparent',
-            'text-[var(--pd-color-fg-muted)]',
-          )}
-          aria-label="Scroll tabs left"
-        >
-          <ChevronLeft size={14} />
+        <button onClick={() => scroll('left')} className="flex-shrink-0 w-7 h-[37px] flex items-center justify-center text-[var(--pd-color-text-tertiary)] hover:text-[var(--pd-color-text-primary)] hover:bg-[var(--pd-color-surface-hover)]">
+          <span className="material-symbols-outlined text-[16px]">chevron_left</span>
         </button>
       )}
 
-      {/* ── Tab list ── */}
       <div
         ref={scrollRef}
-        className="flex flex-1 items-stretch overflow-x-auto scrollbar-none"
+        className="tab-bar-hit-area flex-1 flex items-stretch overflow-x-hidden"
+        onDragOver={(e) => e.preventDefault()}
+        onMouseDown={handleScrollRegionMouseDown}
       >
         {tabs.map((tab, index) => (
-          <div key={tab.id} className={cn("relative flex items-stretch", closingTabId === tab.id && "pd-tab-closing")}>
-            {/* ── Drop indicator (left edge) ── */}
-            {dropTargetIndex === index && dragFromIndex !== null && dragFromIndex !== index && (
-              <span
-                className="absolute left-0 top-1 bottom-1 z-20 w-0.5"
-                style={{ background: 'var(--pd-color-accent)' }}
-              />
-            )}
-
-            <button
-              type="button"
-              draggable={editingTabId !== tab.id}
-              onClick={() => {
-                if (editingTabId !== tab.id) onSelect(tab.id);
-              }}
-              onDoubleClick={() => {
-                if (dragFromIndex === null) {
-                  startEditing(tab.id, tab.title);
-                }
-              }}
-              onMouseDown={(e) => {
-                // Middle-click close (button === 1)
-                if (e.button === 1) {
-                  e.preventDefault();
-                  if (!tab.isPinned) {
-                    onMiddleClick?.(tab.id);
-                  }
-                }
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                onContextMenu?.(tab.id, e.clientX, e.clientY);
-              }}
-              onDragStart={(e) => {
-                if (editingTabId === tab.id) {
-                  e.preventDefault();
-                  return;
-                }
-                e.dataTransfer.effectAllowed = 'move';
-                onDragStart?.(index);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                onDragOver?.(index);
-              }}
-              onDragLeave={() => onDragLeave?.()}
-              onDrop={(e) => {
-                e.preventDefault();
-                onDragEnd?.();
-              }}
-              onDragEnd={() => onDragEnd?.()}
-              className={cn(
-                'group relative flex shrink-0 items-center gap-2 px-4',
-                'border-r border-[var(--pd-color-border-subtle)]',
-                'transition-[colors,transform,opacity]',
-                'duration-[var(--pd-duration-quick)] ease-[var(--pd-ease-standard)]',
-                'min-w-[140px] max-w-[200px]',
-                tab.isActive
-                  ? 'bg-[var(--pd-color-bg)] text-[var(--pd-color-fg)] font-[var(--pd-font-semibold)]'
-                  : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
-              )}
-              style={{
-                width: 180,
-                maxWidth: 180,
-                height: 37,
-                fontSize: 13,  // cc-haha tab font-size 13px
-                opacity: dragFromIndex === index ? 0.5 : 1,
-                transition: 'transform 0.2s ease, opacity 0.15s ease, background-color 0.15s ease',
-                ...(tab.isActive && {
-                  boxShadow: 'inset 0 2px 0 var(--pd-color-accent), 0 1px 0 var(--pd-color-bg)',
-                }),
-              }}
-            >
-              {/* Active indicator — top inset 2px accent + bottom seam covers tabbar border */}
-
-              {/* System type icon (settings/scheduled) — cc-haha pattern */}
-              {tab.systemType === 'settings' && (
-                <SettingsIcon size={14} className="shrink-0 text-[var(--pd-color-fg-tertiary)]" />
-              )}
-              {tab.systemType === 'scheduled' && (
-                <ClockIcon size={14} className="shrink-0 text-[var(--pd-color-fg-tertiary)]" />
-              )}
-
-              {/* Session status dot — green = running, gray = idle (cc-haha visual language) */}
-              {!tab.systemType && tab.statusDot && (
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{
-                    background: tab.statusDot === 'running'
-                      ? 'var(--pd-color-success, #16A34A)'
-                      : 'var(--pd-color-fg-subtle, #A0A09D)',
-                    opacity: tab.statusDot === 'running' ? 1 : 0.6,
-                  }}
-                  aria-label={tab.statusDot === 'running' ? 'Running' : 'Idle'}
-                />
-              )}
-
-              {/* Unsaved-changes dot */}
-              {tab.hasChanges && (
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--pd-color-accent)]" />
-              )}
-
-              {/* Title — inline edit or display */}
-              {editingTabId === tab.id ? (
-                <input
-                  ref={editInputRef}
-                  type="text"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      commitRename();
-                    } else if (e.key === 'Escape') {
-                      e.preventDefault();
-                      cancelEditing();
-                    }
-                    e.stopPropagation();
-                  }}
-                  onBlur={() => commitRename()}
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  className={cn(
-                    'w-full truncate bg-transparent border-0 outline-none',
-                    'border-b border-[var(--pd-color-accent)]',
-                    'text-[var(--pd-color-fg)]',
-                  )}
-                  style={{
-                    fontSize: 'inherit',
-                    fontFamily: 'inherit',
-                    padding: 0,
-                    margin: 0,
-                  }}
-                />
-              ) : (
-                <span className="truncate">{tab.title}</span>
-              )}
-
-              {/* Close button (hidden for pinned tabs) */}
-              {!tab.isPinned && (
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleClose(tab.id);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.stopPropagation();
-                      handleClose(tab.id);
-                    }
-                  }}
-                  className={cn(
-                    'ml-auto shrink-0 rounded-[var(--pd-radius-xs)] p-0.5',
-                    'opacity-0 transition-opacity group-hover:opacity-100',
-                    'text-[var(--pd-color-fg-subtle)] hover:bg-[var(--pd-color-bg-hover)]',
-                    'hover:text-[var(--pd-color-fg)]',
-                  )}
-                >
-                  <X size={12} />
-                </span>
-              )}
-            </button>
-          </div>
+          <TabItem
+            key={tab.sessionId}
+            ref={(node) => { tabRefs.current.set(tab.sessionId, node); }}
+            tab={tab}
+            isActive={tab.sessionId === activeTabId}
+            isDragOver={dragOverIndex === index}
+            isDragging={tab.sessionId === draggingSessionId}
+            dragOffsetX={tab.sessionId === draggingSessionId ? dragOffsetX : 0}
+            onClick={() => handleTabClick(tab.sessionId)}
+            onClose={() => handleClose(tab.sessionId)}
+            onContextMenu={(e) => handleContextMenu(e, tab.sessionId)}
+            onMouseDown={(event) => handleTabMouseDown(event, index)}
+          />
         ))}
       </div>
 
-      {/* ── Scroll-right arrow ── */}
-      {canScrollRight && (
-        <button
-          type="button"
-          onClick={() => scroll('right')}
-          className={cn(
-            'absolute right-10 z-10 flex h-full w-6 items-center justify-center',
-            'bg-gradient-to-l from-[var(--pd-color-bg-subtle)] to-transparent',
-            'text-[var(--pd-color-fg-muted)]',
-          )}
-          aria-label="Scroll tabs right"
-        >
-          <ChevronRight size={14} />
-        </button>
-      )}
-
-      {/* ── Overflow menu button (visible when tabs overflow) ── */}
-      {hasOverflow && (
-        <button
-          ref={overflowBtnRef}
-          type="button"
-          onClick={() => setShowOverflowMenu((v) => !v)}
-          className={cn(
-            'flex shrink-0 items-center justify-center px-2',
-            'text-[var(--pd-color-fg-muted)] transition-colors',
-            'hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
-            showOverflowMenu && 'bg-[var(--pd-color-bg-hover)] text-[var(--pd-color-fg)]',
-          )}
-          aria-label="Show all tabs"
-        >
-          <span style={{ fontSize: 16, lineHeight: 1, letterSpacing: '1px' }}>&#x22EF;</span>
-        </button>
-      )}
-
-      {/* ── Overflow dropdown ── */}
-      {showOverflowMenu && (
+      {isElectron && (
         <div
-          ref={overflowMenuRef}
-          className={cn(
-            'absolute right-10 top-full z-50',
-            'min-w-[180px] max-h-[300px] overflow-y-auto',
-            'rounded-[var(--pd-radius-md)]',
-            'border border-[var(--pd-color-border)]',
-            'bg-[var(--pd-color-bg-elevated)]',
-            'shadow-lg',
-            'py-1',
-          )}
+          data-testid="tab-bar-drag-gutter"
+          data-drag-region
+          data-tauri-drag-region
+          aria-hidden="true"
+          className={`flex-shrink-0 min-h-[37px] ${showWindowControls ? 'w-3' : 'w-4'}`}
+        />
+      )}
+
+      {canScrollRight && (
+        <button onClick={() => scroll('right')} className="flex-shrink-0 w-7 h-[37px] flex items-center justify-center text-[var(--pd-color-text-tertiary)] hover:text-[var(--pd-color-text-primary)] hover:bg-[var(--pd-color-surface-hover)]">
+          <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+        </button>
+      )}
+
+      <PdWindowControls />
+
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-[var(--pd-color-surface)] border border-[var(--pd-color-border)] rounded-[var(--pd-radius-md)] py-1 min-w-[160px]"
+          style={{ left: contextMenu.x, top: contextMenu.y, boxShadow: 'var(--pd-shadow-dropdown)' }}
         >
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                onSelect(tab.id);
-                setShowOverflowMenu(false);
-              }}
-              className={cn(
-                'flex w-full items-center gap-2 px-3 py-1.5 text-left',
-                'text-[var(--pd-text-sm)]',
-                'transition-colors duration-100',
-                tab.isActive
-                  ? 'bg-[var(--pd-color-accent-subtle)] text-[var(--pd-color-accent-fg)] font-medium'
-                  : 'text-[var(--pd-color-fg-muted)] hover:bg-[var(--pd-color-bg-hover)] hover:text-[var(--pd-color-fg)]',
-              )}
-            >
-              {tab.isPinned && (
-                <span className="shrink-0 text-[10px]" aria-label="Pinned">
-                  📌
-                </span>
-              )}
-              <span className="truncate">{tab.title}</span>
-              {tab.hasChanges && (
-                <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--pd-color-accent)]" />
-              )}
-            </button>
-          ))}
+          <button
+            onClick={() => { handleClose(contextMenu.sessionId); setContextMenu(null); }}
+            className="w-full px-3 py-1.5 text-xs text-left text-[var(--pd-color-text-primary)] hover:bg-[var(--pd-color-surface-hover)]"
+          >
+            {tt('tabs.close')}
+          </button>
+          <button
+            onClick={() => handleCloseOthers(contextMenu.sessionId)}
+            className="w-full px-3 py-1.5 text-xs text-left text-[var(--pd-color-text-primary)] hover:bg-[var(--pd-color-surface-hover)]"
+          >
+            {tt('tabs.closeOthers')}
+          </button>
+          <button
+            onClick={() => handleCloseLeft(contextMenu.sessionId)}
+            className="w-full px-3 py-1.5 text-xs text-left text-[var(--pd-color-text-primary)] hover:bg-[var(--pd-color-surface-hover)]"
+          >
+            {tt('tabs.closeLeft')}
+          </button>
+          <button
+            onClick={() => handleCloseRight(contextMenu.sessionId)}
+            className="w-full px-3 py-1.5 text-xs text-left text-[var(--pd-color-text-primary)] hover:bg-[var(--pd-color-surface-hover)]"
+          >
+            {tt('tabs.closeRight')}
+          </button>
+          <div className="my-1 border-t border-[var(--pd-color-border)]" />
+          <button
+            onClick={handleCloseAll}
+            className="w-full px-3 py-1.5 text-xs text-left text-[var(--pd-color-text-primary)] hover:bg-[var(--pd-color-surface-hover)]"
+          >
+            {tt('tabs.closeAll')}
+          </button>
         </div>
       )}
 
-      {/* cc-haha aligned: no explicit + button on tabbar; new sessions
-       * created via Sidebar "新建对话" / Cmd+N. */}
+      {closingTabId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30">
+          <div className="bg-[var(--pd-color-surface)] rounded-xl border border-[var(--pd-color-border)] p-6 max-w-sm w-full mx-4" style={{ boxShadow: 'var(--pd-shadow-dropdown)' }}>
+            <h3 className="text-sm font-semibold text-[var(--pd-color-text-primary)] mb-2">{tt('tabs.closeConfirmTitle')}</h3>
+            <p className="text-xs text-[var(--pd-color-text-secondary)] mb-4">{tt('tabs.closeConfirmMessage')}</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setClosingTabId(null)} className="px-3 py-1.5 text-xs rounded-lg border border-[var(--pd-color-border)] text-[var(--pd-color-text-secondary)] hover:bg-[var(--pd-color-surface-hover)]">
+                {tt('common.cancel')}
+              </button>
+              <button
+                onClick={() => { closeTab(closingTabId); setClosingTabId(null); }}
+                className="px-3 py-1.5 text-xs rounded-lg border border-[var(--pd-color-border)] text-[var(--pd-color-text-secondary)] hover:bg-[var(--pd-color-surface-hover)]"
+              >
+                {tt('tabs.closeConfirmKeep')}
+              </button>
+              <button
+                onClick={() => {
+                  useChatStore.getState().stopGeneration(closingTabId);
+                  disconnectSession(closingTabId);
+                  closeTab(closingTabId);
+                  setClosingTabId(null);
+                }}
+                className="px-3 py-1.5 text-xs rounded-lg bg-[var(--pd-color-brand)] text-white hover:opacity-90"
+              >
+                {tt('tabs.closeConfirmStop')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const TabItem = forwardRef<HTMLDivElement, {
+  tab: Tab;
+  isActive: boolean;
+  isDragOver: boolean;
+  isDragging: boolean;
+  dragOffsetX: number;
+  onClick: () => void;
+  onClose: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+  onMouseDown: (event: React.MouseEvent) => void;
+}>(({ tab, isActive, isDragOver, isDragging, dragOffsetX, onClick, onClose, onContextMenu, onMouseDown }, ref) => {
+  return (
+    <div
+      ref={ref}
+      data-dragging={isDragging ? 'true' : 'false'}
+      onClick={onClick}
+      onMouseDown={onMouseDown}
+      onContextMenu={onContextMenu}
+      className={`
+        tab-bar-hit-area group flex-shrink-0 flex items-center gap-1.5 px-3 min-h-[37px] relative
+        ${isDragging ? 'z-20 cursor-grabbing' : 'cursor-grab'}
+        transition-[background-color,box-shadow,opacity,transform] duration-150 ease-out
+        ${isActive
+          ? 'bg-[var(--pd-color-surface)]'
+          : 'bg-transparent hover:bg-[var(--pd-color-surface-hover)]'
+        }
+        ${isDragging ? 'opacity-95 shadow-[0_10px_24px_rgba(0,0,0,0.18)] ring-1 ring-[var(--pd-color-border)]' : ''}
+        ${isDragOver ? 'before:absolute before:left-0 before:top-[4px] before:bottom-[4px] before:w-[3px] before:bg-[var(--pd-color-brand)] before:rounded-full before:shadow-[0_0_0_1px_rgba(255,255,255,0.25)]' : ''}
+      `}
+      style={{
+        width: TAB_WIDTH,
+        maxWidth: TAB_WIDTH,
+        transform: isDragging ? `translateX(${dragOffsetX}px) scale(1.02)` : undefined,
+      }}
+    >
+      {tab.type === 'session' && tab.status === 'running' && (
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--pd-color-success)] animate-pulse flex-shrink-0" />
+      )}
+      {tab.type === 'session' && tab.status === 'error' && (
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--pd-color-error)] flex-shrink-0" />
+      )}
+      {tab.type === 'settings' && (
+        <span className="material-symbols-outlined text-[14px] flex-shrink-0 text-[var(--pd-color-text-tertiary)]">settings</span>
+      )}
+      {tab.type === 'scheduled' && (
+        <span className="material-symbols-outlined text-[14px] flex-shrink-0 text-[var(--pd-color-text-tertiary)]">schedule</span>
+      )}
+
+      <span className={`flex-1 truncate text-xs ${isActive ? 'text-[var(--pd-color-text-primary)] font-medium' : 'text-[var(--pd-color-text-secondary)]'}`}>
+        {tab.title || 'Untitled'}
+      </span>
+
+      <button
+        type="button"
+        aria-label={`Close ${tab.title || 'Untitled'}`}
+        onMouseDown={(e) => { e.stopPropagation(); }}
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        className="flex-shrink-0 -mr-0.5 inline-flex h-3 w-3 items-center justify-center bg-transparent p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-[opacity,color] text-[var(--pd-color-text-tertiary)] hover:text-[var(--pd-color-text-secondary)] focus-visible:outline-none"
+      >
+        <span className="material-symbols-outlined text-[11px] leading-none">close</span>
+      </button>
+    </div>
+  );
+});
+TabItem.displayName = 'TabItem';
+
+// cc-haha L1-421 — 421 行；panda 复刻 + Electron 替换 Tauri startDragging。

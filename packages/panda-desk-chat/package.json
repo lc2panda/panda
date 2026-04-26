@@ -20,7 +20,7 @@
   },
   "build": {
     "appId": "com.pandaai.desk-chat",
-    "productName": "Panda Code",
+    "productName": "Panda",
     "directories": {
       "output": "release"
     },
@@ -30,23 +30,26 @@
     ],
     "mac": {
       "target": ["dmg", "zip"],
-      "icon": "public/icon.icns"
+      "icon": "public/icon.icns",
+      "category": "public.app-category.developer-tools"
     },
     "win": {
       "target": ["nsis", "zip"],
-      "icon": "public/icon.ico"
+      "icon": "public/icon.png"
     },
     "linux": {
       "target": ["AppImage", "deb"],
-      "icon": "public/icon.png"
+      "icon": "public/icon.png",
+      "category": "Development"
     },
     "publish": {
       "provider": "github",
-      "owner": "anthropics",
+      "owner": "lc2panda",
       "repo": "panda-code"
     }
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
     "clsx": "^2.1.1",
     "electron-updater": "^6.8.3",
     "highlight.js": "^11.11.1",

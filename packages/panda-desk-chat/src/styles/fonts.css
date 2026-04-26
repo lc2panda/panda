@@ -12,11 +12,28 @@
  * 1. Inter Variable — English Sans / UI primary
  *    Source: https://github.com/rsms/inter (v4.1, OFL)
  *    Subset: latin (variable weight 100-900)
+ *    cc-haha 对齐：cc-haha globals.css L7-23 用 weight 400-600 + latin/latin-ext
+ *    panda 用 InterVariable 全权重单文件（更小总体积）
  * --------------------------------------------------------------------------- */
 @font-face {
   font-family: 'Inter';
   src: url('/fonts/inter/InterVariable.woff2') format('woff2-variations');
   font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+/* ---------------------------------------------------------------------------
+ * 1b. Manrope Variable — English Sans / Headline
+ *     Source: Google Fonts (Manrope v20, OFL)
+ *     cc-haha 对齐：cc-haha globals.css L25-41 用作 --font-headline
+ *     Used by: Sidebar logo, EmptySession h1, ActiveSession session title,
+ *              所有 font-headline 引用
+ * --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Manrope';
+  src: url('/fonts/manrope/Manrope-VF.woff2') format('woff2-variations');
+  font-weight: 200 800;
   font-display: swap;
   font-style: normal;
 }
@@ -131,3 +148,19 @@
  *    If Sarasa Mono SC is installed locally it will be picked up by the
  *    font-stack in tokens.css; otherwise JetBrains Mono → system monospace.
  * --------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+ * 7. Material Symbols Outlined — Icon font
+ *    Source: Google Fonts (Material Symbols v332, Apache-2.0)
+ *    cc-haha 对齐：cc-haha globals.css L62-68 用 font-display: block
+ *      避免 ligature 文字一闪。本质上是字符 → icon 的 ligature 字体。
+ *    Used by: <span class="material-symbols-outlined">add</span>
+ *             cc-haha 全部 sidebar/tabbar/composer/settings 图标
+ * --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('/fonts/material-symbols/MaterialSymbolsOutlined.woff2') format('woff2');
+}

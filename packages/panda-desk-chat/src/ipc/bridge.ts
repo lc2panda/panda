@@ -52,6 +52,25 @@ import type {
   LearningPlanMeta,
   LearningFlashcardSet,
   LearningPlanDetail,
+  // Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据
+  TeamMeta,
+  TeamDetail,
+  // Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读
+  AuditEntry,
+  AuditFilter,
+  AuditStats,
+  // Comdr 指令 cc-haha 路线 A: PdMemoryBank / PdPatternsScars memdir
+  MemdirLayer,
+  MemdirProjectMeta,
+  MemdirEntry,
+  MemdirReadResult,
+  // Comdr 指令 cc-haha 路线 A: PdConnectors connectors.json
+  ConnectorPlatformId,
+  ConnectorsConfigSnapshot,
+  ConnectorToggleResult,
+  // Comdr 指令 cc-haha 路线 A: PdSessionControls fork/branch/resume
+  SessionControlAction,
+  SessionControlResult,
 } from './types';
 import {
   DevMockRelay,
@@ -813,5 +832,199 @@ export async function readLearningFlashcards(
   } catch (err) {
     console.warn('[bridge] readLearningFlashcards failed:', err);
     return null;
+  }
+}
+
+// ─── Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据 (3 函数) ─
+//
+// 数据来源（panda CLI src/utils/swarm/teamHelpers.ts + utils/teammateMailbox.ts）：
+//   团队根目录    →  ~/.pandacc/teams/<name>/
+//   邮箱目录      →  ~/.pandacc/teams/<name>/inboxes/
+//   Agent inbox   →  ~/.pandacc/teams/<name>/inboxes/<agent>.json
+//   启用开关      →  ~/.pandacc/settings.json env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+// dev 模式无落盘可读 — 全部返回空 / null / false。
+
+/** 列所有 panda CLI 团队。dev 模式返回空。 */
+export async function listTeams(): Promise<TeamMeta[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().teams.list();
+  } catch (err) {
+    console.warn('[bridge] listTeams failed:', err);
+    return [];
+  }
+}
+
+/** 读取单个团队详情（含每个 inbox 的解析后内容）。dev 模式 / 不存在均返回 null。 */
+export async function getTeamDetail(name: string): Promise<TeamDetail | null> {
+  if (IS_DEV) return null;
+  try {
+    return await getPandaAPI().teams.detail(name);
+  } catch (err) {
+    console.warn('[bridge] getTeamDetail failed:', err);
+    return null;
+  }
+}
+
+/** 读 ~/.pandacc/settings.json env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS。dev 模式返回 false。 */
+export async function isAgentTeamsEnabled(): Promise<boolean> {
+  if (IS_DEV) return false;
+  try {
+    return await getPandaAPI().teams.enabledStatus();
+  } catch (err) {
+    console.warn('[bridge] isAgentTeamsEnabled failed:', err);
+    return false;
+  }
+}
+
+// ─── Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读 ─────────
+//
+// 数据来源（panda CLI src/utils/auditLog.ts → ~/.pandacc/audit.jsonl）。
+// dev 模式无落盘 — 返回空 / 默认值。
+
+export async function listRecentAudit(limit?: number): Promise<AuditEntry[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().audit.listRecent(limit);
+  } catch (err) {
+    console.warn('[bridge] listRecentAudit failed:', err);
+    return [];
+  }
+}
+
+export async function filterAudit(filter: AuditFilter): Promise<AuditEntry[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().audit.filter(filter);
+  } catch (err) {
+    console.warn('[bridge] filterAudit failed:', err);
+    return [];
+  }
+}
+
+export async function getAuditStats(): Promise<AuditStats> {
+  if (IS_DEV) {
+    return {
+      total: 0,
+      today: 0,
+      errorRate: 0,
+      topTools: [],
+      lastTimestamp: null,
+      exists: false,
+    };
+  }
+  try {
+    return await getPandaAPI().audit.stats();
+  } catch (err) {
+    console.warn('[bridge] getAuditStats failed:', err);
+    return {
+      total: 0,
+      today: 0,
+      errorRate: 0,
+      topTools: [],
+      lastTimestamp: null,
+      exists: false,
+    };
+  }
+}
+
+// ─── Comdr 指令 cc-haha 路线 A: memdir 反向读 ───────────────────────────────
+//
+// 数据来源（panda CLI src/memdir/paths.ts getAutoMemPath()）：
+//   ~/.pandacc/projects/<sanitize-cwd>/memory/{patterns,scars,episodes,
+//     semantic,procedural,working,dreams}/
+
+export async function listMemdirProjects(): Promise<MemdirProjectMeta[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().memdir.listProjects();
+  } catch (err) {
+    console.warn('[bridge] listMemdirProjects failed:', err);
+    return [];
+  }
+}
+
+export async function listMemdirLayer(
+  projectSlug: string,
+  layer: MemdirLayer,
+): Promise<MemdirEntry[]> {
+  if (IS_DEV) return [];
+  try {
+    return await getPandaAPI().memdir.listLayer(projectSlug, layer);
+  } catch (err) {
+    console.warn('[bridge] listMemdirLayer failed:', err);
+    return [];
+  }
+}
+
+export async function readMemdirFile(filePath: string): Promise<MemdirReadResult | null> {
+  if (IS_DEV) return null;
+  try {
+    return await getPandaAPI().memdir.readFile(filePath);
+  } catch (err) {
+    console.warn('[bridge] readMemdirFile failed:', err);
+    return null;
+  }
+}
+
+// ─── Comdr 指令 cc-haha 路线 A: connectors.json 真实数据 ────────────────────
+//
+// 数据来源（panda CLI src/connectors/config.ts → ~/.pandacc/config/connectors.json）：
+//   6 platform: feishu / dingtalk / slack / telegram / wechat / teams
+
+export async function getConnectorsSnapshot(): Promise<ConnectorsConfigSnapshot> {
+  if (IS_DEV) {
+    return {
+      configExists: false,
+      configPath: '',
+      entries: [],
+    };
+  }
+  try {
+    return await getPandaAPI().connectors.config();
+  } catch (err) {
+    console.warn('[bridge] getConnectorsSnapshot failed:', err);
+    return {
+      configExists: false,
+      configPath: '',
+      entries: [],
+    };
+  }
+}
+
+export async function toggleConnector(
+  platform: ConnectorPlatformId,
+  enabled: boolean,
+): Promise<ConnectorToggleResult> {
+  if (IS_DEV) {
+    return { ok: false, error: 'dev mode — no-op' };
+  }
+  try {
+    return await getPandaAPI().connectors.toggle(platform, enabled);
+  } catch (err) {
+    console.warn('[bridge] toggleConnector failed:', err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// ─── Comdr 指令 cc-haha 路线 A: 会话控制 fork/branch/resume slash 注入 ───────
+
+export async function dispatchSessionControl(
+  sessionId: string,
+  action: SessionControlAction,
+  args?: string,
+): Promise<SessionControlResult> {
+  if (IS_DEV) {
+    return { ok: false, command: '', error: 'dev mode — no-op' };
+  }
+  try {
+    return await getPandaAPI().sessionControl.dispatch(sessionId, action, args);
+  } catch (err) {
+    console.warn('[bridge] dispatchSessionControl failed:', err);
+    return {
+      ok: false,
+      command: '',
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }

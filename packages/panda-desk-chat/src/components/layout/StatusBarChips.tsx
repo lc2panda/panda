@@ -50,6 +50,7 @@ const dropdownItem = cn(
 // ---------------------------------------------------------------------------
 const permissionColors: Record<PermissionMode, string> = {
   default:           'var(--pd-color-fg-muted)',
+  acceptEdits:       'var(--pd-color-fg-muted)', // cc-haha：等价 default 视觉
   plan:              'var(--pd-color-info)',
   auto:              'var(--pd-color-success)',
   bypassPermissions: 'var(--pd-color-error)',
@@ -57,6 +58,7 @@ const permissionColors: Record<PermissionMode, string> = {
 
 const permissionI18nKeys: Record<PermissionMode, { label: string; desc: string }> = {
   default:           { label: 'statusbar.permission.default',  desc: 'statusbar.permission.default.desc' },
+  acceptEdits:       { label: 'statusbar.permission.default',  desc: 'statusbar.permission.default.desc' }, // cc-haha：复用 default 文案
   plan:              { label: 'statusbar.permission.plan',     desc: 'statusbar.permission.plan.desc' },
   auto:              { label: 'statusbar.permission.auto',     desc: 'statusbar.permission.auto.desc' },
   bypassPermissions: { label: 'statusbar.permission.bypass',   desc: 'statusbar.permission.bypass.desc' },
@@ -66,12 +68,13 @@ const permissionI18nKeys: Record<PermissionMode, { label: string; desc: string }
 // Effort chip — i18n keys
 // ---------------------------------------------------------------------------
 const effortI18nKeys: Record<EffortLevel, { label: string; desc: string }> = {
-  auto:   { label: 'statusbar.effort.medium', desc: 'statusbar.effort.medium.desc' },
-  low:    { label: 'statusbar.effort.low',    desc: 'statusbar.effort.low.desc' },
-  medium: { label: 'statusbar.effort.medium', desc: 'statusbar.effort.medium.desc' },
-  high:   { label: 'statusbar.effort.high',   desc: 'statusbar.effort.high.desc' },
+  low:     { label: 'statusbar.effort.min',    desc: 'statusbar.effort.min.desc' }, // cc-haha vocab
+  minimal: { label: 'statusbar.effort.min',    desc: 'statusbar.effort.min.desc' }, // panda 历史 alias
+  medium:  { label: 'statusbar.effort.medium', desc: 'statusbar.effort.medium.desc' },
+  high:    { label: 'statusbar.effort.high',   desc: 'statusbar.effort.high.desc' },
+  max:     { label: 'statusbar.effort.max',    desc: 'statusbar.effort.max.desc' },
 };
-const effortCycle: EffortLevel[] = ['auto', 'low', 'medium', 'high'];
+const effortCycle: EffortLevel[] = ['minimal', 'medium', 'high', 'max'];
 
 // ---------------------------------------------------------------------------
 // Hook: close dropdown on outside click

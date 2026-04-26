@@ -390,15 +390,26 @@ export class DevMockRelay {
   }
 
   async getSessionHistory(sessionId: string): Promise<import('./types').SessionDetail | null> {
+    const now = new Date();
     return {
       id: sessionId,
       title: sessionId === 'disk-mock-1' ? '示例对话' : sessionId === 'disk-mock-2' ? '代码审查' : '架构讨论',
       projectPath: '/Users/panda/project',
       messageCount: 2,
-      lastModified: new Date().toISOString(),
+      lastModified: now.toISOString(),
       messages: [
-        { role: 'user' as const, content: '你好', timestamp: new Date(Date.now() - 60000).toISOString() },
-        { role: 'assistant' as const, content: '你好！有什么可以帮你的吗？', timestamp: new Date().toISOString() },
+        {
+          id: `${sessionId}-1`,
+          type: 'user',
+          content: '你好',
+          timestamp: new Date(now.getTime() - 60000).toISOString(),
+        },
+        {
+          id: `${sessionId}-2`,
+          type: 'assistant',
+          content: '你好！有什么可以帮你的吗？',
+          timestamp: now.toISOString(),
+        },
       ],
     };
   }

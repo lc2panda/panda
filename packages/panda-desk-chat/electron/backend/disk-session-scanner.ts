@@ -2,6 +2,11 @@
 // Output: DiskSessionMeta[] / SessionDetail / launch info / boolean side-effects
 // Pos: electron main — disk-side session discovery for pd:sessions:* IPC (Phase 1)
 //
+// 路径决策：panda CLI 默认会话路径为 ~/.pandacc/projects/（panda 自有，与 Claude Code .claude/projects/ 隔离）。
+// 引用：src/main.tsx L731、src/tools/FileReadTool/FileReadTool.ts L216、
+//       src/utils/sessionStoragePortable.ts L390、src/utils/permissions/filesystem.ts L282 等。
+// .pandacc 路径下还存放：plugins/skills/scheduled tasks/assistant/channels/cache 等 panda 全套数据。
+//
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 //
 // Reference implementation:
@@ -22,13 +27,14 @@ import * as os from 'node:os';
 
 import type {
   DiskSessionMeta,
+  MessageEntry,
   SessionDetail,
-  SessionMessage,
 } from '../../src/ipc/types.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Root directory storing per-project session transcripts. */
+/** Root directory storing per-project session transcripts.
+ *  panda CLI 默认路径 = ~/.pandacc/projects/（与 Claude Code 的 ~/.claude/projects/ 隔离）。 */
 export const PANDACC_ROOT = path.join(os.homedir(), '.pandacc', 'projects');
 
 /** Title extracted from first user message is capped at this length. */
@@ -125,65 +131,169 @@ export async function readJsonlFile(filePath: string): Promise<RawEntry[]> {
   return entries;
 }
 
-// ─── Entry → SessionMessage conversion ───────────────────────────────────────
+// ─── Entry → MessageEntry conversion ─────────────────────────────────────────
 
 /**
- * Flatten arbitrary message content to a plain string for
- * renderer-side history replay. Arrays of content blocks are reduced to
- * their text portions; tool blocks are rendered as compact placeholders.
+ * Convert a single RawEntry to a MessageEntry, faithfully mirroring
+ * cc-haha sessionService L156-205. The `content` field is preserved as
+ * the raw `unknown` so renderer-side dispatch can extract text /
+ * tool_use / tool_result / thinking blocks losslessly.
+ *
+ * Type rules:
+ *   - role=user + Array content with any tool_result block → 'tool_result'
+ *   - role=user otherwise                                  → 'user'
+ *   - role=assistant + Array content with any tool_use     → 'tool_use'
+ *   - role=assistant otherwise                              → 'assistant'
+ *   - any other role                                        → 'system'
  */
-function stringifyContent(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (content == null) return '';
+function entryToMessage(
+  entry: RawEntry,
+  parentToolUseId?: string,
+): MessageEntry | null {
+  const msg = entry.message;
+  if (!msg || !msg.role) return null;
 
-  if (Array.isArray(content)) {
-    const parts: string[] = [];
-    for (const raw of content) {
-      if (raw == null) continue;
-      if (typeof raw === 'string') {
-        parts.push(raw);
-        continue;
-      }
-      if (typeof raw !== 'object') {
-        parts.push(String(raw));
-        continue;
-      }
-      const block = raw as Record<string, unknown>;
-      const blockType = typeof block.type === 'string' ? block.type : '';
-      if (blockType === 'text' && typeof block.text === 'string') {
-        parts.push(block.text);
-      } else if (blockType === 'tool_use') {
-        const name = typeof block.name === 'string' ? block.name : 'tool';
-        parts.push(`[tool_use: ${name}]`);
-      } else if (blockType === 'tool_result') {
-        const inner = block.content;
-        if (typeof inner === 'string') {
-          parts.push(`[tool_result] ${inner}`);
-        } else {
-          parts.push('[tool_result]');
-        }
-      } else if (blockType === 'thinking' && typeof block.thinking === 'string') {
-        parts.push(block.thinking);
-      }
+  let type: MessageEntry['type'];
+  const role = msg.role;
+
+  if (role === 'user') {
+    if (Array.isArray(msg.content)) {
+      const hasToolResult = (msg.content as Array<Record<string, unknown>>).some(
+        (block) => block?.type === 'tool_result',
+      );
+      type = hasToolResult ? 'tool_result' : 'user';
+    } else {
+      type = 'user';
     }
-    return parts.join('\n');
+  } else if (role === 'assistant') {
+    if (Array.isArray(msg.content)) {
+      const hasToolUse = (msg.content as Array<Record<string, unknown>>).some(
+        (block) => block?.type === 'tool_use',
+      );
+      type = hasToolUse ? 'tool_use' : 'assistant';
+    } else {
+      type = 'assistant';
+    }
+  } else {
+    type = 'system';
   }
 
-  try {
-    return JSON.stringify(content);
-  } catch {
-    return String(content);
-  }
+  return {
+    id: typeof entry.uuid === 'string' && entry.uuid.length > 0
+      ? entry.uuid
+      : crypto.randomUUID(),
+    type,
+    content: msg.content,
+    timestamp: typeof entry.timestamp === 'string' && entry.timestamp.length > 0
+      ? entry.timestamp
+      : new Date().toISOString(),
+    model: typeof msg.model === 'string' ? msg.model : undefined,
+    parentUuid: typeof entry.parentUuid === 'string' ? entry.parentUuid : undefined,
+    parentToolUseId,
+    isSidechain: entry.isSidechain === true ? true : undefined,
+  };
 }
 
 /**
- * Convert raw JSONL entries to the renderer-friendly `SessionMessage[]`.
- * Mirrors cc-haha `entriesToMessages` (L739-778) but collapses content to
- * a string, since `SessionMessage.content` is typed as `string` in
- * `src/ipc/types.ts`.
+ * If `entry` is itself an Agent tool_use turn, return the tool_use id of
+ * the Agent block embedded in its content. Mirrors cc-haha L207-222.
  */
-export function entriesToMessages(entries: RawEntry[]): SessionMessage[] {
-  const messages: SessionMessage[] = [];
+function extractAgentToolUseId(entry: RawEntry): string | undefined {
+  const content = entry.message?.content;
+  if (!Array.isArray(content)) return undefined;
+
+  for (const raw of content as Array<Record<string, unknown>>) {
+    if (
+      raw?.type === 'tool_use' &&
+      raw?.name === 'Agent' &&
+      typeof raw?.id === 'string' &&
+      raw.id.length > 0
+    ) {
+      return raw.id;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Resolve the owning Agent tool_use id for an entry that lives inside a
+ * sub-agent sidechain. Mirrors cc-haha L224-280.
+ *
+ * Resolution order:
+ *   1. Explicit `parent_tool_use_id` on the entry → use it directly.
+ *   2. If `isSidechain` is not true → no parent.
+ *   3. Otherwise walk up `parentUuid` until we hit an entry that *is* an
+ *      Agent tool_use turn (i.e. extractAgentToolUseId returns a string)
+ *      or one whose own resolved id is already in cache. Cycles guarded
+ *      by a visited set.
+ */
+function resolveParentToolUseId(
+  entry: RawEntry,
+  entriesByUuid: Map<string, RawEntry>,
+  cache: Map<string, string | undefined>,
+): string | undefined {
+  if (
+    typeof entry.parent_tool_use_id === 'string' &&
+    entry.parent_tool_use_id.length > 0
+  ) {
+    return entry.parent_tool_use_id;
+  }
+
+  if (entry.isSidechain !== true) return undefined;
+
+  const cacheKey = entry.uuid;
+  if (cacheKey && cache.has(cacheKey)) return cache.get(cacheKey);
+
+  let resolved: string | undefined;
+  let currentParentUuid =
+    typeof entry.parentUuid === 'string' ? entry.parentUuid : undefined;
+  const visited = new Set<string>();
+
+  while (currentParentUuid && !visited.has(currentParentUuid)) {
+    visited.add(currentParentUuid);
+    const parentEntry = entriesByUuid.get(currentParentUuid);
+    if (!parentEntry) break;
+
+    const directAgentToolUseId = extractAgentToolUseId(parentEntry);
+    if (directAgentToolUseId) {
+      resolved = directAgentToolUseId;
+      break;
+    }
+
+    if (parentEntry.uuid && cache.has(parentEntry.uuid)) {
+      resolved = cache.get(parentEntry.uuid);
+      break;
+    }
+
+    currentParentUuid =
+      typeof parentEntry.parentUuid === 'string'
+        ? parentEntry.parentUuid
+        : undefined;
+  }
+
+  if (cacheKey) cache.set(cacheKey, resolved);
+  return resolved;
+}
+
+/**
+ * Convert raw JSONL entries to renderer-friendly `MessageEntry[]`.
+ * Mirrors cc-haha `entriesToMessages` (L739-778):
+ *   - Skip entries without a real `message.role`
+ *   - Skip `isMeta` bookkeeping entries
+ *   - Skip non-transcript types (anything besides user/assistant/system)
+ *   - For each kept entry, resolve sidechain parent tool_use id, then
+ *     emit a MessageEntry whose `type` reflects the inner content.
+ */
+export function entriesToMessages(entries: RawEntry[]): MessageEntry[] {
+  const messages: MessageEntry[] = [];
+  const entriesByUuid = new Map<string, RawEntry>();
+  const parentToolUseIdCache = new Map<string, string | undefined>();
+
+  for (const entry of entries) {
+    if (typeof entry.uuid === 'string' && entry.uuid.length > 0) {
+      entriesByUuid.set(entry.uuid, entry);
+    }
+  }
 
   for (const entry of entries) {
     if (!entry.message?.role) continue;
@@ -194,15 +304,13 @@ export function entriesToMessages(entries: RawEntry[]): SessionMessage[] {
       continue;
     }
 
-    const role = entry.message.role;
-    if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
-
-    messages.push({
-      role,
-      content: stringifyContent(entry.message.content),
-      timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : undefined,
-      uuid: typeof entry.uuid === 'string' ? entry.uuid : undefined,
-    });
+    const parentToolUseId = resolveParentToolUseId(
+      entry,
+      entriesByUuid,
+      parentToolUseIdCache,
+    );
+    const msg = entryToMessage(entry, parentToolUseId);
+    if (msg) messages.push(msg);
   }
 
   return messages;

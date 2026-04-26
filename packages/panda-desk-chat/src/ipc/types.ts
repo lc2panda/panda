@@ -307,6 +307,37 @@ export interface PandaChatAPI {
     readPlan(projectSlug: string, slug: string): Promise<LearningPlanDetail | null>;
     readFlashcards(projectSlug: string, topic: string): Promise<LearningFlashcardSet | null>;
   };
+  // Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据扫描 namespace
+  teams: {
+    list(): Promise<TeamMeta[]>;
+    detail(name: string): Promise<TeamDetail | null>;
+    enabledStatus(): Promise<boolean>;
+  };
+  // Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读 namespace
+  audit: {
+    listRecent(limit?: number): Promise<AuditEntry[]>;
+    filter(filter: AuditFilter): Promise<AuditEntry[]>;
+    stats(): Promise<AuditStats>;
+  };
+  // Comdr 指令 cc-haha 路线 A: memdir 反向读 namespace
+  memdir: {
+    listProjects(): Promise<MemdirProjectMeta[]>;
+    listLayer(projectSlug: string, layer: MemdirLayer): Promise<MemdirEntry[]>;
+    readFile(path: string): Promise<MemdirReadResult | null>;
+  };
+  // Comdr 指令 cc-haha 路线 A: connectors.json 真实数据 namespace
+  connectors: {
+    config(): Promise<ConnectorsConfigSnapshot>;
+    toggle(platform: ConnectorPlatformId, enabled: boolean): Promise<ConnectorToggleResult>;
+  };
+  // Comdr 指令 cc-haha 路线 A: 会话控制 fork/branch/resume slash 注入 namespace
+  sessionControl: {
+    dispatch(
+      sessionId: string,
+      action: SessionControlAction,
+      args?: string,
+    ): Promise<SessionControlResult>;
+  };
 }
 
 // ─── Window init event payload ────────────────────────────────────────────
@@ -605,6 +636,192 @@ export interface LearningFlashcardSet {
   cards: FlashcardEntry[];
   /** 项目级复习日志（按 topic 过滤后）。 */
   reviewLog: ReviewLogEntry[];
+}
+
+// ─── Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据 types ─────
+//
+// 数据来源（panda CLI src/utils/swarm/teamHelpers.ts + utils/teammateMailbox.ts）：
+//   团队根目录          →  ~/.pandacc/teams/<team-name>/
+//   邮箱目录            →  ~/.pandacc/teams/<team-name>/inboxes/
+//   Agent inbox         →  ~/.pandacc/teams/<team-name>/inboxes/<agent>.json
+//   启用开关            →  ~/.pandacc/settings.json env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+
+/** 团队列表项（不含 inbox 内容）。 */
+export interface TeamMeta {
+  /** 团队目录名（slug，可能是 UUID）。 */
+  name: string;
+  /** 完整路径 ~/.pandacc/teams/<name>/。 */
+  path: string;
+  /** inboxes/*.json 文件数。 */
+  memberCount: number;
+  /** 每个 agent 名（去 .json 后缀）。 */
+  members: string[];
+  /** 最近 5 分钟内有 mailbox 修改的 agent 数。 */
+  activeMembers: number;
+  /** 最近 mailbox 修改时间 ISO；无 inbox 时回退团队目录 mtime。 */
+  lastActiveAt: string;
+  /** inboxes 目录是否存在。 */
+  hasInbox: boolean;
+}
+
+/** 单个 agent 邮箱内容（含 raw JSON parse 结果）。 */
+export interface AgentInbox {
+  /** agent 名（文件名去 .json）。 */
+  name: string;
+  /** 完整文件路径。 */
+  path: string;
+  /** 文件 mtime ISO。 */
+  mtime: string;
+  /** 文件 size (bytes)。 */
+  size: number;
+  /** raw JSON parse 结果（数组 / 对象 / null）；解析失败为 null。 */
+  content: unknown;
+  /** 解析出的消息条数（直接数组 / messages / entries 兼容）；无法判定时缺省。 */
+  messageCount?: number;
+}
+
+/** 团队详情（含每个 inbox 内容）。 */
+export interface TeamDetail extends TeamMeta {
+  inboxes: AgentInbox[];
+}
+
+// ─── Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读 types ─────
+//
+// 数据来源（panda CLI src/utils/auditLog.ts → ~/.pandacc/audit.jsonl）：
+//   单行 JSONL：{ timestamp, session_id, tool_name, args_hash, risk_level,
+//                 permission_decision, outcome, duration_ms?, error_brief? }
+
+export type AuditRiskLevel = 'read-only' | 'low-write' | 'high-write' | 'destructive';
+
+export type AuditPermissionDecision =
+  | 'auto-allowed'
+  | 'user-allowed'
+  | 'user-denied'
+  | 'auto-denied'
+  | 'unknown';
+
+export type AuditOutcome = 'success' | 'failure' | 'cancelled' | 'unknown';
+
+export interface AuditEntry {
+  timestamp: string;
+  session_id: string;
+  tool_name: string;
+  args_hash: string;
+  risk_level: AuditRiskLevel;
+  permission_decision: AuditPermissionDecision;
+  outcome: AuditOutcome;
+  duration_ms?: number;
+  error_brief?: string;
+}
+
+export interface AuditFilter {
+  sessionId?: string;
+  toolName?: string;
+  /** ISO 时间戳下限（含）。 */
+  since?: string;
+  limit?: number;
+}
+
+export interface AuditStats {
+  total: number;
+  today: number;
+  errorRate: number;
+  topTools: Array<{ tool: string; count: number }>;
+  lastTimestamp: string | null;
+  exists: boolean;
+}
+
+// ─── Comdr 指令 cc-haha 路线 A: PdMemoryBank / PdPatternsScars memdir types ──
+//
+// 数据来源（panda CLI src/memdir/paths.ts getAutoMemPath()）：
+//   ~/.pandacc/projects/<sanitize-cwd>/memory/{patterns,scars,episodes,
+//     semantic,procedural,working,dreams}/
+
+export type MemdirLayer =
+  | 'working'
+  | 'episodic'
+  | 'semantic'
+  | 'procedural'
+  | 'prospective'
+  | 'patterns'
+  | 'scars';
+
+export interface MemdirProjectMeta {
+  projectSlug: string;
+  projectCwd: string;
+  hasMemory: boolean;
+  layerSummary: Partial<Record<MemdirLayer, number>>;
+  hasEntrypoint: boolean;
+  lastModified: string | null;
+}
+
+export interface MemdirEntry {
+  layer: MemdirLayer;
+  projectSlug: string;
+  projectCwd: string;
+  filename: string;
+  path: string;
+  relativePath: string;
+  modifiedAt: string;
+  size: number;
+  preview?: string;
+}
+
+export interface MemdirReadResult {
+  path: string;
+  content: string;
+  modifiedAt: string;
+  size: number;
+}
+
+// ─── Comdr 指令 cc-haha 路线 A: PdConnectors connectors.json types ─────────
+//
+// 数据来源（panda CLI src/connectors/config.ts → ~/.pandacc/config/connectors.json）：
+//   6 个内置 platform: feishu / dingtalk / slack / telegram / wechat / teams
+
+export type ConnectorPlatformId =
+  | 'feishu'
+  | 'dingtalk'
+  | 'slack'
+  | 'telegram'
+  | 'wechat'
+  | 'teams';
+
+export interface ConnectorEntry {
+  platform: ConnectorPlatformId;
+  enabled: boolean;
+  mode?: string;
+  configured: boolean;
+  hasKeychainRef: boolean;
+  permissions?: string[];
+  rateLimitPerMinute?: number;
+  cacheTtlSeconds?: number;
+}
+
+export interface ConnectorsConfigSnapshot {
+  configExists: boolean;
+  configPath: string;
+  entries: ConnectorEntry[];
+  aggregator?: {
+    deduplication?: boolean;
+    cacheGlobalTtlSeconds?: number;
+    maxMessagesPerQuery?: number;
+  };
+  version?: string;
+}
+
+export type ConnectorToggleResult =
+  | { ok: true; entry: ConnectorEntry }
+  | { ok: false; error: string };
+
+// ─── Comdr 指令 cc-haha 路线 A: PdSessionControls fork/branch/resume types ──
+
+export type SessionControlAction = 'fork' | 'branch' | 'resume';
+
+export interface SessionControlResult {
+  ok: boolean;
+  command: string;
+  error?: string;
 }
 
 // ─── Global augmentation for window.pandaAPI ────────────────────────────────

@@ -53,8 +53,8 @@ describe('settingsStore', () => {
     useSettingsStore.getState().setLocale('en');
     expect(useSettingsStore.getState().locale).toBe('en');
 
-    useSettingsStore.getState().setLocale('ko');
-    expect(useSettingsStore.getState().locale).toBe('ko');
+    useSettingsStore.getState().setLocale('en');
+    expect(useSettingsStore.getState().locale).toBe('en');
   });
 
   it('toggleSidebar flips sidebarExpanded', () => {

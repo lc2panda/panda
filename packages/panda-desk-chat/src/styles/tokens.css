@@ -77,14 +77,17 @@
   --pd-space-32: 128px;
   --pd-space-48: 192px;
 
-  /* ── Border Radius ───────────────────────────────────────────────────── */
+  /* ── Border Radius ─────────────────────────────────────────────────────
+   * cc-haha 对齐：md=8 / lg=12 / xl=16（globals.css --radius-md/lg）。
+   * 整体上移 2-4px 让卡片/按钮/输入框/modal 视觉一致；与 Tailwind rounded-md/lg/xl 默认值一致。
+   */
   --pd-radius-none: 0;
   --pd-radius-xs: 2px;
   --pd-radius-sm: 4px;
-  --pd-radius-md: 6px;
-  --pd-radius-lg: 8px;
-  --pd-radius-xl: 12px;
-  --pd-radius-2xl: 16px;
+  --pd-radius-md: 8px;       /* cc-haha --radius-md */
+  --pd-radius-lg: 12px;      /* cc-haha --radius-lg */
+  --pd-radius-xl: 16px;
+  --pd-radius-2xl: 20px;
   --pd-radius-full: 9999px;
 
   /* ── Z-Index Scale ───────────────────────────────────────────────────── */
@@ -261,11 +264,16 @@
   --pd-color-info: var(--pd-palette-sky-500);
   --pd-color-info-bg: var(--pd-palette-sky-300);
 
-  /* ── Gradients + shadow (Anthropic clay gradient) ────────────────────── */
+  /* ── Gradients + shadow (Anthropic clay gradient — values match cc-haha layout) ────── */
   --pd-gradient-btn-primary: linear-gradient(135deg, #D97757, #C6613F);
   --pd-gradient-btn-primary-hover: linear-gradient(135deg, #C6613F, #AF461D);
-  --pd-shadow-button-terra: 0 8px 24px rgba(217, 119, 87, 0.22);
-  --pd-shadow-focus-ring: 0 0 0 1px rgba(217, 119, 87, 0.20);
+  /* cc-haha button-primary: 0 8px 24px @ 0.18 alpha (clay 替代 deep brown) */
+  --pd-shadow-button-terra: 0 8px 24px rgba(217, 119, 87, 0.18);
+  --pd-shadow-button-primary-cc: 0 8px 24px rgba(217, 119, 87, 0.18);
+  /* cc-haha focus-ring: 1px ring @ 0.16 alpha — low-noise hairline ring */
+  --pd-shadow-focus-ring: 0 0 0 1px rgba(217, 119, 87, 0.16);
+  --pd-shadow-error-ring: 0 0 0 1px rgba(186, 26, 26, 0.18);
+  /* cc-haha dropdown — exact match (alpha 0.04 / 0.08 dual layer) */
   --pd-shadow-dropdown: 0 4px 20px rgba(27, 28, 26, 0.04), 0 12px 40px rgba(27, 28, 26, 0.08);
 
   /* ── Motion (cc-haha --motion-sidebar-*) ───────────────────────────────── */
@@ -296,8 +304,9 @@
   --pd-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.04);
   --pd-shadow-lg: 0 10px 15px rgba(20, 20, 19, 0.08), 0 4px 6px rgba(20, 20, 19, 0.04);
   --pd-shadow-xl: 0 20px 25px rgba(20, 20, 19, 0.10), 0 8px 10px rgba(20, 20, 19, 0.04);
-  --pd-shadow-focus: 0 0 0 3px rgba(217, 119, 87, 0.3);
-  --pd-shadow-focus-danger: 0 0 0 3px rgba(186, 61, 61, 0.3);
+  /* cc-haha focus ring 收敛：1px ring + 16% alpha（globals.css 风格），低视觉噪声 */
+  --pd-shadow-focus: 0 0 0 2px rgba(217, 119, 87, 0.20);
+  --pd-shadow-focus-danger: 0 0 0 2px rgba(186, 61, 61, 0.20);
   --pd-shadow-button-primary: 0 1px 2px rgba(20, 20, 19, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 
   /* ── Domain: Tool Call Colors ─────────────────────────────────────────── */
@@ -362,18 +371,134 @@
   --pd-pet-species-border: var(--pd-palette-cream-400);
   --pd-pet-mood-glow: rgba(217, 119, 87, 0.3);
 
-  /* ── Glass Panel — cc-haha glass-panel + dropdown shadow ───────────────
-   * cc-haha: bg=rgba(255,255,255,0.84) blur=20px border=rgba(218,193,186,0.22)
-   * 我们采用 cc-haha 数值，配合 dropdown 双层 shadow 让 Composer 真正浮起。
+  /* ── Glass Panel — cc-haha glass-panel exact spec ──────────────────────
+   * 数值来源：cc-haha/desktop/src/theme/globals.css 第 196-198 / 425-435 行
+   *   --color-surface-glass:        rgba(255, 255, 255, 0.84)
+   *   --color-surface-glass-border: rgba(218, 193, 186, 0.22)
+   *   .glass-panel { backdrop-filter: blur(20px); box-shadow: var(--shadow-dropdown); }
+   *   :focus-within { box-shadow: var(--shadow-focus-ring), var(--shadow-dropdown); }
+   * panda 完全对齐 cc-haha 数值（HEX/alpha 是事实数据，无版权）。
    */
-  --pd-glass-bg: rgba(255, 255, 255, 0.92);                 /* slightly less transparent for clarity */
-  --pd-glass-border: rgba(218, 193, 186, 0.55);             /* warm brown subtle border */
-  --pd-glass-blur: 20px;                                     /* enable backdrop blur */
-  --pd-glass-shadow:
-    0 1px 2px rgba(27,28,26,0.05),
-    0 4px 20px rgba(27,28,26,0.06),
-    0 12px 40px rgba(27,28,26,0.10);
-  --pd-glass-focus-ring: 0 0 0 2px rgba(217, 119, 87, 0.20);
+  --pd-glass-bg: rgba(255, 255, 255, 0.84);                 /* cc-haha exact */
+  --pd-glass-border: rgba(218, 193, 186, 0.22);             /* cc-haha exact */
+  --pd-glass-blur: 20px;                                     /* cc-haha exact (no saturate) */
+  --pd-glass-shadow: var(--pd-shadow-dropdown);              /* cc-haha glass uses --shadow-dropdown */
+  --pd-glass-focus-ring: var(--pd-shadow-focus-ring);        /* cc-haha :focus-within = focus-ring + dropdown */
+
+  /* ==========================================================================
+   * cc-haha 完整 token alias（1:1 复刻自 cc-haha desktop/src/theme/globals.css）
+   * panda 已有 token 用 alias 桥接，缺失项追加为新 token。所有 token 加 --pd- 前缀。
+   * 来源：cc-haha L112-273 @theme + :root[data-theme="light"]
+   * ========================================================================== */
+
+  /* ── Material Design 3 surface 完整层级 ───────────────────────────────── */
+  --pd-color-primary: #D97757;                               /* clay (Anthropic) — panda 调整为官方 brand */
+  --pd-color-primary-container: #C6613F;
+  --pd-color-primary-fixed: #FFDBD0;
+  --pd-color-primary-fixed-dim: #FFB59D;
+  --pd-color-on-primary: #FFFFFF;
+  --pd-color-on-surface: var(--pd-color-fg);                 /* alias to panda fg */
+  --pd-color-on-surface-variant: var(--pd-color-fg-muted);   /* alias to panda fg-muted */
+  --pd-color-surface: var(--pd-color-bg);                    /* alias to panda bg */
+  --pd-color-surface-bright: #FAF9F5;
+  --pd-color-surface-dim: #DBDAD6;
+  --pd-color-surface-container-highest: #E3E2DF;
+  --pd-color-surface-container-lowest: #FFFFFF;
+  --pd-color-surface-variant: #E3E2DF;
+  --pd-color-background: #FAF9F5;
+
+  /* ── Outline / secondary / tertiary / inverse ──────────────────────────── */
+  --pd-color-outline: #87736D;
+  --pd-color-outline-variant: #DAC1BA;
+  --pd-color-secondary: #2D628F;
+  --pd-color-secondary-container: #9ACBFE;
+  --pd-color-tertiary: #4F6237;
+  --pd-color-tertiary-container: #677B4E;
+  --pd-color-inverse-surface: #2F312E;
+  --pd-color-inverse-on-surface: #F2F1ED;
+  --pd-color-inverse-primary: #FFB59D;
+
+  /* ── Layout dimensions（cc-haha :root L164-170）──────────────────────── */
+  --pd-titlebar-height: 40px;
+  --pd-statusbar-height: 36px;
+
+  /* ── Surface aliases（cc-haha :root L173-184）─────────────────────────── */
+  --pd-color-surface-sidebar: var(--pd-color-surface-container-low);
+  --pd-color-surface-hover: var(--pd-color-surface-container-high);
+  --pd-color-surface-selected: var(--pd-color-surface-container);
+  --pd-color-sidebar-filter-bg: transparent;
+  --pd-color-sidebar-filter-border: rgba(218, 193, 186, 0.92);
+  --pd-color-sidebar-filter-icon-bg: transparent;
+  --pd-color-sidebar-search-bg: rgba(255, 255, 255, 0.78);
+  --pd-color-sidebar-search-border: rgba(218, 193, 186, 0.88);
+  --pd-color-sidebar-item-hover: rgba(239, 238, 234, 0.82);
+  --pd-color-sidebar-item-active: rgba(239, 238, 234, 0.94);
+  --pd-color-sidebar-item-active-border: rgba(143, 72, 47, 0.12);
+  --pd-sidebar-panel-bg-image: none;
+
+  /* ── Border-focus / separator alias ────────────────────────────────────── */
+  --pd-color-border-separator: var(--pd-color-outline-variant);
+
+  /* ── Text aliases（cc-haha L191-194）─────────────────────────────────── */
+  --pd-color-text-primary: var(--pd-color-on-surface);
+  --pd-color-text-secondary: var(--pd-color-on-surface-variant);
+  --pd-color-text-tertiary: var(--pd-color-outline);
+
+  /* ── Info / brand / accent text（cc-haha L197-201）────────────────────── */
+  --pd-color-surface-info: var(--pd-color-surface-container-low);
+  --pd-color-brand: var(--pd-color-primary);
+  --pd-color-text-accent: var(--pd-color-secondary);
+
+  /* ── Button gradients（cc-haha L210-213）──────────────────────────────── */
+  --pd-color-btn-primary-fg: var(--pd-color-on-primary);
+  /* 注：panda 已有 --pd-gradient-btn-primary，不再重复定义 */
+
+  /* ── Glass overlay（cc-haha L218-221）──────────────────────────────────── */
+  --pd-color-overlay-scrim: rgba(27, 28, 26, 0.48);
+  --pd-color-surface-glass: var(--pd-glass-bg);              /* alias = panda 已有 */
+  --pd-color-surface-glass-border: var(--pd-glass-border);
+
+  /* ── Code 完整色板（cc-haha L223-236）───────────────────────────────── */
+  --pd-color-code-bg: #FDFCF9;
+  --pd-color-code-fg: #24201E;
+  --pd-color-code-comment: #5C6B7A;
+  --pd-color-code-string: #437220;
+  --pd-color-code-keyword: #B8533B;
+  --pd-color-code-function: #1D5A8C;
+  --pd-color-code-number: #1B7A6A;
+  --pd-color-code-property: #7A3E20;
+  --pd-color-code-type: #7E5520;
+  --pd-color-code-parameter: #5C3D2E;
+  --pd-color-code-punctuation: #5C504A;
+  --pd-color-code-inserted: #1A7F37;
+  --pd-color-code-deleted: #CF222E;
+
+  /* ── Diff 完整色板（cc-haha L238-250）─────────────────────────────────── */
+  --pd-color-diff-added-bg: #E8F5E2;
+  --pd-color-diff-added-word: #B8E4A8;
+  --pd-color-diff-added-gutter: #D4EDCA;
+  --pd-color-diff-added-text: #1A7F37;
+  --pd-color-diff-removed-bg: #FDECEA;
+  --pd-color-diff-removed-word: #F5B8B4;
+  --pd-color-diff-removed-gutter: #F9D4D0;
+  --pd-color-diff-removed-text: #CF222E;
+  --pd-color-diff-highlight-bg: #FFF5D6;
+  --pd-color-diff-highlight-gutter: #FFECB3;
+  --pd-color-diff-title-border: #DAC1BA;
+
+  /* ── Terminal 完整色板（cc-haha L253-260）────────────────────────────── */
+  --pd-color-terminal-header: #2D2D2D;
+  --pd-color-terminal-bg: #1E1E1E;
+  --pd-color-terminal-border: #1A1A1A;
+  --pd-color-terminal-fg: #D4D4D4;
+  --pd-color-terminal-muted: #999999;
+  --pd-color-terminal-accent: #28C840;
+  --pd-color-terminal-danger: #FF5F57;
+  --pd-color-terminal-warning: #FEBC2E;
+
+  /* ── Window control / selection（cc-haha L263-265）────────────────────── */
+  --pd-color-window-close-hover: #E81123;
+  /* selection 已存在 panda token —— 不重复 */
 }
 
 /* ==========================================================================
@@ -459,19 +584,30 @@
   --pd-color-selection-bg: rgba(183, 90, 56, 0.35);
   --pd-color-selection-text: #E8E6E0;
 
-  /* ── Semantic: Glass / Frost ─────────────────────────────────────────── */
-  --pd-glass-surface: rgba(20, 20, 19, 0.84);
-  --pd-glass-border: rgba(58, 56, 54, 0.35);
+  /* ── Semantic: Glass / Frost (cc-haha dark exact) ──────────────────────
+   * cc-haha: --color-surface-glass = rgba(32,31,31,0.8)  border = rgba(90,65,56,0.18)
+   */
+  --pd-glass-surface: rgba(32, 31, 31, 0.8);
+  --pd-glass-border-default: rgba(90, 65, 56, 0.18);
 
-  /* ── Shadow Scale ────────────────────────────────────────────────────── */
+  /* ── Shadow Scale (cc-haha dark dropdown spec) ─────────────────────────
+   * cc-haha dark: --shadow-dropdown = 0 12px 32px rgba(0,0,0,0.4)
+   *               --shadow-focus-ring = 0 0 0 1px rgba(255,181,159,0.32)
+   *               --shadow-button-primary = 0 12px 24px rgba(255,110,64,0.18)
+   */
   --pd-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
   --pd-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
   --pd-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
   --pd-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3), 0 4px 6px rgba(0, 0, 0, 0.2);
   --pd-shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.4), 0 8px 10px rgba(0, 0, 0, 0.2);
-  --pd-shadow-focus: 0 0 0 3px rgba(227, 139, 110, 0.4);
-  --pd-shadow-focus-danger: 0 0 0 3px rgba(209, 108, 108, 0.4);
+  --pd-shadow-focus: 0 0 0 2px rgba(227, 139, 110, 0.30);
+  --pd-shadow-focus-danger: 0 0 0 2px rgba(209, 108, 108, 0.30);
   --pd-shadow-button-primary: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --pd-shadow-dropdown: 0 12px 32px rgba(0, 0, 0, 0.4);
+  --pd-shadow-focus-ring: 0 0 0 1px rgba(255, 181, 159, 0.32);
+  --pd-shadow-error-ring: 0 0 0 1px rgba(255, 180, 171, 0.26);
+  --pd-shadow-button-terra: 0 12px 24px rgba(255, 110, 64, 0.18);
+  --pd-shadow-button-primary-cc: 0 12px 24px rgba(255, 110, 64, 0.18);
 
   /* ── Domain: Tool Call Colors ─────────────────────────────────────────── */
   --pd-tool-use-bg: rgba(227, 139, 110, 0.08);
@@ -535,11 +671,113 @@
   --pd-pet-species-border: var(--pd-palette-ink-500);
   --pd-pet-mood-glow: rgba(227, 139, 110, 0.35);
 
-  /* ── Glass Panel ────────────────────────────────────────────────────── */
-  --pd-glass-bg: rgba(27, 26, 25, 0.78);
-  --pd-glass-border: rgba(255, 255, 255, 0.08);
+  /* ── Glass Panel — cc-haha dark exact match ─────────────────────────────
+   * cc-haha dark: surface-glass = rgba(32,31,31,0.8) border = rgba(90,65,56,0.18)
+   * shadow = --shadow-dropdown (0 12px 32px rgba(0,0,0,0.4))
+   */
+  --pd-glass-bg: rgba(32, 31, 31, 0.8);
+  --pd-glass-border: rgba(90, 65, 56, 0.18);
   --pd-glass-blur: 20px;
-  --pd-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.24), 0 2px 8px rgba(0, 0, 0, 0.12);
+  --pd-glass-shadow: var(--pd-shadow-dropdown);
+  --pd-glass-focus-ring: var(--pd-shadow-focus-ring);
+
+  /* ==========================================================================
+   * cc-haha dark 完整 token alias（1:1 复刻 cc-haha L275-399）
+   * ========================================================================== */
+  --pd-color-primary: #FFB59F;
+  --pd-color-primary-container: #FF6E40;
+  --pd-color-primary-fixed: #FFD9CF;
+  --pd-color-primary-fixed-dim: #FFB59F;
+  --pd-color-on-primary: #2C120B;
+  --pd-color-on-surface: var(--pd-color-fg);
+  --pd-color-on-surface-variant: var(--pd-color-fg-muted);
+  --pd-color-surface: var(--pd-color-bg);
+  --pd-color-surface-bright: #201F1F;
+  --pd-color-surface-dim: #0E0E0E;
+  --pd-color-surface-container-highest: #353534;
+  --pd-color-surface-container-lowest: #0E0E0E;
+  --pd-color-surface-variant: #252120;
+  --pd-color-background: #0E0E0E;
+
+  --pd-color-outline: #8D7F7A;
+  --pd-color-outline-variant: #5A4138;
+  --pd-color-secondary: #CDBDFF;
+  --pd-color-secondary-container: #3A3050;
+  --pd-color-tertiary: #00DAF3;
+  --pd-color-tertiary-container: #003D44;
+  --pd-color-inverse-surface: #E5E2E1;
+  --pd-color-inverse-on-surface: #1B1C1A;
+  --pd-color-inverse-primary: #8F482F;
+
+  --pd-titlebar-height: 40px;
+  --pd-statusbar-height: 36px;
+
+  --pd-color-surface-sidebar: #171615;
+  --pd-color-surface-hover: var(--pd-color-surface-container-highest);
+  --pd-color-surface-selected: var(--pd-color-surface-container);
+  --pd-color-sidebar-filter-bg: rgba(255, 255, 255, 0.01);
+  --pd-color-sidebar-filter-border: rgba(255, 255, 255, 0.08);
+  --pd-color-sidebar-filter-icon-bg: transparent;
+  --pd-color-sidebar-search-bg: rgba(255, 255, 255, 0.03);
+  --pd-color-sidebar-search-border: rgba(255, 255, 255, 0.06);
+  --pd-color-sidebar-item-hover: rgba(255, 255, 255, 0.04);
+  --pd-color-sidebar-item-active: rgba(255, 255, 255, 0.06);
+  --pd-color-sidebar-item-active-border: rgba(255, 181, 159, 0.14);
+  --pd-sidebar-panel-bg-image:
+    radial-gradient(circle at top left, rgba(255, 181, 159, 0.045), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+
+  --pd-color-border-separator: rgba(90, 65, 56, 0.12);
+  --pd-color-text-primary: var(--pd-color-on-surface);
+  --pd-color-text-secondary: var(--pd-color-on-surface-variant);
+  --pd-color-text-tertiary: #8F827D;
+
+  --pd-color-surface-info: rgba(32, 31, 31, 0.88);
+  --pd-color-brand: var(--pd-color-primary);
+  --pd-color-text-accent: var(--pd-color-tertiary);
+
+  --pd-color-btn-primary-fg: var(--pd-color-on-primary);
+
+  --pd-color-overlay-scrim: rgba(6, 6, 6, 0.56);
+  --pd-color-surface-glass: var(--pd-glass-bg);
+  --pd-color-surface-glass-border: var(--pd-glass-border);
+
+  --pd-color-code-bg: #0E0E0E;
+  --pd-color-code-fg: #E5E2E1;
+  --pd-color-code-comment: #8F8683;
+  --pd-color-code-string: #88C988;
+  --pd-color-code-keyword: #FF8F70;
+  --pd-color-code-function: #00DAF3;
+  --pd-color-code-number: #74E0F7;
+  --pd-color-code-property: #FFC9B8;
+  --pd-color-code-type: #CDBDFF;
+  --pd-color-code-parameter: #E5E2E1;
+  --pd-color-code-punctuation: #9B908C;
+  --pd-color-code-inserted: #8EEA9A;
+  --pd-color-code-deleted: #FFB59F;
+
+  --pd-color-diff-added-bg: rgba(126, 219, 139, 0.12);
+  --pd-color-diff-added-word: rgba(126, 219, 139, 0.22);
+  --pd-color-diff-added-gutter: rgba(126, 219, 139, 0.18);
+  --pd-color-diff-added-text: #8EEA9A;
+  --pd-color-diff-removed-bg: rgba(255, 110, 64, 0.12);
+  --pd-color-diff-removed-word: rgba(255, 110, 64, 0.24);
+  --pd-color-diff-removed-gutter: rgba(255, 110, 64, 0.18);
+  --pd-color-diff-removed-text: #FFB59F;
+  --pd-color-diff-highlight-bg: rgba(205, 189, 255, 0.12);
+  --pd-color-diff-highlight-gutter: rgba(205, 189, 255, 0.16);
+  --pd-color-diff-title-border: rgba(90, 65, 56, 0.15);
+
+  --pd-color-terminal-header: #242323;
+  --pd-color-terminal-bg: #121212;
+  --pd-color-terminal-border: #1A1919;
+  --pd-color-terminal-fg: #D7D2D0;
+  --pd-color-terminal-muted: #8F8683;
+  --pd-color-terminal-accent: #7EF18A;
+  --pd-color-terminal-danger: #FF6D67;
+  --pd-color-terminal-warning: #F8C55F;
+
+  --pd-color-window-close-hover: #C63B44;
 }
 
 /* --------------------------------------------------------------------------
@@ -668,4 +906,108 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ==========================================================================
+   6. cc-haha 双轨 alias 桥接
+      panda 用 --pd-color-X 命名空间，但 cc-haha 源码 1:1 复刻时仍可能残留 var(--color-X)。
+      为避免任何遗漏的 var(--color-X) 落空（V1 audit 根因 #3，命名分叉 28 项），
+      在两个主题块都映射 cc-haha 名 → panda 前缀，双轨保险。
+   ========================================================================== */
+
+[data-pd-theme="light"],
+[data-pd-theme="dark"],
+:root {
+  /* color */
+  --color-primary: var(--pd-color-primary);
+  --color-primary-container: var(--pd-color-primary-container);
+  --color-on-primary: var(--pd-color-on-primary);
+  --color-on-surface: var(--pd-color-on-surface);
+  --color-on-surface-variant: var(--pd-color-on-surface-variant);
+  --color-surface: var(--pd-color-surface);
+  --color-surface-bright: var(--pd-color-surface-bright);
+  --color-surface-dim: var(--pd-color-surface-dim);
+  --color-surface-container: var(--pd-color-surface-container);
+  --color-surface-container-low: var(--pd-color-surface-container-low);
+  --color-surface-container-high: var(--pd-color-surface-container-high);
+  --color-surface-container-highest: var(--pd-color-surface-container-highest);
+  --color-surface-container-lowest: var(--pd-color-surface-container-lowest);
+  --color-surface-variant: var(--pd-color-surface-variant);
+  --color-background: var(--pd-color-background);
+  --color-outline: var(--pd-color-outline);
+  --color-outline-variant: var(--pd-color-outline-variant);
+  --color-secondary: var(--pd-color-secondary);
+  --color-secondary-container: var(--pd-color-secondary-container);
+  --color-tertiary: var(--pd-color-tertiary);
+  --color-tertiary-container: var(--pd-color-tertiary-container);
+  --color-error: var(--pd-color-error);
+  --color-error-container: var(--pd-color-error-container);
+  --color-on-error-container: var(--pd-color-on-error-container);
+  --color-success: var(--pd-color-success);
+  --color-warning: var(--pd-color-warning);
+  --color-inverse-surface: var(--pd-color-inverse-surface);
+  --color-inverse-on-surface: var(--pd-color-inverse-on-surface);
+  --color-inverse-primary: var(--pd-color-inverse-primary);
+  --color-border: var(--pd-color-border);
+  --color-border-focus: var(--pd-color-border-focus);
+  --color-border-separator: var(--pd-color-border-separator);
+  --color-text-primary: var(--pd-color-text-primary);
+  --color-text-secondary: var(--pd-color-text-secondary);
+  --color-text-tertiary: var(--pd-color-text-tertiary);
+  --color-text-accent: var(--pd-color-text-accent);
+  --color-brand: var(--pd-color-brand);
+  --color-surface-info: var(--pd-color-surface-info);
+  --color-surface-sidebar: var(--pd-color-surface-sidebar);
+  --color-surface-hover: var(--pd-color-surface-hover);
+  --color-surface-selected: var(--pd-color-surface-selected);
+  --color-surface-glass: var(--pd-color-surface-glass);
+  --color-surface-glass-border: var(--pd-color-surface-glass-border);
+  --color-surface-user-msg: var(--pd-color-user-message-bg);
+  --color-sidebar-search-bg: var(--pd-color-sidebar-search-bg);
+  --color-sidebar-search-border: var(--pd-color-sidebar-search-border);
+  --color-sidebar-item-hover: var(--pd-color-sidebar-item-hover);
+  --color-sidebar-item-active: var(--pd-color-sidebar-item-active);
+  --color-sidebar-item-active-border: var(--pd-color-sidebar-item-active-border);
+  --color-sidebar-filter-bg: var(--pd-color-sidebar-filter-bg);
+  --color-sidebar-filter-border: var(--pd-color-sidebar-filter-border);
+  --color-sidebar-filter-icon-bg: var(--pd-color-sidebar-filter-icon-bg);
+  --color-overlay-scrim: var(--pd-color-overlay-scrim);
+  --color-window-close-hover: var(--pd-color-window-close-hover);
+  --color-btn-primary-fg: var(--pd-color-btn-primary-fg);
+  /* code/diff/terminal 全套 */
+  --color-code-bg: var(--pd-color-code-bg);
+  --color-code-fg: var(--pd-color-code-fg);
+  --color-code-comment: var(--pd-color-code-comment);
+  --color-code-string: var(--pd-color-code-string);
+  --color-code-keyword: var(--pd-color-code-keyword);
+  --color-code-function: var(--pd-color-code-function);
+  --color-code-number: var(--pd-color-code-number);
+  --color-diff-added-bg: var(--pd-color-diff-added-bg);
+  --color-diff-added-text: var(--pd-color-diff-added-text);
+  --color-diff-removed-bg: var(--pd-color-diff-removed-bg);
+  --color-diff-removed-text: var(--pd-color-diff-removed-text);
+  --color-terminal-bg: var(--pd-color-terminal-bg);
+  --color-terminal-fg: var(--pd-color-terminal-fg);
+  /* font/shadow/radius */
+  --font-headline: var(--pd-font-headline);
+  --font-body: var(--pd-font-sans);
+  --font-mono: var(--pd-font-mono);
+  --shadow-dropdown: var(--pd-shadow-dropdown);
+  --shadow-focus-ring: var(--pd-shadow-focus-ring);
+  --shadow-button-primary: var(--pd-shadow-button-primary-cc);
+  --radius-sm: var(--pd-radius-sm);
+  --radius-md: var(--pd-radius-md);
+  --radius-lg: var(--pd-radius-lg);
+  --radius-xl: var(--pd-radius-xl);
+  --radius-full: var(--pd-radius-full);
+  /* layout */
+  --sidebar-width: var(--pd-layout-sidebar-width);
+  --sidebar-rail-width: var(--pd-layout-sidebar-rail);
+  --titlebar-height: var(--pd-titlebar-height);
+  --statusbar-height: var(--pd-statusbar-height);
+  --motion-sidebar-duration: var(--pd-motion-sidebar-duration);
+  --motion-sidebar-easing: var(--pd-motion-sidebar-easing);
+  --gradient-btn-primary: var(--pd-gradient-btn-primary);
+  --gradient-btn-primary-hover: var(--pd-gradient-btn-primary-hover);
+  --sidebar-panel-bg-image: var(--pd-sidebar-panel-bg-image);
 }

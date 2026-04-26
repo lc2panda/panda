@@ -1,74 +1,57 @@
-// Input: Streaming state (verb, elapsed time, token count)
-// Output: Animated pill indicating active generation with 3-dot pulse
-// Pos: Chat layer — visual feedback for streaming responses
+// Input: chatStore active session 的 chatState / statusVerb / elapsedSeconds / tokenUsage
+// Output: cc-haha 1:1 StreamingIndicator — pill-shaped status badge with ✦ shimmer + verb + elapsed + ↓ tokens
+// Pos: Chat layer — appears below the message stream while the model is thinking or a tool is running.
+//
+// Reference: monitor/tmp/cc-haha/desktop/src/components/chat/StreamingIndicator.tsx L1-41
+// 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 import React from "react";
-import { cn } from "../../lib/cn";
+import { useChatStore } from "../../stores/chatStore";
 
-/* -------------------------------------------------------------------------- */
-/*  Types                                                                     */
-/* -------------------------------------------------------------------------- */
-
-export interface PdStreamingIndicatorProps {
-  verb: string;       // "Thinking" | "Writing" | "Running bash"
-  elapsed: number;    // seconds
-  tokens?: number;    // generated token count
-  className?: string;
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Helpers                                                                   */
-/* -------------------------------------------------------------------------- */
+export const PdStreamingIndicator: React.FC = () => {
+  const activeSession = useChatStore((s) => s.getActiveSession());
+  const chatState = activeSession?.chatState ?? "idle";
+  const statusVerb = activeSession?.statusVerb ?? "";
+  const elapsedSeconds = activeSession?.elapsedSeconds ?? 0;
+  // panda tokenUsage 字段名 input/output — cc-haha 是 input_tokens/output_tokens。
+  // 显示层只读 output（cc-haha L34: tokenUsage.output_tokens > 0）。
+  const tokenUsage = activeSession?.tokenUsage ?? { input: 0, output: 0 };
 
-function formatElapsed(s: number): string {
-  if (s < 60) return `${Math.floor(s)}s`;
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}m ${sec}s`;
-}
+  let verb: string;
+  if (statusVerb) {
+    verb = statusVerb;
+  } else {
+    verb =
+      chatState === "thinking"
+        ? "Thinking"
+        : chatState === "tool_executing"
+          ? "Running"
+          : "Working";
+  }
 
-/* -------------------------------------------------------------------------- */
-/*  Component                                                                 */
-/* -------------------------------------------------------------------------- */
-
-export const PdStreamingIndicator: React.FC<PdStreamingIndicatorProps> = ({
-  verb,
-  elapsed,
-  tokens,
-  className,
-}) => {
-  const elapsedDisplay = formatElapsed(elapsed);
-
+  // 1:1 cc-haha StreamingIndicator L25-40
   return (
-    <div
-      className={cn(
-        'mx-auto my-3 max-w-[820px] px-1',
-        className,
-      )}
-    >
-      <span
-        className={cn(
-          'inline-flex items-center gap-2 px-3 py-1.5 rounded-full',
-          'bg-[var(--pd-color-bg-subtle)] border border-[var(--pd-color-border-subtle)]',
-          'text-[12px] font-[var(--pd-font-medium)] text-[var(--pd-color-fg-muted)] select-none',
-        )}
-      >
-        <span className="inline-flex items-center gap-1" aria-hidden="true">
-          <span className="pd-thinking-dot" />
-          <span className="pd-thinking-dot" />
-          <span className="pd-thinking-dot" />
-        </span>
-        <span>{verb || '正在思考'}</span>
-        <span className="text-[var(--pd-color-fg-subtle)]">·</span>
-        <span className="font-[family-name:var(--pd-font-mono)] tabular-nums">{elapsedDisplay}</span>
-        {tokens !== undefined && tokens > 0 && (
-          <>
-            <span className="text-[var(--pd-color-fg-subtle)]">·</span>
-            <span className="font-[family-name:var(--pd-font-mono)] tabular-nums">
-              {tokens.toLocaleString()} tok
-            </span>
-          </>
-        )}
+    <div className="mb-2 flex w-fit items-center gap-2 rounded-full border border-[var(--pd-color-border)]/40 bg-[var(--pd-color-surface-container-low)] px-3 py-1">
+      <span className="text-[var(--pd-color-brand)] animate-shimmer text-xs">✦</span>
+      <span className="text-xs font-medium text-[var(--pd-color-text-secondary)]">
+        {verb}...
       </span>
+      {elapsedSeconds > 0 && (
+        <span className="text-[10px] text-[var(--pd-color-text-tertiary)]">
+          {formatElapsed(elapsedSeconds)}
+        </span>
+      )}
+      {tokenUsage.output > 0 && (
+        <span className="text-[10px] text-[var(--pd-color-text-tertiary)]">
+          · ↓ {tokenUsage.output}
+        </span>
+      )}
     </div>
   );
 };

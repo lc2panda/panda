@@ -98,6 +98,23 @@ const CH = {
   LEARNING_LIST_FLASHCARDS:   'panda:learning:list-flashcards',
   LEARNING_READ_PLAN:         'panda:learning:read-plan',
   LEARNING_READ_FLASHCARDS:   'panda:learning:read-flashcards',
+  // Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据扫描 (3 个 channel)
+  TEAMS_LIST:           'panda:teams:list',
+  TEAMS_DETAIL:         'panda:teams:detail',
+  TEAMS_ENABLED_STATUS: 'panda:teams:enabled-status',
+  // Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读 (3 个 channel)
+  AUDIT_LIST_RECENT:    'panda:audit:list-recent',
+  AUDIT_FILTER:         'panda:audit:filter',
+  AUDIT_STATS:          'panda:audit:stats',
+  // Comdr 指令 cc-haha 路线 A: memdir 反向读 (3 个 channel)
+  MEMDIR_LIST_PROJECTS: 'panda:memdir:list-projects',
+  MEMDIR_LIST_LAYER:    'panda:memdir:list-layer',
+  MEMDIR_READ_FILE:     'panda:memdir:read-file',
+  // Comdr 指令 cc-haha 路线 A: connectors.json 真实数据 (2 个 channel)
+  CONNECTORS_CONFIG:    'panda:connectors:config',
+  CONNECTORS_TOGGLE:    'panda:connectors:toggle',
+  // Comdr 指令 cc-haha 路线 A: 会话控制 fork/branch/resume slash 注入 (1 个 channel)
+  SESSION_CONTROL:      'panda:session:control',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -257,5 +274,35 @@ contextBridge.exposeInMainWorld('pandaAPI', {
       ipcRenderer.invoke(CH.LEARNING_READ_PLAN, { projectSlug, slug }),
     readFlashcards:  (projectSlug: string, topic: string) =>
       ipcRenderer.invoke(CH.LEARNING_READ_FLASHCARDS, { projectSlug, topic }),
+  },
+  // Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据扫描 namespace
+  teams: {
+    list:           () => ipcRenderer.invoke(CH.TEAMS_LIST),
+    detail:         (name: string) => ipcRenderer.invoke(CH.TEAMS_DETAIL, { name }),
+    enabledStatus:  () => ipcRenderer.invoke(CH.TEAMS_ENABLED_STATUS),
+  },
+  // Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读 namespace
+  audit: {
+    listRecent: (limit?: number) => ipcRenderer.invoke(CH.AUDIT_LIST_RECENT, { limit }),
+    filter: (filter: unknown) => ipcRenderer.invoke(CH.AUDIT_FILTER, filter),
+    stats: () => ipcRenderer.invoke(CH.AUDIT_STATS),
+  },
+  // Comdr 指令 cc-haha 路线 A: memdir 反向读 namespace
+  memdir: {
+    listProjects: () => ipcRenderer.invoke(CH.MEMDIR_LIST_PROJECTS),
+    listLayer: (projectSlug: string, layer: string) =>
+      ipcRenderer.invoke(CH.MEMDIR_LIST_LAYER, { projectSlug, layer }),
+    readFile: (path: string) => ipcRenderer.invoke(CH.MEMDIR_READ_FILE, { path }),
+  },
+  // Comdr 指令 cc-haha 路线 A: connectors.json 真实数据 namespace
+  connectors: {
+    config: () => ipcRenderer.invoke(CH.CONNECTORS_CONFIG),
+    toggle: (platform: string, enabled: boolean) =>
+      ipcRenderer.invoke(CH.CONNECTORS_TOGGLE, { platform, enabled }),
+  },
+  // Comdr 指令 cc-haha 路线 A: 会话控制 fork/branch/resume slash 注入 namespace
+  sessionControl: {
+    dispatch: (sessionId: string, action: 'fork' | 'branch' | 'resume', args?: string) =>
+      ipcRenderer.invoke(CH.SESSION_CONTROL, { sessionId, action, args }),
   },
 });

@@ -1,256 +1,334 @@
-// Input: Tool call data (name, input, status, result)
-// Output: Tool execution card with status indicator
-// Pos: Chat layer — displays tool use within conversation
-import React, { useState } from "react";
-import { cn } from "../../lib/cn";
-import { getToolRenderer, type ToolRendererProps } from "./tool-renderers";
+// Input: toolName + input + result (panda flat: result/isError/status, OR cc-haha {content,isError}|null)
+// Output: cc-haha 1:1 ToolCallBlock — collapsible card; header (icon + 11px label + mono filename + status); body (preview + details)
+// Pos:    Chat layer — invoked by PdMessageList for every assistant tool_use turn
+//
+// Source 1:1: cc-haha desktop/src/components/chat/ToolCallBlock.tsx (L1-281)
+//
+// Notes:
+// - Props 兼容 panda 现有 PdMessageList 调用（result: string + isError + status + defaultExpanded + forceCollapsed）
+//   以及 cc-haha 原生接口（result: { content, isError } | null + compact）。
+// - 当 forceCollapsed 为 true（panda summary 模式），呈现 cc-haha compact 视图（mb-0）。
+// - 11 项 TOOL_ICONS 1:1（cc-haha L19-31）。
+// - summary/preview/details 函数 1:1 cc-haha L228-280 + L111-187。
+//
+// 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
+import { useMemo, useState } from 'react'
+import { PdCodeViewer } from './PdCodeViewer'
+import { PdDiffViewer } from './PdDiffViewer'
+import { PdTerminalChrome } from './PdTerminalChrome'
+import { PdCopyButton } from './PdCopyButton'
+import { PdInlineImageGallery } from './PdInlineImageGallery'
+import { t } from '../../i18n'
 
-/* -------------------------------------------------------------------------- */
-/*  Types                                                                     */
-/* -------------------------------------------------------------------------- */
+export type ToolCallStatus = 'pending' | 'running' | 'success' | 'error'
 
-export type ToolCallStatus = "pending" | "running" | "success" | "error";
-
-export interface PdToolCallCardProps {
-  toolName: string;
-  input: Record<string, unknown>;
-  status: ToolCallStatus;
-  result?: string;
-  isError?: boolean;
-  defaultExpanded?: boolean;
-  /** When true, collapse to a single-line icon + tool name (summary mode). */
-  forceCollapsed?: boolean;
-  className?: string;
+/** Panda flat-result shape (current PdMessageList caller). */
+type FlatResultProps = {
+  toolName: string
+  input: unknown
+  /** Plain-text result (already extracted). When non-null, treated as a successful result by default. */
+  result?: string
+  isError?: boolean
+  /** Optional explicit status — when set, drives the leading icon. */
+  status?: ToolCallStatus
+  /** Default expand on render (panda transcriptMode === 'verbose'). */
+  defaultExpanded?: boolean
+  /** Force compact chip-style layout (panda transcriptMode === 'summary'). */
+  forceCollapsed?: boolean
+  agentTaskNotification?: unknown
+  compact?: boolean
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Status badge config                                                       */
-/* -------------------------------------------------------------------------- */
-
-interface BadgeConfig {
-  bg: string;
-  icon: React.ReactNode;
-  label: string;
+/** cc-haha original shape — kept for forward compat callers. */
+type StructuredResultProps = {
+  toolName: string
+  input: unknown
+  result?: { content: unknown; isError: boolean } | null
+  defaultExpanded?: boolean
+  forceCollapsed?: boolean
+  agentTaskNotification?: unknown
+  compact?: boolean
+  /** When provided as object, the wrapper bridges into cc-haha behaviour. */
+  status?: ToolCallStatus
+  isError?: never
 }
 
-const BADGE: Record<ToolCallStatus, BadgeConfig> = {
-  pending: {
-    bg: "bg-[var(--pd-color-bg-subtle)]",
-    icon: <span className="animate-spin inline-block">⏳</span>,
-    label: "Pending",
-  },
-  running: {
-    bg: "bg-[var(--pd-color-accent-subtle)]",
-    icon: <span className="animate-spin inline-block">⏳</span>,
-    label: "Running",
-  },
-  success: {
-    bg: "bg-[var(--pd-color-success-bg)]",
-    icon: <span>✓</span>,
-    label: "Done",
-  },
-  error: {
-    bg: "bg-[var(--pd-color-error-bg)]",
-    icon: <span>✕</span>,
-    label: "Error",
-  },
-};
+export type PdToolCallCardProps = FlatResultProps | StructuredResultProps
 
-/* -------------------------------------------------------------------------- */
-/*  PdToolCallCard                                                           */
-/* -------------------------------------------------------------------------- */
+const TOOL_ICONS: Record<string, string> = {
+  Bash: 'terminal',
+  Read: 'description',
+  Write: 'edit_document',
+  Edit: 'edit_note',
+  Glob: 'search',
+  Grep: 'find_in_page',
+  Agent: 'smart_toy',
+  WebSearch: 'travel_explore',
+  WebFetch: 'cloud_download',
+  NotebookEdit: 'note',
+  Skill: 'auto_awesome',
+}
 
-export const PdToolCallCard: React.FC<PdToolCallCardProps> = React.memo(({
-  toolName,
-  input,
-  status,
-  result,
-  isError = false,
-  defaultExpanded = false,
-  forceCollapsed = false,
-  className,
-}) => {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  const badge = BADGE[status];
-
-  const formattedInput = React.useMemo(
-    () => JSON.stringify(input, null, 2),
-    [input],
-  );
-
-  /* Summary mode — single-line compact representation */
-  if (forceCollapsed) {
-    return (
-      <div
-        className={cn(
-          "inline-flex items-center gap-1.5",
-          "rounded-[var(--pd-radius-sm)]",
-          "bg-[var(--pd-tool-use-bg)]",
-          "border border-[var(--pd-tool-use-border)]",
-          "px-2.5 py-1",
-          "text-[var(--pd-text-xs)]",
-          className,
-        )}
-      >
-        <span aria-hidden="true">🔧</span>
-        <span className="font-[var(--pd-font-medium)] font-[var(--pd-font-mono)]">
-          {toolName}
-        </span>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1",
-            "px-[var(--pd-space-1\\.5)] py-0.5",
-            "rounded-[var(--pd-radius-full)]",
-            "text-[var(--pd-text-xs)]",
-            badge.bg,
-          )}
-        >
-          {badge.icon}
-        </span>
-      </div>
-    );
+function normalizeResult(props: PdToolCallCardProps): { content: unknown; isError: boolean } | null {
+  // Structured form (cc-haha): result is { content, isError } | null
+  if ('result' in props && props.result !== undefined) {
+    const r = props.result
+    if (r && typeof r === 'object' && 'content' in r && 'isError' in r) {
+      return r as { content: unknown; isError: boolean }
+    }
+    // Flat form: result is a plain string and isError lives on the props
+    if (typeof r === 'string') {
+      return { content: r, isError: !!(props as FlatResultProps).isError }
+    }
   }
+  return null
+}
+
+export function PdToolCallCard(props: PdToolCallCardProps) {
+  const { toolName, input } = props
+  const compact = ('compact' in props && props.compact) || ('forceCollapsed' in props && !!props.forceCollapsed)
+  const initialExpanded = 'defaultExpanded' in props ? !!props.defaultExpanded : false
+
+  const [expanded, setExpanded] = useState(initialExpanded)
+  const obj = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+  const icon = TOOL_ICONS[toolName] || 'build'
+  const filePath = typeof obj.file_path === 'string' ? obj.file_path : ''
+  const summary = getToolSummary(toolName, obj)
+  const result = normalizeResult(props)
+  const outputSummary = getToolResultSummary(toolName, result?.content, result?.isError ?? false)
+
+  const preview = useMemo(() => renderPreview(toolName, obj, result), [obj, result, toolName])
+  const details = useMemo(() => renderDetails(toolName, obj), [obj, toolName])
+  const hasResultDetails = Boolean(result && extractTextContent(result.content))
+  const expandable = toolName === 'Edit' || toolName === 'Write' || hasResultDetails
 
   return (
     <div
-      className={cn(
-        "rounded-[var(--pd-radius-md)]",
-        "bg-[var(--pd-tool-use-bg)]",
-        "border border-[var(--pd-tool-use-border)]",
-        "overflow-hidden",
-        className,
-      )}
+      className={`overflow-hidden rounded-lg border border-[var(--pd-color-border)]/50 bg-[var(--pd-color-surface-container-lowest)] ${
+        compact ? 'mb-0' : 'mb-2'
+      }`}
     >
-      {/* Header */}
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className={cn(
-          "flex w-full items-center gap-[var(--pd-space-1\\.5)]",
-          "cursor-pointer select-none bg-transparent border-none",
-          "px-3 py-2 text-left",
-          "text-[var(--pd-color-fg)] text-[var(--pd-text-sm)]",
-        )}
+        onClick={() => {
+          if (expandable) {
+            setExpanded((value) => !value)
+          }
+        }}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--pd-color-surface-hover)]/50"
       >
-        {/* Expand arrow */}
-        <span
-          className={cn(
-            "inline-block transition-transform duration-[var(--pd-duration-quick)]",
-            expanded ? "rotate-90" : "rotate-0",
-          )}
-          aria-hidden="true"
-        >
-          ▶
-        </span>
-
-        {/* Tool icon + name */}
-        <span aria-hidden="true">🔧</span>
-        <span className="font-[var(--pd-font-medium)] font-[var(--pd-font-mono)]">
-          {toolName}
-        </span>
-
-        {/* Status badge */}
-        <span
-          className={cn(
-            "ml-auto inline-flex items-center gap-1",
-            "px-[var(--pd-space-1\\.5)] py-0.5",
-            "rounded-[var(--pd-radius-full)]",
-            "text-[var(--pd-text-xs)]",
-            badge.bg,
-            status === "running" && "animate-pulse",
-          )}
-        >
-          {badge.icon}
-          <span>{badge.label}</span>
-        </span>
+        <span className="material-symbols-outlined text-[14px] text-[var(--pd-color-outline)]">{icon}</span>
+        <span className="text-[11px] font-semibold text-[var(--pd-color-text-secondary)]">{toolName}</span>
+        {filePath ? (
+          <span className="min-w-0 flex-1 truncate font-[var(--pd-font-mono)] text-[11px] text-[var(--pd-color-text-tertiary)]">
+            {filePath.split('/').pop()}
+          </span>
+        ) : summary ? (
+          <span className="min-w-0 flex-1 truncate font-[var(--pd-font-mono)] text-[11px] text-[var(--pd-color-text-tertiary)]">
+            {summary}
+          </span>
+        ) : (
+          <span className="flex-1" />
+        )}
+        {result && outputSummary && (
+          <span
+            className={`shrink-0 text-[10px] ${
+              result.isError ? 'text-[var(--pd-color-error)]' : 'text-[var(--pd-color-outline)]'
+            }`}
+          >
+            {outputSummary}
+          </span>
+        )}
+        {result?.isError && (
+          <span className="material-symbols-outlined shrink-0 text-[14px] text-[var(--pd-color-error)]">error</span>
+        )}
+        {expandable && (
+          <span className="material-symbols-outlined text-[14px] text-[var(--pd-color-outline)]">
+            {expanded ? 'expand_less' : 'expand_more'}
+          </span>
+        )}
       </button>
 
-      {/* Collapsible body */}
-      <div
-        className={cn(
-          "overflow-hidden transition-[max-height,opacity] duration-[var(--pd-duration-quick)]",
-          expanded ? "max-h-[4000px] opacity-100" : "max-h-0 opacity-0",
-        )}
-      >
-        {/* Tool-specific or generic rendering */}
-        {(() => {
-          const SpecializedRenderer = getToolRenderer(toolName);
-          if (SpecializedRenderer) {
-            /* Parse input safely for specialized renderers */
-            let parsedInput: Record<string, unknown> = {};
-            try {
-              parsedInput = typeof input === "string" ? JSON.parse(input) : (input ?? {});
-            } catch {
-              parsedInput = { _raw: input };
-            }
-            return (
-              <div className="px-3 pb-2">
-                <SpecializedRenderer
-                  input={parsedInput}
-                  result={result}
-                  status={status}
-                  toolName={toolName}
-                  isError={isError}
-                />
-              </div>
-            );
-          }
-
-          /* Generic fallback — original JSON display */
-          return (
-            <>
-              {/* Input section */}
-              <div className="px-3 pb-2">
-                <pre
-                  className={cn(
-                    "m-0 p-2 overflow-x-auto",
-                    "rounded-[var(--pd-radius-sm)]",
-                    "bg-[var(--pd-color-bg-subtle)]",
-                    "text-[var(--pd-code-base)]",
-                    "font-[var(--pd-font-mono)]",
-                    "text-[var(--pd-color-fg-muted)]",
-                  )}
-                >
-                  {formattedInput}
-                </pre>
-              </div>
-
-              {/* Result section */}
-              {result != null && (
-                <div className="px-3 pb-2">
-                  <div
-                    className={cn(
-                      "text-[var(--pd-text-xs)] font-[var(--pd-font-medium)]",
-                      "mb-1",
-                      isError
-                        ? "text-[var(--pd-color-error-fg)]"
-                        : "text-[var(--pd-color-fg-muted)]",
-                    )}
-                  >
-                    {isError ? "Error" : "Result"}
-                  </div>
-                  <pre
-                    className={cn(
-                      "m-0 p-2 overflow-x-auto",
-                      "rounded-[var(--pd-radius-sm)]",
-                      "bg-[var(--pd-color-bg-subtle)]",
-                      "text-[var(--pd-code-base)]",
-                      "font-[var(--pd-font-mono)]",
-                      isError
-                        ? "text-[var(--pd-color-error-fg)]"
-                        : "text-[var(--pd-color-fg)]",
-                    )}
-                  >
-                    {result}
-                  </pre>
-                </div>
-              )}
-            </>
-          );
-        })()}
-      </div>
+      {expandable && expanded && (
+        <div className="space-y-2.5 border-t border-[var(--pd-color-border)]/60 px-3 py-3">
+          {preview}
+          {details}
+        </div>
+      )}
     </div>
-  );
-});
+  )
+}
 
-PdToolCallCard.displayName = "PdToolCallCard";
+function renderPreview(
+  toolName: string,
+  obj: Record<string, unknown>,
+  result?: { content: unknown; isError: boolean } | null,
+) {
+  const filePath = typeof obj.file_path === 'string' ? obj.file_path : 'file'
+
+  if (toolName === 'Edit' && typeof obj.old_string === 'string' && typeof obj.new_string === 'string') {
+    return <PdDiffViewer filePath={filePath} oldString={obj.old_string} newString={obj.new_string} />
+  }
+
+  if (toolName === 'Write' && typeof obj.content === 'string') {
+    return <PdDiffViewer filePath={filePath} oldString="" newString={obj.content} />
+  }
+
+  if (toolName === 'Bash' && typeof obj.command === 'string') {
+    return (
+      <PdTerminalChrome title={typeof obj.description === 'string' ? obj.description : filePath}>
+        <div className="px-3 py-2.5 font-[var(--pd-font-mono)] text-[11px] leading-[1.3] text-[var(--pd-color-terminal-fg)]">
+          <span className="text-[var(--pd-color-terminal-accent)]">$</span> {obj.command as string}
+        </div>
+      </PdTerminalChrome>
+    )
+  }
+
+  if (toolName === 'Read') {
+    return null
+  }
+
+  if (result) {
+    const text = extractTextContent(result.content)
+    if (text) {
+      return (
+        <>
+          <PdInlineImageGallery text={text} />
+          <div
+            className={`overflow-hidden rounded-lg border ${
+              result.isError
+                ? 'border-[var(--pd-color-error)]/20 bg-[var(--pd-color-error-container)]/60'
+                : 'border-[var(--pd-color-border)] bg-[var(--pd-color-surface)]'
+            }`}
+          >
+            <div className="flex items-center justify-between border-b border-[var(--pd-color-border)]/60 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--pd-color-outline)]">
+              <span>{result.isError ? (t('tool.errorOutput') || 'Error Output') : (t('tool.toolOutput') || 'Tool Output')}</span>
+              <PdCopyButton
+                text={text}
+                className="rounded-md border border-[var(--pd-color-border)] px-2 py-1 text-[10px] normal-case tracking-normal text-[var(--pd-color-text-tertiary)] transition-colors hover:text-[var(--pd-color-text-primary)]"
+              />
+            </div>
+            <PdCodeViewer code={text} language="plaintext" maxLines={18} />
+          </div>
+        </>
+      )
+    }
+  }
+
+  return null
+}
+
+function renderDetails(toolName: string, obj: Record<string, unknown>) {
+  if (toolName === 'Edit' || toolName === 'Write') {
+    return null
+  }
+  const text = JSON.stringify(obj, null, 2)
+  return (
+    <div className="overflow-hidden rounded-lg border border-[var(--pd-color-border)] bg-[var(--pd-color-surface)]">
+      <div className="flex items-center justify-between border-b border-[var(--pd-color-border)] px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--pd-color-outline)]">
+        <span>{t('tool.toolInput') || 'Tool Input'}</span>
+        <PdCopyButton
+          text={text}
+          className="rounded-md border border-[var(--pd-color-border)] px-2 py-1 text-[10px] normal-case tracking-normal text-[var(--pd-color-text-tertiary)] transition-colors hover:text-[var(--pd-color-text-primary)]"
+        />
+      </div>
+      <PdCodeViewer code={text} language="json" maxLines={18} />
+    </div>
+  )
+}
+
+function getToolResultSummary(toolName: string, content: unknown, isError: boolean): string {
+  const text = extractTextContent(content)
+  if (!text) return ''
+
+  if (isError) {
+    const firstLine = text
+      .split('\n')
+      .map((line) => stripAnsi(line).replace(/\s+/g, ' ').trim())
+      .find(Boolean)
+
+    if (!firstLine) return t('tool.error') || 'Error'
+    return firstLine.length <= 72 ? firstLine : `${firstLine.slice(0, 72)}…`
+  }
+
+  if (toolName === 'Bash') return ''
+
+  const lineCount = text.split('\n').length
+  if (lineCount > 1) {
+    return t('tool.linesOutput', { count: lineCount }) || `${lineCount} lines output`
+  }
+
+  const compact = text.replace(/\s+/g, ' ').trim()
+  if (!compact) return ''
+  if (compact.length <= 36) return compact
+  return `${compact.slice(0, 36)}…`
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/\x1B\[[0-9;]*m/g, '')
+}
+
+function getToolSummary(toolName: string, obj: Record<string, unknown>): string {
+  switch (toolName) {
+    case 'Bash':
+      return typeof obj.command === 'string' ? obj.command : ''
+    case 'Read':
+      return t('tool.readFileContents') || 'Read file contents'
+    case 'Write':
+      return typeof obj.content === 'string'
+        ? (t('tool.linesCreated', { count: (obj.content as string).split('\n').length }) ||
+            `${(obj.content as string).split('\n').length} lines created`)
+        : (t('tool.createFile') || 'Create file')
+    case 'Edit':
+      return typeof obj.old_string === 'string' && typeof obj.new_string === 'string'
+        ? changedLineSummary(obj.old_string, obj.new_string)
+        : (t('tool.updateFileContents') || 'Update file contents')
+    case 'Glob':
+      return typeof obj.pattern === 'string' ? obj.pattern : ''
+    case 'Grep':
+      return typeof obj.pattern === 'string' ? obj.pattern : ''
+    case 'Agent':
+      return typeof obj.description === 'string' ? obj.description : ''
+    default:
+      return ''
+  }
+}
+
+function extractTextContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content
+      .map((chunk: unknown) => {
+        if (typeof chunk === 'string') return chunk
+        if (chunk && typeof chunk === 'object' && 'text' in chunk) {
+          return typeof (chunk as { text?: unknown }).text === 'string'
+            ? ((chunk as { text: string }).text)
+            : ''
+        }
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n')
+  }
+  if (content && typeof content === 'object') {
+    return JSON.stringify(content, null, 2)
+  }
+  return ''
+}
+
+function changedLineSummary(oldString: string, newString: string): string {
+  const oldLines = oldString.split('\n')
+  const newLines = newString.split('\n')
+  let changed = 0
+  const max = Math.max(oldLines.length, newLines.length)
+
+  for (let index = 0; index < max; index += 1) {
+    if ((oldLines[index] ?? '') !== (newLines[index] ?? '')) {
+      changed += 1
+    }
+  }
+
+  return t('tool.linesChanged', { count: changed }) || `${changed} lines changed`
+}
+
+PdToolCallCard.displayName = 'PdToolCallCard'

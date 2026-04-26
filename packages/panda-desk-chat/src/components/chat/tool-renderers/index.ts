@@ -25,8 +25,16 @@ import { FileRenderer } from "./FileRenderer";
 import { SearchRenderer } from "./SearchRenderer";
 import { AgentRenderer } from "./AgentRenderer";
 import { WebRenderer } from "./WebRenderer";
+import { TodoRenderer } from "./TodoRenderer";
 
-export { BashRenderer, FileRenderer, SearchRenderer, AgentRenderer, WebRenderer };
+export {
+  BashRenderer,
+  FileRenderer,
+  SearchRenderer,
+  AgentRenderer,
+  WebRenderer,
+  TodoRenderer,
+};
 
 /* -------------------------------------------------------------------------- */
 /*  Dispatcher                                                                */
@@ -65,6 +73,9 @@ export function getToolRenderer(
     case "WebSearch":
     case "WebFetch":
       return WebRenderer;
+
+    case "TodoWrite":
+      return TodoRenderer;
 
     default:
       return null;

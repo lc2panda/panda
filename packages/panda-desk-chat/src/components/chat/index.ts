@@ -11,16 +11,51 @@ export {
 } from "./PdMessageBubble";
 
 export { PdComposer } from "./PdComposer";
-export type { PdComposerProps, PdComposerHandle, Attachment } from "./PdComposer";
+export type { PdComposerProps, PdComposerHandle, Attachment, AttachmentRef } from "./PdComposer";
 
-export { PdStreamingIndicator } from "./PdStreamingIndicator";
-export type { PdStreamingIndicatorProps } from "./PdStreamingIndicator";
+// S5 Composer 套件（cc-haha 1:1）
+export { PdAttachmentGallery } from "./PdAttachmentGallery";
+export type { AttachmentPreview } from "./PdAttachmentGallery";
+export { PdImageGalleryModal } from "./PdImageGalleryModal";
+export { PdFileSearchMenu } from "./PdFileSearchMenu";
+export type { PdFileSearchMenuHandle } from "./PdFileSearchMenu";
+export { PdLocalSlashCommandPanel } from "./PdLocalSlashCommandPanel";
+export type { LocalSlashCommandName } from "./PdLocalSlashCommandPanel";
+export { PdComputerUsePermissionModal } from "./PdComputerUsePermissionModal";
+export {
+  PANEL_SLASH_COMMANDS,
+  SETTINGS_SLASH_COMMANDS,
+  FALLBACK_SLASH_COMMANDS,
+  resolveSlashUiAction,
+  mergeSlashCommands,
+  findSlashTrigger,
+  replaceSlashToken,
+  findSlashToken,
+  replaceSlashCommand,
+  insertSlashTrigger,
+} from "./composerUtils";
+export type { SlashCommandOption, SlashUiAction, SlashTrigger, SlashToken } from "./composerUtils";
 
 export { PdThinkingBlock } from "./PdThinkingBlock";
 export type { PdThinkingBlockProps } from "./PdThinkingBlock";
 
 export { PdToolCallCard } from "./PdToolCallCard";
 export type { PdToolCallCardProps, ToolCallStatus } from "./PdToolCallCard";
+
+export { PdToolCallGroup } from "./PdToolCallGroup";
+export type { PdToolCallGroupProps } from "./PdToolCallGroup";
+
+export { PdToolResultBlock } from "./PdToolResultBlock";
+export type { PdToolResultBlockProps } from "./PdToolResultBlock";
+
+export { PdSessionHeader } from "./PdSessionHeader";
+export type { PdSessionHeaderProps } from "./PdSessionHeader";
+
+export { PdMessageActionBar } from "./PdMessageActionBar";
+export type { PdMessageActionBarProps } from "./PdMessageActionBar";
+
+export { PdTerminalChrome } from "./PdTerminalChrome";
+export type { PdTerminalChromeProps } from "./PdTerminalChrome";
 
 export { PdPermissionDialog } from "./PdPermissionDialog";
 export type {
@@ -32,23 +67,17 @@ export type {
 export { PdMarkdownRenderer } from "./PdMarkdownRenderer";
 export type { PdMarkdownRendererProps } from "./PdMarkdownRenderer";
 
-export { PdSideChat } from "./PdSideChat";
-export type { PdSideChatProps } from "./PdSideChat";
+export { PdCodeViewer } from "./PdCodeViewer";
+export type { PdCodeViewerProps } from "./PdCodeViewer";
 
-export { PdBuddyEventCard } from "./PdBuddyEventCard";
-export type { PdBuddyEventCardProps, BuddyEventType } from "./PdBuddyEventCard";
+export { PdMermaidRenderer } from "./PdMermaidRenderer";
+export type { PdMermaidRendererProps } from "./PdMermaidRenderer";
 
-export { PdRoutingBanner } from "./PdRoutingBanner";
-export type { PdRoutingBannerProps } from "./PdRoutingBanner";
-
-export { PdPetCameo } from "./PdPetCameo";
-export type { PdPetCameoProps, PetCameoOccasion } from "./PdPetCameo";
+export { PdCopyButton } from "./PdCopyButton";
+export type { PdCopyButtonProps } from "./PdCopyButton";
 
 export { PdHeroComposer } from "./PdHeroComposer";
 export type { PdHeroComposerProps } from "./PdHeroComposer";
-
-export { PdSuperAssistBar } from "./PdSuperAssistBar";
-export type { PdSuperAssistBarProps } from "./PdSuperAssistBar";
 
 export { PdDiffViewer } from "./PdDiffViewer";
 export type { PdDiffViewerProps } from "./PdDiffViewer";
@@ -57,4 +86,11 @@ export { PdAskUserQuestion } from "./PdAskUserQuestion";
 export type { PdAskUserQuestionProps } from "./PdAskUserQuestion";
 
 export { PdInlineTaskSummary } from "./PdInlineTaskSummary";
-export type { PdInlineTaskSummaryProps, PdTask, PdTaskStatus } from "./PdInlineTaskSummary";
+export type { PdInlineTaskSummaryProps } from "./PdInlineTaskSummary";
+
+export { PdInlineImageGallery } from "./PdInlineImageGallery";
+export type { PdInlineImageGalleryProps } from "./PdInlineImageGallery";
+
+export { PdSessionTaskBar } from "./PdSessionTaskBar";
+
+export { PdStreamingIndicator } from "./PdStreamingIndicator";

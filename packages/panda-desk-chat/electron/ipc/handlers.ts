@@ -20,6 +20,37 @@ import {
   readPlan as readLearningPlan,
   readFlashcards as readLearningFlashcards,
 } from '../backend/learning-scanner';
+// Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据扫描
+import {
+  listTeams as scanTeams,
+  getTeamDetail as readTeamDetail,
+  isAgentTeamsEnabled as readAgentTeamsEnabled,
+} from '../backend/team-scanner';
+// Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读
+import {
+  listRecentAudit as scanRecentAudit,
+  filterAudit as scanFilteredAudit,
+  getAuditStats as scanAuditStats,
+  type AuditFilter,
+} from '../backend/audit-scanner';
+// Comdr 指令 cc-haha 路线 A: PdPatternsScars / PdMemoryBank — memdir 反向读
+import {
+  listMemdirProjects as scanMemdirProjects,
+  listLayerEntries as scanMemdirLayer,
+  readMemdirFile as readMemdirFileBackend,
+  type MemdirLayer,
+} from '../backend/memdir-scanner';
+// Comdr 指令 cc-haha 路线 A: PdConnectors — connectors.json 真实数据
+import {
+  getConnectorsConfig as readConnectorsConfig,
+  toggleConnector as writeConnectorToggle,
+  type ConnectorPlatform,
+} from '../backend/connectors-scanner';
+// Comdr 指令 cc-haha 路线 A: PdSessionControls — fork/branch/resume slash 注入
+import {
+  dispatchSessionControl,
+  type SessionControlAction,
+} from '../backend/session-controls';
 import { cronScheduler, type CreateTaskInput, type ScheduledTask } from '../backend/cron-scheduler';
 // Comdr 指令: IM Wechat — IM Adapter 启停管理（feishu/telegram/wechat）
 import { adapterManager, type AdapterPlatform } from '../backend/adapter-manager';
@@ -125,6 +156,23 @@ const CH = {
   LEARNING_LIST_FLASHCARDS:   'panda:learning:list-flashcards',
   LEARNING_READ_PLAN:         'panda:learning:read-plan',
   LEARNING_READ_FLASHCARDS:   'panda:learning:read-flashcards',
+  // Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据扫描 (3 个 channel)
+  TEAMS_LIST:           'panda:teams:list',
+  TEAMS_DETAIL:         'panda:teams:detail',
+  TEAMS_ENABLED_STATUS: 'panda:teams:enabled-status',
+  // Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读 (3 个 channel)
+  AUDIT_LIST_RECENT:    'panda:audit:list-recent',
+  AUDIT_FILTER:         'panda:audit:filter',
+  AUDIT_STATS:          'panda:audit:stats',
+  // Comdr 指令 cc-haha 路线 A: memdir 反向读 (3 个 channel)
+  MEMDIR_LIST_PROJECTS: 'panda:memdir:list-projects',
+  MEMDIR_LIST_LAYER:    'panda:memdir:list-layer',
+  MEMDIR_READ_FILE:     'panda:memdir:read-file',
+  // Comdr 指令 cc-haha 路线 A: connectors.json 真实数据 (2 个 channel)
+  CONNECTORS_CONFIG:    'panda:connectors:config',
+  CONNECTORS_TOGGLE:    'panda:connectors:toggle',
+  // Comdr 指令 cc-haha 路线 A: 会话控制 fork/branch/resume slash 注入 (1 个 channel)
+  SESSION_CONTROL:      'panda:session:control',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -642,7 +690,172 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning connected)');
+  // ── Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据扫描 ─────
+  // 数据来源 (panda CLI src/utils/swarm/teamHelpers.ts + utils/teammateMailbox.ts)：
+  //   团队根目录   → ~/.pandacc/teams/<name>/
+  //   邮箱目录     → ~/.pandacc/teams/<name>/inboxes/
+  //   Agent inbox  → ~/.pandacc/teams/<name>/inboxes/<agent>.json
+  //   启用开关     → ~/.pandacc/settings.json env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+  ipcMain.handle(CH.TEAMS_LIST, async () => {
+    try {
+      return await scanTeams();
+    } catch (err) {
+      console.error('[IPC] TEAMS_LIST failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(CH.TEAMS_DETAIL, async (_event, payload: { name: string }) => {
+    if (!payload || typeof payload.name !== 'string') return null;
+    try {
+      return await readTeamDetail(payload.name);
+    } catch (err) {
+      console.error('[IPC] TEAMS_DETAIL failed:', err);
+      return null;
+    }
+  });
+
+  ipcMain.handle(CH.TEAMS_ENABLED_STATUS, async () => {
+    try {
+      return await readAgentTeamsEnabled();
+    } catch (err) {
+      console.error('[IPC] TEAMS_ENABLED_STATUS failed:', err);
+      return false;
+    }
+  });
+
+  // ── Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读 ──────
+  // 数据来源: panda CLI src/utils/auditLog.ts → ~/.pandacc/audit.jsonl
+  // 字段: timestamp / session_id / tool_name / args_hash / risk_level
+  //       permission_decision / outcome / duration_ms? / error_brief?
+  ipcMain.handle(CH.AUDIT_LIST_RECENT, async (_event, payload: { limit?: number } | undefined) => {
+    try {
+      return await scanRecentAudit(payload?.limit);
+    } catch (err) {
+      console.error('[IPC] AUDIT_LIST_RECENT failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(CH.AUDIT_FILTER, async (_event, payload: AuditFilter | undefined) => {
+    try {
+      return await scanFilteredAudit(payload ?? {});
+    } catch (err) {
+      console.error('[IPC] AUDIT_FILTER failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(CH.AUDIT_STATS, async () => {
+    try {
+      return await scanAuditStats();
+    } catch (err) {
+      console.error('[IPC] AUDIT_STATS failed:', err);
+      return {
+        total: 0,
+        today: 0,
+        errorRate: 0,
+        topTools: [],
+        lastTimestamp: null,
+        exists: false,
+      };
+    }
+  });
+
+  // ── Comdr 指令 cc-haha 路线 A: memdir 反向读 ──────────────────────────
+  // 数据来源: panda CLI src/memdir/paths.ts getAutoMemPath()
+  //   ~/.pandacc/projects/<sanitize-cwd>/memory/{patterns,scars,episodes,
+  //     semantic,procedural,working,dreams}/
+  ipcMain.handle(CH.MEMDIR_LIST_PROJECTS, async () => {
+    try {
+      return await scanMemdirProjects();
+    } catch (err) {
+      console.error('[IPC] MEMDIR_LIST_PROJECTS failed:', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle(
+    CH.MEMDIR_LIST_LAYER,
+    async (_event, payload: { projectSlug: string; layer: MemdirLayer }) => {
+      if (!payload || typeof payload.projectSlug !== 'string' || typeof payload.layer !== 'string') {
+        return [];
+      }
+      try {
+        return await scanMemdirLayer(payload.projectSlug, payload.layer);
+      } catch (err) {
+        console.error('[IPC] MEMDIR_LIST_LAYER failed:', err);
+        return [];
+      }
+    },
+  );
+
+  ipcMain.handle(CH.MEMDIR_READ_FILE, async (_event, payload: { path: string }) => {
+    if (!payload || typeof payload.path !== 'string') return null;
+    try {
+      return await readMemdirFileBackend(payload.path);
+    } catch (err) {
+      console.error('[IPC] MEMDIR_READ_FILE failed:', err);
+      return null;
+    }
+  });
+
+  // ── Comdr 指令 cc-haha 路线 A: connectors.json 真实数据 ──────────────────
+  // 数据来源: panda CLI src/connectors/config.ts → ~/.pandacc/config/connectors.json
+  // 6 platform: feishu / dingtalk / slack / telegram / wechat / teams
+  ipcMain.handle(CH.CONNECTORS_CONFIG, async () => {
+    try {
+      return await readConnectorsConfig();
+    } catch (err) {
+      console.error('[IPC] CONNECTORS_CONFIG failed:', err);
+      return {
+        configExists: false,
+        configPath: '',
+        entries: [],
+      };
+    }
+  });
+
+  ipcMain.handle(
+    CH.CONNECTORS_TOGGLE,
+    async (_event, payload: { platform: ConnectorPlatform; enabled: boolean }) => {
+      if (!payload || typeof payload.platform !== 'string' || typeof payload.enabled !== 'boolean') {
+        return { ok: false, error: 'invalid payload' };
+      }
+      try {
+        return await writeConnectorToggle(payload.platform, payload.enabled);
+      } catch (err) {
+        console.error('[IPC] CONNECTORS_TOGGLE failed:', err);
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+  );
+
+  // ── Comdr 指令 cc-haha 路线 A: 会话控制 fork/branch/resume slash 注入 ────
+  ipcMain.handle(
+    CH.SESSION_CONTROL,
+    async (_event, payload: { sessionId: string; action: SessionControlAction; args?: string }) => {
+      if (
+        !payload ||
+        typeof payload.sessionId !== 'string' ||
+        typeof payload.action !== 'string'
+      ) {
+        return { ok: false, command: '', error: 'invalid payload' };
+      }
+      try {
+        return await dispatchSessionControl(payload.sessionId, payload.action, payload.args);
+      } catch (err) {
+        console.error('[IPC] SESSION_CONTROL failed:', err);
+        return {
+          ok: false,
+          command: '',
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
+
+  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning + teams + audit + memdir + connectors + session-control connected)');
 }
 
 // ---------------------------------------------------------------------------

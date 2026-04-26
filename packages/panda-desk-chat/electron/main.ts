@@ -8,6 +8,8 @@ import { app, BrowserWindow, Menu, nativeImage, nativeTheme, session, shell, Tra
 import { join } from 'node:path';
 import { registerIpcHandlers, setupMainWindow } from './ipc/handlers';
 import { cliManager } from './backend/cli-manager';
+// Comdr 指令: IM Wechat — quit 时清理 IM Adapter child processes
+import { adapterManager } from './backend/adapter-manager';
 import { appUpdater } from './updater';
 import { windowManager } from './window-manager';
 
@@ -17,6 +19,14 @@ import { windowManager } from './window-manager';
 
 const isDev = !app.isPackaged;
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173';
+
+// ── Dev: 启用 CDP 9222 + 禁 HTTP 缓存（cc-haha 1:1 复刻视觉诊断） ──
+// 让远程 Chrome DevTools Protocol 连入实测 DOM/CSS，并避免 webContents 缓存旧版 bundle。
+if (isDev) {
+  app.commandLine.appendSwitch('remote-debugging-port', '9333');
+  app.commandLine.appendSwitch('disable-http-cache');
+  app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
+}
 
 // ---------------------------------------------------------------------------
 // Window management
@@ -265,6 +275,8 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   isQuitting = true;
   cliManager.destroyAll();
+  // Comdr 指令: IM Wechat — kill 所有 IM Adapter child processes
+  adapterManager.destroyAll();
 });
 
 // Quit when all windows closed (except macOS)
