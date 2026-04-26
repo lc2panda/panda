@@ -3153,7 +3153,7 @@ export function updateUsage(
   let inputTokens =
     partUsage.input_tokens !== null && partUsage.input_tokens > 0
       ? partUsage.input_tokens
-      : usage.input_tokens
+      : usage.input_tokens ?? 0
   // 第三方 API 的 input_tokens 通常 = cached + uncached，需要去重避免双计
   if (thirdPartyCachedTokens > 0 && inputTokens > thirdPartyCachedTokens) {
     const promptTokens = (raw.prompt_tokens as number) ?? 0

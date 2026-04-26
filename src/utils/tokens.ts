@@ -47,10 +47,10 @@ function getAssistantMessageId(message: Message): string | undefined {
  */
 export function getTokenCountFromUsage(usage: Usage): number {
   return (
-    usage.input_tokens +
+    (usage.input_tokens ?? 0) +
     (usage.cache_creation_input_tokens ?? 0) +
     (usage.cache_read_input_tokens ?? 0) +
-    usage.output_tokens
+    (usage.output_tokens ?? 0)
   )
 }
 
@@ -97,7 +97,7 @@ export function finalContextTokensFromLastResponse(
       ).iterations
       if (iterations && iterations.length > 0) {
         const last = iterations.at(-1)!
-        return last.input_tokens + last.output_tokens
+        return (last.input_tokens ?? 0) + (last.output_tokens ?? 0)
       }
       // No iterations → no server tool loop → top-level usage IS the final
       // window. Match the iterations path's formula (input + output, no cache)
@@ -106,7 +106,7 @@ export function finalContextTokensFromLastResponse(
       // (renderer.py:292 calculate_context_tokens) counts cache the same way
       // is an open question; aligning with the iterations path keeps the two
       // branches consistent until that's resolved.
-      return usage.input_tokens + usage.output_tokens
+      return (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0)
     }
     i--
   }
@@ -130,7 +130,7 @@ export function messageTokenCountFromLastAPIResponse(
     const message = messages[i]
     const usage = message ? getTokenUsage(message) : undefined
     if (usage) {
-      return usage.output_tokens
+      return usage.output_tokens ?? 0
     }
     i--
   }
@@ -148,8 +148,8 @@ export function getCurrentUsage(messages: Message[]): {
     const usage = message ? getTokenUsage(message) : undefined
     if (usage) {
       return {
-        input_tokens: usage.input_tokens,
-        output_tokens: usage.output_tokens,
+        input_tokens: usage.input_tokens ?? 0,
+        output_tokens: usage.output_tokens ?? 0,
         cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
         cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
       }

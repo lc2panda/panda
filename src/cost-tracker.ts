@@ -264,8 +264,8 @@ function addToTotalModelUsage(
     maxOutputTokens: 0,
   }
 
-  modelUsage.inputTokens += usage.input_tokens
-  modelUsage.outputTokens += usage.output_tokens
+  modelUsage.inputTokens += usage.input_tokens ?? 0
+  modelUsage.outputTokens += usage.output_tokens ?? 0
   modelUsage.cacheReadInputTokens += usage.cache_read_input_tokens ?? 0
   modelUsage.cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0
   modelUsage.webSearchRequests +=
@@ -290,8 +290,8 @@ export function addToTotalSessionCost(
       : { model }
 
   getCostCounter()?.add(cost, attrs)
-  getTokenCounter()?.add(usage.input_tokens, { ...attrs, type: 'input' })
-  getTokenCounter()?.add(usage.output_tokens, { ...attrs, type: 'output' })
+  getTokenCounter()?.add(usage.input_tokens ?? 0, { ...attrs, type: 'input' })
+  getTokenCounter()?.add(usage.output_tokens ?? 0, { ...attrs, type: 'output' })
   getTokenCounter()?.add(usage.cache_read_input_tokens ?? 0, {
     ...attrs,
     type: 'cacheRead',
