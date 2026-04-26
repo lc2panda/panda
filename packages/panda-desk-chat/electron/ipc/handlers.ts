@@ -198,27 +198,82 @@ const BUILTIN_SLASH_COMMANDS = [
   { name: '/memory',  description: 'Edit CLAUDE.md memory files' },
 ];
 
-// Source of truth: panda CLI src/utils/model/configs.ts ALL_MODEL_CONFIGS
-//   每个 entry 的 id 对齐 firstParty 字段。panda CLI 增删模型时同步更新此列表
-//   （CLI 的 configs.ts 依赖 model.js/providers.js 类型系统，vite-plugin-electron
-//   直接 import 会拖入 CLI 全套类型，故 1:1 抄常量值更轻量）。
-const AVAILABLE_MODELS = [
-  // Opus 家族（旗舰，倒序排列）
-  { id: 'claude-opus-4-7',            name: 'Claude Opus 4.7',   provider: 'anthropic' },
-  { id: 'claude-opus-4-6',            name: 'Claude Opus 4.6',   provider: 'anthropic' },
-  { id: 'claude-opus-4-5-20251101',   name: 'Claude Opus 4.5',   provider: 'anthropic' },
-  { id: 'claude-opus-4-1-20250805',   name: 'Claude Opus 4.1',   provider: 'anthropic' },
-  { id: 'claude-opus-4-20250514',     name: 'Claude Opus 4',     provider: 'anthropic' },
-  // Sonnet 家族
-  { id: 'claude-sonnet-4-6',          name: 'Claude Sonnet 4.6', provider: 'anthropic' },
-  { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
-  { id: 'claude-sonnet-4-20250514',   name: 'Claude Sonnet 4',   provider: 'anthropic' },
-  { id: 'claude-3-7-sonnet-20250219', name: 'Claude Sonnet 3.7', provider: 'anthropic' },
-  { id: 'claude-3-5-sonnet-20241022', name: 'Claude Sonnet 3.5', provider: 'anthropic' },
-  // Haiku 家族
-  { id: 'claude-haiku-4-5-20251001',  name: 'Claude Haiku 4.5',  provider: 'anthropic' },
-  { id: 'claude-3-5-haiku-20241022',  name: 'Claude Haiku 3.5',  provider: 'anthropic' },
-];
+// 真·从 panda CLI 同步获取模型清单（运行时 fs 读源码 + regex 解析）：
+//   panda CLI src/utils/model/configs.ts 是单一 source of truth；CLI 增删模型时 regex
+//   自动捕获，desk-chat 不用改代码（无 import 不破坏 tsc 跨包 typecheck）。
+//   过滤策略（Comdr 指令）：去掉 4 及以下系列；按 Opus → Sonnet → Haiku 家族 + 版本号倒序；默认 Opus 4.7。
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve as pathResolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+// ESM 模式下 __dirname 不可用，用 import.meta.url 派生
+const __dirname_handlers = dirname(fileURLToPath(import.meta.url));
+
+interface CLIModelEntry {
+  id: string;        // firstParty 模型 ID
+  family: 'opus' | 'sonnet' | 'haiku';
+  version: number;   // 主版本号 ×10 + 次版本号（4.7 → 47, 4.5 → 45, 3.5 → 35）
+}
+
+function loadModelsFromCLI(): CLIModelEntry[] {
+  // 候选路径：dev (源码) + packaged (extraResource)
+  const candidates = [
+    pathResolve(__dirname_handlers, '../../../src/utils/model/configs.ts'),
+    pathResolve(__dirname_handlers, '../../../../src/utils/model/configs.ts'),
+    pathResolve(process.cwd(), 'src/utils/model/configs.ts'),
+    pathResolve(process.cwd(), '../../src/utils/model/configs.ts'),
+    pathResolve(process.resourcesPath || '', 'cli-configs.ts'),
+  ];
+  let source = '';
+  for (const p of candidates) {
+    if (existsSync(p)) { source = readFileSync(p, 'utf-8'); break; }
+  }
+  if (!source) return [];
+  const re = /firstParty:\s*['"]([a-z0-9-]+)['"]/g;
+  const ids = Array.from(source.matchAll(re), (m) => m[1]).filter((s): s is string => !!s);
+  return ids.map((id) => {
+    const family: CLIModelEntry['family'] =
+      id.includes('opus') ? 'opus' : id.includes('haiku') ? 'haiku' : 'sonnet';
+    // 先剥末尾 dated suffix（"-20250514" 这种 8 位日期），避免 regex 误匹配
+    // "claude-opus-4-20250514" 的 "4-2" 算成 v4.2。
+    const cleaned = id.replace(/-\d{8,}$/, '');
+    const major = cleaned.match(/(\d+)-(\d+)/);
+    let version = 0;
+    if (major && major[1] && major[2]) {
+      version = parseInt(major[1], 10) * 10 + parseInt(major[2], 10);
+    } else {
+      // "claude-opus-4" / "claude-sonnet-4" 这种无次版本号 → 视作 X.0
+      const single = cleaned.match(/-(\d+)$/);
+      if (single && single[1]) version = parseInt(single[1], 10) * 10;
+    }
+    return { id, family, version };
+  });
+}
+
+const FAMILY_DISPLAY = { opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku' } as const;
+const FAMILY_ORDER = { opus: 0, sonnet: 1, haiku: 2 } as const;
+
+const cliModels = loadModelsFromCLI()
+  .filter((m) => m.version >= 41)
+  .sort((a, b) => FAMILY_ORDER[a.family] - FAMILY_ORDER[b.family] || b.version - a.version);
+
+const AVAILABLE_MODELS = cliModels.length > 0
+  ? cliModels.map((m) => ({
+      id: m.id,
+      name: `Claude ${FAMILY_DISPLAY[m.family]} ${Math.floor(m.version / 10)}.${m.version % 10}`,
+      provider: 'anthropic' as const,
+    }))
+  : [
+      // Fallback hardcode（CLI 源码 fs 读全部失败时兜底；保持跟 cc-panda/src/utils/model/configs.ts 一致）
+      { id: 'claude-opus-4-7',            name: 'Claude Opus 4.7',   provider: 'anthropic' as const },
+      { id: 'claude-opus-4-6',            name: 'Claude Opus 4.6',   provider: 'anthropic' as const },
+      { id: 'claude-opus-4-5-20251101',   name: 'Claude Opus 4.5',   provider: 'anthropic' as const },
+      { id: 'claude-opus-4-1-20250805',   name: 'Claude Opus 4.1',   provider: 'anthropic' as const },
+      { id: 'claude-sonnet-4-6',          name: 'Claude Sonnet 4.6', provider: 'anthropic' as const },
+      { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'anthropic' as const },
+      { id: 'claude-haiku-4-5-20251001',  name: 'Claude Haiku 4.5',  provider: 'anthropic' as const },
+    ];
+
+console.log('[handlers] AVAILABLE_MODELS loaded:', AVAILABLE_MODELS.length, 'models, source=', cliModels.length > 0 ? 'panda CLI configs.ts (live fs read)' : 'fallback hardcode');
 
 // ---------------------------------------------------------------------------
 // Register all IPC handlers

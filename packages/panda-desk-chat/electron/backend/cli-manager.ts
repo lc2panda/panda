@@ -75,6 +75,12 @@ export class CLISession extends EventEmitter {
   // Options used to start the session (needed for respawn)
   private startOptions: { model?: string; permissionMode?: string } | undefined;
 
+  // Comdr 指令: 修复 spawn race condition — sendMessage 在 spawnWithDiskProbe
+  //   await 完成前调用时，this.process 还是 null/stdin 不 writable，旧实现直接
+  //   console.error + return 静默丢消息（用户感受："发了没响应/必须刷新"）。
+  //   改为：未就绪时 push 到 pendingSends queue，spawn 完成后 flush。
+  private pendingSends: Array<{ content: string; attachments?: Array<{ mediaType: string; data: string }> }> = [];
+
   constructor(id: string, cwd: string, name?: string) {
     super();
     this.id = id;
@@ -191,6 +197,15 @@ export class CLISession extends EventEmitter {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
     });
+
+    // Comdr 指令: spawn 完成 + stdin 已 ready → flush 所有挂起的 sendMessage 调用。
+    //   stdio:'pipe' 模式下 stdin 在 spawn 同步返回时就 writable=true，但保险起见
+    //   监听 once('open') 兜底。
+    if (this.process.stdin?.writable) {
+      this.flushPendingSends();
+    } else {
+      this.process.stdin?.once('open', () => this.flushPendingSends());
+    }
 
     // ── stdout: NDJSON line-by-line ──────────────────────────────────
     if (this.process.stdout) {
@@ -423,11 +438,24 @@ export class CLISession extends EventEmitter {
   // ── Send message to CLI stdin ────────────────────────────────────────
 
   sendMessage(content: string, attachments?: Array<{ mediaType: string; data: string }>): void {
+    // Comdr 指令: spawn race 修复 — 子进程 stdin 还没就绪时 push queue，
+    //   等 spawnWithDiskProbe await 完成 + flushPendingSends 时统一 write。
     if (!this.process?.stdin?.writable) {
-      console.error(`[CLISession:${this.id}] Cannot send: stdin not writable`);
+      console.log(`[CLISession:${this.id}] stdin not ready, queueing message (queue=${this.pendingSends.length + 1})`);
+      this.pendingSends.push({ content, attachments });
       return;
     }
+    this.writeUserInput(content, attachments);
+  }
 
+  private writeUserInput(
+    content: string,
+    attachments?: Array<{ mediaType: string; data: string }>,
+  ): void {
+    if (!this.process?.stdin?.writable) {
+      console.error(`[CLISession:${this.id}] writeUserInput: stdin gone, dropping`);
+      return;
+    }
     const userInput: UserInput = {
       type: 'user',
       message: {
@@ -442,10 +470,20 @@ export class CLISession extends EventEmitter {
       },
       parent_tool_use_id: null,
     };
-
     const line = JSON.stringify(userInput) + '\n';
     this.process.stdin.write(line);
     this.state = 'streaming';
+  }
+
+  /** 内部: spawn 完成后 flush 所有挂起的 send 调用。 */
+  private flushPendingSends(): void {
+    if (this.pendingSends.length === 0) return;
+    const queue = this.pendingSends;
+    this.pendingSends = [];
+    console.log(`[CLISession:${this.id}] flushing ${queue.length} pending send(s)`);
+    for (const { content, attachments } of queue) {
+      this.writeUserInput(content, attachments);
+    }
   }
 
   // ── Respond to permission request ────────────────────────────────────

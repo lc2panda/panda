@@ -246,8 +246,10 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
         useUIStore.getState().setTheme(themeFinal);
       }
 
-      const currentId = persisted.model ?? get().model;
-      const currentModel = list.find((m) => m.id === currentId) ?? null;
+      // Comdr 指令：默认 Opus 4.7（backend list 已按 Opus → Sonnet → Haiku 家族 + 版本倒序，
+      //   list[0] 即旗舰 Opus 4.7）。persisted.model 优先（用户选过的），fallback 到 list[0]。
+      const currentId = persisted.model ?? get().model ?? list[0]?.id;
+      const currentModel = list.find((m) => m.id === currentId) ?? list[0] ?? null;
 
       set({
         permissionMode: permissionFinal,

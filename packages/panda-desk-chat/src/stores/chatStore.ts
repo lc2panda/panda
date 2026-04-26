@@ -417,7 +417,14 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     }),
 
   appendStreamDelta: (sessionId, _messageId, delta, type) => {
-    // Hot path — buffer only, no React re-render.
+    // 1:1 cc-haha desktop/src/stores/chatStore.ts L130-142 + L590-603 同款节流策略：
+    //   pendingDelta + setTimeout(50ms) flush，**而不是** RAF (requestAnimationFrame)。
+    //   原因（cc-haha 实测过）：
+    //     1. RAF 在 Electron 窗口失焦/最小化时暂停 tick → streaming 卡住
+    //     2. RAF 60fps 频率过高，setState 合并/React 渲染层未必跟上 → typewriter 不顺
+    //     3. setTimeout(50) = 20fps 数据驱动，data-arrival 才 schedule，无数据 0 开销
+    //   每次 delta 进 buffer，没有挂起的 timer 就 schedule 一个 50ms 后调 flush。
+    //   flush 完 timer 自动清，下一个 delta 来再 schedule 新 timer。
     const buf = getBuffer(sessionId);
     switch (type) {
       case 'text':
@@ -429,6 +436,12 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       case 'tool_input':
         buf.toolInput += delta;
         break;
+    }
+    if (flushTimer == null) {
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        useChatStore.getState().flushStreamBuffer(sessionId);
+      }, 50);
     }
   },
 
@@ -1053,7 +1066,10 @@ function messageEntryToUIMessage(entry: MessageEntry): UIMessage {
 // Bridge event wiring — connects IPC events to store actions
 // ---------------------------------------------------------------------------
 
-let flushRAF: ReturnType<typeof requestAnimationFrame> | null = null;
+// 1:1 cc-haha desktop chatStore.ts L131-132：模块级 setTimeout 句柄替代 RAF。
+//   Electron renderer RAF 在窗口失焦时暂停 → streaming 卡顿；setTimeout(50) 数据
+//   驱动稳定。activeSessions 仍需保留追踪并发 session。
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
 const activeSessions = new Set<string>();
 
 // Comdr 指令 (任务 2 — 消息流刷新 bug 根因修复):
@@ -1097,7 +1113,8 @@ export function setupBridgeListeners(): void {
     store().startStreaming(sessionId, messageId);
     store().setConnectionState(sessionId, 'connected');
     activeSessions.add(sessionId);
-    startFlushLoop();
+    // cc-haha 同款 setTimeout throttle — 不需要预启动 RAF loop，
+    // appendStreamDelta 内部 schedule 自行触发。
   }));
 
   // stream:delta → buffer deltas
@@ -1119,10 +1136,17 @@ export function setupBridgeListeners(): void {
       finishReason: string;
       tokenUsage?: TokenUsage;
     };
+    // cc-haha 同款 message_complete 收尾：先把挂起的 setTimeout 立即 flush 拿到全部
+    // 残余 buffer，再让 endStreaming finalize content（避免 50ms 末段 typewriter
+    // 闪烁/缺尾）。
+    if (flushTimer != null) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    store().flushStreamBuffer(sessionId);
     store().endStreaming(sessionId, messageId, finishReason, tokenUsage);
     store().setConnectionState(sessionId, 'connected');
     activeSessions.delete(sessionId);
-    if (activeSessions.size === 0) stopFlushLoop();
   }));
 
   // tool:start
@@ -1255,27 +1279,12 @@ if (typeof window !== 'undefined') {
 }
 
 // ---------------------------------------------------------------------------
-// RAF-based flush loop for streaming buffers (~16ms cadence)
+// 流式节流策略 — 1:1 cc-haha desktop chatStore.ts L130-142 + L590-603
+//   旧实现用 requestAnimationFrame 60fps tick，但在 Electron 窗口失焦/最小化时
+//   RAF 自动暂停 → streaming 看起来卡住，必须 Cmd+R 才显示完整。
+//   cc-haha 用 setTimeout(50ms) 数据驱动单次 flush，无窗口状态依赖；
+//   appendStreamDelta 内部按需 schedule，flush 完即清 timer，无空跑开销。
 // ---------------------------------------------------------------------------
-
-function startFlushLoop(): void {
-  if (flushRAF != null) return;
-  const tick = () => {
-    const store = useChatStore.getState();
-    for (const sid of activeSessions) {
-      store.flushStreamBuffer(sid);
-    }
-    flushRAF = requestAnimationFrame(tick);
-  };
-  flushRAF = requestAnimationFrame(tick);
-}
-
-function stopFlushLoop(): void {
-  if (flushRAF != null) {
-    cancelAnimationFrame(flushRAF);
-    flushRAF = null;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // 遗留 IPC 修复 #2: chatStore.chatState → tabStore.tab.status 自动同步
