@@ -15,7 +15,8 @@
     />
 
     <!-- FOUC prevention: sync theme before first paint (external for CSP compliance) -->
-    <script src="/fouc.js"></script>
+    <!-- Electron prod build 走 file:// 协议，绝对 "/" 会指向系统根；改 "./" 兼容 dev (vite serves from /) + prod (file:// from dist/)。 -->
+    <script src="./fouc.js"></script>
   </head>
   <body>
     <div id="root"></div>

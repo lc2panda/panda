@@ -49,7 +49,10 @@ const electronPlugins = isElectron
   : [];
 
 export default defineConfig({
-  base: "/",
+  // Electron 打包用 file:// 协议加载 dist/index.html — 绝对路径 "/assets/..." 会指向
+  // 系统根而非 app bundle，导致 dmg 安装后黑屏。dev 模式 vite 走 http://localhost:5173
+  // base 自动适配；prod build 用 "./" 让 script/link 解析为同级 dist/assets/。
+  base: "./",
   plugins: [react(), tailwindcss(), ...electronPlugins],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
