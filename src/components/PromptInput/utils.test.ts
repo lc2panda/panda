@@ -55,23 +55,16 @@ describe('shouldJumpToBottom — Comdr #3 jump-to-bottom 三键支持', () => {
     expect(shouldJumpToBottom(' ', k(), 5, false)).toBe(true)
   })
 
-  // Enter — 仅空 prompt
-  test('Enter + sticky=false + 空 prompt：跳', () => {
-    expect(shouldJumpToBottom('\r', k({ return: true }), 0, false)).toBe(true)
+  // v2.25.56 hotfix: Enter / ArrowDown 不再触发 jump-to-bottom（仅空格）
+  // 之前 v2.25.54 添加的 Enter/ArrowDown 分支破坏 submit，已回退
+  test('Enter + sticky=false + 空 prompt：不跳（v2.25.56 回退）', () => {
+    expect(shouldJumpToBottom('\r', k({ return: true }), 0, false)).toBe(false)
   })
   test('Enter + sticky=false + 已输入 1 字符：不跳（保护 submit）', () => {
     expect(shouldJumpToBottom('\r', k({ return: true }), 1, false)).toBe(false)
   })
-  test('Enter + sticky=false + 已输入 100 字符：不跳（保护 submit）', () => {
-    expect(shouldJumpToBottom('\r', k({ return: true }), 100, false)).toBe(false)
-  })
-
-  // ArrowDown — 仅空 prompt
-  test('ArrowDown + sticky=false + 空 prompt：跳', () => {
-    expect(shouldJumpToBottom('', k({ downArrow: true }), 0, false)).toBe(true)
-  })
-  test('ArrowDown + sticky=false + 已输入 1 字符：不跳（保护历史/光标 down）', () => {
-    expect(shouldJumpToBottom('', k({ downArrow: true }), 1, false)).toBe(false)
+  test('ArrowDown + sticky=false + 空 prompt：不跳（v2.25.56 回退）', () => {
+    expect(shouldJumpToBottom('', k({ downArrow: true }), 0, false)).toBe(false)
   })
 
   // 其他键不跳

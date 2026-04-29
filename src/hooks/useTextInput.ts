@@ -435,16 +435,10 @@ export function useTextInput({
     const filteredInput = inputFilter ? inputFilter(input, key) : input
 
     // If the input was filtered out, do nothing.
-    // Contract: returning '' from inputFilter drops the event. Original guard
-    // `input !== ''` prevented dropping events for special keys whose stdin
-    // is empty (ArrowUp/ArrowDown/etc.). Extended for Comdr jump-to-bottom
-    // (2026-04-26): also honour drop for `key.return` (Enter; rawInput='\r')
-    // and `key.downArrow` (rawInput=''), so PromptInput's lazySpaceInputFilter
-    // can intercept these keys when scrolled away from bottom.
-    if (
-      filteredInput === '' &&
-      (input !== '' || key.return || key.downArrow)
-    ) {
+    // v2.25.56 hotfix: REVERTED Enter/ArrowDown drop extension from v2.25.54
+    // — it broke normal submit (Comdr reported: 按回车没反应). Restored
+    // original `input !== ''` guard to preserve submit path.
+    if (filteredInput === '' && input !== '') {
       return
     }
 

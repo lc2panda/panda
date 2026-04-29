@@ -60,35 +60,31 @@ export function isNonSpacePrintable(input: string, key: Key): boolean {
 }
 
 /**
- * Decide whether a keystroke should jump-to-bottom in the message viewport
- * (Comdr fix 2026-04-26: extends prior space-only behavior to also cover
- * Enter and ArrowDown when the prompt is empty).
+ * Decide whether a keystroke should jump-to-bottom in the message viewport.
  *
- * Returns true when:
+ * v2.25.56 hotfix: REVERTED Enter / ArrowDown branch added in v2.25.54.
+ * The Enter branch caused submit regressions (Comdr reported: "输入正常内容，
+ * 按回车没反应") because the empty-prompt-only guard interacted poorly with
+ * scrollRef.isSticky() state in real terminals. Restored to pure space-only
+ * behaviour to unblock submit. Future re-attempt should land behind an env
+ * opt-in until tested across all terminal/scroll states.
+ *
+ * Returns true ONLY when:
  *   - User has scrolled away from the bottom (`sticky === false`)
  *   - No modifier (ctrl/meta/shift) is held
- *   - One of:
- *       a) Space (`rawInput === ' '`)               — any prompt content
- *       b) Enter / ArrowDown                         — ONLY when prompt empty
+ *   - The keystroke is exactly Space (`rawInput === ' '`)
  *
  * Pure / side-effect-free: caller is responsible for invoking
  * `scrollRef.current.scrollToBottom()` when this returns true.
  */
 export function shouldJumpToBottom(
   rawInput: string,
-  key: Pick<
-    Key,
-    'ctrl' | 'meta' | 'shift' | 'return' | 'downArrow'
-  >,
-  promptLength: number,
+  key: Pick<Key, 'ctrl' | 'meta' | 'shift'>,
+  _promptLength: number,
   sticky: boolean,
 ): boolean {
   if (sticky) return false
   if (key.ctrl || key.meta || key.shift) return false
-  // Space: drop the character, jump (preserves prior behaviour).
   if (rawInput === ' ') return true
-  // Enter / ArrowDown: only when prompt is empty (avoid silently dropping
-  // submit / history-down while the user is composing).
-  if ((key.return || key.downArrow) && promptLength === 0) return true
   return false
 }
