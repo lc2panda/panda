@@ -99,6 +99,7 @@ import { executePostSamplingHooks } from './utils/hooks/postSamplingHooks.js'
 import { executeStopFailureHooks } from './utils/hooks.js'
 import type { QuerySource } from './constants/querySource.js'
 import { createDumpPromptsFetch } from './services/api/dumpPrompts.js'
+import { isEnvTruthy } from './utils/envUtils.js'
 import { StreamingToolExecutor } from './services/tools/StreamingToolExecutor.js'
 import { queryCheckpoint } from './utils/queryProfiler.js'
 import { runTools } from './services/tools/toolOrchestration.js'
@@ -643,9 +644,16 @@ async function* queryLoop(
     // instead of all request bodies from the session (~500MB for long sessions).
     // Note: agentId is effectively constant during a query() call - it only changes
     // between queries (e.g., /clear command or session resume).
-    const dumpPromptsFetch = config.gates.isAnt
-      ? createDumpPromptsFetch(toolUseContext.agentId ?? config.sessionId)
-      : undefined
+    //
+    // Panda gate (v2.25.53+): build.ts:162 强制 USER_TYPE='ant' 让 isAnt 永远为 true，
+    // 但 dump-prompts 是 Anthropic /issue debug 工具，对 panda 用户没有用 — 默认每次
+    // 请求双向 dump 一份到 ~/.pandacc/dump-prompts/，长跑 8h 累计 1.7 GB（实测见
+    // monitor/audit-pandacc-storage-2026-04-26.md）+ SSE buffer 内存峰值 数 MB。
+    // 因此叠加 PANDA_DUMP_PROMPTS=1 opt-in：默认关，只有显式开启才走 dump。
+    const dumpPromptsFetch =
+      config.gates.isAnt && isEnvTruthy(process.env.PANDA_DUMP_PROMPTS)
+        ? createDumpPromptsFetch(toolUseContext.agentId ?? config.sessionId)
+        : undefined
 
     // Block if we've hit the hard blocking limit (only applies when auto-compact is OFF)
     // This reserves space so users can still run /compact manually

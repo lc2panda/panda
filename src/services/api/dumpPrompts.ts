@@ -263,30 +263,59 @@ export function createDumpPromptsFetch(
 
           let data: unknown
           if (isStreaming && cloned.body) {
-            // Parse SSE stream into chunks
+            // Panda v2.25.53+: 增量解析 SSE 流，避免内存峰值爆炸。
+            // 旧实现：把整个流的所有 chunks 拼到单 string buffer（10000+ 个
+            // content_block_delta event，单 message 累计 MB 级），并发 query
+            // 时多份副本叠加（响应 .clone() + dump 完整 buffer 双份）。
+            // 新实现：流式按 SSE event 分隔符 '\n\n' 切片，已完整 event 立即
+            // 解析+push 后丢弃；只保留尾部最后一个不完整 event。内存峰值
+            // 降到单 event 大小（KB 级）。落盘 jsonl 格式不变（仍为
+            // { stream: true, chunks: [...] }）。
             const reader = cloned.body.getReader()
             const decoder = new TextDecoder()
+            const chunks: unknown[] = []
             let buffer = ''
+            const drainEvents = (): void => {
+              // SSE event 分隔符为 '\n\n'。最后一段可能不完整 → 留回 buffer。
+              let sepIdx: number
+              while ((sepIdx = buffer.indexOf('\n\n')) !== -1) {
+                const event = buffer.slice(0, sepIdx)
+                buffer = buffer.slice(sepIdx + 2)
+                for (const line of event.split('\n')) {
+                  if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                    try {
+                      chunks.push(jsonParse(line.slice(6)))
+                    } catch {
+                      // Ignore parse errors
+                    }
+                  }
+                }
+              }
+            }
             try {
               while (true) {
                 const { done, value } = await reader.read()
                 if (done) break
                 buffer += decoder.decode(value, { stream: true })
+                drainEvents()
+              }
+              // 流结束后 flush 解码器尾部 + 处理可能没有 '\n\n' 收尾的最后 event
+              buffer += decoder.decode()
+              if (buffer.length > 0) {
+                // 末尾缺分隔符的孤立 event（防御性）
+                for (const line of buffer.split('\n')) {
+                  if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                    try {
+                      chunks.push(jsonParse(line.slice(6)))
+                    } catch {
+                      // Ignore parse errors
+                    }
+                  }
+                }
+                buffer = ''
               }
             } finally {
               reader.releaseLock()
-            }
-            const chunks: unknown[] = []
-            for (const event of buffer.split('\n\n')) {
-              for (const line of event.split('\n')) {
-                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                  try {
-                    chunks.push(jsonParse(line.slice(6)))
-                  } catch {
-                    // Ignore parse errors
-                  }
-                }
-              }
             }
             data = { stream: true, chunks }
           } else {

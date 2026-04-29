@@ -1,5 +1,9 @@
 import { test, expect, beforeEach, afterEach } from 'bun:test'
-import { isMatrixTheme } from './isMatrixTheme.js'
+import {
+  isMatrixTheme,
+  setMatrixThemeCache,
+  _resetMatrixThemeCacheForTest,
+} from './isMatrixTheme.js'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -23,7 +27,8 @@ beforeEach(() => {
   isolatedDir = mkdtempSync(join(tmpdir(), 'isMatrixTheme-test-'))
   process.env.PANDA_CONFIG_DIR = isolatedDir
   // 清掉所有缓存层，让函数重新走 env / fs 路径
-  delete _gt.__PANDA_IS_MATRIX_PREFETCH
+  // （Comdr #4 fix 2026-04-26 引入 setMatrixThemeCache 后，跨 test 残留更明显）
+  _resetMatrixThemeCacheForTest()
 })
 
 afterEach(() => {
@@ -65,6 +70,37 @@ test('isMatrixTheme — env=light 返回 false', () => {
 })
 
 test('isMatrixTheme — env=dark 返回 false', () => {
+  process.env.PANDA_THEME = 'dark'
+  expect(isMatrixTheme()).toBe(false)
+})
+
+// Comdr #4 (2026-04-26): /theme 热切修复 — prefetch 缓存可被 setMatrixThemeCache 主动刷新
+test('setMatrixThemeCache — 切到非 matrix 后 prefetch 不再返回 true', () => {
+  // 模拟启动时 .pandacc.json=matrix → prefetch=true
+  delete process.env.PANDA_THEME
+  setMatrixThemeCache(true)
+  expect(isMatrixTheme()).toBe(true)
+  // 用户 /theme dark：env 删除（已是 undefined） + prefetch 刷新 false
+  setMatrixThemeCache(false)
+  expect(isMatrixTheme()).toBe(false)
+})
+
+test('setMatrixThemeCache — 切到 matrix 后 prefetch=true 即使 env 未设', () => {
+  delete process.env.PANDA_THEME
+  setMatrixThemeCache(false)
+  expect(isMatrixTheme()).toBe(false)
+  // 用户 /theme matrix：env=matrix + prefetch=true
+  setMatrixThemeCache(true)
+  expect(isMatrixTheme()).toBe(true)
+})
+
+test('setMatrixThemeCache — env 显式设置时优先级最高（覆盖 prefetch）', () => {
+  // prefetch=false 但 env=matrix → 仍返回 true（env 优先）
+  setMatrixThemeCache(false)
+  process.env.PANDA_THEME = 'matrix'
+  expect(isMatrixTheme()).toBe(true)
+  // prefetch=true 但 env=dark → 仍返回 false（env 优先）
+  setMatrixThemeCache(true)
   process.env.PANDA_THEME = 'dark'
   expect(isMatrixTheme()).toBe(false)
 })

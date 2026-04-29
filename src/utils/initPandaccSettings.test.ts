@@ -45,13 +45,14 @@ describe('initDefaultPandaccSettings', () => {
     }
   })
 
-  test('settings.json 不存在 → 创建并写入全部 16 项 env + 顶层 SETTINGS_DEFAULTS', () => {
+  test('settings.json 不存在 → 创建并写入全部 17 项 env + 顶层 SETTINGS_DEFAULTS', () => {
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
     expect(result.newlyAddedKeys.length).toBe(
       Object.keys(PANDA_DEFAULTS).length,
     )
-    expect(result.newlyAddedKeys.length).toBe(16)
+    // v2.25.53+: 17 项（v2.21.5 移除 PANDA_CONFIG_DIR；后续未增减）
+    expect(result.newlyAddedKeys.length).toBe(17)
     expect(result.newlyAddedTopLevelKeys.length).toBe(
       Object.keys(SETTINGS_DEFAULTS).length,
     )
@@ -154,8 +155,8 @@ describe('initDefaultPandaccSettings', () => {
 
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
-    // 补了 16 - 2 = 14 项（PANDA_THEME / PANDA_FORCE_CACHE_STRATEGY 已存在）
-    expect(result.newlyAddedKeys.length).toBe(14)
+    // v2.25.53+: 17 - 2 = 15 项（PANDA_THEME / PANDA_FORCE_CACHE_STRATEGY 已存在）
+    expect(result.newlyAddedKeys.length).toBe(15)
     expect(result.newlyAddedKeys).not.toContain('PANDA_THEME')
     expect(result.newlyAddedKeys).not.toContain('PANDA_FORCE_CACHE_STRATEGY')
 
@@ -164,8 +165,8 @@ describe('initDefaultPandaccSettings', () => {
     expect(written.env.PANDA_THEME).toBe('dracula')
     expect(written.env.PANDA_FORCE_CACHE_STRATEGY).toBe('implicit')
     expect(written.env.ANTHROPIC_AUTH_TOKEN).toBe('user-secret')
-    // 补齐值写入
-    expect(written.env.PANDA_DEBUG).toBe('1')
+    // 补齐值写入 — v2.25.53+ PANDA_DEBUG 默认从 '1' 降到 '0'
+    expect(written.env.PANDA_DEBUG).toBe('0')
     expect(written.env.PANDA_CACHE_TEXT_MIN_SIZE).toBe('1500')
     // 非 env 字段保留
     expect(written.permissions.allow).toEqual(['Bash(ls:*)'])
@@ -207,7 +208,7 @@ describe('initDefaultPandaccSettings', () => {
 
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
-    expect(result.newlyAddedKeys.length).toBe(16)
+    expect(result.newlyAddedKeys.length).toBe(17)
     expect(result.newlyAddedTopLevelKeys.length).toBe(
       Object.keys(SETTINGS_DEFAULTS).length,
     )
@@ -223,5 +224,107 @@ describe('initDefaultPandaccSettings', () => {
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
     expect(existsSync(join(deep, 'settings.json'))).toBe(true)
+  })
+
+  // ─── v2.25.53+ 长跑爆点修复 ──────────────────────────────────────────
+  test('v2.25.53+ 默认值：PANDA_DEBUG=0 / TIMEOUT=600000 / FORK_TIMEOUT=600000', () => {
+    const result = initDefaultPandaccSettings({ silent: true })
+    expect(result.skipped).toBe(false)
+    const written = JSON.parse(
+      readFileSync(join(tmpRoot, 'settings.json'), 'utf-8'),
+    )
+    // 这三项必须按新默认写入（首次安装的新用户拿到的应是降级后的安全默认）
+    expect(written.env.PANDA_DEBUG).toBe('0')
+    expect(written.env.PANDA_AGENT_TIMEOUT_MS).toBe('600000')
+    expect(written.env.PANDA_FORK_TIMEOUT_MS).toBe('600000')
+    // 其他保持的字段验证（防止误改）
+    expect(written.env.PANDA_AGENT_MAX_TURNS).toBe('200')
+    expect(written.env.PANDA_THEME).toBe('matrix')
+  })
+
+  test('v2.25.53+ migration：旧 PANDA_AGENT_TIMEOUT_MS=0 → 600000', () => {
+    const path = join(tmpRoot, 'settings.json')
+    writeFileSync(
+      path,
+      JSON.stringify(
+        {
+          env: { ...PANDA_DEFAULTS, PANDA_AGENT_TIMEOUT_MS: '0' },
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    )
+    const result = initDefaultPandaccSettings({ silent: true })
+    expect(result.skipped).toBe(false)
+    // newlyAddedKeys 不应含已存在的 PANDA_AGENT_TIMEOUT_MS（migration ≠ add）
+    expect(result.newlyAddedKeys).not.toContain('PANDA_AGENT_TIMEOUT_MS')
+
+    const written = JSON.parse(readFileSync(path, 'utf-8'))
+    expect(written.env.PANDA_AGENT_TIMEOUT_MS).toBe('600000')
+  })
+
+  test('v2.25.53+ migration：旧 PANDA_FORK_TIMEOUT_MS=0 → 600000', () => {
+    const path = join(tmpRoot, 'settings.json')
+    writeFileSync(
+      path,
+      JSON.stringify(
+        {
+          env: { ...PANDA_DEFAULTS, PANDA_FORK_TIMEOUT_MS: '0' },
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    )
+    const result = initDefaultPandaccSettings({ silent: true })
+    expect(result.skipped).toBe(false)
+    const written = JSON.parse(readFileSync(path, 'utf-8'))
+    expect(written.env.PANDA_FORK_TIMEOUT_MS).toBe('600000')
+  })
+
+  test('v2.25.53+ migration 不动 PANDA_DEBUG（用户可能故意开诊断模式）', () => {
+    const path = join(tmpRoot, 'settings.json')
+    writeFileSync(
+      path,
+      JSON.stringify(
+        {
+          env: { ...PANDA_DEFAULTS, PANDA_DEBUG: '1' },
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    )
+    const result = initDefaultPandaccSettings({ silent: true })
+    expect(result.skipped).toBe(false)
+    const written = JSON.parse(readFileSync(path, 'utf-8'))
+    // 用户已显式 '1' 不被 migration 覆盖
+    expect(written.env.PANDA_DEBUG).toBe('1')
+  })
+
+  test('v2.25.53+ 用户已显式设 TIMEOUT=300000 → 不被 migration 覆盖', () => {
+    const path = join(tmpRoot, 'settings.json')
+    writeFileSync(
+      path,
+      JSON.stringify(
+        {
+          env: {
+            ...PANDA_DEFAULTS,
+            PANDA_AGENT_TIMEOUT_MS: '300000',
+            PANDA_FORK_TIMEOUT_MS: '900000',
+          },
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    )
+    const result = initDefaultPandaccSettings({ silent: true })
+    expect(result.skipped).toBe(false)
+    const written = JSON.parse(readFileSync(path, 'utf-8'))
+    // 非 '0' 的旧值不应被 migration 覆盖
+    expect(written.env.PANDA_AGENT_TIMEOUT_MS).toBe('300000')
+    expect(written.env.PANDA_FORK_TIMEOUT_MS).toBe('900000')
   })
 })

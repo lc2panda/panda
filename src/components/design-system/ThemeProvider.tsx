@@ -5,6 +5,7 @@ import useStdin from '../../ink/hooks/use-stdin.js';
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js';
 import { getSystemThemeName, type SystemTheme } from '../../utils/systemTheme.js';
 import type { ThemeName, ThemeSetting } from '../../utils/theme.js';
+import { setMatrixThemeCache } from '../MatrixTheme/isMatrixTheme.js';
 type ThemeContextValue = {
   /** The saved user preference. May be 'auto'. */
   themeSetting: ThemeSetting;
@@ -40,6 +41,23 @@ function defaultSaveTheme(setting: ThemeSetting): void {
     theme: setting
   }));
 }
+
+/**
+ * 单一入口同步 process.env.PANDA_THEME 与 isMatrixTheme prefetch 缓存。
+ * Comdr #4 修复（2026-04-26）：原代码在四处分别 set/delete env，且 savePreview
+ * 不同步 env，prefetch 缓存又永久不刷新 → /theme 热切失效。
+ */
+function syncMatrixEnv(setting: ThemeSetting): void {
+  const isMatrix = setting === 'matrix';
+  if (isMatrix) {
+    process.env.PANDA_THEME = 'matrix';
+  } else if (process.env.PANDA_THEME === 'matrix') {
+    delete process.env.PANDA_THEME;
+  }
+  // 必须刷新 prefetch 缓存：env 删除后 isMatrixTheme() 走 prefetch 路径，
+  // 旧值（module-load 时为 true）会盖过 env 删除的语义。
+  setMatrixThemeCache(isMatrix);
+}
 export function ThemeProvider({
   children,
   initialState,
@@ -48,11 +66,9 @@ export function ThemeProvider({
   const [themeSetting, setThemeSetting] = useState(initialState ?? defaultInitialTheme);
   const [previewTheme, setPreviewTheme] = useState<ThemeSetting | null>(null);
 
-  // Sync PANDA_THEME env var on mount for Matrix detection
+  // Sync PANDA_THEME env var + prefetch cache on mount for Matrix detection
   useEffect(() => {
-    if (themeSetting === 'matrix') {
-      process.env.PANDA_THEME = 'matrix';
-    }
+    syncMatrixEnv(themeSetting);
   }, []); // run once on mount
 
   // Track terminal theme for 'auto' resolution. Seeds from $COLORFGBG (or
@@ -91,12 +107,10 @@ export function ThemeProvider({
     setThemeSetting: (newSetting: ThemeSetting) => {
       setThemeSetting(newSetting);
       setPreviewTheme(null);
-      // Matrix: sync env var so isMatrixTheme() / color-diff-napi detect it
-      if (newSetting === 'matrix') {
-        process.env.PANDA_THEME = 'matrix';
-      } else if (process.env.PANDA_THEME === 'matrix') {
-        delete process.env.PANDA_THEME;
-      }
+      // Matrix: sync env var + prefetch cache so isMatrixTheme() /
+      // color-diff-napi detect the new theme. See syncMatrixEnv for cache
+      // invalidate semantics (Comdr #4 fix, 2026-04-26).
+      syncMatrixEnv(newSetting);
       // Switching to 'auto' restarts the watcher (activeSetting dep), whose
       // first poll fires immediately. Seed from the cache so the OSC
       // round-trip doesn't flash the wrong palette.
@@ -107,12 +121,8 @@ export function ThemeProvider({
     },
     setPreviewTheme: (newSetting_0: ThemeSetting) => {
       setPreviewTheme(newSetting_0);
-      // Matrix: sync env var for preview
-      if (newSetting_0 === 'matrix') {
-        process.env.PANDA_THEME = 'matrix';
-      } else if (process.env.PANDA_THEME === 'matrix') {
-        delete process.env.PANDA_THEME;
-      }
+      // Matrix: sync env var + prefetch cache for live preview
+      syncMatrixEnv(newSetting_0);
       if (newSetting_0 === 'auto') {
         setSystemTheme(getSystemThemeName());
       }
@@ -121,18 +131,21 @@ export function ThemeProvider({
       if (previewTheme !== null) {
         setThemeSetting(previewTheme);
         setPreviewTheme(null);
+        // Comdr #4 fix (2026-04-26): savePreview previously DID NOT sync
+        // env / prefetch cache — only setThemeSetting wrap did. When
+        // ThemePicker confirms (Enter), savePreview runs first; if it
+        // doesn't sync, isMatrixTheme() may flip-flop until the wrap-version
+        // setter is called (race depending on call order).
+        syncMatrixEnv(previewTheme);
         onThemeSave?.(previewTheme);
       }
     },
     cancelPreview: () => {
       if (previewTheme !== null) {
         setPreviewTheme(null);
-        // Restore env var to match the saved theme (not the preview)
-        if (themeSetting === 'matrix') {
-          process.env.PANDA_THEME = 'matrix';
-        } else if (process.env.PANDA_THEME === 'matrix') {
-          delete process.env.PANDA_THEME;
-        }
+        // Restore env var + prefetch cache to match the saved theme (not
+        // the preview).
+        syncMatrixEnv(themeSetting);
       }
     },
     currentTheme

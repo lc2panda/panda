@@ -58,3 +58,37 @@ export function isNonSpacePrintable(input: string, key: Key): boolean {
   }
   return input.length > 0 && !/^\s/.test(input) && !input.startsWith('\x1b')
 }
+
+/**
+ * Decide whether a keystroke should jump-to-bottom in the message viewport
+ * (Comdr fix 2026-04-26: extends prior space-only behavior to also cover
+ * Enter and ArrowDown when the prompt is empty).
+ *
+ * Returns true when:
+ *   - User has scrolled away from the bottom (`sticky === false`)
+ *   - No modifier (ctrl/meta/shift) is held
+ *   - One of:
+ *       a) Space (`rawInput === ' '`)               — any prompt content
+ *       b) Enter / ArrowDown                         — ONLY when prompt empty
+ *
+ * Pure / side-effect-free: caller is responsible for invoking
+ * `scrollRef.current.scrollToBottom()` when this returns true.
+ */
+export function shouldJumpToBottom(
+  rawInput: string,
+  key: Pick<
+    Key,
+    'ctrl' | 'meta' | 'shift' | 'return' | 'downArrow'
+  >,
+  promptLength: number,
+  sticky: boolean,
+): boolean {
+  if (sticky) return false
+  if (key.ctrl || key.meta || key.shift) return false
+  // Space: drop the character, jump (preserves prior behaviour).
+  if (rawInput === ' ') return true
+  // Enter / ArrowDown: only when prompt is empty (avoid silently dropping
+  // submit / history-down while the user is composing).
+  if ((key.return || key.downArrow) && promptLength === 0) return true
+  return false
+}

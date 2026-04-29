@@ -910,6 +910,17 @@ async function run(): Promise<CommanderCommand> {
     await init();
     profileCheckpoint('preAction_after_init');
 
+    // Panda v2.25.53+: 启动 RSS 健康心跳（60s 一次）。Bun 1.3.11 在 long-running
+    // 场景下 ~1.67 GB RSS 触发 segfault（实测 8h），1.2 GB 阈值给用户预警空间。
+    // 不阻塞启动，失败静默；可由 PANDA_RSS_HEALTH=0 关闭。
+    try {
+      const { installProcessHealthMonitor } = await import('./utils/processHealth.js');
+      installProcessHealthMonitor();
+    } catch {
+      // 心跳失败不能拖累启动
+    }
+    profileCheckpoint('preAction_after_rss_health');
+
     // W1-T1 panda-on-desk 桌面端自动拉起 — npm 安装 panda 后启动即启动桌面宠物。
     // 4 重 gate（任一不满足即静默 return）：feature('BUDDY') + companionOnDesk +
     // isTTY + --no-desk；spawn 子进程 detached + unref，失败完全静默。

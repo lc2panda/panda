@@ -26,15 +26,22 @@ export const PANDA_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   PANDA_HIDE_CONTEXT_WARNING: '1',
   PANDA_NO_AUTO_COLLAPSE: '1',
   PANDA_SHOW_DEVBAR: '1',
-  PANDA_DEBUG: '1',
+  // v2.25.53: '1' → '0'  长跑 debug 日志写盘是 192 MB / 1790 文件爆点之一，
+  // 新用户首次启动不应自动开 debug。已开 debug 的老用户不会被强制改回（migration
+  // 区只迁移 timeout，不动 PANDA_DEBUG，见下方 migration 注释）。
+  PANDA_DEBUG: '0',
   PANDA_THEME: 'matrix',
   PANDA_MODEL_ROUTING: '1',
   PANDA_CONTEXT_COLLAPSE: '1',
   PANDA_AGENT_MAX_TURNS: '200',
   PANDA_AGENT_PER_TURN_LIMIT: '2',
   PANDA_AGENT_MAX_OUTPUT_TOKENS: '65536',
-  PANDA_AGENT_TIMEOUT_MS: '0',
-  PANDA_FORK_TIMEOUT_MS: '0',
+  // v2.25.53: '0' → '600000'(10 min)  '0' = 永不超时，长跑 agent 永不释放是
+  // 内存爆点之一（2026-04-26 实测 8h Bun runtime segfault Peak RSS 1.67 GB）。
+  // 10 分钟硬上限保留绝大多数实际任务（agent fork 通常在 ≤ 10 min 内完成），
+  // 同时阻断"卡死 agent 永远占内存"的情况。Comdr 已有的 '0' 会被 migration 区迁移。
+  PANDA_AGENT_TIMEOUT_MS: '600000',
+  PANDA_FORK_TIMEOUT_MS: '600000',
   PANDA_CACHE_TEXT_KEEP_LAST: '5',
   PANDA_CACHE_TEXT_MIN_SIZE: '1500',
   PANDA_FORCE_CACHE_STRATEGY: 'explicit',
@@ -175,6 +182,19 @@ export function initDefaultPandaccSettings(options?: {
   let migrated = false
   if (mergedEnv.PANDA_AGENT_MAX_TURNS === '10') {
     mergedEnv.PANDA_AGENT_MAX_TURNS = '200'
+    migrated = true
+  }
+  // Migration v2.25.53+: PANDA_AGENT_TIMEOUT_MS / PANDA_FORK_TIMEOUT_MS '0' → '600000'
+  // 旧默认 '0' = 永不超时，是 long-running session 内存爆点之一（实测 8h Bun
+  // runtime segfault Peak RSS 1.67 GB，见 monitor/audit-pandacc-storage-2026-04-26.md）。
+  // 仅迁移"明确为 0"的旧默认值；用户显式设的 '300000' / '900000' 等保留不动。
+  // 不迁移 PANDA_DEBUG：用户可能故意开诊断模式，强制改 '0' 会丢失场景。
+  if (mergedEnv.PANDA_AGENT_TIMEOUT_MS === '0') {
+    mergedEnv.PANDA_AGENT_TIMEOUT_MS = '600000'
+    migrated = true
+  }
+  if (mergedEnv.PANDA_FORK_TIMEOUT_MS === '0') {
+    mergedEnv.PANDA_FORK_TIMEOUT_MS = '600000'
     migrated = true
   }
 

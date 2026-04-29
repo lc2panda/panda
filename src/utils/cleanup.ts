@@ -592,6 +592,16 @@ export async function cleanupOldMessageFilesInBackground(): Promise<void> {
   await cleanupOldDebugLogs()
   await cleanupOldImageCaches()
   await cleanupOldPastes(getCutoffDate())
+  // Panda v2.25.53+: dump-prompts 历来漏在 cleanup 列表外，导致长跑用户
+  // ~/.pandacc/dump-prompts/<sessionId>.jsonl 无界增长 — 实测 1.7 GB / 6862 文件
+  // （见 monitor/audit-pandacc-storage-2026-04-26.md）。这里复用通用的 30 天 mtime
+  // retention（settings.cleanupPeriodDays 可覆盖），与其他 jsonl 路径策略一致。
+  // removeEmptyDir=false：dump-prompts 目录可能正在被新会话使用，不要在清空后删目录。
+  await cleanupSingleDirectory(
+    join(getClaudeConfigHomeDir(), 'dump-prompts'),
+    '.jsonl',
+    false,
+  )
   const removedWorktrees = await cleanupStaleAgentWorktrees(getCutoffDate())
   if (removedWorktrees > 0) {
     logEvent('tengu_worktree_cleanup', { removed: removedWorktrees })

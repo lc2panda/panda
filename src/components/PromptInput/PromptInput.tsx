@@ -123,7 +123,7 @@ import { useMaybeTruncateInput } from './useMaybeTruncateInput.js';
 import { usePromptInputPlaceholder } from './usePromptInputPlaceholder.js';
 import { useShowFastIconHint } from './useShowFastIconHint.js';
 import { useSwarmBanner } from './useSwarmBanner.js';
-import { isNonSpacePrintable, isVimModeEnabled } from './utils.js';
+import { isNonSpacePrintable, isVimModeEnabled, shouldJumpToBottom } from './utils.js';
 type Props = {
   debug: boolean;
   ideSelection: IDESelection | undefined;
@@ -1245,26 +1245,32 @@ function PromptInput({
       insertTextAtCursor(text);
     }
   }
-  const lazySpaceInputFilter = useCallback((input: string, key: Key): string => {
-    // Space-to-bottom: when scrolled away from bottom in fullscreen mode,
-    // space jumps to bottom instead of typing. This must happen here (in
-    // inputFilter) because BaseTextInput's useInput registers before
-    // ScrollKeybindingHandler's in the EventEmitter listener array (child
-    // effects fire before parent effects), so stopImmediatePropagation in
-    // ScrollKeybindingHandler can't prevent BaseTextInput from consuming
-    // the space character.
-    if (input === ' ' && !key.ctrl && !key.meta && !key.shift) {
-      const s = scrollRef?.current;
-      if (s && !s.isSticky()) {
+  const lazySpaceInputFilter = useCallback((rawInput: string, key: Key): string => {
+    // Jump-to-bottom: when scrolled away from bottom in fullscreen mode,
+    // Space / Enter / ArrowDown jump to bottom instead of typing/submitting/
+    // history-nav. Must happen here (in inputFilter) because BaseTextInput's
+    // useInput registers before ScrollKeybindingHandler's in the EventEmitter
+    // listener array (child effects fire before parent effects), so
+    // stopImmediatePropagation in ScrollKeybindingHandler can't prevent
+    // BaseTextInput from consuming the keystroke. Decision logic factored
+    // into shouldJumpToBottom() (pure, unit-tested) — see ./utils.ts.
+    const s = scrollRef?.current;
+    if (s) {
+      const sticky = s.isSticky();
+      if (shouldJumpToBottom(rawInput, key, input.length, sticky)) {
         s.scrollToBottom();
+        // Return '' so useTextInput's filtered-empty drop-key path triggers.
+        // For Enter (rawInput='\r') the original `input !== ''` guard works.
+        // For ArrowDown (rawInput=''), useTextInput.ts has been extended to
+        // honour an empty filter return for `key.return || key.downArrow`.
         return '';
       }
     }
-    if (!pendingSpaceAfterPillRef.current) return input;
+    if (!pendingSpaceAfterPillRef.current) return rawInput;
     pendingSpaceAfterPillRef.current = false;
-    if (isNonSpacePrintable(input, key)) return ' ' + input;
-    return input;
-  }, [scrollRef]);
+    if (isNonSpacePrintable(rawInput, key)) return ' ' + rawInput;
+    return rawInput;
+  }, [scrollRef, input]);
   function insertTextAtCursor(text: string) {
     // Push current state to buffer before inserting
     pushToBuffer(input, cursorOffset, pastedContents);

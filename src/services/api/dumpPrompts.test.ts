@@ -408,3 +408,140 @@ describe('v2.21.21 dump-prompts — Anthropic 通道 request body byte-equal 守
     }
   })
 })
+
+// ─── v2.25.53+ SSE buffer 增量解析（不再全流入内存） ──────────────────
+
+/**
+ * 构造一个流式 Response，body 通过 ReadableStream 喂入 SSE event。
+ * eventCount 是 content_block_delta event 数量；textPerEvent 是每条 event
+ * 的 data 文本长度（用于模拟"总流大小"）。
+ */
+function makeStreamingResponse(
+  eventCount: number,
+  textPerEvent: number,
+): Response {
+  const encoder = new TextEncoder()
+  let i = 0
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (i >= eventCount) {
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+        controller.close()
+        return
+      }
+      // 一次塞 ~16 个 event，避免 chunk 边界过细影响测试速度
+      const batch = Math.min(16, eventCount - i)
+      const lines: string[] = []
+      for (let k = 0; k < batch; k++) {
+        const text = 'x'.repeat(textPerEvent)
+        const payload = JSON.stringify({
+          type: 'content_block_delta',
+          index: i + k,
+          delta: { type: 'text_delta', text },
+        })
+        lines.push(`data: ${payload}`)
+      }
+      // SSE event 之间用 '\n\n' 分隔
+      controller.enqueue(encoder.encode(lines.join('\n\n') + '\n\n'))
+      i += batch
+    },
+  })
+  return new Response(stream, {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  })
+}
+
+describe('v2.25.53+ dump-prompts SSE 增量解析', () => {
+  test('10 MB 流：解析后 chunks 数正确，落盘 jsonl 仍含全部 chunks', async () => {
+    const agentId = 'session-sse-incremental-1'
+    // 10 MB 总流 ≈ 1000 events * 10 KB/event
+    const eventCount = 1000
+    const textPerEvent = 10 * 1024
+    currentFetchHook = async () => makeStreamingResponse(eventCount, textPerEvent)
+    const dumpFetch = createDumpPromptsFetch(agentId)!
+    await dumpFetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      body: mkBody(1),
+    })
+    // 流较大，给充足时间 drain
+    await drainEventLoop()
+    await new Promise(r => setTimeout(r, 500))
+
+    const recs = await readDumpRecords(agentId)
+    const responses = recs.filter(r => r.type === 'response')
+    expect(responses.length).toBe(1)
+    const respData = responses[0]!.data as { stream: boolean; chunks: unknown[] }
+    expect(respData.stream).toBe(true)
+    expect(respData.chunks.length).toBe(eventCount)
+    // 任取一条断言结构
+    const sample = respData.chunks[0] as {
+      type: string
+      delta: { type: string; text: string }
+    }
+    expect(sample.type).toBe('content_block_delta')
+    expect(sample.delta.type).toBe('text_delta')
+    expect(sample.delta.text.length).toBe(textPerEvent)
+  })
+
+  test('chunk 边界跨 \\n\\n 分隔符：增量 drain 仍能正确切割', async () => {
+    const agentId = 'session-sse-incremental-2'
+    const encoder = new TextEncoder()
+    const events = [
+      JSON.stringify({ type: 'message_start' }),
+      JSON.stringify({ type: 'content_block_start', index: 0 }),
+      JSON.stringify({
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: 'AAA' },
+      }),
+      JSON.stringify({ type: 'content_block_stop', index: 0 }),
+      JSON.stringify({ type: 'message_stop' }),
+    ]
+    // 故意把分隔符切到不同 chunk 内：先发前两个 event 到 'data:' 头，再补 payload
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        // chunk 1: 完整两个 event + 第三个 event 的前半（含 'data: ' 但缺尾 '\n\n'）
+        const part1 =
+          `data: ${events[0]}\n\n` +
+          `data: ${events[1]}\n\n` +
+          `data: ${events[2]!.slice(0, 30)}`
+        // chunk 2: 第三个 event 后半 + 第四个 event
+        const part2 =
+          events[2]!.slice(30) + `\n\ndata: ${events[3]}\n\n`
+        // chunk 3: 第五个 event + DONE
+        const part3 = `data: ${events[4]}\n\ndata: [DONE]\n\n`
+        controller.enqueue(encoder.encode(part1))
+        controller.enqueue(encoder.encode(part2))
+        controller.enqueue(encoder.encode(part3))
+        controller.close()
+      },
+    })
+    currentFetchHook = async () =>
+      new Response(stream, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      })
+
+    const dumpFetch = createDumpPromptsFetch(agentId)!
+    await dumpFetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      body: mkBody(1),
+    })
+    await drainEventLoop()
+    await new Promise(r => setTimeout(r, 200))
+
+    const recs = await readDumpRecords(agentId)
+    const responses = recs.filter(r => r.type === 'response')
+    expect(responses.length).toBe(1)
+    const respData = responses[0]!.data as { stream: boolean; chunks: unknown[] }
+    expect(respData.chunks.length).toBe(5)
+    // 第三个 event 是 content_block_delta，text 应被还原为 'AAA'
+    const delta = respData.chunks[2] as {
+      type: string
+      delta: { text: string }
+    }
+    expect(delta.type).toBe('content_block_delta')
+    expect(delta.delta.text).toBe('AAA')
+  })
+})

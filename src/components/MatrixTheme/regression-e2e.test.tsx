@@ -135,6 +135,32 @@ test('isMatrixTheme — env=dark → false（禁止 user config 污染）', asyn
   expect(isMatrixTheme()).toBe(false)
 })
 
+// ─── Comdr #4 (2026-04-26) /theme 热切修复 — prefetch 缓存 invalidate ───
+
+test('/theme 热切：模拟 matrix → dark 切换链路（env 删除 + prefetch invalidate）', async () => {
+  // 启动前：env=matrix
+  process.env.PANDA_THEME = 'matrix'
+  const { isMatrixTheme, setMatrixThemeCache } = await import(
+    './isMatrixTheme.js'
+  )
+  // module load 阶段 prefetch 可能为 true 也可能为 false（取决于 .pandacc.json
+  // 隔离）。模拟 prefetch=true 即可代表"用户老配置 theme=matrix"。
+  setMatrixThemeCache(true)
+  expect(isMatrixTheme()).toBe(true) // 启动状态 = matrix
+
+  // 模拟 ThemeProvider.syncMatrixEnv('dark')：先 delete env，再 cache=false
+  delete process.env.PANDA_THEME
+  setMatrixThemeCache(false)
+  // 关键断言：env 删除后，prefetch 已被 invalidate，**不会**再返回 true。
+  // 这是 W13/Comdr-4 修复前的失败模式（prefetch 永久 true → 主题永远 matrix）。
+  expect(isMatrixTheme()).toBe(false)
+
+  // 再切回 matrix：env 重设 + prefetch=true
+  process.env.PANDA_THEME = 'matrix'
+  setMatrixThemeCache(true)
+  expect(isMatrixTheme()).toBe(true)
+})
+
 // ─────────────────────────────────────────────────────────────────────
 // 3) usage 边界 — getCurrentUsage / safeUsage 各路径都不抛
 // ─────────────────────────────────────────────────────────────────────

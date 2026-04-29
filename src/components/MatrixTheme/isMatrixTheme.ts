@@ -135,6 +135,36 @@ export function isMatrixTheme(): boolean {
 }
 
 /**
+ * 显式更新 prefetch 缓存与模块级缓存。
+ *
+ * 用于 ThemeProvider 在 /theme 切换主题后通知 isMatrixTheme():
+ *   - matrix → true：保持 env=matrix + prefetch=true（兜底一致）
+ *   - 非 matrix → false：env 删除时 prefetch=false 防止旧缓存残留
+ *
+ * 不修改 process.env（由调用方负责）。仅刷新 in-memory 缓存。
+ *
+ * 设计动机：原 prefetch 缓存是 module-load 一次性，无 invalidate 路径。
+ * /theme 切换时 ThemeProvider 删除 env=matrix 后，下次 isMatrixTheme() 跳过
+ * env 分支命中 prefetch=true（旧值），导致主题热切失效（Comdr #4，2026-04-26）。
+ */
+export function setMatrixThemeCache(isMatrix: boolean): void {
+  _gt.__PANDA_IS_MATRIX_PREFETCH = isMatrix
+  // 模块级 cachedTheme 是兜底路径（prefetch undefined 时才走），但保持一致以防
+  // 未来 prefetch 被某条路径绕过。
+  cachedTheme = isMatrix ? 'matrix' : ''
+}
+
+/**
+ * 测试专用：把缓存恢复到模块加载初始态（cachedTheme=undefined +
+ * prefetch=undefined）。生产代码不应调用 — beforeEach 用，让单测从干净
+ * 状态开始走 env / fs 真实路径。
+ */
+export function _resetMatrixThemeCacheForTest(): void {
+  cachedTheme = undefined
+  _gt.__PANDA_IS_MATRIX_PREFETCH = undefined
+}
+
+/**
  * Matrix 主题 + 系统暗色模式。
  * 用于 MatrixCharRain、MatrixBootSequence 选择深色/浅色渲染路径。
  */
