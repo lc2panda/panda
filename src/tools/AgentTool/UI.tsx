@@ -10,6 +10,9 @@ import { AgentProgressLine } from '../../components/AgentProgressLine.js';
 import { FallbackToolUseErrorMessage } from '../../components/FallbackToolUseErrorMessage.js';
 import { FallbackToolUseRejectedMessage } from '../../components/FallbackToolUseRejectedMessage.js';
 import { Markdown } from '../../components/Markdown.js';
+import { isMatrixTheme } from '../../components/MatrixTheme/isMatrixTheme.js';
+import { TurnHeader } from '../../components/MatrixTheme/TurnHeader.js';
+import { WorkerScope } from '../../components/MatrixTheme/WorkerScope.js';
 import { Message as MessageComponent } from '../../components/Message.js';
 import { MessageResponse } from '../../components/MessageResponse.js';
 import { ToolUseLoader } from '../../components/ToolUseLoader.js';
@@ -384,7 +387,22 @@ export function renderToolResultMessage(data: Output, progressMessagesForMessage
       speed: null
     } as import('@anthropic-ai/sdk/resources/beta/messages/messages.mjs').BetaUsage
   });
-  return <Box flexDirection="column">
+
+  // v3.7 Pro 波次3 — sub-agent 完成态用 WorkerScope 三重边框包裹完整管线。
+  // 升级前（波次2）：单线 [WORKER · 名 · ts] chrome（仅顶标）
+  // 升级后（波次3）：╔══▶ [WORKER...]  /  ┃ <内容>  /  ╚══· completed · {duration} · {commit}
+  // 取首条 progressMessage 的 timestamp（sub-agent 起始时间）
+  const firstWithProg = progressMessagesForMessage.find((pm): pm is ProgressMessage<AgentToolProgress> => hasProgressMessage(pm.data));
+  const startTs = firstWithProg?.timestamp as string | undefined;
+  const promptStr = typeof prompt === 'string' && prompt.length > 0 ? prompt : '';
+  const cleanPrompt = promptStr.replace(/\s+/g, ' ').trim();
+  const workerName = cleanPrompt.length > 0
+    ? (cleanPrompt.length > 32 ? cleanPrompt.slice(0, 32) + '…' : cleanPrompt)
+    : 'sub-agent';
+  const durationSec = totalDurationMs > 0 ? Math.round(totalDurationMs / 1000) : undefined;
+
+  const innerContent = (
+    <Box flexDirection="column">
       {("external" as string) === 'ant' && <MessageResponse>
           <Text color="warning">
             [ANT-ONLY] API calls: {getDisplayPath(getDumpPromptsPath(agentId))}
@@ -406,7 +424,23 @@ export function renderToolResultMessage(data: Output, progressMessagesForMessage
           {'  '}
           <CtrlOToExpand />
         </Text>}
-    </Box>;
+    </Box>
+  );
+
+  // matrix 主题：用 WorkerScope 三重边框包裹；非 matrix：直接返回内容
+  if (isMatrixTheme()) {
+    return (
+      <WorkerScope
+        workerName={workerName}
+        startTimestamp={startTs}
+        status="completed"
+        durationSec={durationSec}
+      >
+        {innerContent}
+      </WorkerScope>
+    );
+  }
+  return innerContent;
 }
 export function renderToolUseMessage({
   description,
@@ -542,33 +576,61 @@ export function renderToolUseProgressMessage(progressMessages: ProgressMessage<P
     lookups: subagentLookups,
     inProgressToolUseIDs: collapsedInProgressIDs
   } = buildSubagentLookups(progressMessages.filter((pm): pm is ProgressMessage<AgentToolProgress> => hasProgressMessage(pm.data)).map(pm => pm.data));
-  return <MessageResponse>
-      <Box flexDirection="column">
-        <SubAgentProvider>
-          {isTranscriptMode && prompt && <Box marginBottom={1}>
-              <AgentPromptDisplay prompt={prompt} />
-            </Box>}
-          {displayedMessages.map(processed => {
-          if (processed.type === 'summary') {
-            // Render summary for grouped search/read/REPL operations using shared formatting
-            const summaryText = getSearchReadSummaryText(processed.searchCount, processed.readCount, processed.isActive, processed.replCount);
-            return <Box key={processed.uuid} height={1} overflow="hidden">
-                  <Text dimColor>{summaryText}</Text>
-                </Box>;
-          }
-          // Render original message without height=1 wrapper so null
-          // content (tool not found, renderToolUseMessage returns null)
-          // doesn't leave a blank line. Tool call headers are single-line
-          // anyway so truncation isn't needed.
-          return <MessageComponent key={processed.message.uuid} message={processed.message.data.message} lookups={subagentLookups} addMargin={false} tools={tools} commands={[]} verbose={verbose} inProgressToolUseIDs={collapsedInProgressIDs} progressMessagesForMessage={[]} shouldAnimate={false} shouldShowDot={false} style="condensed" isTranscriptMode={false} isStatic={true} />;
-        })}
-        </SubAgentProvider>
-        {hiddenToolUseCount > 0 && <Text dimColor>
-            +{hiddenToolUseCount} more tool{' '}
-            {hiddenToolUseCount === 1 ? 'use' : 'uses'} <CtrlOToExpand />
-          </Text>}
-      </Box>
-    </MessageResponse>;
+
+  // v3.7 Pro 波次3 — sub-agent UI 实时态用 WorkerScope 三重边框包裹完整管线。
+  // 升级前（波次2）：单线 [WORKER · 名 · ts] chrome
+  // 升级后（波次3）：╔══▶ [WORKER...] ●  /  ┃ <progress>  /  ╚══· running · ...
+  const firstWithProgRT = progressMessages.find((pm): pm is ProgressMessage<AgentToolProgress> => hasProgressMessage(pm.data));
+  const startTsRT = firstWithProgRT?.timestamp as string | undefined;
+  const promptStrRT = typeof prompt === 'string' && prompt.length > 0 ? prompt : '';
+  const cleanPromptRT = promptStrRT.replace(/\s+/g, ' ').trim();
+  const workerNameRT = cleanPromptRT.length > 0
+    ? (cleanPromptRT.length > 32 ? cleanPromptRT.slice(0, 32) + '…' : cleanPromptRT)
+    : 'sub-agent';
+
+  const innerContentRT = (
+    <Box flexDirection="column">
+      <SubAgentProvider>
+        {isTranscriptMode && prompt && <Box marginBottom={1}>
+            <AgentPromptDisplay prompt={prompt} />
+          </Box>}
+        {displayedMessages.map(processed => {
+        if (processed.type === 'summary') {
+          // Render summary for grouped search/read/REPL operations using shared formatting
+          const summaryText = getSearchReadSummaryText(processed.searchCount, processed.readCount, processed.isActive, processed.replCount);
+          return <Box key={processed.uuid} height={1} overflow="hidden">
+                <Text dimColor>{summaryText}</Text>
+              </Box>;
+        }
+        // Render original message without height=1 wrapper so null
+        // content (tool not found, renderToolUseMessage returns null)
+        // doesn't leave a blank line. Tool call headers are single-line
+        // anyway so truncation isn't needed.
+        return <MessageComponent key={processed.message.uuid} message={processed.message.data.message} lookups={subagentLookups} addMargin={false} tools={tools} commands={[]} verbose={verbose} inProgressToolUseIDs={collapsedInProgressIDs} progressMessagesForMessage={[]} shouldAnimate={false} shouldShowDot={false} style="condensed" isTranscriptMode={false} isStatic={true} />;
+      })}
+      </SubAgentProvider>
+      {hiddenToolUseCount > 0 && <Text dimColor>
+          +{hiddenToolUseCount} more tool{' '}
+          {hiddenToolUseCount === 1 ? 'use' : 'uses'} <CtrlOToExpand />
+        </Text>}
+    </Box>
+  );
+
+  // matrix 主题：用 WorkerScope 三重边框（running 态）；非 matrix：直接返回内容
+  if (isMatrixTheme()) {
+    return (
+      <MessageResponse>
+        <WorkerScope
+          workerName={workerNameRT}
+          startTimestamp={startTsRT}
+          status="running"
+        >
+          {innerContentRT}
+        </WorkerScope>
+      </MessageResponse>
+    );
+  }
+  return <MessageResponse>{innerContentRT}</MessageResponse>;
 }
 export function renderToolUseRejectedMessage(_input: {
   description: string;

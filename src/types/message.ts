@@ -37,6 +37,16 @@ export type Message = {
   isCompactSummary?: boolean
   toolUseResult?: unknown
   isVisibleInTranscriptOnly?: boolean
+  /**
+   * v3.7 Pro 波次2：标识此 message 来自 sub-agent (worker) 内部。
+   * 在 user/assistant message 上设置后：
+   *   - Messages.tsx roleChanged 走 'worker' chrome 分支
+   *   - TurnHeader 显示 [WORKER · subAgentName · ts]
+   * 元字段方案（侵入性最小），不扩展 MessageType 联合避免污染 Schema/SDK/序列化路径。
+   */
+  isSubAgent?: boolean
+  /** v3.7 Pro 波次2：sub-agent 显示名（如 'general-purpose' / 'UI-修复'），传给 TurnHeader.displayName */
+  subAgentName?: string
   attachment?: { type: string; toolUseID?: string; [key: string]: unknown }
   message?: {
     role?: string

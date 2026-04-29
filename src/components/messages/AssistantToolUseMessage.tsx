@@ -261,15 +261,22 @@ export function AssistantToolUseMessage(t0) {
   const _matrixScan = isMatrixTheme() && !isResolved && !isQueued
     ? <Box marginLeft={1}><ScanLine active={true} /></Box>
     : null;
+  // v3.7 Pro 波次4：tool call 已完成 (isResolved) 时末尾挂 ▸▸ 流向指示符
+  // —— 静态字符（不动效），worker 暗绿色 SHADOW，表达"结果流出"语义。
+  // 仅 isResolved 时显示（避免与 _matrixScan 重叠）。
+  const _matrixFlowMark = isMatrixTheme() && isResolved
+    ? <Box marginLeft={1}><Text color={isMatrixLight() ? MATRIX_SCALE_LIGHT.SHADOW : MATRIX_SCALE.SHADOW}>{'\u25B8\u25B8'}</Text></Box>
+    : null;
   let t12;
-  if ($[48] !== t10 || $[49] !== t11 || $[50] !== t6 || $[51] !== t7 || $[52] !== t9 || $['ms'] !== _matrixScan) {
-    t12 = <Box flexDirection="row" flexWrap="nowrap" minWidth={t6}>{t7}{t9}{t10}{t11}{_matrixScan}</Box>;
+  if ($[48] !== t10 || $[49] !== t11 || $[50] !== t6 || $[51] !== t7 || $[52] !== t9 || $['ms'] !== _matrixScan || $['mf'] !== _matrixFlowMark) {
+    t12 = <Box flexDirection="row" flexWrap="nowrap" minWidth={t6}>{t7}{t9}{t10}{t11}{_matrixScan}{_matrixFlowMark}</Box>;
     $[48] = t10;
     $[49] = t11;
     $[50] = t6;
     $[51] = t7;
     $[52] = t9;
     $['ms'] = _matrixScan;
+    $['mf'] = _matrixFlowMark;
     $[53] = t12;
   } else {
     t12 = $[53];

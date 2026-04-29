@@ -13,12 +13,23 @@
  * - panda    → PANDA（assistant 文本响应）
  * - tool     → tool 调用 / 结果块
  * - thinking → 内省思考块
+ * - worker   → sub-agent worker（v3.7 Pro 波次1 新增；displayName 承载具体名）
+ * - system   → system event（v3.7 Pro 波次1 新增；如 "system event"）
  */
-export type TurnRole = 'user' | 'panda' | 'tool' | 'thinking'
+export type TurnRole =
+  | 'user'
+  | 'panda'
+  | 'tool'
+  | 'thinking'
+  | 'worker'
+  | 'system'
 
 /**
  * TurnRole → MATRIX_UI[token] 的 palette key 映射。
  * 值必须是 MATRIX_UI / MATRIX_UI_LIGHT 都存在的 key。
+ *
+ * worker / system 复用 toolGutter / thinkingGutter（既有 palette key），
+ * chrome 主色由 getRoleColor() 在 TurnHeader 直接返回 v3.7 Pro 4 档色板。
  */
 export const ROLE_TOKEN: Readonly<
   Record<
@@ -30,6 +41,8 @@ export const ROLE_TOKEN: Readonly<
   panda: 'pandaGutter',
   tool: 'toolGutter',
   thinking: 'thinkingGutter',
+  worker: 'toolGutter', // worker 沿用 tool 通道的 gutter palette
+  system: 'thinkingGutter', // system 沿用 thinking 通道的 gutter palette
 } as const
 
 /**
@@ -37,10 +50,14 @@ export const ROLE_TOKEN: Readonly<
  *
  * v3 升级：'you' → 'OPERATOR'，'panda' → 'PANDA'（全大写映射 Matrix HUD 字幕风）。
  * 'tool' / 'thinking' 保持小写（次级身份，不抢主角戏份）。
+ * v3.7 Pro 波次1：worker / system 大写（属于一级 chrome 身份）。
+ *   worker 默认文案为 'WORKER'；具体名（如 'UI-修复'）通过 displayName prop 覆盖。
  */
 export const ROLE_LABEL: Readonly<Record<TurnRole, string>> = {
   user: 'OPERATOR',
   panda: 'PANDA',
   tool: 'tool',
   thinking: 'thinking',
+  worker: 'WORKER',
+  system: 'SYSTEM',
 }

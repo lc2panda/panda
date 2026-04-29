@@ -629,22 +629,47 @@ const MessagesImpl = ({
     const rawRow = <MessageRow key={k_0} message={msg_8} isUserContinuation={isUserContinuation} hasContentAfter={hasContentAfter} tools={tools} commands={commands} verbose={verbose || isItemExpanded(msg_8) || cursor?.expanded === true && index === selectedIdx} inProgressToolUseIDs={inProgressToolUseIDs} streamingToolUseIDs={streamingToolUseIDs} screen={screen} canAnimate={canAnimate} onOpenRateLimitOptions={onOpenRateLimitOptions} lastThinkingBlockId={lastThinkingBlockId} latestBashOutputUUID={latestBashOutputUUID} columns={columns} isLoading={isLoading} lookups={lookups_0} />;
     // v3 OPERATOR-NEO chrome: roleChanged → 插入 [OPERATOR/PANDA · ts] 顶标 + 上一 turn 末尾的 TurnSeparator。
     // 连续同角色 message 不重复顶标（只首条显示），与原 isUserContinuation 同源。
-    const isRoleMsg = msg_8.type === 'user' || msg_8.type === 'assistant';
-    const roleChanged = isRoleMsg && prevType !== msg_8.type;
+    // v3.7 Pro 波次2：扩展 worker / system 分支。
+    //   - worker: msg.isSubAgent=true 的 user/assistant 消息（来自 sub-agent 内部）
+    //   - system: msg.type='system'（"Agent X completed" 等系统事件）
+    // chrome key 同时考虑 isSubAgent 标记，确保 user→worker 切换也插顶标。
+    const isRoleMsg = msg_8.type === 'user' || msg_8.type === 'assistant' || msg_8.type === 'system';
+    const isSubAgentMsg = (msg_8 as { isSubAgent?: boolean }).isSubAgent === true;
+    const prevMsg = index > 0 ? renderableMessages[index - 1] : undefined;
+    const prevIsSubAgent = (prevMsg as { isSubAgent?: boolean } | undefined)?.isSubAgent === true;
+    // chromeKey: 用于跨 type+isSubAgent 维度判定 roleChanged
+    //   user             → 'user'
+    //   assistant        → 'panda'
+    //   user/assistant + isSubAgent → 'worker'
+    //   system           → 'system'
+    const computeChromeKey = (m: typeof msg_8 | undefined): string | null => {
+      if (!m) return null;
+      const sub = (m as { isSubAgent?: boolean }).isSubAgent === true;
+      if (m.type === 'user') return sub ? 'worker' : 'user';
+      if (m.type === 'assistant') return sub ? 'worker' : 'panda';
+      if (m.type === 'system') return 'system';
+      return null;
+    };
+    const curChromeKey = computeChromeKey(msg_8);
+    const prevChromeKey = computeChromeKey(prevMsg);
+    const roleChanged = isRoleMsg && curChromeKey !== null && curChromeKey !== prevChromeKey;
     const row = rawRow;
     const matrix = isMatrixTheme();
 
     // v3 P3: roleChanged 时为本 turn 首条 message 插一行顶标。
     // role: user → 'user', assistant → 'panda'（chrome 规约）。
+    // v3.7 Pro 波次2: isSubAgent → 'worker'（displayName 取 msg.subAgentName）；type='system' → 'system'。
     // timestamp 取自 normalizedMessage 的 timestamp（兜底空字符串则 TurnHeader 自然不显示时段）。
     let matrixHeader: React.ReactNode = null;
     let matrixSeparator: React.ReactNode = null;
-    if (matrix && roleChanged) {
-      const role = msg_8.type === 'user' ? 'user' : 'panda';
+    if (matrix && roleChanged && curChromeKey !== null) {
+      const role = curChromeKey as 'user' | 'panda' | 'worker' | 'system';
       const ts = (msg_8 as { timestamp?: string }).timestamp;
+      const displayName = isSubAgentMsg ? (msg_8 as { subAgentName?: string }).subAgentName : undefined;
       matrixHeader = (
         <TurnHeader
           role={role}
+          displayName={displayName}
           timestamp={ts}
           // streaming 中的最后一条 panda 用 isLoading 触发呼吸 dot
           isLoading={role === 'panda' && isLoading && index === renderableMessages.length - 1}
@@ -652,10 +677,12 @@ const MessagesImpl = ({
       );
       // index > 0 时在顶标前面插 turn 分隔条（首条不插，避免 logo 后多余间隔）
       if (index > 0) {
-        // turnIndex 用 index 直接当近似 turn 序号（每 5 turn 一次彩蛋）
-        matrixSeparator = <TurnSeparator turnIndex={index} />;
+        // v3.7 Pro 波次3：传入 columns 让分隔条响应式 ╳ ─── ╳。
+        matrixSeparator = <TurnSeparator turnIndex={index} width={columns} />;
       }
     }
+    // 标记 prevIsSubAgent 已读取（消除未使用警告，预留给后续波次的 worker→operator 出栈分隔逻辑）
+    void prevIsSubAgent;
 
     // Per-row Provider — only 2 rows re-render on selection change.
     // Wrapped BEFORE divider branch so both return paths get it.

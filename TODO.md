@@ -183,3 +183,36 @@ W16 进行中 (4/5 完成):
 
 ### D 类不迁移（已知禁用）
 - 企业 Console 鉴权 / Bedrock Mantle / OTEL 全家桶 / Datadog / Slacked / Perforce / 远程 settings 强刷 / channels 插件白名单
+
+## matrix theme v3.7 Pro 后续波次（2026-04-29）
+
+### 波次1 已完成 ✅
+- [x] 4 档绿色板（OPERATOR_BRIGHT/PANDA_STD/WORKER_DIM/SYSTEM_FAINT）+ getRoleColor / getRoleDimColor helper
+- [x] TurnRole 扩展 worker / system + ROLE_LABEL / ROLE_TOKEN 同步
+- [x] TurnHeader 重构：`▎▶ [LABEL · ts] ━━━━ ◉ IN ▌` 6 元素 chrome
+- [x] 响应式延伸线（最少 8 字符 / 上限 columns-4）
+- [x] 11 单元测试 + 全套 74 测试无回归
+- [x] build PASS（606 文件）
+
+### 波次2 已完成 ✅（2026-04-29）
+- [x] Message 元字段扩展 isSubAgent? + subAgentName?（侵入性最小方案，不扩展 type 联合）
+- [x] Messages.tsx roleChanged 逻辑接 worker / system 分支（computeChromeKey helper 跨 type+isSubAgent 维度）
+- [x] AgentTool/UI 与 TurnHeader worker role 对接，displayName 来自 prompt 摘要（首 32 字符 + …）
+- [x] sub-agent 实时模式（renderToolUseProgressMessage）+ 完成模式（renderToolResultMessage）双路径 worker chrome
+- [x] **Comdr 问题 #2 修复**：sub-agent UI 自带 chrome 边界，thinking/tool calls 不再「淹没」在主线时间戳间
+- [x] 12 单元测试 + 全套 86 测试无回归
+- [x] build PASS（606 文件）+ dist 落盘验证（chunk-97z7bbgv.js / chunk-j35q1e1c.js）
+- [x] 端到端实测 [SYSTEM · 18:44:19] chrome 在 cli stdout 渲染
+
+### 波次3 / 波次4（指挥官明确范围外）
+- [ ] 屏幕骨架（screen scaffold）
+- [ ] worker 三重边框
+- [ ] 动效细节（呼吸 dot 改进、scanline 增强等）
+- [ ] prevIsSubAgent 出栈分隔逻辑（已在 Messages.tsx 预留 void 引用）
+- [ ] displayName 完整命名：扩展 Tool.renderToolUseProgressMessage 加 toolUseInput 参数从 lookups 反查 subagent_type（涉及 9 个工具适配）
+
+### 已知限制
+- TurnHeader 单元测试覆盖逻辑层（color/role/bar 宽度 + chromeKey）；React 组件渲染快照需 ink-testing-library（项目未引入），用 stdout 仿真脚本 + 静态源码 + dist bundle grep 三重链路验证已 PASS
+- pipe 模式（`-p`）不渲染 TurnHeader，端到端真机验证需 TTY 交互模式
+- 真实 spawn sub-agent 受上游 cache_control API 阻挡，worker chrome 验证依赖单元 + 源码 + dist + e2e SYSTEM chrome 同源链路
+

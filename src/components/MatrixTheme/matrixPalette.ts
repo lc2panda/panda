@@ -224,6 +224,103 @@ export const MATRIX_BREATH_PULSE_LIGHT = [
   '#1A6A1A', // L5 NEON
 ] as const
 
+// ─── v3.7 Pro 波次1：4 档 role 色板 ─────────────────────────────────
+// 设计目标：每个 role 一个明确的 chrome 主色，亮度阶梯严格递减，
+// 确保 OPERATOR > PANDA > WORKER > SYSTEM 的视觉层级 1 眼可识。
+//
+// dark 档：纯磷光 hex（CRT phosphor 经典 #00ff41 雨头）
+// light 档：取等价亮度的暗绿（在浅底上保持 ≥4.5:1 对比）
+//
+// 选用规则（getRoleColor）：仅按 role 派生，与既有 phosphor fade / flash 动效叠加。
+export const MATRIX_ROLE_DARK = {
+  OPERATOR_BRIGHT: '#00ff41', // 亮绿 — 用户主动信号（雨头）
+  PANDA_STD: '#00cc33', // 标准绿 — assistant 主体
+  WORKER_DIM: '#008822', // 暗绿 — sub-agent worker
+  SYSTEM_FAINT: '#005511', // 极暗 — system event
+} as const
+
+// light 档对称：取浅底上视觉权重相当的暗绿
+export const MATRIX_ROLE_LIGHT = {
+  OPERATOR_BRIGHT: '#1A5A1A', // L4-5 — OPERATOR 主信号（浅底深绿）
+  PANDA_STD: '#1E6A1E', // L6 — PANDA 标准
+  WORKER_DIM: '#3C8C3C', // L3.5 — WORKER 中度
+  SYSTEM_FAINT: '#6BA86B', // L3 SHADOW — SYSTEM 极淡
+} as const
+
+/**
+ * 4 类 role → role 主色（hex）。
+ * 逻辑层 role token：
+ *   - 'operator' / 'user'  → OPERATOR_BRIGHT
+ *   - 'panda' / 'assistant'→ PANDA_STD
+ *   - 'worker'             → WORKER_DIM
+ *   - 'system'             → SYSTEM_FAINT
+ *   - 其它（'tool' / 'thinking'）→ 回退到 PANDA_STD（承袭既有 chrome 默认）
+ *
+ * lightMode=true 时返回 light 档对称值。
+ */
+export function getRoleColor(
+  role: string,
+  lightMode = false,
+): string {
+  const palette = lightMode ? MATRIX_ROLE_LIGHT : MATRIX_ROLE_DARK
+  switch (role) {
+    case 'operator':
+    case 'user':
+      return palette.OPERATOR_BRIGHT
+    case 'panda':
+    case 'assistant':
+      return palette.PANDA_STD
+    case 'worker':
+      return palette.WORKER_DIM
+    case 'system':
+      return palette.SYSTEM_FAINT
+    default:
+      return palette.PANDA_STD
+  }
+}
+
+/**
+ * role 主色 dim 一档（用于 chrome 尾部延伸线）。
+ * 实现：在 dark 档下用 50% 亮度对应的暗色映射；light 档下取更深一档。
+ */
+export function getRoleDimColor(
+  role: string,
+  lightMode = false,
+): string {
+  if (lightMode) {
+    // light：dim 用更浅的色（不那么"显眼"）
+    switch (role) {
+      case 'operator':
+      case 'user':
+        return MATRIX_SCALE_LIGHT.SHADOW // L3
+      case 'panda':
+      case 'assistant':
+        return MATRIX_SCALE_LIGHT.SHADOW
+      case 'worker':
+        return MATRIX_SCALE_LIGHT.DEEP // L2
+      case 'system':
+        return MATRIX_SCALE_LIGHT.DEEP
+      default:
+        return MATRIX_SCALE_LIGHT.SHADOW
+    }
+  }
+  // dark：dim 取约 role 主色的 50% 亮度
+  switch (role) {
+    case 'operator':
+    case 'user':
+      return '#007F1F' // OPERATOR_BRIGHT 50%
+    case 'panda':
+    case 'assistant':
+      return '#006619' // PANDA_STD 50%
+    case 'worker':
+      return '#004411' // WORKER_DIM 50%
+    case 'system':
+      return '#002A08' // SYSTEM_FAINT 50%
+    default:
+      return '#006619'
+  }
+}
+
 // ─── Light-mode Matrix scale (H≈130° — cool mint-green on pale paper) ───
 // Designed for bright terminals: deep greens on light background.
 // Contrast ratios against #E8F5E8 noted for WCAG compliance.
