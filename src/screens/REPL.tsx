@@ -4623,16 +4623,7 @@ export function REPL({
         jumpToNew(scrollRef.current);
       }} scrollable={<>
               <TeammateViewHeader />
-              {/* v3.7 Pro 波次3 — 顶 frame + 顶 char rain：终端外壳上半 */}
-              {isMatrixTheme() && <ScreenFrame
-                position="top"
-                cols={transcriptCols}
-                sessionId={getSessionId()}
-                modelId={mainLoopModel ? String(mainLoopModel).replace(/-\d{8}$/, '') : undefined}
-                turnCount={messages.filter(m => m.type === 'user' && !m.isMeta).length}
-                status={isLoading ? 'gen' : 'idle'}
-              />}
-              {isMatrixTheme() && <StaticCharRain width={transcriptCols} />}
+              {/* v3.8 简化：移除顶 ScreenFrame + StaticCharRain（过度装饰）；保留 MatrixBanner */}
               {isMatrixTheme() && <MatrixBanner cols={transcriptCols} height={2} />}
               <Messages messages={displayedMessages} tools={tools} commands={commands} verbose={verbose} toolJSX={toolJSX} toolUseConfirmQueue={toolUseConfirmQueue} inProgressToolUseIDs={viewedTeammateTask ? viewedTeammateTask.inProgressToolUseIDs ?? new Set() : inProgressToolUseIDs} isMessageSelectorVisible={isMessageSelectorVisible} conversationId={conversationId} screen={screen} streamingToolUses={streamingToolUses} showAllInTranscript={showAllInTranscript} agentDefinitions={agentDefinitions} onOpenRateLimitOptions={handleOpenRateLimitOptions} isLoading={isLoading} streamingText={isLoading && !viewedAgentTask ? visibleStreamingText : null} isBriefOnly={viewedAgentTask ? false : isBriefOnly} unseenDivider={viewedAgentTask ? undefined : unseenDivider} scrollRef={isFullscreenEnvEnabled() ? scrollRef : undefined} trackStickyPrompt={isFullscreenEnvEnabled() ? true : undefined} cursor={cursor} setCursor={setCursor} cursorNavRef={cursorNavRef} />
               <AwsAuthStatusBox />
@@ -4654,14 +4645,7 @@ export function REPL({
               {showSpinner && <SpinnerWithVerb mode={streamMode} spinnerTip={spinnerTip} responseLengthRef={responseLengthRef} apiMetricsRef={apiMetricsRef} overrideMessage={spinnerMessage} spinnerSuffix={stopHookSpinnerSuffix} verbose={verbose} loadingStartTimeRef={loadingStartTimeRef} totalPausedMsRef={totalPausedMsRef} pauseStartTimeRef={pauseStartTimeRef} overrideColor={spinnerColor} overrideShimmerColor={spinnerShimmerColor} hasActiveTools={inProgressToolUseIDs.size > 0} leaderIsIdle={!isLoading} />}
               {!showSpinner && !isLoading && !userInputOnProcessing && !hasRunningTeammates && isBriefOnly && !viewedAgentTask && <BriefIdleStatus />}
               {isFullscreenEnvEnabled() && <PromptInputQueuedCommands />}
-              {/* v3.7 Pro 波次3 — 底 char rain + 底 frame：终端外壳下半 */}
-              {isMatrixTheme() && <StaticCharRain width={transcriptCols} />}
-              {isMatrixTheme() && <ScreenFrame
-                position="bottom"
-                cols={transcriptCols}
-                sessionId={getSessionId()}
-                status={isLoading ? 'gen' : 'idle'}
-              />}
+              {/* v3.8 简化：移除底 ScreenFrame + StaticCharRain（过度装饰） */}
             </>} bottom={<Box flexDirection={feature('BUDDY') && companionNarrow ? 'column' : 'row'} width="100%" alignItems={feature('BUDDY') && companionNarrow ? undefined : 'flex-end'}>
               {feature('BUDDY') && companionNarrow && isFullscreenEnvEnabled() && companionVisible ? <CompanionSprite /> : null}
               <Box flexDirection="column" flexGrow={1}>

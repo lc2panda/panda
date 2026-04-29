@@ -195,10 +195,8 @@ export function TurnHeader({ role, displayName, timestamp, flashTrigger, isLoadi
       <Text color={finalColor} dimColor={!flashed && fading}>
         {headerText}
       </Text>
-      {/* 延伸线 ━ — role 暗 1 级 */}
-      <Text color={dimColor}> {bar} </Text>
-      {/* 状态灯 ◉/▰/● — role 主色 */}
-      <Text color={finalColor}>{statusLight}</Text>
+      {/* 状态灯 ◉/▰/● — role 主色（v3.8 简化：移除 ━━━ 延伸线，过度装饰） */}
+      <Text color={finalColor}> {statusLight}</Text>
       {/* 末尾 ▌ — 同 role 主色 */}
       <Text color={finalColor}> {tail}</Text>
     </Box>

@@ -675,11 +675,7 @@ const MessagesImpl = ({
           isLoading={role === 'panda' && isLoading && index === renderableMessages.length - 1}
         />
       );
-      // index > 0 时在顶标前面插 turn 分隔条（首条不插，避免 logo 后多余间隔）
-      if (index > 0) {
-        // v3.7 Pro 波次3：传入 columns 让分隔条响应式 ╳ ─── ╳。
-        matrixSeparator = <TurnSeparator turnIndex={index} width={columns} />;
-      }
+      // v3.8 简化：移除 ╳ ─── ╳ 扫描线（v3.7 Pro 装饰过度），matrixSeparator 保持 null
     }
     // 标记 prevIsSubAgent 已读取（消除未使用警告，预留给后续波次的 worker→operator 出栈分隔逻辑）
     void prevIsSubAgent;
