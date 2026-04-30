@@ -65,19 +65,38 @@ const recap = {
           return null
         }
 
+        // v2.25.57 hotfix: 30s timeout 防止 generateAwaySummary 静默卡死
+        // 导致 outer Promise 永不 resolve（Comdr 实测：/recap 后回车没反应）。
+        // 任何路径都保证 onDone 被调用，dispatch 不会挂死。
         const controller = new AbortController()
-        const text = await generateAwaySummary(messages, controller.signal)
+        const timeoutId = setTimeout(() => controller.abort(), 30000)
 
-        if (controller.signal.aborted || text === null) {
-          onDone('Recap generation aborted or returned empty.', {
-            display: 'system',
-          })
+        try {
+          const text = await generateAwaySummary(messages, controller.signal)
+          clearTimeout(timeoutId)
+
+          if (controller.signal.aborted) {
+            onDone('Recap generation timed out (30s). Try again.', {
+              display: 'system',
+            })
+            return null
+          }
+          if (text === null) {
+            onDone('Recap generation returned empty (API error?). Check PANDA_DEBUG=1 logs.', {
+              display: 'system',
+            })
+            return null
+          }
+
+          context.setMessages(prev => [...prev, createAwaySummaryMessage(text)])
+          onDone(undefined, { display: 'skip' })
+          return null
+        } catch (err) {
+          clearTimeout(timeoutId)
+          const msg = err instanceof Error ? err.message : String(err)
+          onDone(`Recap failed: ${msg}`, { display: 'system' })
           return null
         }
-
-        context.setMessages(prev => [...prev, createAwaySummaryMessage(text)])
-        onDone(undefined, { display: 'skip' })
-        return null
       },
     }),
 } satisfies Command

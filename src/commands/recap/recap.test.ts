@@ -145,7 +145,8 @@ describe('/recap command integration', () => {
     }
     await mod.call(onDone, ctx, '')
     expect(captured.length).toBe(0)
-    expect(doneText).toContain('aborted or returned empty')
+    // v2.25.57: null 路径文案细分为 timeout / empty / err 三类，断言关键字 "empty"
+    expect(doneText).toContain('empty')
   })
 })
 
