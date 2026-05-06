@@ -120,17 +120,19 @@ describe('/recap command integration', () => {
       doneOpts = o
     }
     await mod.call(onDone, ctx, '')
+    // v2.25.59: onDone 立即 ack（display:'system' + 'Generating recap…'）
+    expect(doneOpts?.display).toBe('system')
+    expect(doneText).toBe('Generating recap…')
+    // setMessages 在 background fire-and-forget 中触发，等 microtask 跑完再断言
+    await new Promise(resolve => setTimeout(resolve, 50))
     expect(captured.length).toBe(1)
     const last = captured[0]![captured[0]!.length - 1]! as any
     expect(last.type).toBe('system')
     expect(last.subtype).toBe('away_summary')
     expect(last.content).toContain('debugging')
-    // onDone with display:'skip' → 不在 transcript 留 stdout 包装
-    expect(doneOpts?.display).toBe('skip')
-    expect(doneText).toBeUndefined()
   })
 
-  test('generateAwaySummary 返回 null（abort/error）→ 提示并不 push', async () => {
+  test('generateAwaySummary 返回 null（abort/error）→ background 不 push', async () => {
     mock.module('../../services/awaySummary.js', () => ({
       generateAwaySummary: async () => null,
     }))
@@ -144,9 +146,11 @@ describe('/recap command integration', () => {
       doneText = t
     }
     await mod.call(onDone, ctx, '')
+    // v2.25.59: onDone 立即 ack 'Generating recap…' 即使 background 失败
+    expect(doneText).toBe('Generating recap…')
+    await new Promise(resolve => setTimeout(resolve, 50))
+    // background null → 不 push（仅 log，dispatch 已 ack）
     expect(captured.length).toBe(0)
-    // v2.25.57: null 路径文案细分为 timeout / empty / err 三类，断言关键字 "empty"
-    expect(doneText).toContain('empty')
   })
 })
 

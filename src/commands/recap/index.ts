@@ -24,6 +24,7 @@ import type {
 import type { Message } from '../../types/message.js'
 import { generateAwaySummary } from '../../services/awaySummary.js'
 import { createAwaySummaryMessage } from '../../utils/messages.js'
+import { logForDebugging } from '../../utils/debug.js'
 
 /**
  * Returns true if there is already an away_summary system message after the
@@ -51,52 +52,60 @@ const recap = {
         onDone: LocalJSXCommandOnDone,
         context: LocalJSXCommandContext,
       ): Promise<React.ReactNode> {
+        logForDebugging('[recap] call() entered')
         const messages = context.getAppState().messages
         if (messages.length === 0) {
+          logForDebugging('[recap] empty messages → early return')
           onDone('No conversation yet — nothing to recap.', {
             display: 'system',
           })
           return null
         }
         if (hasSummarySinceLastUserTurn(messages)) {
+          logForDebugging('[recap] already exists this turn → early return')
           onDone('Recap already exists for the current turn.', {
             display: 'system',
           })
           return null
         }
 
-        // v2.25.57 hotfix: 30s timeout 防止 generateAwaySummary 静默卡死
-        // 导致 outer Promise 永不 resolve（Comdr 实测：/recap 后回车没反应）。
-        // 任何路径都保证 onDone 被调用，dispatch 不会挂死。
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 30000)
+        // v2.25.59 hotfix: fire-and-forget — onDone 立即 ack 不阻塞 dispatch，
+        // generateAwaySummary 在 background 跑，完成后 setMessages push ※ 卡片。
+        // 之前 v2.25.57 的 await + 30s timeout 在某条件下 onDone 仍不显示
+        // (Comdr 实测：等 60s 仍零反应)，根因可能在 await 期间 outer Promise
+        // 长时间挂起影响 React render path。改为 fire-and-forget 让 dispatch
+        // 链路立即解锁，给用户即时反馈。
+        logForDebugging(
+          `[recap] dispatching background generate (messages=${messages.length})`,
+        )
+        onDone('Generating recap…', { display: 'system' })
 
-        try {
-          const text = await generateAwaySummary(messages, controller.signal)
-          clearTimeout(timeoutId)
-
-          if (controller.signal.aborted) {
-            onDone('Recap generation timed out (30s). Try again.', {
-              display: 'system',
-            })
-            return null
+        void (async () => {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 30000)
+          try {
+            const text = await generateAwaySummary(messages, controller.signal)
+            clearTimeout(timeoutId)
+            if (controller.signal.aborted) {
+              logForDebugging('[recap] background timed out (30s)')
+              return
+            }
+            if (text === null) {
+              logForDebugging('[recap] background returned null')
+              return
+            }
+            logForDebugging(
+              `[recap] background success, pushing summary (${text.length} chars)`,
+            )
+            context.setMessages(prev => [...prev, createAwaySummaryMessage(text)])
+          } catch (err) {
+            clearTimeout(timeoutId)
+            const msg = err instanceof Error ? err.message : String(err)
+            logForDebugging(`[recap] background failed: ${msg}`)
           }
-          if (text === null) {
-            onDone('Recap generation returned empty (API error?). Check PANDA_DEBUG=1 logs.', {
-              display: 'system',
-            })
-            return null
-          }
+        })()
 
-          context.setMessages(prev => [...prev, createAwaySummaryMessage(text)])
-          onDone(undefined, { display: 'skip' })
-          return null
-        } catch (err) {
-          clearTimeout(timeoutId)
-          const msg = err instanceof Error ? err.message : String(err)
-          onDone(`Recap failed: ${msg}`, { display: 'system' })
-          return null
-        }
+        return null
       },
     }),
 } satisfies Command
