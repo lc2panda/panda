@@ -639,6 +639,10 @@ const en = {
   'tool.errorOutput': 'Error Output',
   'tool.toolOutput': 'Tool Output',
   'tool.toolInput': 'Tool Input',
+  'tool.agentPrompt': 'Agent Prompt',
+  // W23C task #3: truncated message expand / collapse (Ctrl+O for global verbose)
+  'chat.expandTruncated': 'Show {hidden} more (Ctrl+O all)',
+  'chat.collapseTruncated': 'Collapse',
   'tool.readFileContents': 'Read file contents',
   'tool.createFile': 'Create file',
   'tool.updateFileContents': 'Update file contents',

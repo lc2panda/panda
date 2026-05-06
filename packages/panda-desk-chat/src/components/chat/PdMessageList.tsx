@@ -217,6 +217,7 @@ export const PdMessageList: React.FC<PdMessageListProps> = ({
   const shouldAutoScrollRef = useRef(true);
   const lastSessionIdRef = useRef<string | null>(sessionId);
   const transcriptMode = useChatStore((s) => s.transcriptMode);
+  const cycleTranscriptMode = useChatStore((s) => s.cycleTranscriptMode);
   const retryLastMessage = useChatStore((s) => s.retryLastMessage);
   const setFeedback = useChatStore((s) => s.setFeedback);
   const activeSession = useChatStore((s) => s.getActiveSession());
@@ -224,6 +225,28 @@ export const PdMessageList: React.FC<PdMessageListProps> = ({
   const activeThinkingId = activeSession?.activeThinkingId ?? null;
   // panda store 暂无 agentTaskNotifications — stub `{}` for cc-haha 接口对齐.
   const agentTaskNotifications: Record<string, unknown> = {};
+
+  // W23C 任务 #3：全局 Ctrl+O 切换 transcriptMode（normal → verbose → summary → ...）
+  //   verbose 模式下所有 truncate 失效（消息全展开），与 Claude Code CLI 行为一致。
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ctrl+O 或 Cmd+O（macOS friendly）— 但不能与浏览器 "open file" 冲突，
+      //   因此只在不带 Shift / Alt 的情况下触发，且如果焦点在 input/textarea 内不触发
+      const target = e.target as HTMLElement | null;
+      const inEditable =
+        !!target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (inEditable) return;
+      if ((e.ctrlKey || e.metaKey) && (e.key === "o" || e.key === "O") && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        cycleTranscriptMode();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [cycleTranscriptMode]);
 
   /* ── Rewind Modal state — 1:1 cc-haha L153-291 (panda：暂未接入 sessionsApi，
         仅维持 dialog 视觉与可触发交互；confirm 按钮无网络副作用) ────────────── */
@@ -325,6 +348,7 @@ export const PdMessageList: React.FC<PdMessageListProps> = ({
               key={msg.id}
               content={text}
               timestamp={msg.timestamp}
+              transcriptMode={transcriptMode}
               onRewind={
                 typeof rewindableUserIndex === "number"
                   ? () =>

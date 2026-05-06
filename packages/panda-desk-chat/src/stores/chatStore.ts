@@ -363,9 +363,15 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
   setActiveSession: (sessionId) => {
     set({ activeSessionId: sessionId });
-    // Lazy-load history from disk when switching to a session
+    // W23C 任务 #5 修复：每次切回 tab 都 force reload 历史，确保外部终端写入的
+    //   jsonl 增量被吸收（Comdr 反馈"必须关闭再打开 tab 才同步"根因）。
+    //   loadSessionHistory 内部 guard：如果 chatState 是 streaming/thinking/tool_executing
+    //   则跳过（避免冲掉 desk-chat 自己启的 stream 状态）。
     const session = getSession(get().sessions, sessionId);
     if (!session || session.messages.length === 0) {
+      get().loadSessionHistory(sessionId);
+    } else {
+      // 已有内存数据 → force reload 但保护 streaming 状态
       get().loadSessionHistory(sessionId);
     }
   },
@@ -881,9 +887,29 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         messageEntryToUIMessage(m),
       );
 
+      // W23C 任务 #5 修复：对齐磁盘最新状态（外部终端写入的增量也吸收进来）。
+      //   保护规则：
+      //   - 如果当前 session 正在 streaming/thinking/tool_executing → 跳过 reload（保 live 状态）
+      //   - 如果磁盘消息数量 ≤ 内存消息数量 → 跳过（避免回退）
+      //   - 其它情况 → 用磁盘数据替换内存（外部终端进度同步进来）
       set((state) => {
         const existing = getSession(state.sessions, sessionId);
-        if (existing && existing.messages.length > 0) return state;
+
+        // 保护 active streaming：避免 reload 冲掉正在进行的 stream
+        if (
+          existing &&
+          (existing.chatState === 'streaming' ||
+            existing.chatState === 'thinking' ||
+            existing.chatState === 'tool_executing' ||
+            existing.chatState === 'permission_pending')
+        ) {
+          return state;
+        }
+
+        // 防止回退：磁盘条数 < 内存条数（在罕见 race 下可能发生），保留内存
+        if (existing && existing.messages.length > messages.length) {
+          return state;
+        }
 
         const session: PerSessionState = existing ?? createEmptySession(sessionId);
         return {
@@ -1320,3 +1346,71 @@ queueMicrotask(() => {
     console.warn('[chatStore] tabStore status sync subscribe failed:', err);
   });
 });
+
+// ---------------------------------------------------------------------------
+// W23C 任务 #5 修复：active session 轮询同步 — 解决"外部终端进度更新时
+//   UI 已打开 tab 不自动刷新"问题。
+//
+// 触发条件：
+//   - 当前 active session 存在
+//   - chatState === 'idle'（不冲撞 desk-chat 自己启的 stream）
+//   - 浏览器窗口可见（document.visibilityState === 'visible'，否则浪费 IPC）
+//
+// 轮询间隔：3 秒（足够低延迟感知，不至于 IPC 风暴）
+//
+// 实现要点：
+//   - loadSessionHistory 内部已有 streaming 保护 + 防回退保护
+//   - 这里只触发，不自己解析
+// ---------------------------------------------------------------------------
+
+const ACTIVE_SESSION_SYNC_INTERVAL_MS = 3000;
+
+if (typeof window !== 'undefined') {
+  let syncTimer: ReturnType<typeof setInterval> | null = null;
+
+  const startSyncTimer = () => {
+    if (syncTimer != null) return;
+    syncTimer = setInterval(() => {
+      // 浏览器隐藏时跳过（节省资源）
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      const state = useChatStore.getState();
+      const activeId = state.activeSessionId;
+      if (!activeId) return;
+      const session = state.sessions.get(activeId);
+      if (!session) return;
+      if (session.chatState !== 'idle') return; // streaming 时跳过
+      // 触发 reload — loadSessionHistory 内部 guard 决定是否覆盖
+      void state.loadSessionHistory(activeId);
+    }, ACTIVE_SESSION_SYNC_INTERVAL_MS);
+  };
+
+  const stopSyncTimer = () => {
+    if (syncTimer != null) {
+      clearInterval(syncTimer);
+      syncTimer = null;
+    }
+  };
+
+  // 启动 + 在窗口可见性变化时管理 timer
+  startSyncTimer();
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        // 立即触发一次 + 启动 timer
+        const state = useChatStore.getState();
+        const activeId = state.activeSessionId;
+        if (activeId) {
+          const session = state.sessions.get(activeId);
+          if (session && session.chatState === 'idle') {
+            void state.loadSessionHistory(activeId);
+          }
+        }
+        startSyncTimer();
+      } else {
+        stopSyncTimer();
+      }
+    });
+  }
+}

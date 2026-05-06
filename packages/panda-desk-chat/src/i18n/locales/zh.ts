@@ -642,6 +642,10 @@ const zh: Record<TranslationKey, string> = {
   'tool.errorOutput': '错误输出',
   'tool.toolOutput': '工具输出',
   'tool.toolInput': '工具输入',
+  'tool.agentPrompt': 'Agent 提示',
+  // W23C 任务 #3：消息缩略 / 展开 / 折叠（Ctrl+O 全局展开）
+  'chat.expandTruncated': '展开 {hidden} 行 (Ctrl+O 全展开)',
+  'chat.collapseTruncated': '折叠',
   'tool.readFileContents': '读取文件内容',
   'tool.createFile': '创建文件',
   'tool.updateFileContents': '更新文件内容',

@@ -390,15 +390,25 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(function
       return;
     }
 
-    if (!activeTabId) return;
-
     // panda chatStore.sendMessage 不接 attachments；序列化为内容尾部 @path 行（后端在 chat 流中可识别）。
     const attachmentLines = attachments.map((a) => `@${a.name}`).join(' ');
     const merged = attachmentLines ? (text ? `${text}\n${attachmentLines}` : attachmentLines) : text;
 
+    // Comdr 指令 (W23B 任务 #2 — 第一次发消息丢失根因修复，2026-05-06):
+    //   旧代码 `if (!activeTabId) return;` 在 EmptySession 场景下错误地拦截发送 —
+    //   EmptySession 传 sessionId='' + onSend=handleSendNew，期望按 Enter 触发 onSend
+    //   再走 createSession + sendMessage 流程；但 `activeTabId = '' || null || null = null`
+    //   被 guard 拦截，handleSubmit 提前 return，textarea 内容保留、IPC 不发，造成
+    //   "第一次发消息丢失" + "输入框其实没清屏（用户感知差异）"。
+    //   修复：onSend 路径 (EmptySession) 直接调 onSend，不依赖 activeTabId；
+    //         无 onSend 路径 (ActiveSession) 才需要 activeTabId 守护。
+    //   1:1 对齐 cc-haha EmptySession.tsx L183-254（独立 handleSubmit 直 await
+    //   createSession 再 sendMessage，无 activeTabId 守卫）+ ChatInput.tsx L298-336
+    //   （非空场景才走 sendMessage(activeTabId!,...))。
     if (onSend) {
       onSend(merged);
     } else {
+      if (!activeTabId) return;
       sendMessage(activeTabId, merged);
     }
     setInput('');

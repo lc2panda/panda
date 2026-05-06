@@ -396,25 +396,38 @@ export function PdProviderSettings() {
   );
 }
 
-// ─── Claude Official Login (cc-haha components/settings/ClaudeOfficialLogin.tsx 1:1) ────────────
+// ─── Claude Official 认证状态 (panda 适配版) ────────────
+//
+// Comdr 指令 (W23B 任务 #4 — 服务商配置不可用根因修复，2026-05-06):
+//   旧 ClaudeOfficialLogin 是 cc-haha 1:1 占位（disabled OAuth 按钮 + "Claude OAuth
+//   not yet wired"），导致 Comdr 进设置-服务商看到 "登录 Claude 账号" 按钮永久灰禁，
+//   误判为"配置不可用"。panda 实际认证模式不是 OAuth，而是：
+//     1. 环境变量 ANTHROPIC_API_KEY (优先)
+//     2. ~/.pandacc/settings.json 中的 token
+//     3. panda CLI 终端运行 /login 走完整 OAuth 流程
+//   本组件改为状态说明面板，明确告知用户当前认证方式，去掉 disabled 按钮，避免
+//   "不可用"误导。
 
 function ClaudeOfficialLogin() {
-  // panda 暂无 OAuth 后端 → 显示降级占位（cc-haha 形态保留：intro + login button）。
+  // Renderer 拿不到 process.env，但能从 settingsStore 看 activeProviderName。
   return (
-    <div className="flex flex-col gap-2">
-      <div className="text-sm text-[var(--pd-color-text-secondary)]">
-        {t('settings.claudeOfficialLogin.intro')}
+    <div className="flex flex-col gap-2 text-sm">
+      <div className="text-[var(--pd-color-text-secondary)] leading-relaxed">
+        Anthropic 官方服务商通过以下任一方式认证（按优先级）：
       </div>
-      <button
-        type="button"
-        disabled
-        className="self-start rounded-md bg-[image:var(--pd-gradient-btn-primary)] px-4 py-2 text-sm text-[var(--pd-color-btn-primary-fg)] shadow-[var(--pd-shadow-button-primary)] disabled:opacity-50 transition-opacity"
-      >
-        {t('settings.claudeOfficialLogin.loginButton')}
-      </button>
-      <div className="text-xs text-[var(--pd-color-text-tertiary)]">
-        {/* TODO(IPC): panda 缺 OAuth 后端，按钮当前为占位 disabled 状态。 */}
-        Claude OAuth not yet wired
+      <ol className="ml-4 list-decimal text-xs text-[var(--pd-color-text-secondary)] space-y-1 leading-relaxed">
+        <li>
+          环境变量 <code className="rounded bg-[var(--pd-color-surface-container-high)] px-1 py-0.5 font-mono text-[11px]">ANTHROPIC_API_KEY</code>
+        </li>
+        <li>
+          配置文件 <code className="rounded bg-[var(--pd-color-surface-container-high)] px-1 py-0.5 font-mono text-[11px]">~/.pandacc/settings.json</code>
+        </li>
+        <li>
+          在 panda 终端运行 <code className="rounded bg-[var(--pd-color-surface-container-high)] px-1 py-0.5 font-mono text-[11px]">/login</code> 触发浏览器 OAuth
+        </li>
+      </ol>
+      <div className="text-[11px] text-[var(--pd-color-text-tertiary)] leading-relaxed">
+        如需切换账号或重新登录：可在任何会话的输入框输入 <code className="rounded bg-[var(--pd-color-surface-container-high)] px-1 font-mono text-[10px]">/login</code> 然后回车，panda CLI 会处理 OAuth 流程。
       </div>
     </div>
   );

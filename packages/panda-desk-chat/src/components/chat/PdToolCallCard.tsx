@@ -1,5 +1,6 @@
 // Input: toolName + input + result (panda flat: result/isError/status, OR cc-haha {content,isError}|null)
 // Output: cc-haha 1:1 ToolCallBlock — collapsible card; header (icon + 11px label + mono filename + status); body (preview + details)
+//         W23C 任务 #6：Agent 工具走结构化渲染（prompt 字段 + 结果 markdown），不再展示 raw JSON。
 // Pos:    Chat layer — invoked by PdMessageList for every assistant tool_use turn
 //
 // Source 1:1: cc-haha desktop/src/components/chat/ToolCallBlock.tsx (L1-281)
@@ -10,6 +11,7 @@
 // - 当 forceCollapsed 为 true（panda summary 模式），呈现 cc-haha compact 视图（mb-0）。
 // - 11 项 TOOL_ICONS 1:1（cc-haha L19-31）。
 // - summary/preview/details 函数 1:1 cc-haha L228-280 + L111-187。
+// - W23C 任务 #6：Agent 走 renderAgentDetails（结构化），其它 tool 沿用 renderDetails JSON。
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 import { useMemo, useState } from 'react'
@@ -18,6 +20,7 @@ import { PdDiffViewer } from './PdDiffViewer'
 import { PdTerminalChrome } from './PdTerminalChrome'
 import { PdCopyButton } from './PdCopyButton'
 import { PdInlineImageGallery } from './PdInlineImageGallery'
+import { PdMarkdownRenderer } from './PdMarkdownRenderer'
 import { t } from '../../i18n'
 
 export type ToolCallStatus = 'pending' | 'running' | 'success' | 'error'
@@ -97,10 +100,15 @@ export function PdToolCallCard(props: PdToolCallCardProps) {
   const result = normalizeResult(props)
   const outputSummary = getToolResultSummary(toolName, result?.content, result?.isError ?? false)
 
+  const isAgent = toolName === 'Agent' || toolName === 'AgentTool'
   const preview = useMemo(() => renderPreview(toolName, obj, result), [obj, result, toolName])
-  const details = useMemo(() => renderDetails(toolName, obj), [obj, toolName])
+  const details = useMemo(
+    () => (isAgent ? renderAgentDetails(obj) : renderDetails(toolName, obj)),
+    [obj, toolName, isAgent],
+  )
   const hasResultDetails = Boolean(result && extractTextContent(result.content))
-  const expandable = toolName === 'Edit' || toolName === 'Write' || hasResultDetails
+  // W23C 任务 #6：Agent 始终可展开（即使无 result 也展开 prompt 详情）
+  const expandable = toolName === 'Edit' || toolName === 'Write' || hasResultDetails || isAgent
 
   return (
     <div
@@ -191,6 +199,8 @@ function renderPreview(
   if (result) {
     const text = extractTextContent(result.content)
     if (text) {
+      // W23C 任务 #6：Agent 结果用 markdown 渲染（结构化输出更易读），非 Agent / 错误仍用 PdCodeViewer
+      const useMarkdown = (toolName === 'Agent' || toolName === 'AgentTool') && !result.isError
       return (
         <>
           <PdInlineImageGallery text={text} />
@@ -208,7 +218,13 @@ function renderPreview(
                 className="rounded-md border border-[var(--pd-color-border)] px-2 py-1 text-[10px] normal-case tracking-normal text-[var(--pd-color-text-tertiary)] transition-colors hover:text-[var(--pd-color-text-primary)]"
               />
             </div>
-            <PdCodeViewer code={text} language="plaintext" maxLines={18} />
+            {useMarkdown ? (
+              <div className="px-3 py-2.5 text-[12px] leading-[1.55] text-[var(--pd-color-text-primary)]">
+                <PdMarkdownRenderer content={text} />
+              </div>
+            ) : (
+              <PdCodeViewer code={text} language="plaintext" maxLines={18} />
+            )}
           </div>
         </>
       )
@@ -216,6 +232,76 @@ function renderPreview(
   }
 
   return null
+}
+
+/**
+ * W23C 任务 #6：Agent 工具结构化渲染。
+ *   - description / subagent_type → label 行
+ *   - prompt → markdown 渲染（保留分行/列表/代码块结构）
+ *   - 不展示 raw JSON
+ *
+ * 输入 schema（Anthropic Agent tool）：
+ *   { description: string, prompt: string, subagent_type?: string }
+ */
+function renderAgentDetails(obj: Record<string, unknown>) {
+  const description = typeof obj.description === 'string' ? obj.description : ''
+  const prompt = typeof obj.prompt === 'string' ? obj.prompt : ''
+  const subagentType = typeof obj.subagent_type === 'string' ? obj.subagent_type : ''
+
+  return (
+    <div className="space-y-2">
+      {/* Subagent 类型 + description（label 风格） */}
+      {(description || subagentType) && (
+        <div className="flex flex-wrap items-baseline gap-2 rounded-lg border border-[var(--pd-color-border)]/60 bg-[var(--pd-color-surface)] px-3 py-2">
+          {subagentType && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--pd-color-surface-container-high)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--pd-color-text-secondary)]">
+              <span className="material-symbols-outlined text-[12px]">smart_toy</span>
+              {subagentType}
+            </span>
+          )}
+          {description && (
+            <span className="flex-1 text-[12px] leading-relaxed text-[var(--pd-color-text-primary)]">
+              {description}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Prompt — markdown 渲染（保留结构） */}
+      {prompt && (
+        <div className="overflow-hidden rounded-lg border border-[var(--pd-color-border)] bg-[var(--pd-color-surface)]">
+          <div className="flex items-center justify-between border-b border-[var(--pd-color-border)] px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-[var(--pd-color-outline)]">
+            <span>{t('tool.agentPrompt') || 'Agent Prompt'}</span>
+            <PdCopyButton
+              text={prompt}
+              className="rounded-md border border-[var(--pd-color-border)] px-2 py-1 text-[10px] normal-case tracking-normal text-[var(--pd-color-text-tertiary)] transition-colors hover:text-[var(--pd-color-text-primary)]"
+            />
+          </div>
+          <div className="px-3 py-2.5 text-[12px] leading-[1.55] text-[var(--pd-color-text-primary)]">
+            <PdMarkdownRenderer content={prompt} />
+          </div>
+        </div>
+      )}
+
+      {/* Other input fields — 仅当非空展示，避免 raw JSON */}
+      {Object.entries(obj)
+        .filter(([k]) => k !== 'description' && k !== 'prompt' && k !== 'subagent_type')
+        .filter(([, v]) => v !== undefined && v !== null && v !== '')
+        .map(([k, v]) => (
+          <div
+            key={k}
+            className="flex items-baseline gap-2 rounded-lg border border-[var(--pd-color-border)]/60 bg-[var(--pd-color-surface)] px-3 py-2"
+          >
+            <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--pd-color-text-tertiary)]">
+              {k}
+            </span>
+            <span className="flex-1 break-words font-[var(--pd-font-mono)] text-[11px] text-[var(--pd-color-text-secondary)]">
+              {typeof v === 'string' ? v : JSON.stringify(v)}
+            </span>
+          </div>
+        ))}
+    </div>
+  )
 }
 
 function renderDetails(toolName: string, obj: Record<string, unknown>) {

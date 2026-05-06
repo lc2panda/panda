@@ -77,7 +77,7 @@ const inputSchema = lazySchema(() =>
       .string()
       .optional()
       .describe(
-        'A 5-10 word summary shown as a preview in the UI (required when message is a string)',
+        'A 5-10 word summary shown as a preview in the UI. Strongly recommended when message is a string; if omitted, the first line of the message is used.',
       ),
     message: z.union([
       z.string().describe('Plain text message content'),
@@ -665,11 +665,14 @@ export const SendMessageTool: Tool<InputSchema, SendMessageToolOutput> =
         return { result: true }
       }
       if (typeof input.message === 'string') {
+        // Schema 标 summary optional + describe 提示"required when string" → LLM
+        // 偶发漏带（Anthropic OAuth 直连观测到）。原来强拒绝会让 LLM 整轮 tool
+        // 失败。改为静默回填：从 message 截取一行 ≤50 列作为 UI preview，与
+        // line 765/782 的 `input.summary || truncate(...)` fallback 一致。
         if (!input.summary || input.summary.trim().length === 0) {
-          return {
-            result: false,
-            message: 'summary is required when message is a string',
-            errorCode: 9,
+          const fallback = truncate(input.message, 50, true).trim()
+          if (fallback.length > 0) {
+            input.summary = fallback
           }
         }
         return { result: true }
