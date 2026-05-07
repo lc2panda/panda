@@ -40,54 +40,76 @@ function hasSummarySinceLastUserTurn(messages: readonly Message[]): boolean {
 export async function call(
   onDone: LocalJSXCommandOnDone,
   context: LocalJSXCommandContext,
+  _args?: string, // processSlashCommand 传 3 参数，对齐避免类型 mismatch
 ): Promise<null> {
   logForDebugging('[recap] call() entered')
-  const messages = context.getAppState().messages
-  if (messages.length === 0) {
-    logForDebugging('[recap] empty messages → early return')
-    onDone('No conversation yet — nothing to recap.', {
-      display: 'system',
-    })
-    return null
-  }
-  if (hasSummarySinceLastUserTurn(messages)) {
-    logForDebugging('[recap] already exists this turn → early return')
-    onDone('Recap already exists for the current turn.', {
-      display: 'system',
-    })
-    return null
-  }
 
-  // fire-and-forget: onDone 立即 ack，setMessages 在 background 跑
-  logForDebugging(
-    `[recap] dispatching background generate (messages=${messages.length})`,
-  )
-  onDone('Generating recap…', { display: 'system' })
+  // v2.25.61 hotfix: 包整个 body 在 try/catch 里，任何 throw 都会 onDone 显示
+  // 给用户。之前 v2.25.60 实测 [recap] call() entered 出现但无后续 log，
+  // 怀疑 context.getAppState() 或类似 sync 调用 throw 被 processSlashCommand
+  // 外层 catch 静默吞掉，用户看不到任何反馈。
+  try {
+    logForDebugging('[recap] reading appState')
+    const appState = context.getAppState()
+    logForDebugging(
+      `[recap] appState type=${typeof appState}, has messages=${!!appState?.messages}`,
+    )
+    const messages = appState?.messages ?? []
+    logForDebugging(`[recap] messages.length=${messages.length}`)
 
-  void (async () => {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000)
-    try {
-      const text = await generateAwaySummary(messages, controller.signal)
-      clearTimeout(timeoutId)
-      if (controller.signal.aborted) {
-        logForDebugging('[recap] background timed out (30s)')
-        return
-      }
-      if (text === null) {
-        logForDebugging('[recap] background returned null')
-        return
-      }
-      logForDebugging(
-        `[recap] background success, pushing summary (${text.length} chars)`,
-      )
-      context.setMessages(prev => [...prev, createAwaySummaryMessage(text)])
-    } catch (err) {
-      clearTimeout(timeoutId)
-      const msg = err instanceof Error ? err.message : String(err)
-      logForDebugging(`[recap] background failed: ${msg}`)
+    if (messages.length === 0) {
+      logForDebugging('[recap] empty messages → early return')
+      onDone('No conversation yet — nothing to recap.', {
+        display: 'system',
+      })
+      return null
     }
-  })()
 
-  return null
+    logForDebugging('[recap] checking hasSummarySinceLastUserTurn guard')
+    if (hasSummarySinceLastUserTurn(messages)) {
+      logForDebugging('[recap] already exists this turn → early return')
+      onDone('Recap already exists for the current turn.', {
+        display: 'system',
+      })
+      return null
+    }
+
+    logForDebugging(
+      `[recap] dispatching background generate (messages=${messages.length})`,
+    )
+    onDone('Generating recap…', { display: 'system' })
+
+    void (async () => {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      try {
+        const text = await generateAwaySummary(messages, controller.signal)
+        clearTimeout(timeoutId)
+        if (controller.signal.aborted) {
+          logForDebugging('[recap] background timed out (30s)')
+          return
+        }
+        if (text === null) {
+          logForDebugging('[recap] background returned null')
+          return
+        }
+        logForDebugging(
+          `[recap] background success, pushing summary (${text.length} chars)`,
+        )
+        context.setMessages(prev => [...prev, createAwaySummaryMessage(text)])
+      } catch (err) {
+        clearTimeout(timeoutId)
+        const msg = err instanceof Error ? err.message : String(err)
+        logForDebugging(`[recap] background failed: ${msg}`)
+      }
+    })()
+
+    return null
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const stack = err instanceof Error ? err.stack : ''
+    logForDebugging(`[recap] call() throw: ${msg}\n${stack}`)
+    onDone(`Recap error: ${msg}`, { display: 'system' })
+    return null
+  }
 }
