@@ -1,6 +1,6 @@
 // Input:  fetchProviderModels(baseURL, apiKey, { transport })
-// Output: 单元测试集 —— 覆盖正常 / fallback URL 链 / parse 错 / 错误响应 / 超时 兜底全路径
-// Pos:    src/services/api/providerModels.ts （作战线 V worker-V-authmodels）
+// Output: 单元测试集 —— 覆盖正常 / fallback URL 链 / parse 错 / 错误响应 / 超时 / 黑名单 兜底全路径
+// Pos:    src/services/api/providerModels.ts （作战线 V/W）
 //
 // 一旦我被修改，请更新我的头部注释。
 
@@ -12,47 +12,57 @@ import {
 } from './providerModels.js'
 
 describe('buildModelEndpointCandidates', () => {
-  test('DeepSeek anthropic baseURL → 主路径 + 剥后缀 + 域名 root', () => {
+  test('DeepSeek anthropic baseURL → 包含 anthropic 路径 + 剥后缀域名 root', () => {
     const candidates = buildModelEndpointCandidates('https://api.deepseek.com/anthropic')
-    expect(candidates).toEqual([
-      'https://api.deepseek.com/anthropic/v1/models',
-      'https://api.deepseek.com/v1/models',
-    ])
+    // 实测：anthropic/v1/models 端点存在 (401)，必须保留为候选
+    expect(candidates).toContain('https://api.deepseek.com/anthropic/v1/models')
+    expect(candidates).toContain('https://api.deepseek.com/v1/models')
   })
 
-  test('Qwen anthropic baseURL → 主路径 + 剥后缀 + dashscope 特殊 compatible-mode', () => {
+  test('Qwen anthropic baseURL → dashscope compatible-mode 必须排首位', () => {
     const candidates = buildModelEndpointCandidates(
       'https://dashscope-intl.aliyuncs.com/apps/anthropic',
     )
-    expect(candidates).toContain('https://dashscope-intl.aliyuncs.com/apps/anthropic/v1/models')
+    // 实测：apps/anthropic 路径 404，compatible-mode 是唯一可用 → 应排首位
+    expect(candidates[0]).toBe('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models')
     expect(candidates).toContain('https://dashscope-intl.aliyuncs.com/v1/models')
-    expect(candidates).toContain('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models')
   })
 
-  test('Kimi coding baseURL → 主路径 + 剥 /coding + 域名 root', () => {
+  test('Kimi moonshot.cn baseURL → /v1/models 直接命中', () => {
+    const candidates = buildModelEndpointCandidates('https://api.moonshot.cn')
+    expect(candidates).toContain('https://api.moonshot.cn/v1/models')
+  })
+
+  test('Kimi api.kimi.com 旧 baseURL → /coding/v1/models 优先（root 实测 404）', () => {
     const candidates = buildModelEndpointCandidates('https://api.kimi.com/coding/')
     expect(candidates).toContain('https://api.kimi.com/coding/v1/models')
-    expect(candidates).toContain('https://api.kimi.com/v1/models')
   })
 
-  test('GLM bigmodel baseURL → bigmodel 特殊 paas/v4 候选', () => {
+  test('GLM bigmodel.cn baseURL → paas/v4 首选 + anthropic 路径已黑名单 skip', () => {
     const candidates = buildModelEndpointCandidates('https://open.bigmodel.cn/api/anthropic/')
-    expect(candidates).toContain('https://open.bigmodel.cn/api/anthropic/v1/models')
-    expect(candidates).toContain('https://open.bigmodel.cn/v1/models')
-    expect(candidates).toContain('https://open.bigmodel.cn/api/paas/v4/models')
+    // 实测：paas/v4 是唯一可靠路径（401）；anthropic 实测 10s+ 挂死 → 黑名单 skip
+    expect(candidates[0]).toBe('https://open.bigmodel.cn/api/paas/v4/models')
+    expect(candidates).not.toContain('https://open.bigmodel.cn/api/anthropic/v1/models')
+    expect(candidates).not.toContain('https://open.bigmodel.cn/v1/models') // root 返回 HTML
   })
 
-  test('Volcano baseURL → ark v3 候选', () => {
+  test('Volcano baseURL → ark v3 优先', () => {
     const candidates = buildModelEndpointCandidates(
       'https://ark.cn-beijing.volces.com/api/coding',
     )
+    expect(candidates[0]).toBe('https://ark.cn-beijing.volces.com/api/v3/models')
     expect(candidates).toContain('https://ark.cn-beijing.volces.com/api/coding/v1/models')
-    expect(candidates).toContain('https://ark.cn-beijing.volces.com/api/v3/models')
   })
 
-  test('OpenAI 标准 baseURL → 单一候选', () => {
+  test('MiniMax anthropic baseURL → host-root /v1/models 优先', () => {
+    const candidates = buildModelEndpointCandidates('https://api.minimax.io/anthropic')
+    // host-known 优先：api.minimax.io/v1/models 实测 401（可用）
+    expect(candidates[0]).toBe('https://api.minimax.io/v1/models')
+    expect(candidates).toContain('https://api.minimax.io/anthropic/v1/models')
+  })
+
+  test('OpenAI 标准 baseURL → /v1/models 候选包含', () => {
     const candidates = buildModelEndpointCandidates('https://api.openai.com/v1')
-    expect(candidates).toContain('https://api.openai.com/v1/v1/models')
     expect(candidates).toContain('https://api.openai.com/v1/models')
   })
 
@@ -64,6 +74,13 @@ describe('buildModelEndpointCandidates', () => {
   test('非法 URL → 仍生成主路径（不抛）', () => {
     const candidates = buildModelEndpointCandidates('not-a-url')
     expect(candidates).toEqual(['not-a-url/v1/models'])
+  })
+
+  test('黑名单：GLM anthropic /v1/models 永不出现', () => {
+    const candidates = buildModelEndpointCandidates('https://open.bigmodel.cn/api/anthropic/')
+    for (const c of candidates) {
+      expect(c).not.toBe('https://open.bigmodel.cn/api/anthropic/v1/models')
+    }
   })
 })
 
@@ -199,9 +216,10 @@ describe('fetchProviderModels', () => {
     }) as typeof fetch
   }
 
-  test('正常：主路径返回 models 直接成功', async () => {
+  test('正常：第一个候选返回 models 直接成功', async () => {
+    const tries: string[] = []
     const transport = mockFetch(url => {
-      expect(url).toBe('https://api.deepseek.com/anthropic/v1/models')
+      tries.push(url)
       return {
         body: { data: [{ id: 'deepseek-chat' }, { id: 'deepseek-reasoner' }] },
       }
@@ -212,9 +230,11 @@ describe('fetchProviderModels', () => {
       { transport },
     )
     expect(out.map(m => m.id)).toEqual(['deepseek-chat', 'deepseek-reasoner'])
+    // 第一个候选即返回 → 只发一次请求
+    expect(tries.length).toBe(1)
   })
 
-  test('主路径 404 → fallback 剥后缀路径成功', async () => {
+  test('主路径 404 → fallback 后续候选成功', async () => {
     const tries: string[] = []
     const transport = mockFetch(url => {
       tries.push(url)
@@ -232,10 +252,9 @@ describe('fetchProviderModels', () => {
       { transport },
     )
     expect(out.map(m => m.id)).toEqual(['deepseek-chat'])
-    expect(tries).toEqual([
-      'https://api.deepseek.com/anthropic/v1/models',
-      'https://api.deepseek.com/v1/models',
-    ])
+    // 至少包含 anthropic 和 v1 两个候选
+    expect(tries).toContain('https://api.deepseek.com/anthropic/v1/models')
+    expect(tries).toContain('https://api.deepseek.com/v1/models')
   })
 
   test('全部失败（404 / network err / 错误 body） → []', async () => {
@@ -254,8 +273,10 @@ describe('fetchProviderModels', () => {
   })
 
   test('网络抛错 → fallback 继续', async () => {
-    const transport = mockFetch(url => {
-      if (url === 'https://api.deepseek.com/anthropic/v1/models') {
+    let firstCall = true
+    const transport = mockFetch(_url => {
+      if (firstCall) {
+        firstCall = false
         return { throwBeforeResponse: true }
       }
       return { body: { data: [{ id: 'deepseek-chat' }] } }
@@ -341,5 +362,17 @@ describe('fetchProviderModels', () => {
     )
     expect(out.map(m => m.id)).toEqual(['fallback-model'])
     expect(tries.length).toBeGreaterThanOrEqual(2)
+  })
+
+  test('黑名单 URL 不出现在候选中（GLM anthropic 挂死端点）', async () => {
+    const tries: string[] = []
+    const transport = mockFetch(url => {
+      tries.push(url)
+      return { body: { data: [{ id: 'glm-5.1' }] } }
+    })
+    await fetchProviderModels('https://open.bigmodel.cn/api/anthropic/', 'k', { transport })
+    // 黑名单的 URL 永远不应被请求
+    expect(tries).not.toContain('https://open.bigmodel.cn/api/anthropic/v1/models')
+    expect(tries).not.toContain('https://open.bigmodel.cn/v1/models')
   })
 })

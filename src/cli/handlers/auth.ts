@@ -50,49 +50,99 @@ import {
 // ---------------------------------------------------------------------------
 // Third-party provider definitions
 // ---------------------------------------------------------------------------
+// Default model & context-window 数据更新基准：2026-05-15 22:10 +08:00
+// 数据源（详见 monitor/provider-models-research-2026-05-15.md）：
+//   - DeepSeek:   api-docs.deepseek.com 官方 list-models + change-log
+//   - Kimi:       platform.moonshot.ai/docs/models（K2.6 现役，K2 2026-05-25 下线）
+//   - Qwen:       help.aliyun.com/zh/model-studio（qwen3-max / qwen3.5-plus 现役）
+//   - GLM:        docs.bigmodel.cn（GLM-5.1 现役 / paas/v4 主路径）
+//   - MiniMax:    platform.minimax.io/docs（M2.7 现役 default，highspeed 变体）
+//   - Volcano:    ByteDance Seed 2.0 (2026-02-14) + doubao-seed-2-0-pro-260215
+//   - OpenAI:     platform.openai.com api-docs（GPT-5.x 系列 2026 现役）
 const THIRD_PARTY_PROVIDERS: Record<
   string,
   { name: string; baseURL: string; defaultModel: string; consoleURL: string }
 > = {
+  // DeepSeek 2026-05：deepseek-chat / deepseek-reasoner 2026-07-24 下线；
+  //   新生产 model 是 deepseek-v4-flash（推荐 chat/coding）/ deepseek-v4-pro（推荐 reasoning）。
+  //   暂仍用 deepseek-chat 作 default（向后兼容到 7-24），fetchProviderModels 会拉到完整列表让用户选。
   deepseek: { name: 'DeepSeek', baseURL: 'https://api.deepseek.com/anthropic', defaultModel: 'deepseek-chat', consoleURL: 'https://platform.deepseek.com/api_keys' },
-  kimi: { name: 'Kimi Code', baseURL: 'https://api.kimi.com/coding/', defaultModel: 'kimi-for-coding', consoleURL: 'https://www.kimi.com/code' },
-  qwen: { name: 'Qwen (阿里百炼)', baseURL: 'https://dashscope-intl.aliyuncs.com/apps/anthropic', defaultModel: 'qwen3.5-plus', consoleURL: 'https://dashscope.console.aliyun.com/' },
-  minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'minimax-m2.7', consoleURL: 'https://platform.minimax.io' },
-  glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic/', defaultModel: 'glm-5.1', consoleURL: 'https://open.bigmodel.cn/' },
+  // Kimi 2026-05：kimi-k2.6 是 2026-04-20 发布的现役 flagship；kimi-k2 系列 2026-05-25 下线。
+  //   baseURL 切到 api.moonshot.cn 官方主域（api.kimi.com 是 coding 子域，实测 root 404）。
+  kimi: { name: 'Kimi (Moonshot)', baseURL: 'https://api.moonshot.cn', defaultModel: 'kimi-k2.6', consoleURL: 'https://platform.moonshot.cn/console/api-keys' },
+  // Qwen 2026-05：qwen3-max 现役 flagship，qwen3.5-plus 是 Plus 系列现役。
+  //   baseURL 仍保留 anthropic 子路径供 chat/completions 走 Anthropic 协议，
+  //   但 /models 端点候选会优先走 compatible-mode（实测唯一可用）。
+  qwen: { name: 'Qwen (阿里百炼)', baseURL: 'https://dashscope-intl.aliyuncs.com/apps/anthropic', defaultModel: 'qwen3-max', consoleURL: 'https://dashscope.console.aliyun.com/' },
+  // MiniMax 2026-05：MiniMax-M2.7 是 default flagship（platform.minimax.io 官方记载）。
+  minimax: { name: 'MiniMax', baseURL: 'https://api.minimax.io/anthropic', defaultModel: 'MiniMax-M2.7', consoleURL: 'https://platform.minimax.io' },
+  // GLM 2026-05：GLM-5.1 现役 flagship；anthropic 路径实测 10s+ 挂死，
+  //   baseURL 仍保留（chat/completions 走 anthropic 兼容），但 /models 候选黑名单已 skip。
+  glm: { name: 'GLM (智谱)', baseURL: 'https://open.bigmodel.cn/api/anthropic/', defaultModel: 'glm-5.1', consoleURL: 'https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys' },
+  // Volcano 2026-05：Seed 2.0 family 2026-02-14 发布；doubao-seed-code 是通用 code alias。
   volcano: { name: 'Volcano (火山引擎)', baseURL: 'https://ark.cn-beijing.volces.com/api/coding', defaultModel: 'doubao-seed-code', consoleURL: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey' },
+  // OpenAI：GPT-5 现役 flagship（2026），但保守用 gpt-4o（最稳定 default），列表后用户可选。
   openai: { name: 'OpenAI', baseURL: 'https://api.openai.com/v1', defaultModel: 'gpt-4o', consoleURL: 'https://platform.openai.com/api-keys' },
 }
 
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-  'deepseek-chat': 128000,
-  'deepseek-reasoner': 128000,
-  'kimi-for-coding': 262144,
+  // ── DeepSeek（2026-05） ──────────────────────────────────────────
+  'deepseek-chat': 128000,         // V3 别名，2026-07-24 retire
+  'deepseek-reasoner': 128000,     // V3 reasoner alias，同上 retire
+  'deepseek-v4-flash': 1000000,    // V4 新 1M context（2026 launch）
+  'deepseek-v4-pro': 1000000,
+  // ── Kimi（2026-05） ──────────────────────────────────────────────
+  'kimi-k2.6': 262144,             // 2026-04-20 flagship
   'kimi-k2.5': 262144,
-  'kimi-k2': 262144,
+  'kimi-k2': 262144,               // 2026-05-25 retire
   'kimi-k2-thinking': 262144,
   'kimi-k2-thinking-turbo': 262144,
+  'kimi-for-coding': 262144,       // 旧 coding alias，向后兼容
+  // ── Qwen（2026-05） ──────────────────────────────────────────────
+  'qwen3-max': 262144,             // 现役 flagship
   'qwen3.5-plus': 1000000,
   'qwen3.5-flash': 1000000,
-  'qwen3-max': 262144,
+  'qwen3-coder-plus': 262144,
+  'qwen3-coder-flash': 262144,
   'qwen-plus': 1000000,
   'qwen-max': 32000,
   'qwen-turbo': 1000000,
+  // ── MiniMax（2026-05） ──────────────────────────────────────────
+  'MiniMax-M2.7': 204800,
+  'MiniMax-M2.7-highspeed': 204800,
+  'MiniMax-M2.5': 1000000,         // 官方记 1M context（2026 文档）
+  'MiniMax-M2.5-highspeed': 204800,
+  'MiniMax-M2.1': 200000,
+  'MiniMax-M2': 200000,
+  // 兼容旧小写 id（v2.26.4 之前的格式）
   'minimax-m2.7': 204800,
   'minimax-m2.7-highspeed': 204800,
   'minimax-m2.5': 196608,
   'minimax-m2.1': 200000,
   'minimax-m2': 200000,
-  'glm-5.1': 204800,
-  'glm-5': 200000,
+  // ── GLM（2026-05） ──────────────────────────────────────────────
+  'glm-5.1': 128000,               // 官方记 128K cap（之前 204K 写错）
+  'glm-5': 128000,
   'glm-4.7': 200000,
+  'glm-4.7-flash': 203000,
   'glm-4.5': 131000,
+  'glm-4.5-flash': 131000,
   'glm-4-plus': 128000,
+  // ── Volcano / Doubao Seed（2026-05） ─────────────────────────────
   'doubao-seed-code': 256000,
+  'doubao-seed-2.0-code': 256000,
+  'doubao-seed-2.0-pro': 256000,
+  'doubao-seed-2-0-pro-260215': 256000,
+  'doubao-seed-2.0-lite': 256000,
+  'doubao-seed-2.0-mini': 256000,
+  // ── OpenAI（2026-05） ───────────────────────────────────────────
   'gpt-4o': 128000,
   'gpt-4o-mini': 128000,
   'gpt-4.1': 1047576,
   'gpt-4.1-mini': 1047576,
   'gpt-4.1-nano': 1047576,
+  'gpt-5': 256000,                 // 2026 现役
+  'gpt-5-mini': 256000,
   'o3': 200000,
   'o3-mini': 200000,
   'o4-mini': 200000,
@@ -437,9 +487,10 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
     process.exit(1)
   }
 
-  // 作战线 V (worker-V-authmodels)：从 provider /v1/models 自动拉真实可用模型列表
-  //   - 多 fallback URL（剥 /anthropic /coding 后缀 + 域名 root + 特殊 path）
-  //   - 总超时 10s 防挂死
+  // 作战线 V (worker-V-authmodels) + W (worker-W-providerfix)：从 provider /models 自动拉真实可用模型列表
+  //   - host-aware 候选优先级（OpenAI 兼容路径 → anthropic 原路径 → 剥后缀 → 域名 root）
+  //   - 黑名单 skip 已知挂死端点（GLM /api/anthropic/v1/models 实测 10s+ hang）
+  //   - 总超时 30s、单请求 10s（v2.26.4 的 5s 单请求超时太短，DNS 抖动易超时）
   //   - 任何失败 → fall through 到 provider.defaultModel 并明确提示用户
   let selectedModel = provider.defaultModel
   let modelSource: 'fetched' | 'fallback' = 'fallback'
@@ -449,8 +500,8 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
     process.stdout.write('\nFetching available models...\n')
     const debugEnabled = !!process.env.PANDA_DEBUG
     const models = await fetchProviderModels(provider.baseURL, apiKey.trim(), {
-      totalTimeoutMs: 10_000,
-      perRequestTimeoutMs: 5_000,
+      totalTimeoutMs: 30_000,
+      perRequestTimeoutMs: 10_000,
       debug: debugEnabled
         ? (msg: string) => process.stderr.write(`${msg}\n`)
         : undefined,
@@ -516,11 +567,18 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
         modelSource = 'fetched'
       }
     } else {
+      // 失败诊断：可能是 key 错（端点存在但 401）、网络抖动（DNS/TLS）、provider 改了 API
       process.stdout.write(
         `\x1b[33m! Could not auto-fetch models from ${provider.name}, using default: ${provider.defaultModel}\x1b[0m\n`,
       )
       process.stdout.write(
-        `  \x1b[2m(You can manually set via /model later, or set PANDA_DEBUG=1 to inspect)\x1b[0m\n`,
+        `  \x1b[2m原因可能：API key 错 / 网络抖动 / provider 临时不可用。\x1b[0m\n`,
+      )
+      process.stdout.write(
+        `  \x1b[2m排查：PANDA_DEBUG=1 panda auth login --provider ${providerKey}\x1b[0m\n`,
+      )
+      process.stdout.write(
+        `  \x1b[2m登录后可用 /model 切换到任意可用模型。\x1b[0m\n`,
       )
     }
   }
