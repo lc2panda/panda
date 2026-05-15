@@ -216,3 +216,66 @@ W16 进行中 (4/5 完成):
 - pipe 模式（`-p`）不渲染 TurnHeader，端到端真机验证需 TTY 交互模式
 - 真实 spawn sub-agent 受上游 cache_control API 阻挡，worker chrome 验证依赖单元 + 源码 + dist + e2e SYSTEM chrome 同源链路
 
+
+---
+
+## v2.26.0 — 2026-05-15 · 上游 v2.1.120→v2.1.142 全量对标（方案 A 激进路径 100% 交付）
+
+### 调研基线
+- 上游版本：v2.1.142（2026-05-14 npm @anthropic-ai/claude-code）
+- 跨度：v2.1.120→v2.1.142 共 16 个有效版本（17 天 110 条新能力）
+- 战略分水岭：v2.1.139（Code with Claude 大会同日）
+- 调研报告：`monitor/migration-plan-v2120-to-v2142-2026-05-15.md`
+
+### 战术分组（4 wave 14 任务）
+**Wave 1（W1-149/164/161/158）** — Hook + Spinner + Transcript 底层增强
+- Spinner amber 10s+ + Auto mode 红色（v2.1.126/.141）
+- Hook 6 字段：updatedToolOutput / effort.level+$CLAUDE_EFFORT / args:string[] exec / continueOnBlock / terminalSequence / 配置错误明确化（v2.1.121/.133/.139×2/.141/.142）
+- Transcript ?/{/}/v 快捷键导航（v2.1.139）
+
+**Wave 2（W2-160）** — /goal 旗舰命令（v2.1.139）
+- condition store + Haiku evaluator + Stop hook 包装 + ◎ overlay + --goal CLI flag + 50turn 死循环兜底
+- 26 单元测试 / 7 NEW-FILE [#20260515-01..07]
+
+**Wave 3（W3-152）** — Agent View Tier 1（v2.1.139→.142）
+- claude agents TUI dashboard + 22 键位 + roster + peek + attach/detach (exit+re-spawn)
+- 22 单元测试 / 13 NEW-FILE [#20260515-AV-01..13]
+
+**Wave 4（W4-150/151/153/154/155/156/159/162/163）** — B 档 + 中价值能力
+- /resume PR URL（4 平台）+ /skills 输入过滤 + /mcp 工具数显示
+- MCP alwaysLoad + stdio CLAUDE_PROJECT_DIR + Reconnect 拾取 .mcp.json
+- Auto Mode hard_deny + parentSettingsBehavior + 分类器错误带 retry/compact/--debug
+- /scroll-speed + /feedback 24h/7d + /web-setup 警告 + bare /color 随机
+- Compaction 三件套：reactive seeding + 保留 sensitive 指令 + Rewind "Summarize up to here"
+- claude plugin prune + --plugin-dir .zip + --plugin-url（9 项安全控制）
+- Skill 五连：通配符前缀 + 根级 SKILL.md + /context all token + skillOverrides + subagent 三层发现
+- claude project purge + EnterWorktree 本地 HEAD + worktree.baseRef
+- Agent tool subagent_type 大小写不敏感 + claude plugin details + Subagent x-claude-code-agent-id
+
+### 交付物
+- commit: `90e34be` feat（80 文件 +6989/-239）+ `87dc43c` v2.26.0
+- 测试: 68/68 通过（hook 20 + goal 26 + agentview 22）
+- build: 623 files bundled
+- npm: `@lc2panda/panda-code@2.26.0` 发布到 GitHub Packages（19.2MB / 768 files）
+- push: `8df66de..87dc43c main -> main`
+- 工期: 调研 1.5h + 实施 2h = 3.5h（vs 估算 45 人天）
+
+### Tier 2/3 推迟项（Agent View 范围）
+- [ ] Supervisor 守护进程（Tier 2，v2.27.x 评估）
+- [ ] Worktree 自动隔离（Tier 2，v2.27.x 评估）
+- [ ] inline reply in peek panel（Tier 2）
+- [ ] Ctrl+G $EDITOR 编辑 dispatch prompt（Tier 2）
+- [ ] Shift+Enter 携带 prompt 启动（框架已就绪 draft 始终空）
+- [ ] Haiku 15s 行摘要（Tier 3，需 multi-model routing 稳定）
+- [ ] PR 状态点（Tier 3，需 GitHub 集成）
+- [ ] `/loop` 与 `/goal` 互补集成（Tier 4 不做）
+
+### 风险监控
+- Worker B addToolResult 延迟改变消息顺序（hook 后发，理论正确，未观察到下游依赖）
+- Worker L React Compiler 缓存槽 `_c(88)` 手动调（未来 recompile 注意）
+- Worker N 未给 4 个改动文件加 Input/Output/Pos 文件头（次要，二轮 polish）
+- /goal --resume 后从 transcript 恢复 condition 未实现（二期）
+- /goal 没加企业关闭开关（如需 disableAllHooks 联动二期补）
+
+### 实际执行节奏
+14 worker 后台并行作战，按"独立文件域"派工避免冲突，PM 单线程验收。完成顺序：A → C → D → E（旗舰）→ F → H → I → G → K → B → J → L → M → N。
