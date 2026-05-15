@@ -14,7 +14,10 @@ const forceSnip = {
         onDone: LocalJSXCommandOnDone,
         context: LocalJSXCommandContext,
       ): Promise<React.ReactNode> {
-        const messages = context.getAppState().messages
+        // Read from context.messages — AppState 不含 messages 字段，messages
+        // 是 ToolUseContext 顶层字段（Tool.ts:250），由 REPL.tsx
+        // getToolUseContext 注入。对齐 /recap、/copy、/rename 等同类命令。
+        const messages = context.messages ?? []
         if (messages.length === 0) {
           onDone('No messages to snip.', { display: 'system' })
           return null

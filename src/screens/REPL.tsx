@@ -73,6 +73,7 @@ import { SkillImprovementSurvey } from '../components/SkillImprovementSurvey.js'
 import { useSkillImprovementSurvey } from '../hooks/useSkillImprovementSurvey.js';
 import { useMoreRight } from '../moreright/useMoreRight.js';
 import { SpinnerWithVerb, BriefIdleStatus, type SpinnerMode } from '../components/Spinner.js';
+import { CompactProgressBar, createInitialCompactProgress, type CompactProgressState } from '../components/Spinner/CompactProgressBar.js';
 import { getSystemPrompt } from '../constants/prompts.js';
 import { buildEffectiveSystemPrompt } from '../utils/systemPrompt.js';
 import { getSystemContext, getUserContext } from '../context.js';
@@ -1537,6 +1538,9 @@ export function REPL({
   const [spinnerMessage, setSpinnerMessage] = useState<string | null>(null);
   const [spinnerColor, setSpinnerColor] = useState<keyof Theme | null>(null);
   const [spinnerShimmerColor, setSpinnerShimmerColor] = useState<keyof Theme | null>(null);
+  // Worker S (v2.26.2): /compact ASCII progress bar — phase + percent + token count.
+  // null when no compact in flight; reset to null on compact_end / resetLoadingState.
+  const [compactProgress, setCompactProgress] = useState<CompactProgressState | null>(null);
   const [isMessageSelectorVisible, setIsMessageSelectorVisible] = useState(false);
   const [messageSelectorPreselect, setMessageSelectorPreselect] = useState<UserMessage | undefined>(undefined);
   const [showCostDialog, setShowCostDialog] = useState(false);
@@ -1642,6 +1646,7 @@ export function REPL({
     setSpinnerMessage(null);
     setSpinnerColor(null);
     setSpinnerShimmerColor(null);
+    setCompactProgress(null);
     pickNewSpinnerTip();
     endInteractionSpan();
     // Speculative bash classifier checks are only valid for the current
@@ -2585,14 +2590,50 @@ export function REPL({
             setSpinnerColor('claudeBlue_FOR_SYSTEM_SPINNER');
             setSpinnerShimmerColor('claudeBlueShimmer_FOR_SYSTEM_SPINNER');
             setSpinnerMessage(event.hookType === 'pre_compact' ? 'Running PreCompact hooks\u2026' : event.hookType === 'post_compact' ? 'Running PostCompact hooks\u2026' : 'Running SessionStart hooks\u2026');
+            // Worker S v2.26.2: pivot bar to current phase. First hook event
+            // also seeds the bar — createInitialCompactProgress() owns
+            // startedAt so elapsed counter survives multiple phase transitions.
+            setCompactProgress(prev => {
+              const base = prev ?? createInitialCompactProgress();
+              return {
+                ...base,
+                phase: event.phase ?? base.phase,
+                percent: event.percent ?? base.percent,
+              };
+            });
             break;
           case 'compact_start':
             setSpinnerMessage(isZh() ? '压缩对话中' : 'Compacting conversation');
+            setCompactProgress(prev => {
+              const base = prev ?? createInitialCompactProgress();
+              return {
+                ...base,
+                phase: event.phase ?? 'Summarizing',
+                percent: event.percent ?? base.percent ?? 8,
+                tokensTotal: event.tokensTotal ?? base.tokensTotal,
+              };
+            });
+            break;
+          case 'compact_progress':
+            setCompactProgress(prev => {
+              const base = prev ?? createInitialCompactProgress();
+              return {
+                ...base,
+                phase: event.phase,
+                percent: event.percent,
+                tokensProcessed: event.tokensProcessed ?? base.tokensProcessed,
+                tokensTotal: event.tokensTotal ?? base.tokensTotal,
+                attempt: event.attempt ?? base.attempt,
+                maxAttempts: event.maxAttempts ?? base.maxAttempts,
+                note: event.note ?? base.note,
+              };
+            });
             break;
           case 'compact_end':
             setSpinnerMessage(null);
             setSpinnerColor(null);
             setSpinnerShimmerColor(null);
+            setCompactProgress(null);
             break;
         }
       },
@@ -4751,6 +4792,7 @@ export function REPL({
               {feature('WEB_BROWSER_TOOL') ? WebBrowserPanelModule && <WebBrowserPanelModule.WebBrowserPanel /> : null}
               <Box flexGrow={1} />
               {showSpinner && <SpinnerWithVerb mode={streamMode} spinnerTip={spinnerTip} responseLengthRef={responseLengthRef} apiMetricsRef={apiMetricsRef} overrideMessage={spinnerMessage} spinnerSuffix={stopHookSpinnerSuffix} verbose={verbose} loadingStartTimeRef={loadingStartTimeRef} totalPausedMsRef={totalPausedMsRef} pauseStartTimeRef={pauseStartTimeRef} overrideColor={spinnerColor} overrideShimmerColor={spinnerShimmerColor} hasActiveTools={inProgressToolUseIDs.size > 0} leaderIsIdle={!isLoading} autoModePending={autoModePendingPermission} />}
+              {showSpinner && compactProgress && <CompactProgressBar state={compactProgress} />}
               {!showSpinner && !isLoading && !userInputOnProcessing && !hasRunningTeammates && isBriefOnly && !viewedAgentTask && <BriefIdleStatus />}
               {isFullscreenEnvEnabled() && <PromptInputQueuedCommands />}
               {/* v3.8 简化：移除底 ScreenFrame + StaticCharRain（过度装饰） */}

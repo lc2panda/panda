@@ -1,3 +1,7 @@
+// Input: messages[] + ToolUseContext + cacheSafeParams
+// Output: CompactionResult（boundary + summary + attachments + hooks）+ onCompactProgress 事件流
+// Pos: services/compact 主流程，被 /compact slash、autoCompact、reactiveCompact 共用
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 import { feature } from 'bun:bundle'
 import type { UUID } from 'crypto'
 import uniqBy from 'lodash-es/uniqBy.js'
@@ -369,6 +373,45 @@ function seedFromOverflow(
 }
 
 /**
+ * Phase-weight model for the /compact progress bar (Worker S, v2.26.2).
+ *
+ *   Pre-hooks: 0 → 8
+ *   Summarizing (streaming): 8 → 80 (token-fraction lerp)
+ *   Restoring files: 80 → 90
+ *   Post-hooks: 90 → 100
+ *
+ * Weights were chosen by inspection of compact.ts hot paths — Summarizing is
+ * by far the longest (single API call streaming summary, can take 30s+ on a
+ * 200K-token session) while hooks + file restore are <1s each in practice.
+ * The weights are conservative: even when one segment overshoots, the bar
+ * stays monotonic because mapSummarizePercent clamps to its own window.
+ */
+export const COMPACT_PROGRESS_WEIGHTS = {
+  preHookStart: 0,
+  preHookEnd: 8,
+  summarizeStart: 8,
+  summarizeEnd: 80,
+  restoreStart: 80,
+  restoreEnd: 90,
+  postHookStart: 90,
+  postHookEnd: 100,
+} as const
+
+/**
+ * Map a streaming-tokens fraction (0..1) onto the Summarizing window.
+ * Out-of-range inputs are clamped to keep the producer side simple — the bar
+ * UI is the wrong place to surface "percent estimator returned NaN".
+ */
+export function mapSummarizePercent(fraction: number): number {
+  if (!Number.isFinite(fraction)) return COMPACT_PROGRESS_WEIGHTS.summarizeStart
+  const clamped = Math.max(0, Math.min(1, fraction))
+  const span =
+    COMPACT_PROGRESS_WEIGHTS.summarizeEnd -
+    COMPACT_PROGRESS_WEIGHTS.summarizeStart
+  return COMPACT_PROGRESS_WEIGHTS.summarizeStart + clamped * span
+}
+
+/**
  * Build the base post-compact messages array from a CompactionResult.
  * This ensures consistent ordering across all compaction paths.
  * Order: boundaryMarker, summaryMessages, messagesToKeep, attachments, hookResults
@@ -459,6 +502,8 @@ export async function compactConversation(
     context.onCompactProgress?.({
       type: 'hooks_start',
       hookType: 'pre_compact',
+      phase: 'Pre-hooks',
+      percent: COMPACT_PROGRESS_WEIGHTS.preHookStart,
     })
 
     // Execute PreCompact hooks
@@ -479,7 +524,12 @@ export async function compactConversation(
     // Show requesting mode with up arrow and custom message
     context.setStreamMode?.('requesting')
     context.setResponseLength?.(() => 0)
-    context.onCompactProgress?.({ type: 'compact_start' })
+    context.onCompactProgress?.({
+      type: 'compact_start',
+      phase: 'Summarizing',
+      percent: COMPACT_PROGRESS_WEIGHTS.summarizeStart,
+      tokensTotal: preCompactTokenCount,
+    })
 
     // 3P default: true — forked-agent path reuses main conversation's prompt cache.
     // Experiment (Jan 2026) confirmed: false path is 98% cache miss, costs ~0.76% of
@@ -523,6 +573,8 @@ export async function compactConversation(
         context,
         preCompactTokenCount,
         cacheSafeParams: retryCacheSafeParams,
+        progressAttempt: ptlAttempts + 1,
+        progressMaxAttempts: MAX_PTL_RETRIES + 1,
       })
       summary = getAssistantMessageText(summaryResponse)
       if (!summary?.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE)) break
@@ -655,6 +707,8 @@ export async function compactConversation(
     context.onCompactProgress?.({
       type: 'hooks_start',
       hookType: 'session_start',
+      phase: 'Restoring files',
+      percent: COMPACT_PROGRESS_WEIGHTS.restoreStart,
     })
     // Execute SessionStart hooks after successful compaction
     const hookMessages = await processSessionStartHooks('compact', {
@@ -787,6 +841,8 @@ export async function compactConversation(
     context.onCompactProgress?.({
       type: 'hooks_start',
       hookType: 'post_compact',
+      phase: 'Post-hooks',
+      percent: COMPACT_PROGRESS_WEIGHTS.postHookStart,
     })
     const postCompactHookResult = await executePostCompactHooks(
       {
@@ -880,6 +936,8 @@ export async function partialCompactConversation(
     context.onCompactProgress?.({
       type: 'hooks_start',
       hookType: 'pre_compact',
+      phase: 'Pre-hooks',
+      percent: COMPACT_PROGRESS_WEIGHTS.preHookStart,
     })
 
     context.setSDKStatus?.('compacting')
@@ -903,7 +961,12 @@ export async function partialCompactConversation(
 
     context.setStreamMode?.('requesting')
     context.setResponseLength?.(() => 0)
-    context.onCompactProgress?.({ type: 'compact_start' })
+    context.onCompactProgress?.({
+      type: 'compact_start',
+      phase: 'Summarizing',
+      percent: COMPACT_PROGRESS_WEIGHTS.summarizeStart,
+      tokensTotal: preCompactTokenCount,
+    })
 
     const compactPrompt = getPartialCompactPrompt(customInstructions, direction)
     const summaryRequest = createUserMessage({
@@ -935,6 +998,8 @@ export async function partialCompactConversation(
         context,
         preCompactTokenCount,
         cacheSafeParams: retryCacheSafeParams,
+        progressAttempt: ptlAttempts + 1,
+        progressMaxAttempts: MAX_PTL_RETRIES + 1,
       })
       summary = getAssistantMessageText(summaryResponse)
       if (!summary?.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE)) break
@@ -1045,6 +1110,8 @@ export async function partialCompactConversation(
     context.onCompactProgress?.({
       type: 'hooks_start',
       hookType: 'session_start',
+      phase: 'Restoring files',
+      percent: COMPACT_PROGRESS_WEIGHTS.restoreStart,
     })
     const hookMessages = await processSessionStartHooks('compact', {
       model: context.options.mainLoopModel,
@@ -1133,6 +1200,8 @@ export async function partialCompactConversation(
     context.onCompactProgress?.({
       type: 'hooks_start',
       hookType: 'post_compact',
+      phase: 'Post-hooks',
+      percent: COMPACT_PROGRESS_WEIGHTS.postHookStart,
     })
     const postCompactHookResult = await executePostCompactHooks(
       {
@@ -1208,6 +1277,8 @@ async function streamCompactSummary({
   context,
   preCompactTokenCount,
   cacheSafeParams,
+  progressAttempt,
+  progressMaxAttempts,
 }: {
   messages: Message[]
   summaryRequest: UserMessage
@@ -1215,6 +1286,8 @@ async function streamCompactSummary({
   context: ToolUseContext
   preCompactTokenCount: number
   cacheSafeParams: CacheSafeParams
+  progressAttempt?: number
+  progressMaxAttempts?: number
 }): Promise<AssistantMessage> {
   // When prompt cache sharing is enabled, use forked agent to reuse the
   // main conversation's cached prefix (system prompt, tools, context messages).
@@ -1395,6 +1468,42 @@ async function streamCompactSummary({
       const streamIter = streamingGen[Symbol.asyncIterator]()
       let next = await streamIter.next()
 
+      // Summary streaming progress (Worker S, v2.26.2). We track the running
+      // character count locally — context.setResponseLength updates an
+      // animation ref that's not safe to read back synchronously here, and
+      // we want a stable monotonically-increasing counter for the bar. Token
+      // estimate: 1 token ≈ 4 chars. Total budget: COMPACT_MAX_OUTPUT_TOKENS
+      // (20K). Throttled to every 256 chars / 250ms to avoid event spam on
+      // long summaries (~80K events otherwise).
+      let summaryChars = 0
+      let lastProgressEmit = 0
+      let lastProgressChars = 0
+      const PROGRESS_EMIT_CHARS = 256
+      const PROGRESS_EMIT_MS = 250
+      const SUMMARY_BUDGET_CHARS = 20_000 * 4
+      const emitSummaryProgress = (force: boolean): void => {
+        const now = Date.now()
+        if (
+          !force &&
+          summaryChars - lastProgressChars < PROGRESS_EMIT_CHARS &&
+          now - lastProgressEmit < PROGRESS_EMIT_MS
+        ) {
+          return
+        }
+        lastProgressEmit = now
+        lastProgressChars = summaryChars
+        const fraction = summaryChars / SUMMARY_BUDGET_CHARS
+        context.onCompactProgress?.({
+          type: 'compact_progress',
+          phase: 'Summarizing',
+          percent: mapSummarizePercent(fraction),
+          tokensProcessed: Math.round(summaryChars / 4),
+          tokensTotal: 20_000,
+          attempt: progressAttempt,
+          maxAttempts: progressMaxAttempts,
+        })
+      }
+
       while (!next.done) {
         const event = next.value as StreamEvent | AssistantMessage | SystemAPIErrorMessage
         const streamEvent = event as { type: string; event: { type: string; content_block: { type: string }; delta: { type: string; text: string } } }
@@ -1407,6 +1516,7 @@ async function streamCompactSummary({
         ) {
           hasStartedStreaming = true
           context.setStreamMode?.('responding')
+          emitSummaryProgress(true)
         }
 
         if (
@@ -1416,6 +1526,8 @@ async function streamCompactSummary({
         ) {
           const charactersStreamed = streamEvent.event.delta.text.length
           context.setResponseLength?.(length => length + charactersStreamed)
+          summaryChars += charactersStreamed
+          emitSummaryProgress(false)
         }
 
         if (event.type === 'assistant') {

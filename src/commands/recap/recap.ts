@@ -12,6 +12,15 @@
 // Aligning with /color's file split makes load() return a true ESM
 // module namespace where `call` is unambiguously the export function.
 //
+// v2.26.2+ hotfix: real-runtime bug — AppState has no `messages` field
+// (see AppStateStore.ts). messages live on ToolUseContext.messages
+// (Tool.ts:250), wired in REPL.tsx getToolUseContext at L2525. The legacy
+// `context.getAppState().messages` read returned undefined at runtime,
+// triggering the "No conversation yet — nothing to recap" early return on
+// every invocation. Test mocks faked appState.messages so the test suite
+// passed (recap.test.ts:29), masking the bug. Fix: read context.messages
+// directly, matching /copy, /rename, /export, /btw, /diff, /feedback.
+//
 // 一旦我被修改，请更新所属文件夹的 README.md（如有）。
 
 import type {
@@ -48,13 +57,21 @@ export async function call(
   // 给用户。之前 v2.25.60 实测 [recap] call() entered 出现但无后续 log，
   // 怀疑 context.getAppState() 或类似 sync 调用 throw 被 processSlashCommand
   // 外层 catch 静默吞掉，用户看不到任何反馈。
+  //
+  // v2.26.2+ hotfix: 真因找到 — AppState 类型里根本没有 messages 字段
+  // (见 AppStateStore.ts)。messages 是 ToolUseContext 顶层字段
+  // (Tool.ts:250)，由 REPL.tsx:2525 的 getToolUseContext 把 messagesRef
+  // 直接装进 context.messages。之前调用 context.getAppState().messages
+  // 永远拿到 undefined → 触发 "No conversation yet" early return。
+  // 单测里 makeContext({ getAppState: () => ({ messages }) }) 假塞了
+  // messages 到 appState 上，所以测试通过运行时挂掉。
+  // 修复：改读 context.messages，对齐 /copy /rename /export /btw /diff
+  // /feedback 这一组同类命令的标准用法。
   try {
-    logForDebugging('[recap] reading appState')
-    const appState = context.getAppState()
     logForDebugging(
-      `[recap] appState type=${typeof appState}, has messages=${!!appState?.messages}`,
+      `[recap] reading context.messages (length=${context.messages?.length ?? 'undefined'})`,
     )
-    const messages = appState?.messages ?? []
+    const messages = context.messages ?? []
     logForDebugging(`[recap] messages.length=${messages.length}`)
 
     if (messages.length === 0) {

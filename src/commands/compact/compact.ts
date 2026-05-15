@@ -1,3 +1,7 @@
+// Input: /compact slash args + ToolUseContext + messages
+// Output: CompactionResult + displayText（聊天面板展示）
+// Pos: commands/compact slash 入口，路由到 reactive / session-memory / traditional compact
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 import { feature } from 'bun:bundle'
 import chalk from 'chalk'
 import { markPostCompaction } from 'src/bootstrap/state.js'
@@ -152,6 +156,8 @@ async function compactViaReactive(
   context.onCompactProgress?.({
     type: 'hooks_start',
     hookType: 'pre_compact',
+    phase: 'Pre-hooks',
+    percent: 0,
   })
   context.setSDKStatus?.('compacting')
 
@@ -173,7 +179,11 @@ async function compactViaReactive(
 
     context.setStreamMode?.('requesting')
     context.setResponseLength?.(() => 0)
-    context.onCompactProgress?.({ type: 'compact_start' })
+    context.onCompactProgress?.({
+      type: 'compact_start',
+      phase: 'Summarizing',
+      percent: 8,
+    })
 
     const outcome = await reactive.reactiveCompactOnPromptTooLong(
       messages,

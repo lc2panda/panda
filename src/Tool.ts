@@ -147,12 +147,44 @@ export const getEmptyToolPermissionContext: () => ToolPermissionContext =
     isBypassPermissionsModeAvailable: false,
   })
 
+/**
+ * Compact progress phase — coarse stage names threaded into UI for the
+ * progress bar (Worker S, v2.26.2). Optional `percent` is the estimated
+ * completion ratio (0-100). When `percent` is undefined the UI degrades to
+ * a spinner with the phase label only. `tokensProcessed` / `tokensTotal`
+ * power the second-line counter. `attempt` / `maxAttempts` surface PTL +
+ * streaming retry state so the user sees "attempt 2/3" rather than a stalled
+ * spinner. All new fields are optional so legacy callers stay compatible.
+ */
+export type CompactProgressPhase =
+  | 'Pre-hooks'
+  | 'Summarizing'
+  | 'Restoring files'
+  | 'Post-hooks'
+
 export type CompactProgressEvent =
   | {
       type: 'hooks_start'
       hookType: 'pre_compact' | 'post_compact' | 'session_start'
+      phase?: CompactProgressPhase
+      percent?: number
     }
-  | { type: 'compact_start' }
+  | {
+      type: 'compact_start'
+      phase?: CompactProgressPhase
+      percent?: number
+      tokensTotal?: number
+    }
+  | {
+      type: 'compact_progress'
+      phase: CompactProgressPhase
+      percent: number
+      tokensProcessed?: number
+      tokensTotal?: number
+      attempt?: number
+      maxAttempts?: number
+      note?: string
+    }
   | { type: 'compact_end' }
 
 export type ToolUseContext = {

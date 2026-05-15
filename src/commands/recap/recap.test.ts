@@ -25,8 +25,19 @@ function makeContext(messages: Message[]) {
     const next = updater(messages)
     captured.push(next)
   }
+  // v2.26.2+ hotfix regression: messages 通过 ToolUseContext.messages 注入
+  // （见 Tool.ts:250 + REPL.tsx getToolUseContext L2525），AppState 类型
+  // 里根本没有 messages 字段（见 AppStateStore.ts AppState 定义）。运行时
+  // context.getAppState().messages === undefined，触发 "No conversation
+  // yet" 误判 → 这是 Comdr 实测 P0 bug 的真因。
+  //
+  // 旧 mock 把 messages 假塞进 getAppState() 让测试通过但掩盖了 bug。
+  // 现在 getAppState() 返回的 AppState shape **不含** messages，messages
+  // 仅通过 ctx.messages 暴露 — 强制 recap.ts 必须读 context.messages 才能
+  // 跑通测试，与运行时契约对齐。
   const ctx = {
-    getAppState: () => ({ messages }) as any,
+    getAppState: () => ({}) as any, // 模拟真实 AppState — 不含 messages
+    messages,
     setMessages,
   } as any
   return { ctx, captured }
@@ -164,6 +175,81 @@ describe('/recap command shape', () => {
     expect(recap.type).toBe('local-jsx')
     expect(recap.description).toContain('summary')
     expect(recap.immediate).toBe(true)
+  })
+})
+
+// v2.26.2+ hotfix regression — Comdr 实测 /recap 永远 "No conversation yet"
+// 的 P0 bug。真因：recap.ts 旧版读 context.getAppState().messages 拿到
+// undefined，AppState 类型里根本没有 messages 字段。messages 是
+// ToolUseContext 顶层字段（Tool.ts:250），由 REPL.tsx:2525 getToolUseContext
+// 直接装进 context.messages。固定下此契约，防止再次回归。
+describe('/recap regression — context.messages 是 messages 的唯一真源', () => {
+  test('当 getAppState() 返回的 AppState 不含 messages（真实运行时契约）但 context.messages 有数据 → 走正常路径，不应误判为空会话', async () => {
+    mock.module('../../services/awaySummary.js', () => ({
+      generateAwaySummary: async () => 'a recap from real context.messages',
+    }))
+    const { default: recap } = await import('./index.js?regression-runtime=1')
+    if (recap.type !== 'local-jsx') throw new Error('type mismatch')
+    const mod = await recap.load()
+
+    // 严格模拟运行时：getAppState() 返回的对象**没有** messages 字段，
+    // 同时 ctx.messages 有真实历史。如果实现还读 getAppState().messages
+    // 就会拿到 undefined → 报 "No conversation yet" → 测试失败。
+    const messages: Message[] = [userMsg('please summarise our convo')]
+    const captured: Array<Message[]> = []
+    const ctx = {
+      getAppState: () => ({}) as any, // 真实 AppState — 不含 messages
+      messages,
+      setMessages: (updater: (prev: Message[]) => Message[]) => {
+        captured.push(updater(messages))
+      },
+    } as any
+
+    let doneText: string | undefined
+    await mod.call(
+      (t?: string) => {
+        doneText = t
+      },
+      ctx,
+      '',
+    )
+    // 必须走 happy path（onDone 'Generating recap…'），而不是 early return
+    // 'No conversation yet' — 这正是 Comdr 实测到的 bug 表现。
+    expect(doneText).toBe('Generating recap…')
+    expect(doneText).not.toContain('No conversation')
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(captured.length).toBe(1)
+  })
+
+  test('当 ctx.messages 是 undefined（极端 defensive 路径）→ 走 "No conversation" 不 crash', async () => {
+    mock.module('../../services/awaySummary.js', () => ({
+      generateAwaySummary: async () => 'should-not-be-called',
+    }))
+    const { default: recap } = await import(
+      './index.js?regression-no-messages=1'
+    )
+    if (recap.type !== 'local-jsx') throw new Error('type mismatch')
+    const mod = await recap.load()
+
+    const captured: Array<Message[]> = []
+    const ctx = {
+      getAppState: () => ({}) as any,
+      // 故意 omit messages 字段 — 模拟非常老的 context 路径
+      setMessages: (updater: (prev: Message[]) => Message[]) => {
+        captured.push(updater([]))
+      },
+    } as any
+
+    let doneText: string | undefined
+    await mod.call(
+      (t?: string) => {
+        doneText = t
+      },
+      ctx,
+      '',
+    )
+    expect(doneText).toContain('No conversation')
+    expect(captured.length).toBe(0)
   })
 })
 
