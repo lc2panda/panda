@@ -49,9 +49,14 @@ export async function agentViewHandler(): Promise<void> {
     }
     case 'dispatch': {
       const args: string[] = [];
-      // Tier 1: draft is currently always empty — full prompt threading is Tier 2.
-      if (action.draft) {
-        args.push('-p', action.draft);
+      // Tier 2 (v2.26.1, Worker P): dashboard 的 dispatchPrompt 通过 --prefill
+      // 注入新 panda 子进程的 prompt input。--prefill 调 seedEarlyInput()，
+      // REPL 渲染时 consumeEarlyInput() 把内容预填进输入框（不会自动提交）。
+      //
+      // 这里没用 `-p`（headless 模式）：dispatch + attach 的语义是“打开一个
+      // 新交互会话，把草稿填好让用户决定是否回车”，不是“headless 跑完就退”。
+      if (action.draft && action.draft.trim().length > 0) {
+        args.push('--prefill', action.draft);
       }
       const code = await reSpawnPanda(args, action.cwd);
       process.exit(code);

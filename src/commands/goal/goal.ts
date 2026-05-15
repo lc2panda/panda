@@ -10,18 +10,23 @@
 //
 // 一旦我被修改，请更新所属文件夹的 README.md（如有）。
 
+import { randomUUID } from 'crypto'
+import type { Message, SystemInformationalMessage } from '../../types/message.js'
 import type {
   LocalJSXCommandContext,
   LocalJSXCommandOnDone,
 } from '../../types/command.js'
 import { logForDebugging } from '../../utils/debug.js'
+import { getSettingsForSource } from '../../utils/settings/settings.js'
 import {
   clearGoal,
   getGoal,
   getGoalConditionPreview,
   getGoalElapsedDisplay,
   GOAL_CONDITION_MAX_LENGTH,
+  GOAL_MARKER_SUBTYPE,
   setGoal,
+  type GoalMarkerPayload,
 } from '../../state/goalStore.js'
 
 const CLEAR_ALIASES = new Set([
@@ -53,12 +58,85 @@ function buildStatusMessage(): string {
   return lines.join('\n')
 }
 
+/**
+ * Build the marker SystemMessage that we splice into the transcript every
+ * time /goal sets/replaces/clears a goal. On --resume, goalStore.restoreFromMarker
+ * scans for the most recent active marker to rehydrate the condition.
+ *
+ * `isMeta: true` keeps the marker out of the rendered conversation (it's
+ * bookkeeping, not user-facing) while still flowing through the transcript
+ * persistence path so it survives a save/reload cycle. `goalMarker` is the
+ * payload field consumed by findActiveGoalMarker().
+ */
+function buildGoalMarkerMessage(
+  action: 'set' | 'clear',
+  payload: GoalMarkerPayload | null,
+): SystemInformationalMessage {
+  return {
+    type: 'system',
+    subtype: GOAL_MARKER_SUBTYPE,
+    content:
+      action === 'set'
+        ? `[goal] set: ${payload?.condition.slice(0, 80) ?? ''}`
+        : '[goal] cleared',
+    goalMarker: { action, payload },
+    isMeta: true,
+    timestamp: new Date().toISOString(),
+    uuid: randomUUID(),
+    level: 'info',
+  } as unknown as SystemInformationalMessage
+}
+
+/**
+ * Enterprise off-switch: returns a user-facing reason string when /goal is
+ * blocked by admin policy, or null when the command is allowed to run.
+ * Three layers are checked, in priority order:
+ *
+ * 1. `policySettings.goalCommandEnabled === false` — explicit kill switch
+ *    set by IT in managed-settings.json. Highest authority.
+ * 2. `policySettings.disableAllHooks === true` — when admins fully disable
+ *    the hook infrastructure, /goal's evaluator (which behaves like a
+ *    background hook from the operator POV) also goes dark.
+ * 3. `policySettings.allowManagedHooksOnly === true` — managed-hooks-only
+ *    mode means user-initiated background work surfaces (incl. /goal eval)
+ *    are not allowed. We surface a clear error rather than silently letting
+ *    /goal run with a no-op evaluator.
+ *
+ * Non-policy (user/project/local) flags do NOT block /goal — only the
+ * managed-settings layer can disable it. This mirrors how disableAllHooks
+ * itself is treated as managed-only for the "fully off" semantics
+ * (hooksConfigSnapshot.shouldDisableAllHooksIncludingManaged).
+ */
+function checkGoalAdminPolicy(): string | null {
+  const policy = getSettingsForSource('policySettings')
+  if (policy?.goalCommandEnabled === false) {
+    return 'Goal command disabled by admin policy (settings.goalCommandEnabled = false).'
+  }
+  // disableAllHooks (managed) — full shutdown of background-evaluator surfaces.
+  if (policy?.disableAllHooks === true) {
+    return 'Goal command disabled by admin policy (disableAllHooks).'
+  }
+  // allowManagedHooksOnly — only managed-defined background work permitted.
+  if (policy?.allowManagedHooksOnly === true) {
+    return 'Goal command disabled by admin policy (allowManagedHooksOnly).'
+  }
+  return null
+}
+
 export async function call(
   onDone: LocalJSXCommandOnDone,
-  _context: LocalJSXCommandContext,
+  context: LocalJSXCommandContext,
   args?: string,
 ): Promise<null> {
   logForDebugging(`[goal] call() args=${JSON.stringify(args)}`)
+
+  // Enterprise gate — admins can disable /goal via managed settings.
+  const denied = checkGoalAdminPolicy()
+  if (denied !== null) {
+    onDone(denied, { display: 'system' })
+    return null
+  }
+
   const raw = (args ?? '').trim()
 
   // Empty → status
@@ -74,6 +152,9 @@ export async function call(
     if (prev === null) {
       onDone('No active goal to clear.', { display: 'system' })
     } else {
+      // Splice a clear marker so --resume sees the goal as cleared.
+      const marker = buildGoalMarkerMessage('clear', null)
+      context.setMessages?.(prevMsgs => [...prevMsgs, marker as Message])
       onDone(
         `Goal cleared (was: "${getOnelinePreview(prev.condition, 60)}", ${prev.turns} turns).`,
         { display: 'system' },
@@ -97,6 +178,13 @@ export async function call(
     const next = setGoal(raw)
     const preview = getOnelinePreview(next.condition, 80)
     const verb = prev ? 'Replaced goal' : 'Goal set'
+    // Splice a set marker so --resume can rehydrate this condition next session.
+    const marker = buildGoalMarkerMessage('set', {
+      condition: next.condition,
+      setAtMs: next.setAtMs,
+      maxTurns: next.maxTurns,
+    })
+    context.setMessages?.(prevMsgs => [...prevMsgs, marker as Message])
     onDone(
       `${verb}: "${preview}" — Claude will continue working until the evaluator agrees this is met (or ${next.maxTurns} turns elapse).`,
       { display: 'system' },

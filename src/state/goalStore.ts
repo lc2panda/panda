@@ -166,3 +166,109 @@ export function getGoalConditionPreview(maxLen = 60): string {
   if (cond.length <= maxLen) return cond
   return cond.slice(0, Math.max(1, maxLen - 1)) + '…'
 }
+
+/**
+ * Subtype literal stamped on the SystemMessage marker dropped into the
+ * transcript every time /goal sets/replaces a condition. Used by
+ * restoreFromMarker() to find the latest still-relevant marker on --resume.
+ */
+export const GOAL_MARKER_SUBTYPE = 'goal_marker'
+
+/**
+ * Shape of the marker SystemMessage's `goalMarker` field. Kept narrow so the
+ * transcript reader can rely on `condition` always being a non-empty string.
+ */
+export type GoalMarkerPayload = {
+  condition: string
+  /** When the original /goal was issued. Restore resets turn/token baseline
+   *  but we keep this in the payload for diagnostics + future "elapsed since
+   *  original set" display modes. */
+  setAtMs: number
+  /** Mirrors GoalState.maxTurns at marker time so resume honors the user's
+   *  original safety cap (if they tuned it via future /goal --max-turns flag). */
+  maxTurns: number
+}
+
+/**
+ * Scan a transcript (oldest → newest) for the most recent goal marker that is
+ * still in effect, i.e. has not been overridden by a clear marker or a newer
+ * set marker. Returns the marker payload to restore, or null if no active
+ * goal is recorded.
+ *
+ * The scan respects two marker subtypes:
+ *   - `goal_marker` with `goalMarker.action === 'set'` → newest wins
+ *   - `goal_marker` with `goalMarker.action === 'clear'` → cancels prior set
+ *
+ * We walk backwards so we can short-circuit on the first 'set' or 'clear'.
+ */
+export function findActiveGoalMarker(
+  messages: ReadonlyArray<{ type?: unknown; [key: string]: unknown }>,
+): GoalMarkerPayload | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (!m || m.type !== 'system') continue
+    if ((m as { subtype?: unknown }).subtype !== GOAL_MARKER_SUBTYPE) continue
+    const action = (m as { goalMarker?: { action?: unknown } }).goalMarker
+      ?.action
+    if (action === 'clear') {
+      // A clear marker shadows any prior set: no active goal.
+      return null
+    }
+    if (action === 'set') {
+      const payload = (m as { goalMarker?: { payload?: unknown } }).goalMarker
+        ?.payload
+      if (
+        typeof payload === 'object' &&
+        payload !== null &&
+        typeof (payload as { condition?: unknown }).condition === 'string' &&
+        ((payload as { condition: string }).condition as string).trim().length >
+          0
+      ) {
+        const p = payload as Partial<GoalMarkerPayload>
+        return {
+          condition: (p.condition as string).trim(),
+          setAtMs: typeof p.setAtMs === 'number' ? p.setAtMs : Date.now(),
+          maxTurns:
+            typeof p.maxTurns === 'number' && p.maxTurns > 0
+              ? p.maxTurns
+              : GOAL_MAX_TURNS_DEFAULT,
+        }
+      }
+      // Malformed payload: keep scanning to maybe find an older valid marker.
+      continue
+    }
+  }
+  return null
+}
+
+/**
+ * --resume / --continue entry point. Scans the loaded transcript for the most
+ * recent active goal marker and rehydrates `current` from it. Returns the
+ * restored GoalState (or null if nothing to restore).
+ *
+ * IMPORTANT: caller (sessionRestore / REPL resume) must invoke this AFTER the
+ * transcript has been deserialized but BEFORE the goal evaluator runs in the
+ * resumed session, so the first post-resume turn sees the restored goal.
+ *
+ * Turn count, token count, lastReason, lastMet are intentionally reset — we
+ * don't carry stale per-turn telemetry across a resume boundary. setAtMs is
+ * also reset to `now()` so the elapsed timer starts fresh (matches user
+ * mental model: "I /resume'd; the clock should reflect this session").
+ */
+export function restoreFromMarker(
+  messages: ReadonlyArray<{ type?: unknown; [key: string]: unknown }>,
+): GoalState | null {
+  const payload = findActiveGoalMarker(messages)
+  if (payload === null) return null
+  current = {
+    condition: payload.condition,
+    setAtMs: Date.now(),
+    turns: 0,
+    lastReason: null,
+    lastMet: null,
+    tokens: 0,
+    maxTurns: payload.maxTurns,
+  }
+  notify()
+  return current
+}

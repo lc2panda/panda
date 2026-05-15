@@ -487,6 +487,21 @@ export async function processResumedConversation(
     adoptResumedSessionFile()
   }
 
+  // Rehydrate any active /goal condition from the transcript. The /goal
+  // command emits a `goal_marker` SystemMessage on every set/clear so a
+  // --resume / --continue can pick the goal back up. Done here (CLI entry)
+  // and in REPL.tsx (/resume slash command) so both resume paths converge.
+  // Safe to call even when no marker is present — returns null and leaves
+  // the goalStore untouched.
+  try {
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    const goalStore = require('../state/goalStore.js') as typeof import('../state/goalStore.js')
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    goalStore.restoreFromMarker(result.messages)
+  } catch {
+    // Goal restoration must never block resume — swallow.
+  }
+
   // Restore context-collapse commit log + staged snapshot. The interactive
   // /resume path goes through restoreSessionStateFromLog (REPL.tsx); CLI
   // --continue/--resume goes through here instead. Called unconditionally

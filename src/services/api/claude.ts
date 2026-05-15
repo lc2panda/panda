@@ -1,3 +1,12 @@
+// Input:  system prompt + message history + tools + provider/model selection
+// Output: streaming BetaRawMessageStreamEvent → AssistantMessage / SystemAPIErrorMessage,
+//         plus non-streaming queryModelWithoutStreaming() for off-band evals.
+// Pos:    src/services/api/claude.ts — core API boundary. Talks to Anthropic
+//         direct / Bedrock / Vertex / Azure / third-party. Every query() and
+//         every background eval (haiku titles, away summaries, goal evaluator)
+//         funnels through here. Provider params + retry + cache TTL live here.
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import type {
   BetaContentBlock,
   BetaContentBlockParam,

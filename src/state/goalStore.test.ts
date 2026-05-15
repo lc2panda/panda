@@ -12,13 +12,16 @@ import { describe, it, expect, beforeEach } from 'bun:test'
 import {
   __resetGoalStoreForTests,
   clearGoal,
+  findActiveGoalMarker,
   GOAL_CONDITION_MAX_LENGTH,
+  GOAL_MARKER_SUBTYPE,
   GOAL_MAX_TURNS_DEFAULT,
   getGoal,
   getGoalConditionPreview,
   getGoalElapsedDisplay,
   isGoalActive,
   recordGoalTurn,
+  restoreFromMarker,
   setGoal,
   subscribeGoal,
 } from './goalStore.js'
@@ -145,5 +148,119 @@ describe('goalStore', () => {
   it('preview returns full condition when short enough', () => {
     setGoal('short')
     expect(getGoalConditionPreview(60)).toBe('short')
+  })
+})
+
+describe('goalStore — restoreFromMarker', () => {
+  it('returns null when transcript has no markers', () => {
+    const r = restoreFromMarker([
+      { type: 'user' },
+      { type: 'assistant' },
+    ])
+    expect(r).toBeNull()
+    expect(isGoalActive()).toBe(false)
+  })
+
+  it('returns null when transcript ends with a clear marker', () => {
+    const r = restoreFromMarker([
+      {
+        type: 'system',
+        subtype: GOAL_MARKER_SUBTYPE,
+        goalMarker: {
+          action: 'set',
+          payload: { condition: 'old', setAtMs: 1, maxTurns: 50 },
+        },
+      },
+      {
+        type: 'system',
+        subtype: GOAL_MARKER_SUBTYPE,
+        goalMarker: { action: 'clear', payload: null },
+      },
+    ])
+    expect(r).toBeNull()
+    expect(isGoalActive()).toBe(false)
+  })
+
+  it('rehydrates condition from the most recent set marker', () => {
+    const r = restoreFromMarker([
+      { type: 'user' },
+      {
+        type: 'system',
+        subtype: GOAL_MARKER_SUBTYPE,
+        goalMarker: {
+          action: 'set',
+          payload: { condition: 'first', setAtMs: 1, maxTurns: 20 },
+        },
+      },
+      { type: 'assistant' },
+      {
+        type: 'system',
+        subtype: GOAL_MARKER_SUBTYPE,
+        goalMarker: {
+          action: 'set',
+          payload: { condition: 'second', setAtMs: 2, maxTurns: 30 },
+        },
+      },
+      { type: 'assistant' },
+    ])
+    expect(r).not.toBeNull()
+    expect(r?.condition).toBe('second')
+    expect(r?.maxTurns).toBe(30)
+    expect(r?.turns).toBe(0) // turn baseline reset
+    expect(r?.tokens).toBe(0) // token baseline reset
+    expect(r?.lastMet).toBeNull() // last-eval reset
+    expect(isGoalActive()).toBe(true)
+    expect(getGoal()?.condition).toBe('second')
+  })
+
+  it('ignores malformed set markers and falls back to older valid one', () => {
+    const r = restoreFromMarker([
+      {
+        type: 'system',
+        subtype: GOAL_MARKER_SUBTYPE,
+        goalMarker: {
+          action: 'set',
+          payload: { condition: 'valid older', setAtMs: 1, maxTurns: 50 },
+        },
+      },
+      {
+        type: 'system',
+        subtype: GOAL_MARKER_SUBTYPE,
+        goalMarker: { action: 'set', payload: { condition: '' } }, // malformed
+      },
+    ])
+    expect(r?.condition).toBe('valid older')
+  })
+
+  it('skips non-system messages and non-goal subtypes', () => {
+    // findActiveGoalMarker should ignore unrelated SystemMessages.
+    const marker = findActiveGoalMarker([
+      { type: 'user' },
+      { type: 'system', subtype: 'informational', content: 'hi' },
+      { type: 'attachment' },
+      {
+        type: 'system',
+        subtype: GOAL_MARKER_SUBTYPE,
+        goalMarker: {
+          action: 'set',
+          payload: { condition: 'the goal', setAtMs: 5, maxTurns: 50 },
+        },
+      },
+    ])
+    expect(marker?.condition).toBe('the goal')
+  })
+
+  it('uses default maxTurns when marker omits or zero', () => {
+    const r = restoreFromMarker([
+      {
+        type: 'system',
+        subtype: GOAL_MARKER_SUBTYPE,
+        goalMarker: {
+          action: 'set',
+          payload: { condition: 'no max', setAtMs: 1 },
+        },
+      },
+    ])
+    expect(r?.maxTurns).toBe(GOAL_MAX_TURNS_DEFAULT)
   })
 })

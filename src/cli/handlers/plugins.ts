@@ -1,3 +1,12 @@
+// Input:  argv from `panda plugin …` / `panda plugin marketplace …` subcommands
+// Output: terminal stdout/stderr + process.exit codes; mutates settings.json
+//         (enabledPlugins / extraKnownMarketplaces) and writes plugin cache.
+// Pos:    src/cli/handlers/plugins.ts — lazy-loaded by main.tsx Commander.js
+//         dispatcher. Owns the non-REPL plugin/marketplace UX (install / list
+//         / enable / disable / search). REPL-side `/plugin` slash command
+//         lives elsewhere.
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 /**
  * Plugin and marketplace subcommand handlers — extracted from main.tsx for lazy loading.
  * These are dynamically imported only when `claude plugin *` or `claude plugin marketplace *` runs.

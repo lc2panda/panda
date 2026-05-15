@@ -18,6 +18,7 @@ import { _internal as enumInternal } from './sessionEnumerator.js'
 import { createKeyHandler } from './useAgentViewKeybindings.js'
 import type { AgentViewActions } from './useAgentViewState.js'
 import type { DashboardState, RosterEntry, SessionEntry } from './types.js'
+import { computePeekWindow, PEEK_PAGE_SIZE } from './PeekPanel.js'
 
 const FAKE_HOME = mkdtempSync(join(tmpdir(), 'panda-av-test-'))
 
@@ -174,6 +175,10 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
     attach: string[]
     exit: number
     dispatch: number
+    dispatchDraft: string[]
+    movePeekPage: number[]
+    editPrompt: number
+    setDispatchPrompt: string[]
   }
   const fakeKey = (
     over: Partial<Record<string, boolean>>,
@@ -220,10 +225,12 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
     cursor: 0,
     groupMode: 'status',
     peekOpen: false,
+    peekPageOffset: 0,
     renameMode: false,
     renameDraft: '',
     pendingStopId: null,
     lastError: null,
+    dispatchPrompt: '',
     ...over,
   })
 
@@ -237,6 +244,10 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
       attach: [],
       exit: 0,
       dispatch: 0,
+      dispatchDraft: [],
+      movePeekPage: [],
+      editPrompt: 0,
+      setDispatchPrompt: [],
     }
     const actions: AgentViewActions = {
       refresh: async () => {},
@@ -254,6 +265,9 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
         calls.togglePeek++
       },
       closePeek: () => {},
+      movePeekPage: d => {
+        calls.movePeekPage.push(d)
+      },
       beginRename: n => {
         calls.beginRename.push(n)
       },
@@ -263,15 +277,21 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
         calls.setPendingStop.push(id)
       },
       setError: () => {},
+      setDispatchPrompt: t => {
+        calls.setDispatchPrompt.push(t)
+      },
     }
     const cb = {
       onAttach: (e: SessionEntry) => {
         calls.attach.push(e.id)
       },
-      onDispatchAndAttach: () => {
+      onDispatchAndAttach: (_e: SessionEntry | null, draft: string) => {
         calls.dispatch++
+        calls.dispatchDraft.push(draft)
       },
-      onEditPrompt: () => {},
+      onEditPrompt: () => {
+        calls.editPrompt++
+      },
       onStop: () => {},
       onExit: () => {
         calls.exit++
@@ -368,6 +388,72 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
     expect(calls.exit).toBe(1)
   })
 
+  // ---- Tier 2 (v2.26.1, Worker P) ----
+
+  test('Ctrl+G calls onEditPrompt (open $EDITOR for dispatch prompt)', () => {
+    const { calls, actions, cb } = makeCallbacks()
+    const handler = createKeyHandler(baseState(), actions, cb)
+    handler('g', fakeKey({ ctrl: true }))
+    expect(calls.editPrompt).toBe(1)
+  })
+
+  test('Shift+Enter dispatches with dispatchPrompt as draft', () => {
+    const { calls, actions, cb } = makeCallbacks()
+    const handler = createKeyHandler(
+      baseState({ dispatchPrompt: 'fix the bug in foo.ts' }),
+      actions,
+      cb,
+    )
+    handler('', fakeKey({ return: true, shift: true }))
+    expect(calls.dispatch).toBe(1)
+    expect(calls.dispatchDraft).toEqual(['fix the bug in foo.ts'])
+  })
+
+  test('Ctrl+Enter (fallback for non-Kitty terminals) also dispatches with draft', () => {
+    const { calls, actions, cb } = makeCallbacks()
+    const handler = createKeyHandler(
+      baseState({ dispatchPrompt: 'review pr 42' }),
+      actions,
+      cb,
+    )
+    handler('', fakeKey({ return: true, ctrl: true }))
+    expect(calls.dispatchDraft).toEqual(['review pr 42'])
+  })
+
+  test('PgUp in peek-open paginates older (movePeekPage +1)', () => {
+    const { calls, actions, cb } = makeCallbacks()
+    const handler = createKeyHandler(
+      baseState({ peekOpen: true }),
+      actions,
+      cb,
+    )
+    handler('', fakeKey({ pageUp: true }))
+    expect(calls.movePeekPage).toEqual([1])
+  })
+
+  test('PgDn in peek-open paginates newer (movePeekPage -1)', () => {
+    const { calls, actions, cb } = makeCallbacks()
+    const handler = createKeyHandler(
+      baseState({ peekOpen: true }),
+      actions,
+      cb,
+    )
+    handler('', fakeKey({ pageDown: true }))
+    expect(calls.movePeekPage).toEqual([-1])
+  })
+
+  test('PgUp/PgDn ignored when peek is closed (no-op)', () => {
+    const { calls, actions, cb } = makeCallbacks()
+    const handler = createKeyHandler(
+      baseState({ peekOpen: false }),
+      actions,
+      cb,
+    )
+    handler('', fakeKey({ pageUp: true }))
+    handler('', fakeKey({ pageDown: true }))
+    expect(calls.movePeekPage).toEqual([])
+  })
+
   test('rename mode: typed chars accumulate, Enter ends, Esc cancels', () => {
     const { calls, actions, cb } = makeCallbacks()
     // First test: typing -> setRenameDraft chain (we re-spy through closure)
@@ -392,6 +478,54 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
     )
     handler2('', fakeKey({ return: true }))
     expect(calls.beginRename).toContain('END')
+  })
+})
+
+describe('PeekPanel.computePeekWindow (Tier 2 paging)', () => {
+  test('PAGE_SIZE constant exists', () => {
+    expect(typeof PEEK_PAGE_SIZE).toBe('number')
+    expect(PEEK_PAGE_SIZE).toBeGreaterThan(0)
+  })
+
+  test('20 messages, offset 0 → last page slice', () => {
+    const r = computePeekWindow(20, 0, 8)
+    expect(r.start).toBe(12)
+    expect(r.end).toBe(20)
+    expect(r.totalPages).toBe(3)
+    expect(r.clampedOffset).toBe(0)
+  })
+
+  test('20 messages, offset 1 → middle page', () => {
+    const r = computePeekWindow(20, 1, 8)
+    expect(r.start).toBe(4)
+    expect(r.end).toBe(12)
+  })
+
+  test('20 messages, offset 2 → first page (partial)', () => {
+    const r = computePeekWindow(20, 2, 8)
+    expect(r.start).toBe(0)
+    expect(r.end).toBe(4)
+  })
+
+  test('offset overshoots → clamped to last valid page', () => {
+    const r = computePeekWindow(20, 99, 8)
+    expect(r.clampedOffset).toBe(2)
+    expect(r.start).toBe(0)
+    expect(r.end).toBe(4)
+  })
+
+  test('empty messages → empty window, no crash', () => {
+    const r = computePeekWindow(0, 0, 8)
+    expect(r.start).toBe(0)
+    expect(r.end).toBe(0)
+    expect(r.totalPages).toBe(1)
+  })
+
+  test('fewer than one page → single page window', () => {
+    const r = computePeekWindow(3, 0, 8)
+    expect(r.start).toBe(0)
+    expect(r.end).toBe(3)
+    expect(r.totalPages).toBe(1)
   })
 })
 

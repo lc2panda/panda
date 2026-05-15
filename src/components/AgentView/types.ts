@@ -101,6 +101,11 @@ export type DashboardState = {
   groupMode: GroupMode
   /** Peek panel 开关。 */
   peekOpen: boolean
+  /**
+   * Peek 翻页偏移：以 page 为单位。0 = 最新一页。
+   * 每页 PEEK_PAGE_SIZE 条消息（默认 8）。仅在 peekOpen=true 时有意义。
+   */
+  peekPageOffset: number
   /** Rename 输入模式。 */
   renameMode: boolean
   /** Rename 当前输入值。 */
@@ -109,4 +114,9 @@ export type DashboardState = {
   pendingStopId: string | null
   /** 状态最近刷新错误（如果有）。 */
   lastError: string | null
+  /**
+   * Tier 2: dispatch prompt 草稿。Shift+Enter 时作为 draft 携带到新 session；
+   * Ctrl+G 在 $EDITOR 中编辑此字段。
+   */
+  dispatchPrompt: string
 }

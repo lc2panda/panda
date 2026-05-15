@@ -1180,6 +1180,22 @@ export const SettingsSchema = lazySchema(() =>
         .describe(
           'Configure output compression behavior for BashTool and other tool outputs.',
         ),
+      // ── /goal command (panda v2.26.x) ──────────────────────
+      // Enterprise off-switch for the /goal session-goal command. When set to
+      // false in policySettings (managed-settings.json), the command short-
+      // circuits with an admin-policy error and the small-fast-model evaluator
+      // never runs. Defaults to true (command is available) when unset. Note
+      // that `disableAllHooks` and `allowManagedHooksOnly` ALSO disable /goal —
+      // those flags treat the goal evaluator as a background work surface and
+      // the /goal handler checks them too. Only honored from policySettings.
+      goalCommandEnabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Enterprise off-switch for the /goal session-goal command. ' +
+            'When false (set in managed settings), /goal returns an admin-policy ' +
+            'error and the evaluator does not run. Defaults to true.',
+        ),
       // ── Multi-Model Agent Routing (Panda extension) ──────
       enableModelRouting: z
         .boolean()

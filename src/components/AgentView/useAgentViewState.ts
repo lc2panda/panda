@@ -13,10 +13,12 @@ const INITIAL_STATE: DashboardState = {
   cursor: 0,
   groupMode: 'status',
   peekOpen: false,
+  peekPageOffset: 0,
   renameMode: false,
   renameDraft: '',
   pendingStopId: null,
   lastError: null,
+  dispatchPrompt: '',
 }
 
 export type AgentViewActions = {
@@ -27,11 +29,15 @@ export type AgentViewActions = {
   setGroupMode: (mode: GroupMode) => void
   togglePeek: () => void
   closePeek: () => void
+  /** Peek 翻页：+1=往更早翻一页，-1=往更新翻一页。0 = 最新一页。 */
+  movePeekPage: (delta: number) => void
   beginRename: (currentName: string) => void
   setRenameDraft: (draft: string) => void
   endRename: () => void
   setPendingStop: (id: string | null) => void
   setError: (err: string | null) => void
+  /** 设置 dispatch prompt（Shift+Enter 时携带的草稿，Ctrl+G 编辑入口）。 */
+  setDispatchPrompt: (text: string) => void
 }
 
 /**
@@ -112,11 +118,27 @@ export function useAgentViewState(): {
   }, [])
 
   const togglePeek = useCallback(() => {
-    setState(prev => ({ ...prev, peekOpen: !prev.peekOpen }))
+    // 切换时复位翻页到最新页（避免下次打开仍停留在旧偏移）。
+    setState(prev => ({
+      ...prev,
+      peekOpen: !prev.peekOpen,
+      peekPageOffset: 0,
+    }))
   }, [])
 
   const closePeek = useCallback(() => {
-    setState(prev => ({ ...prev, peekOpen: false }))
+    setState(prev => ({ ...prev, peekOpen: false, peekPageOffset: 0 }))
+  }, [])
+
+  const movePeekPage = useCallback((delta: number) => {
+    setState(prev => {
+      // 仅在 peek 打开时翻页有意义。
+      if (!prev.peekOpen) return prev
+      // 不允许偏移为负（=未来不存在）。上限由 PeekPanel 自己根据实际消息数裁掉。
+      const next = Math.max(0, prev.peekPageOffset + delta)
+      if (next === prev.peekPageOffset) return prev
+      return { ...prev, peekPageOffset: next }
+    })
   }, [])
 
   const beginRename = useCallback((currentName: string) => {
@@ -139,6 +161,10 @@ export function useAgentViewState(): {
     setState(prev => ({ ...prev, lastError: err }))
   }, [])
 
+  const setDispatchPrompt = useCallback((text: string) => {
+    setState(prev => ({ ...prev, dispatchPrompt: text }))
+  }, [])
+
   const selected = state.entries[state.cursor] ?? null
 
   const actions: AgentViewActions = {
@@ -149,11 +175,13 @@ export function useAgentViewState(): {
     setGroupMode,
     togglePeek,
     closePeek,
+    movePeekPage,
     beginRename,
     setRenameDraft,
     endRename,
     setPendingStop,
     setError,
+    setDispatchPrompt,
   }
 
   return { state, actions, selected }

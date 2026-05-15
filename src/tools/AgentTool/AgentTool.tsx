@@ -1,3 +1,11 @@
+// Input:  tool_use call from the model with {description, prompt, subagent_type, model}
+// Output: AssistantMessage stream from the spawned sub-agent + final
+//         normalized result block returned to the parent conversation.
+// Pos:    src/tools/AgentTool/AgentTool.tsx — Task tool (a.k.a. /agent). Owns
+//         the sub-agent lifecycle: pick definition → enforce permissions →
+//         build system prompt → run nested query() → summarize → emit result.
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { feature } from 'bun:bundle';
 import * as React from 'react';
 import { buildTool, type ToolDef, toolMatchesName } from 'src/Tool.js';

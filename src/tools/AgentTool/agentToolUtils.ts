@@ -1,3 +1,11 @@
+// Input:  agent invocation params (prompt, type, model overrides) + tool registry
+// Output: helpers shared by AgentTool/AgentToolMain: tool whitelisting, agent
+//         frontmatter parsing, sub-agent prompt assembly, model routing hooks.
+// Pos:    src/tools/AgentTool/agentToolUtils.ts — pure-ish utility layer for
+//         the Agent (Task) tool; consumed by AgentTool.tsx and SDK
+//         in-process teammates. Modifying it ripples into every Task call.
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { feature } from 'bun:bundle'
 import { z } from 'zod/v4'
 import { clearInvokedSkillsForAgent } from '../../bootstrap/state.js'

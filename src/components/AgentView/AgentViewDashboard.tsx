@@ -11,6 +11,8 @@ import { useAgentViewState } from './useAgentViewState.js';
 import { useAgentViewKeybindings, type AgentViewCallbacks } from './useAgentViewKeybindings.js';
 import type { SessionEntry } from './types.js';
 import { upsertRosterEntry } from './roster.js';
+import { editPromptInEditor } from '../../utils/promptEditor.js';
+import { errorMessage } from '../../utils/errors.js';
 
 const ANIMATION_MS = 500;
 
@@ -85,9 +87,26 @@ export function AgentViewDashboard(): React.ReactElement {
         exit();
       },
       onEditPrompt: () => {
-        // Tier 1: stub — full $EDITOR pipe-into-dispatch is Tier 2.
-        actions.setError('Editor dispatch (Ctrl+G) lands in Tier 2.');
-        setTimeout(() => actions.setError(null), 2_000);
+        // Tier 2: spawnSync $EDITOR with the current dispatchPrompt as initial
+        // content. editPromptInEditor() handles Ink alt-screen handoff
+        // internally (pause/suspend stdin, enter alt screen, exec editor, exit
+        // alt screen, resume). Returns the edited content (or null on error /
+        // editor missing). We swallow null silently — user can press Ctrl+G
+        // again or just keep typing.
+        try {
+          const result = editPromptInEditor(state.dispatchPrompt);
+          if (result.error) {
+            actions.setError(`Editor: ${result.error}`);
+            setTimeout(() => actions.setError(null), 3_000);
+            return;
+          }
+          if (result.content !== null) {
+            actions.setDispatchPrompt(result.content);
+          }
+        } catch (e) {
+          actions.setError(`Editor failed: ${errorMessage(e)}`);
+          setTimeout(() => actions.setError(null), 3_000);
+        }
       },
       onStop: entry => {
         // Tier 1: roster removal happens in keybinding (already done by the
@@ -100,7 +119,8 @@ export function AgentViewDashboard(): React.ReactElement {
         exit();
       },
     }),
-    [actions, exit],
+    // state.dispatchPrompt 必须列在 deps，否则 Ctrl+G 闭包里读到的是旧字符串。
+    [actions, exit, state.dispatchPrompt],
   );
 
   const handleInput = useAgentViewKeybindings(state, actions, callbacks);
@@ -110,7 +130,15 @@ export function AgentViewDashboard(): React.ReactElement {
 
   const helpLine = state.renameMode
     ? `Rename: ${state.renameDraft}_ · Enter save · Esc cancel`
-    : '↑↓ move · Enter attach · Space peek · Alt+1..9 jump · Ctrl+T pin · Ctrl+R rename · Ctrl+X stop · Ctrl+S group · ← exit';
+    : '↑↓ move · Enter attach · Shift+Enter dispatch · Space peek · Ctrl+G edit prompt · Alt+1..9 jump · Ctrl+T pin · Ctrl+R rename · Ctrl+X stop · Ctrl+S group · ← exit';
+
+  // Dispatch prompt 预览：截断长字符串避免占据多行。多行 → 用 ⏎ 显示换行。
+  const promptPreview = (() => {
+    const t = state.dispatchPrompt;
+    if (!t) return null;
+    const flat = t.replace(/\n/g, ' ⏎ ');
+    return flat.length > 80 ? flat.slice(0, 77) + '…' : flat;
+  })();
 
   return (
     <Box flexDirection="column" width="100%">
@@ -124,6 +152,12 @@ export function AgentViewDashboard(): React.ReactElement {
       <Box paddingX={1}>
         <Text dimColor>{helpLine}</Text>
       </Box>
+      {promptPreview ? (
+        <Box paddingX={1}>
+          <Text color="suggestion">{'> '}</Text>
+          <Text>{promptPreview}</Text>
+        </Box>
+      ) : null}
       {state.lastError ? (
         <Box paddingX={1}>
           <Text color="red">{state.lastError}</Text>
@@ -141,7 +175,7 @@ export function AgentViewDashboard(): React.ReactElement {
         </Box>
         {state.peekOpen && selected ? (
           <Box flexDirection="column" width={56} paddingLeft={1}>
-            <PeekPanel entry={selected} />
+            <PeekPanel entry={selected} pageOffset={state.peekPageOffset} />
           </Box>
         ) : null}
       </Box>

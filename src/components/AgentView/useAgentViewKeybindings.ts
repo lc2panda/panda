@@ -71,6 +71,16 @@ export function createKeyHandler(
       return true
     }
 
+    // ---- Peek 翻页：PgUp 往更早翻 / PgDn 往更新翻（仅 peek 打开时）----
+    if (state.peekOpen && key.pageUp) {
+      actions.movePeekPage(+1)
+      return true
+    }
+    if (state.peekOpen && key.pageDown) {
+      actions.movePeekPage(-1)
+      return true
+    }
+
     const selected = state.entries[state.cursor]
 
     // ---- 移动 ----
@@ -93,17 +103,19 @@ export function createKeyHandler(
       return true
     }
 
-    // ---- Attach: Enter / → ----
-    if ((key.return || key.rightArrow) && !key.shift && selected) {
-      callbacks.onAttach(selected)
+    // ---- Shift+Enter / Ctrl+Enter: Dispatch + Attach ----
+    // 注意：Ink 的 key.shift 在 return 上未必稳定（终端依赖 Kitty 协议），
+    // 在不可用的终端我们 fallback 到 Ctrl+Enter（key.ctrl）。
+    // 必须先于普通 Enter/→ Attach 分支判定，否则 Ctrl+Enter 会先匹配 Attach。
+    // dispatchPrompt 作为 draft 透传，handler 通过 --prefill 注入到新 panda 子进程。
+    if (key.return && (key.shift || key.ctrl)) {
+      callbacks.onDispatchAndAttach(selected ?? null, state.dispatchPrompt)
       return true
     }
 
-    // ---- Shift+Enter: Dispatch + Attach ----
-    // 注意：Ink 的 key.shift 在 return 上未必稳定（终端依赖 Kitty 协议），
-    // 在不可用的终端我们 fallback 到 `Ctrl+Enter`（input==='\n' && key.ctrl）。
-    if (key.return && (key.shift || key.ctrl)) {
-      callbacks.onDispatchAndAttach(selected ?? null, '')
+    // ---- Attach: Enter / → ----
+    if ((key.return || key.rightArrow) && !key.shift && !key.ctrl && selected) {
+      callbacks.onAttach(selected)
       return true
     }
 

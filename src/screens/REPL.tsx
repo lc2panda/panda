@@ -1999,6 +1999,16 @@ export function REPL({
       // Use a callback to ensure we're not dependent on stale state
       setMessages(() => messages);
 
+      // Rehydrate any active /goal condition from the resumed transcript.
+      // Mirrors the CLI --resume/--continue path in sessionRestore.ts so
+      // /resume from the interactive picker also restores the goal.
+      try {
+        const { restoreFromMarker } = await import('../state/goalStore.js');
+        restoreFromMarker(messages);
+      } catch {
+        // Never let goal restoration block the /resume happy path.
+      }
+
       // Clear any active tool JSX
       setToolJSX(null);
 
