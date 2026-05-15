@@ -15,7 +15,7 @@ const goal = {
   type: 'local-jsx',
   name: 'goal',
   description:
-    'Set a session goal Claude works toward (`/goal <condition>` · `/goal` status · `/goal clear` reset) · 设置会话目标',
+    'Set a session goal Panda works toward (`/goal <condition>` · `/goal` status · `/goal clear` reset) · 设置会话目标',
   argumentHint: '<condition>',
   immediate: true,
   load: () => import('./goal.js'),

@@ -45,8 +45,21 @@ async function loadGoalModule(querySuffix = '') {
 
 function captureOnDone() {
   let text: string | undefined
-  let opts: { display?: string } | undefined
-  const onDone = (t?: string, o?: { display?: string }) => {
+  let opts:
+    | {
+        display?: string
+        shouldQuery?: boolean
+        metaMessages?: string[]
+      }
+    | undefined
+  const onDone = (
+    t?: string,
+    o?: {
+      display?: string
+      shouldQuery?: boolean
+      metaMessages?: string[]
+    },
+  ) => {
     text = t
     opts = o
   }
@@ -136,6 +149,26 @@ describe('/goal admin-policy gate', () => {
     expect(last?.subtype).toBe('goal_marker')
     expect(last?.goalMarker?.action).toBe('set')
     expect(last?.goalMarker?.payload?.condition).toBe('all tests pass')
+  })
+
+  test('set path triggers first turn via shouldQuery + metaMessages kickoff', async () => {
+    // Regression: Comdr reported turns 0/50 stuck after `/goal foo`. Root cause:
+    // goal.ts called onDone() without shouldQuery → processSlashCommand defaults
+    // to shouldQuery=false → handlePromptSubmit.onQuery skips dispatch.
+    // Brand: message says "Panda will continue working", not "Claude".
+    mock.module('../../utils/settings/settings.js', () => ({
+      getSettingsForSource: () => undefined,
+    }))
+    const goal = await loadGoalModule('kickoff')
+    const { ctx } = makeContext([])
+    const cap = captureOnDone()
+    await goal.call(cap.onDone, ctx, 'finish the work')
+    expect(cap.opts?.shouldQuery).toBe(true)
+    expect(cap.opts?.metaMessages?.length).toBeGreaterThan(0)
+    expect(cap.opts?.metaMessages?.[0]).toContain('system-reminder')
+    expect(cap.opts?.metaMessages?.[0]).toContain('finish the work')
+    expect(cap.text ?? '').toContain('Panda will continue working')
+    expect(cap.text ?? '').not.toContain('Claude will continue working')
   })
 
   test('clear path splices a clear marker', async () => {

@@ -185,9 +185,22 @@ export async function call(
       maxTurns: next.maxTurns,
     })
     context.setMessages?.(prevMsgs => [...prevMsgs, marker as Message])
+    // shouldQuery: true triggers the first agent turn immediately after `/goal`
+    // set, otherwise the user has to send another (no-op) message to start
+    // working toward the goal. processSlashCommand reads `options.shouldQuery`
+    // (defaults false), so without this flag handlePromptSubmit's onQuery
+    // receives shouldQuery=false and skips the dispatch. The metaMessages
+    // payload gives the model an explicit kickoff prompt — mirrors /brief and
+    // /thinkback's pattern of injecting a model-visible <system-reminder>.
     onDone(
-      `${verb}: "${preview}" — Claude will continue working until the evaluator agrees this is met (or ${next.maxTurns} turns elapse).`,
-      { display: 'system' },
+      `${verb}: "${preview}" — Panda will continue working until the evaluator agrees this is met (or ${next.maxTurns} turns elapse).`,
+      {
+        display: 'system',
+        shouldQuery: true,
+        metaMessages: [
+          `<system-reminder>\nA session goal has been set: "${next.condition}"\n\nStart working toward this goal now. The evaluator will check progress after each turn and end the session when the goal is met (or after ${next.maxTurns} turns).\n</system-reminder>`,
+        ],
+      },
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

@@ -437,44 +437,93 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
     process.exit(1)
   }
 
+  // 作战线 V (worker-V-authmodels)：从 provider /v1/models 自动拉真实可用模型列表
+  //   - 多 fallback URL（剥 /anthropic /coding 后缀 + 域名 root + 特殊 path）
+  //   - 总超时 10s 防挂死
+  //   - 任何失败 → fall through 到 provider.defaultModel 并明确提示用户
   let selectedModel = provider.defaultModel
-  try {
+  let modelSource: 'fetched' | 'fallback' = 'fallback'
+  let fetchedModelCount = 0
+  {
+    const { fetchProviderModels } = await import('../../services/api/providerModels.js')
     process.stdout.write('\nFetching available models...\n')
-    const modelsURL = provider.baseURL.replace(/\/?$/, '/v1/models')
-    const res = await fetch(modelsURL, {
-      headers: { 'x-api-key': apiKey.trim(), 'Authorization': `Bearer ${apiKey.trim()}` },
+    const debugEnabled = !!process.env.PANDA_DEBUG
+    const models = await fetchProviderModels(provider.baseURL, apiKey.trim(), {
+      totalTimeoutMs: 10_000,
+      perRequestTimeoutMs: 5_000,
+      debug: debugEnabled
+        ? (msg: string) => process.stderr.write(`${msg}\n`)
+        : undefined,
     })
-    if (res.ok) {
-      const data = await res.json() as { data?: Array<{ id: string }> }
-      const models = data.data?.map(m => m.id).filter(Boolean) ?? []
-      if (models.length > 0) {
+
+    if (models.length > 0) {
+      fetchedModelCount = models.length
+      // 推荐索引：先匹配 provider.defaultModel；否则首项
+      const defaultIdx = Math.max(0, models.findIndex(m => m.id === provider.defaultModel))
+
+      // 非 TTY（CI / pipe）：直接选推荐项
+      if (!process.stdin.isTTY) {
+        selectedModel = models[defaultIdx]?.id ?? models[0]!.id
+        modelSource = 'fetched'
+      } else {
         process.stdout.write(`\nAvailable models (${models.length}):\n`)
-        let sel = 0
-        const renderModels = () => {
-          process.stdout.write(`\x1b[${models.length}A\x1b[J`)
-          models.forEach((m, i) => {
-            process.stdout.write(`  ${i === sel ? '\x1b[36m❯\x1b[0m \x1b[1m' + m + '\x1b[0m' : '  \x1b[2m' + m + '\x1b[0m'}\n`)
-          })
+        let sel = defaultIdx
+
+        const formatLine = (m: { id: string; label?: string }, i: number): string => {
+          const mark = i === sel ? '\x1b[36m❯\x1b[0m' : ' '
+          const text = i === sel ? `\x1b[1m${m.id}\x1b[0m` : `\x1b[2m${m.id}\x1b[0m`
+          const label = m.label && m.label !== m.id ? ` \x1b[2m(${m.label})\x1b[0m` : ''
+          const recommend = i === defaultIdx ? ` \x1b[33m← default\x1b[0m` : ''
+          return `  ${mark} ${text}${label}${recommend}\n`
         }
-        models.forEach((m, i) => {
-          process.stdout.write(`  ${i === sel ? '\x1b[36m❯\x1b[0m \x1b[1m' + m + '\x1b[0m' : '  \x1b[2m' + m + '\x1b[0m'}\n`)
-        })
+
+        // 初始绘制
+        for (let i = 0; i < models.length; i++) {
+          process.stdout.write(formatLine(models[i]!, i))
+        }
+
+        const renderModels = (): void => {
+          process.stdout.write(`\x1b[${models.length}A\x1b[J`)
+          for (let i = 0; i < models.length; i++) {
+            process.stdout.write(formatLine(models[i]!, i))
+          }
+        }
+
         selectedModel = await new Promise<string>(resolve => {
-          if (!process.stdin.isTTY) { resolve(models[0]!); return }
           process.stdin.setRawMode(true)
           process.stdin.resume()
           process.stdin.setEncoding('utf-8')
-          const onKey = (d: string) => {
-            if (d === '\x1b[A' || d === 'k') { sel = (sel - 1 + models.length) % models.length; renderModels() }
-            else if (d === '\x1b[B' || d === 'j') { sel = (sel + 1) % models.length; renderModels() }
-            else if (d === '\r' || d === '\n') { process.stdin.setRawMode(false); process.stdin.pause(); process.stdin.removeListener('data', onKey); resolve(models[sel]!) }
-            else if (d === '\x03') { process.stdin.setRawMode(false); process.exit(0) }
+          const onKey = (d: string): void => {
+            if (d === '\x1b[A' || d === 'k') {
+              sel = (sel - 1 + models.length) % models.length
+              renderModels()
+            } else if (d === '\x1b[B' || d === 'j') {
+              sel = (sel + 1) % models.length
+              renderModels()
+            } else if (d === '\r' || d === '\n') {
+              process.stdin.setRawMode(false)
+              process.stdin.pause()
+              process.stdin.removeListener('data', onKey)
+              resolve(models[sel]!.id)
+            } else if (d === '\x03') {
+              process.stdin.setRawMode(false)
+              process.stderr.write('\n登录已取消\n')
+              process.exit(130)
+            }
           }
           process.stdin.on('data', onKey)
         })
+        modelSource = 'fetched'
       }
+    } else {
+      process.stdout.write(
+        `\x1b[33m! Could not auto-fetch models from ${provider.name}, using default: ${provider.defaultModel}\x1b[0m\n`,
+      )
+      process.stdout.write(
+        `  \x1b[2m(You can manually set via /model later, or set PANDA_DEBUG=1 to inspect)\x1b[0m\n`,
+      )
     }
-  } catch {}
+  }
 
   saveGlobalConfig(current => ({
     ...current,
@@ -507,7 +556,11 @@ async function thirdPartyLogin(providerKey: string): Promise<void> {
   }
 
   process.stdout.write(`\n✓ Login successful! Provider: ${provider.name}\n`)
-  process.stdout.write(`  Model: ${selectedModel}\n`)
+  if (modelSource === 'fetched' && fetchedModelCount > 0) {
+    process.stdout.write(`  Model: ${selectedModel}  \x1b[2m(从 ${fetchedModelCount} 个可用模型中选择)\x1b[0m\n`)
+  } else {
+    process.stdout.write(`  Model: ${selectedModel}  \x1b[2m(default fallback)\x1b[0m\n`)
+  }
   process.stdout.write(`  Base URL: ${provider.baseURL}\n`)
   process.stdout.write(`\nRun 'panda' to start.\n`)
   process.exit(0)
