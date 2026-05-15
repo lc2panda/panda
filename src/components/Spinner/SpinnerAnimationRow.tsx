@@ -1,3 +1,7 @@
+// Input: spinner mode + 计时 refs + 任务/team 状态 + permission mode
+// Output: 50ms 动画行（glyph + glimmer message + 计时/词元/thinking + 长等候 amber / auto-mode 红色信号）
+// Pos: components/Spinner 子模块，spinner 唯一 50ms 动画驱动源
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 import { c as _c } from "react/compiler-runtime";
 import figures from 'figures';
 import * as React from 'react';
@@ -19,6 +23,21 @@ import { interpolateColor, toRGBColor } from './utils.js';
 const SEP_WIDTH = stringWidth(' · ');
 const THINKING_BARE_WIDTH = stringWidth('thinking');
 const SHOW_TOKENS_AFTER_MS = 30_000;
+
+// Long-wait amber warming (upstream v2.1.141 parity): warm spinner to amber
+// after 10s of waiting so the user knows Claude is still working. Fade-in
+// over 1.5s for visual smoothness; suppressed when stalled red is active
+// (stalled stall-red owns the post-3s-no-tokens signal) or when REPL has
+// supplied an overrideColor (system spinners must stay byte-equal).
+const AMBER_WARM_AFTER_MS = 10_000;
+const AMBER_WARM_FADE_MS = 1_500;
+const AMBER_RGB = { r: 255, g: 165, b: 0 };
+
+// Auto-mode + pending-permission red signal (upstream v2.1.126 parity): when
+// the user is in auto permission mode and there's at least one pending
+// tool-use confirmation waiting on their decision, paint the spinner red so
+// the visual matches the stall semantics ("Claude wants you").
+const PERM_RED_RGB = { r: 171, g: 43, b: 63 };
 
 // Thinking shimmer constants. Previously lived in a separate ThinkingShimmerText
 // component with its own useAnimationFrame(50) — inlined here to reuse our
@@ -82,6 +101,13 @@ export type SpinnerAnimationRowProps = {
 
   // cache tokens 命中数（从 API usage 累计）
   cacheReadTokens: number;
+
+  /**
+   * Auto-mode permission ask is pending the user's decision (v2.1.126 signal).
+   * REPL plumbs (toolPermissionContext.mode === 'auto' && toolUseConfirmQueue.length > 0).
+   * Takes precedence over amber 10s+ warming; suppressed by stalled-red and overrideColor.
+   */
+  autoModePending?: boolean;
 };
 
 /**
@@ -115,7 +141,8 @@ export function SpinnerAnimationRow({
   leaderIsIdle = false,
   thinkingStatus,
   effortSuffix,
-  cacheReadTokens
+  cacheReadTokens,
+  autoModePending = false
 }: SpinnerAnimationRowProps): React.ReactNode {
   const [viewportRef, time] = useAnimationFrame(reducedMotion ? null : 50);
 
@@ -247,9 +274,34 @@ export function SpinnerAnimationRow({
           <Text dimColor>)</Text>
         </> : null;
   const effectiveMessageColor = isMatrixTheme() ? MATRIX_UI.spinnerMsg as keyof Theme : messageColor;
+
+  // === Long-wait warming + auto-mode permission red (upstream v2.1.126/141) ===
+  // Both are *secondary* signals subordinate to stalled-red and REPL-supplied
+  // overrideColor: when either of those owns the color, skip ours (no double-
+  // tint). Auto-mode red takes precedence over amber warming. The autoModePending
+  // signal is plumbed in from the REPL (it owns toolUseConfirmQueue + permission
+  // mode state) rather than read from a global store.
+  let warmingIntensity = 0;
+  let warmingTargetRGB: { r: number; g: number; b: number } | null = null;
+  if (!overrideColor && stalledIntensity === 0 && !reducedMotion) {
+    if (autoModePending) {
+      // Snap to full red — same urgency as stalled-red; classifier handed
+      // off and is waiting on the user.
+      warmingIntensity = 1;
+      warmingTargetRGB = PERM_RED_RGB;
+    } else if (effectiveElapsedMs > AMBER_WARM_AFTER_MS) {
+      const fadeProgress = Math.min(
+        (effectiveElapsedMs - AMBER_WARM_AFTER_MS) / AMBER_WARM_FADE_MS,
+        1,
+      );
+      warmingIntensity = fadeProgress;
+      warmingTargetRGB = AMBER_RGB;
+    }
+  }
+
   return <Box ref={viewportRef} flexDirection="row" flexWrap="wrap" marginTop={1} width="100%">
-      <SpinnerGlyph frame={frame} messageColor={messageColor} stalledIntensity={overrideColor ? 0 : stalledIntensity} reducedMotion={reducedMotion} time={time} />
-      <GlimmerMessage message={message} mode={mode} messageColor={effectiveMessageColor} glimmerIndex={glimmerIndex} flashOpacity={flashOpacity} shimmerColor={shimmerColor} stalledIntensity={overrideColor ? 0 : stalledIntensity} />
+      <SpinnerGlyph frame={frame} messageColor={messageColor} stalledIntensity={overrideColor ? 0 : stalledIntensity} reducedMotion={reducedMotion} time={time} warmingIntensity={warmingIntensity} warmingTargetRGB={warmingTargetRGB} />
+      <GlimmerMessage message={message} mode={mode} messageColor={effectiveMessageColor} glimmerIndex={glimmerIndex} flashOpacity={flashOpacity} shimmerColor={shimmerColor} stalledIntensity={overrideColor ? 0 : stalledIntensity} warmingIntensity={warmingIntensity} warmingTargetRGB={warmingTargetRGB} />
       {status}
     </Box>;
 }

@@ -247,6 +247,10 @@ export async function autoCompactIfNeeded(
   querySource?: QuerySource,
   tracking?: AutoCompactTrackingState,
   snipTokensFreed?: number,
+  // v2.1.142: caller may already know from a prior PTL response how many
+  // tokens overflowed. Forwarded to compactConversation so the first
+  // summarize attempt seeds from a pre-trimmed message set.
+  overflowTokenGap?: number,
 ): Promise<{
   wasCompacted: boolean
   compactionResult?: CompactionResult
@@ -320,6 +324,7 @@ export async function autoCompactIfNeeded(
       undefined, // No custom instructions for autocompact
       true, // isAutoCompact
       recompactionInfo,
+      overflowTokenGap,
     )
 
     // Reset lastSummarizedMessageId since legacy compaction replaces all messages

@@ -1,3 +1,7 @@
+// Input: spinner verb 文本 + mode + glimmer/flash/stalled/warming 强度
+// Output: 带 shimmer 与 stalled/warming 颜色叠加的 spinner 主消息文本片段
+// Pos: components/Spinner 子模块，verb 文本渲染叶节点
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
 import { stringWidth } from '../../ink/stringWidth.js';
@@ -14,6 +18,10 @@ type Props = {
   flashOpacity: number;
   shimmerColor: keyof Theme;
   stalledIntensity?: number;
+  /** 0..1 fade into warmingTargetRGB (amber 10s+ / auto-mode permission red). */
+  warmingIntensity?: number;
+  /** Target RGB lerped toward when warmingIntensity > 0. Subordinate to stalled. */
+  warmingTargetRGB?: { r: number; g: number; b: number } | null;
 };
 const ERROR_RED = {
   r: 171,
@@ -29,10 +37,29 @@ export function GlimmerMessage(t0) {
     glimmerIndex,
     flashOpacity,
     shimmerColor,
-    stalledIntensity: t1
+    stalledIntensity: t1,
+    warmingIntensity: tw1,
+    warmingTargetRGB: tw2
   } = t0;
   const stalledIntensity = t1 === undefined ? 0 : t1;
+  const warmingIntensity = tw1 === undefined ? 0 : tw1;
+  const warmingTargetRGB = tw2 === undefined ? null : tw2;
   const [themeName] = useTheme();
+  // Warming early-out (amber 10s+ / auto-mode red). Mirrors stalled-intensity
+  // path but lerps base→warmingTargetRGB. Only when stalled doesn't already
+  // own the color and we have a target. Renders the full message in one Text
+  // run (shimmer is skipped during warming for visual clarity, matching the
+  // stalled-red behavior).
+  if (message && stalledIntensity === 0 && warmingIntensity > 0 && warmingTargetRGB) {
+    const _theme_w = getTheme(themeName);
+    const _baseStr_w = _theme_w[messageColor];
+    const _baseRGB_w = _baseStr_w ? parseRGB(_baseStr_w) : null;
+    if (_baseRGB_w) {
+      const _interp_w = interpolateColor(_baseRGB_w, warmingTargetRGB, Math.min(warmingIntensity, 1));
+      const _color_w = toRGBColor(_interp_w);
+      return <><Text color={_color_w}>{message}</Text><Text color={_color_w}> </Text></>;
+    }
+  }
   let messageWidth;
   let segments;
   let t2;

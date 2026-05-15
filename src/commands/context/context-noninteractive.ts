@@ -1,3 +1,8 @@
+// Input: args (可为 "all") + ToolUseContext (messages + appState + options)
+// Output: { type:'text'; value: markdown 表格 } 给 SDK / pipe 模式调用
+// Pos: /context (non-interactive) — pipe / control-request 入口
+//
+// v2.1.139: args="all" → formatContextAsMarkdownTable(data, true) 强制 Skills 表。
 import { feature } from 'bun:bundle'
 import { microcompactMessages } from '../../services/compact/microCompact.js'
 import type { AppState } from '../../state/AppStateStore.js'
@@ -77,17 +82,20 @@ export async function collectContextData(
 }
 
 export async function call(
-  _args: string,
+  args: string,
   context: ToolUseContext,
 ): Promise<{ type: 'text'; value: string }> {
   const data = await collectContextData(context)
+  // v2.1.139: `/context all` forces per-skill breakdown even when total
+  // skill tokens are zero. Non-interactive version mirrors interactive UX.
+  const showAllSkills = args.trim().toLowerCase() === 'all'
   return {
     type: 'text' as const,
-    value: formatContextAsMarkdownTable(data),
+    value: formatContextAsMarkdownTable(data, showAllSkills),
   }
 }
 
-function formatContextAsMarkdownTable(data: ContextData): string {
+function formatContextAsMarkdownTable(data: ContextData, showAllSkills = false): string {
   const {
     categories,
     totalTokens,
@@ -277,9 +285,13 @@ function formatContextAsMarkdownTable(data: ContextData): string {
     output += `\n`
   }
 
-  // Skills
-  if (skills && skills.tokens > 0 && skills.skillFrontmatter.length > 0) {
-    output += `### Skills\n\n`
+  // Skills — v2.1.139: `/context all` forces the breakdown even at 0 tokens
+  const renderSkillsTable =
+    skills &&
+    skills.skillFrontmatter.length > 0 &&
+    (skills.tokens > 0 || showAllSkills)
+  if (renderSkillsTable) {
+    output += `### Skills${showAllSkills ? ' (all)' : ''}\n\n`
     output += `| Skill | Source | Tokens |\n`
     output += `|-------|--------|--------|\n`
     for (const skill of skills.skillFrontmatter) {

@@ -1,3 +1,6 @@
+// Input: user description text + current session messages + background tasks
+// Output: feedback POST payload (transcript + env + v2.1.141 recent-sessions bundle)
+// Pos: rendered by /feedback (src/commands/feedback) and /bug alias.
 import axios from 'axios';
 import { readFile, stat } from 'fs/promises';
 import * as React from 'react';
@@ -23,6 +26,8 @@ import { getAuthHeaders, getUserAgent } from '../utils/http.js';
 import { getInMemoryErrors, logError } from '../utils/log.js';
 import { isEssentialTrafficOnly } from '../utils/privacyLevel.js';
 import { extractTeammateTranscriptsFromTasks, getTranscriptPath, loadAllSubagentTranscriptsFromDisk, MAX_TRANSCRIPT_READ_BYTES } from '../utils/sessionStorage.js';
+import { listSessionsImpl, type SessionInfo } from '../utils/listSessionsImpl.js';
+import { getOriginalCwd, getSessionId } from '../bootstrap/state.js';
 import { jsonStringify } from '../utils/slowOperations.js';
 import { asSystemPrompt } from '../utils/systemPromptType.js';
 import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js';
@@ -52,6 +57,23 @@ type Props = {
   };
 };
 type Step = 'userInput' | 'consent' | 'submitting' | 'done';
+// v2.1.141: cross-session feedback. /feedback now bundles a lite summary of
+// recent sessions (24h / 7d) so engineers can spot reproducible patterns
+// across multiple runs without asking the user to attach individual logs.
+// We send sessionId + lastModified + title/firstPrompt only — no transcript
+// content, no per-message data — to keep payload bounded and avoid leaking
+// unrelated chat content into a bug report.
+export type RecentSessionSummary = {
+  sessionId: string;
+  lastModified: number;
+  ageMs: number;
+  summary: string;
+  cwd?: string;
+};
+export type RecentSessionsBundle = {
+  last24h: RecentSessionSummary[];
+  last7d: RecentSessionSummary[];
+};
 type FeedbackData = {
   // latestAssistantMessageId is the message ID from the latest main model call
   latestAssistantMessageId: string | null;
@@ -69,6 +91,7 @@ type FeedbackData = {
     [agentId: string]: Message[];
   };
   rawTranscriptJsonl?: string;
+  recentSessions?: RecentSessionsBundle;
 };
 
 // Utility function to redact sensitive information from strings
@@ -138,6 +161,76 @@ function getSanitizedErrorLogs(): Array<{
     return errorCopy;
   });
 }
+// Cap per-window list size. 24h is typically <30 sessions; 7d can balloon
+// for heavy users — 50 entries is enough for a triage breadcrumb trail
+// without bloating the feedback payload.
+const RECENT_SESSIONS_LIMIT = 50;
+const SUMMARY_MAX_CHARS = 200;
+
+function clampSummary(text: string | undefined): string {
+  if (!text) return '';
+  // Redact API keys/tokens from the prompt summary BEFORE truncation, so
+  // any sensitive substring at the head of the prompt is removed instead
+  // of slipping into the report due to char-count truncation.
+  const sanitized = redactSensitiveInfo(text);
+  if (sanitized.length <= SUMMARY_MAX_CHARS) return sanitized;
+  return sanitized.slice(0, SUMMARY_MAX_CHARS) + '…';
+}
+
+function toRecentSummary(info: SessionInfo, now: number): RecentSessionSummary {
+  return {
+    sessionId: info.sessionId,
+    lastModified: info.lastModified,
+    ageMs: Math.max(0, now - info.lastModified),
+    summary: clampSummary(info.customTitle || info.summary || info.firstPrompt),
+    ...(info.cwd ? { cwd: info.cwd } : {}),
+  };
+}
+
+/**
+ * Lists recent sessions from the current project (and worktree siblings).
+ * Splits results into 24h and 7d buckets so triage can quickly tell whether
+ * an issue is a fresh regression or has been brewing across the week.
+ *
+ * Bounded by RECENT_SESSIONS_LIMIT per bucket. Excludes the current session
+ * from both buckets — it's already captured in `transcript`/`rawTranscriptJsonl`.
+ * Best-effort: returns null on any error so the rest of the report still posts.
+ */
+async function loadRecentSessions(): Promise<RecentSessionsBundle | null> {
+  try {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    const sessions = await listSessionsImpl({
+      dir: getOriginalCwd(),
+      includeWorktrees: true,
+      // Pull a generous slice so the 7d window has enough entries after
+      // current-session filtering. listSessionsImpl already sorts by mtime
+      // desc internally when limit is set.
+      limit: RECENT_SESSIONS_LIMIT * 3,
+    });
+    const currentId = getSessionId();
+    const filtered = sessions.filter(s => s.sessionId !== currentId);
+    const last24h: RecentSessionSummary[] = [];
+    const last7d: RecentSessionSummary[] = [];
+    for (const s of filtered) {
+      const age = now - s.lastModified;
+      if (age < 0) continue;
+      const summary = toRecentSummary(s, now);
+      if (age <= day && last24h.length < RECENT_SESSIONS_LIMIT) {
+        last24h.push(summary);
+      }
+      if (age <= 7 * day && last7d.length < RECENT_SESSIONS_LIMIT) {
+        last7d.push(summary);
+      }
+      if (last7d.length >= RECENT_SESSIONS_LIMIT) break;
+    }
+    return { last24h, last7d };
+  } catch (err) {
+    logForDebugging(`loadRecentSessions failed: ${String(err)}`, { level: 'warn' });
+    return null;
+  }
+}
+
 async function loadRawTranscriptJsonl(): Promise<string | null> {
   try {
     const transcriptPath = getTranscriptPath();
@@ -201,7 +294,7 @@ export function Feedback({
     // Extract last assistant message ID from messages array
     const lastAssistantMessage = getLastAssistantMessage(messages);
     const lastAssistantMessageId = lastAssistantMessage?.requestId ?? null;
-    const [diskTranscripts, rawTranscriptJsonl] = await Promise.all([loadAllSubagentTranscriptsFromDisk(), loadRawTranscriptJsonl()]);
+    const [diskTranscripts, rawTranscriptJsonl, recentSessions] = await Promise.all([loadAllSubagentTranscriptsFromDisk(), loadRawTranscriptJsonl(), loadRecentSessions()]);
     const teammateTranscripts = extractTeammateTranscriptsFromTasks(backgroundTasks);
     const subagentTranscripts = {
       ...diskTranscripts,
@@ -224,6 +317,11 @@ export function Feedback({
       }),
       ...(rawTranscriptJsonl && {
         rawTranscriptJsonl
+      }),
+      // v2.1.141: cross-session breadcrumbs — only added when we actually
+      // collected something so older feedback ingestion paths still match.
+      ...(recentSessions && (recentSessions.last24h.length > 0 || recentSessions.last7d.length > 0) && {
+        recentSessions
       })
     };
     const [result, t] = await Promise.all([submitFeedback(reportData, abortSignal), generateTitle(description, abortSignal)]);
@@ -361,6 +459,9 @@ export function Feedback({
                 </Text>
               </Text>}
             <Text>- Current session transcript</Text>
+            <Text>
+              - {isZh() ? '最近会话摘要（24h / 7d）：仅元数据，不含对话内容' : 'Recent session summaries (24h / 7d) · metadata only, no transcript content'}
+            </Text>
           </Box>
           <Box marginTop={1}>
             <Text wrap="wrap" dimColor>

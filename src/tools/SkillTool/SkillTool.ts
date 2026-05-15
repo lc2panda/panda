@@ -1,3 +1,8 @@
+// Input: skill name + optional args (from model tool_use or user slash command)
+// Output: ToolResult (inline newMessages 或 forked sub-agent 执行结果)
+// Pos: Skill 调用枢纽 — permission check + validation + dispatch (inline/fork/remote)
+//
+// v2.1.139: `Skill(name *)` 通配符前缀匹配新增到 ruleMatches()。
 import { feature } from 'bun:bundle'
 import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
 import uniqBy from 'lodash-es/uniqBy.js'
@@ -533,6 +538,14 @@ export const SkillTool: Tool<InputSchema, Output, Progress> = buildTool({
       // Check prefix match (e.g., "review:*" matches "review-pr 123")
       if (normalizedRule.endsWith(':*')) {
         const prefix = normalizedRule.slice(0, -2) // Remove ':*'
+        return commandName.startsWith(prefix)
+      }
+      // v2.1.139: Skill(name *) wildcard — trailing `*` (without `:`) acts as a
+      // pure prefix match. `Skill(my-skill-*)` matches `my-skill-foo`,
+      // `my-skill-bar`, etc. Distinct from `:*` (args-style suffix) so both
+      // semantics coexist. The bare `*` rule (`Skill(*)`) becomes match-all.
+      if (normalizedRule.endsWith('*') && !normalizedRule.endsWith(':*')) {
+        const prefix = normalizedRule.slice(0, -1) // Remove trailing '*'
         return commandName.startsWith(prefix)
       }
       return false

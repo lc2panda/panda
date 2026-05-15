@@ -1,3 +1,6 @@
+// Input: ServerInfo[] + AgentMcpServerInfo[] + mcp.tools (from AppState)
+// Output: Dialog with grouped MCP server list, each row showing tool count or [no tools]
+// Pos: /mcp slash command — MCP server browser entry panel
 import { c as _c } from "react/compiler-runtime";
 import figures from 'figures';
 import React, { useCallback, useState } from 'react';
@@ -6,7 +9,8 @@ import { Box, color, Link, Text, useTheme } from '../../ink.js';
 import { isZh } from '../../utils/i18n.js';
 import { useKeybindings } from '../../keybindings/useKeybinding.js';
 import type { ConfigScope } from '../../services/mcp/types.js';
-import { describeMcpConfigFilePath } from '../../services/mcp/utils.js';
+import { describeMcpConfigFilePath, filterToolsByServer } from '../../services/mcp/utils.js';
+import { useAppState } from '../../state/AppState.js';
 import { isDebugMode } from '../../utils/debug.js';
 import { plural } from '../../utils/stringUtils.js';
 import { ConfigurableShortcutHint } from '../ConfigurableShortcutHint.js';
@@ -110,6 +114,7 @@ export function MCPListPanel(t0) {
   const agentServers = t2;
   const [theme] = useTheme();
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const mcpTools = useAppState(_temp_mcpTools);
   let t3;
   if ($[2] !== servers) {
     const regularServers = servers.filter(_temp);
@@ -298,53 +303,53 @@ export function MCPListPanel(t0) {
   if (servers.length === 0 && agentServers.length === 0) {
     return null;
   }
-  let t17;
-  if ($[37] !== getServerIndex || $[38] !== selectedIndex || $[39] !== theme) {
-    t17 = server_3 => {
-      const index = getServerIndex(server_3);
-      const isSelected = selectedIndex === index;
-      let statusIcon;
-      let statusText;
-      if (server_3.client.type === "disabled") {
-        statusIcon = color("inactive", theme)(figures.radioOff);
-        statusText = "disabled";
+  // Disabled memo cache here intentionally: renderServerItem must read fresh
+  // `mcpTools` each render so [no tools] / tool count stay in sync with
+  // MCP connection state. Cells $[37]-$[40] remain reserved (unused).
+  const renderServerItem = (server_3) => {
+    const index = getServerIndex(server_3);
+    const isSelected = selectedIndex === index;
+    let statusIcon;
+    let statusText;
+    if (server_3.client.type === "disabled") {
+      statusIcon = color("inactive", theme)(figures.radioOff);
+      statusText = "disabled";
+    } else {
+      if (server_3.client.type === "connected") {
+        statusIcon = color("success", theme)(figures.tick);
+        statusText = isZh() ? "已连接" : "connected";
       } else {
-        if (server_3.client.type === "connected") {
-          statusIcon = color("success", theme)(figures.tick);
-          statusText = isZh() ? "已连接" : "connected";
-        } else {
-          if (server_3.client.type === "pending") {
-            statusIcon = color("inactive", theme)(figures.radioOff);
-            const {
-              reconnectAttempt,
-              maxReconnectAttempts
-            } = server_3.client;
-            if (reconnectAttempt && maxReconnectAttempts) {
-              statusText = `reconnecting (${reconnectAttempt}/${maxReconnectAttempts})…`;
-            } else {
-              statusText = "connecting\u2026";
-            }
+        if (server_3.client.type === "pending") {
+          statusIcon = color("inactive", theme)(figures.radioOff);
+          const {
+            reconnectAttempt,
+            maxReconnectAttempts
+          } = server_3.client;
+          if (reconnectAttempt && maxReconnectAttempts) {
+            statusText = `reconnecting (${reconnectAttempt}/${maxReconnectAttempts})…`;
           } else {
-            if (server_3.client.type === "needs-auth") {
-              statusIcon = color("warning", theme)(figures.triangleUpOutline);
-              statusText = "needs authentication";
-            } else {
-              statusIcon = color("error", theme)(figures.cross);
-              statusText = "failed";
-            }
+            statusText = "connecting\u2026";
+          }
+        } else {
+          if (server_3.client.type === "needs-auth") {
+            statusIcon = color("warning", theme)(figures.triangleUpOutline);
+            statusText = "needs authentication";
+          } else {
+            statusIcon = color("error", theme)(figures.cross);
+            statusText = "failed";
           }
         }
       }
-      return <Box key={`${server_3.name}-${index}`}><Text color={isSelected ? "suggestion" : undefined}>{isSelected ? `${figures.pointer} ` : "  "}</Text><Text color={isSelected ? "suggestion" : undefined}>{server_3.name}</Text><Text dimColor={!isSelected}> · {statusIcon} </Text><Text dimColor={!isSelected}>{statusText}</Text></Box>;
-    };
-    $[37] = getServerIndex;
-    $[38] = selectedIndex;
-    $[39] = theme;
-    $[40] = t17;
-  } else {
-    t17 = $[40];
-  }
-  const renderServerItem = t17;
+    }
+    // v2.1.128: show tool count or [no tools] marker — only meaningful once
+    // the server is connected (others have no tool list to report).
+    const isConnected = server_3.client.type === "connected";
+    const toolCount = isConnected ? filterToolsByServer(mcpTools, server_3.name).length : -1;
+    const toolSuffix = isConnected
+      ? (toolCount === 0 ? " [no tools]" : ` · ${toolCount} ${plural(toolCount, "tool")}`)
+      : "";
+    return <Box key={`${server_3.name}-${index}`}><Text color={isSelected ? "suggestion" : undefined}>{isSelected ? `${figures.pointer} ` : "  "}</Text><Text color={isSelected ? "suggestion" : undefined}>{server_3.name}</Text><Text dimColor={!isSelected}> · {statusIcon} </Text><Text dimColor={!isSelected}>{statusText}</Text>{toolSuffix && <Text dimColor={!isSelected}>{toolSuffix}</Text>}</Box>;
+  };
   let t18;
   if ($[41] !== getAgentServerIndex || $[42] !== selectedIndex || $[43] !== theme) {
     t18 = agentServer_1 => {
@@ -483,6 +488,9 @@ export function MCPListPanel(t0) {
     t32 = $[77];
   }
   return t32;
+}
+function _temp_mcpTools(s_t) {
+  return s_t.mcp.tools;
 }
 function _temp6(s_2) {
   return s_2.sourceAgents;

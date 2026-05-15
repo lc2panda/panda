@@ -357,6 +357,9 @@ export type HookAttachment =
       hookName: string
       toolUseID: string
       hookEvent: HookEvent
+      /** [v2.1.139] PostToolUse hook used continueOnBlock — the model should
+       * read this reason and keep going rather than treat it as a stop signal. */
+      continueOnBlock?: boolean
     }
   | HookNonBlockingErrorAttachment
   | HookErrorDuringExecutionAttachment

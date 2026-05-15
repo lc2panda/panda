@@ -35,6 +35,13 @@ import type { McpServerType, MessageUpdateLazy } from './toolExecution.js'
 export type PostToolUseHooksResult<Output> =
   | MessageUpdateLazy<AttachmentMessage | ProgressMessage<HookProgress>>
   | { updatedMCPToolOutput: Output }
+  // [v2.1.121] Generic tool-output replacement (any tool, not just MCP).
+  | { updatedToolOutput: Output }
+  // [v2.1.139] Block was emitted but the hook asked the turn to continue —
+  // toolExecution treats this as "skip preventContinuation, surface reason
+  // as additional context, keep going". The reason is already embedded in
+  // the preceding hook_blocking_error attachment.
+  | { continueOnBlock: true }
 
 export async function* runPostToolUseHooks<Input extends AnyObject, Output>(
   toolUseContext: ToolUseContext,
@@ -119,8 +126,19 @@ export async function* runPostToolUseHooks<Input extends AnyObject, Output>(
               toolUseID: toolUseID,
               hookEvent: 'PostToolUse',
               blockingError: result.blockingError,
+              // [v2.1.139] Mark the attachment so the message renderer / next
+              // turn knows this block is NOT a hard stop — the model should
+              // read the reason and keep going.
+              continueOnBlock: result.continueOnBlock || undefined,
             }),
           }
+        }
+
+        // Also yield the bare continueOnBlock signal so toolExecution can
+        // short-circuit the preventContinuation path before composing the
+        // assistant message (rather than relying on attachment inspection).
+        if (result.continueOnBlock) {
+          yield { continueOnBlock: true }
         }
 
         // If hook indicated to prevent continuation, yield a stop reason message
@@ -156,6 +174,18 @@ export async function* runPostToolUseHooks<Input extends AnyObject, Output>(
           toolOutput = result.updatedMCPToolOutput as Output
           yield {
             updatedMCPToolOutput: toolOutput,
+          }
+        }
+
+        // [v2.1.121] updatedToolOutput — replace output for ANY tool (not just
+        // MCP). Hook can sanitize, redact, or rewrite a Bash/Read/Grep response
+        // before the model sees it. Takes priority over the pre-hook output,
+        // and stacks if multiple PostToolUse hooks chain (each sees the
+        // previous hook's replacement via the next iteration's toolOutput).
+        if (result.updatedToolOutput !== undefined) {
+          toolOutput = result.updatedToolOutput as Output
+          yield {
+            updatedToolOutput: toolOutput,
           }
         }
       } catch (error) {

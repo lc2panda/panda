@@ -31,15 +31,15 @@ export async function call(
     return null
   }
 
+  // v2.1.128: bare `/color` randomly picks one of AGENT_COLORS so users
+  // can spin the wheel without re-reading the list every time.
+  let colorArg: string
   if (!args || args.trim() === '') {
-    const colorList = AGENT_COLORS.join(', ')
-    onDone(`Please provide a color. Available colors: ${colorList}, default`, {
-      display: 'system',
-    })
-    return null
+    const idx = Math.floor(Math.random() * AGENT_COLORS.length)
+    colorArg = AGENT_COLORS[idx] as string
+  } else {
+    colorArg = args.trim().toLowerCase()
   }
-
-  const colorArg = args.trim().toLowerCase()
 
   // Handle reset to default (gray)
   if (RESET_ALIASES.includes(colorArg as (typeof RESET_ALIASES)[number])) {

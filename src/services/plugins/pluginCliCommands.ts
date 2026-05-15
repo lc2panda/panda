@@ -29,6 +29,9 @@ import {
   enablePluginOp,
   type InstallableScope,
   installPluginOp,
+  type OrphanPluginEntry,
+  type PrunePluginsResult,
+  prunePluginsOp,
   uninstallPluginOp,
   updatePluginOp,
   VALID_INSTALLABLE_SCOPES,
@@ -44,6 +47,7 @@ type PluginCliCommand =
   | 'disable'
   | 'disable-all'
   | 'update'
+  | 'prune'
 
 /**
  * Generic error handler for plugin CLI commands. Emits
@@ -342,3 +346,80 @@ export async function updatePluginCli(
     handlePluginCommandError(error, 'update', plugin)
   }
 }
+
+/**
+ * CLI command: Prune orphan auto-installed plugin dependencies (upstream v2.1.121).
+ *
+ * Orphan 判定见 prunePluginsOp 注释。--dry-run 仅打印不删除。
+ */
+export async function prunePluginsCli(options: {
+  dryRun?: boolean
+  json?: boolean
+} = {}): Promise<void> {
+  try {
+    const result: PrunePluginsResult = await prunePluginsOp({
+      dryRun: options.dryRun,
+    })
+
+    if (options.json) {
+      const payload = {
+        dryRun: !!options.dryRun,
+        orphans: result.orphans,
+        removed: result.removed,
+        message: result.message,
+      }
+      // biome-ignore lint/suspicious/noConsole:: intentional console output
+      console.log(JSON.stringify(payload, null, 2))
+    } else {
+      // 人类可读输出
+      if (result.orphans.length === 0) {
+        writeToStdout(`${figures.tick} ${result.message}\n`)
+      } else {
+        writeToStdout(
+          `Found ${result.orphans.length} orphan plugin(s):\n\n`,
+        )
+        for (const o of result.orphans) {
+          writeToStdout(
+            `  ${figures.pointer} ${o.pluginId}\n` +
+              `    reason: ${o.reason}\n` +
+              `    scopes: ${o.enabledScopes.join(', ') || '(none)'}\n`,
+          )
+          if (o.installations.length > 0) {
+            const paths = o.installations
+              .map(i =>
+                i.projectPath
+                  ? `${i.scope}@${i.projectPath}`
+                  : i.scope,
+              )
+              .join(', ')
+            writeToStdout(`    installs: ${paths}\n`)
+          }
+        }
+        writeToStdout(`\n${figures.tick} ${result.message}\n`)
+        if (options.dryRun) {
+          writeToStdout(
+            `\nRun without --dry-run to actually remove them.\n`,
+          )
+        }
+      }
+    }
+
+    logEvent('tengu_plugin_prune_command', {
+      dry_run: (options.dryRun
+        ? 'true'
+        : 'false') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      orphan_count:
+        result.orphans.length as unknown as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      removed_count:
+        result.removed.length as unknown as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    })
+
+    // 故意不调 process.exit — gracefulShutdown 会处理 telemetry flush
+    await gracefulShutdown(0)
+  } catch (error) {
+    handlePluginCommandError(error, 'prune')
+  }
+}
+
+// 重导出供 main.tsx handler 引用类型
+export type { OrphanPluginEntry, PrunePluginsResult }

@@ -34,6 +34,15 @@ import {
   createUserInterruptionMessage,
   createUserMessage,
 } from '../utils/messages.js'
+// /goal — session-scoped Stop-hook wrap (upstream v2.1.139). Evaluator runs
+// after all built-in stop hooks complete + before final return so goal-continue
+// nudges don't clobber teammate/extract-memories flows.
+import { evaluateGoal } from '../services/goalEvaluator.js'
+import {
+  clearGoal,
+  getGoal,
+  recordGoalTurn,
+} from '../state/goalStore.js'
 import type { SystemPrompt } from '../utils/systemPromptType.js'
 import { getTaskListId, listTasks } from '../utils/tasks.js'
 import { getAgentName, getTeamName, isTeammate } from '../utils/teammate.js'
@@ -534,6 +543,83 @@ export async function* handleStopHooks(
           blockingErrors: teammateBlockingErrors,
           preventContinuation: false,
         }
+      }
+    }
+
+    // /goal — session-scoped Stop hook (upstream v2.1.139).
+    // Skip when: no active goal, this is a teammate (per upstream behavior —
+    // /goal binds to the main session only), or signal already aborted.
+    // Honor disableAllHooks/allowManagedHooksOnly by checking permission mode.
+    const activeGoal = getGoal()
+    if (
+      activeGoal !== null &&
+      !isTeammate() &&
+      !toolUseContext.abortController.signal.aborted &&
+      // querySource gate: only evaluate goal on main REPL/SDK queries, never
+      // background forks (extract-memories, auto-dream, prompt-suggestion).
+      // Otherwise a background fork's "completion" would prematurely fire
+      // the evaluator with stale transcript context.
+      (querySource === 'repl_main_thread' || querySource === 'sdk')
+    ) {
+      try {
+        // Soft cap: prevent runaway loops on under-specified conditions.
+        if (activeGoal.turns >= activeGoal.maxTurns) {
+          logForDebugging(
+            `[goal-eval] turn cap reached (${activeGoal.turns}/${activeGoal.maxTurns}) — auto-clearing`,
+          )
+          clearGoal()
+          yield createSystemMessage(
+            `Goal auto-cleared after ${activeGoal.turns} turns (max ${activeGoal.maxTurns} reached without met=true). Last reason: ${activeGoal.lastReason ?? 'n/a'}.`,
+            'warning',
+          )
+        } else {
+          const evalMessages = [...messagesForQuery, ...assistantMessages]
+          const result = await evaluateGoal(
+            activeGoal.condition,
+            evalMessages,
+            toolUseContext.abortController.signal,
+          )
+          if (result === null) {
+            // Evaluator failed (API error, parse error, abort). Treat as
+            // "not yet met" but DON'T inject a continue nudge — that would
+            // turn an evaluator outage into a runaway loop. Just record the
+            // turn and let query loop return completed.
+            recordGoalTurn({ met: false, reason: 'evaluator unavailable' })
+            logForDebugging('[goal-eval] null result — turn recorded, no nudge')
+          } else if (result.met) {
+            recordGoalTurn({ met: true, reason: result.reason })
+            clearGoal()
+            yield createSystemMessage(
+              `Goal completed: ${result.reason}`,
+              'info',
+            )
+            logForDebugging(`[goal-eval] met=true — cleared. reason=${result.reason}`)
+          } else {
+            const updated = recordGoalTurn({
+              met: false,
+              reason: result.reason,
+            })
+            // Inject a meta user message so query loop continues. isMeta=true
+            // hides it from the rendered transcript while still feeding it to
+            // the model on the next turn. Mirrors how stop-hook blocking
+            // errors flow through query.ts (L1438) — caller receives this in
+            // blockingErrors[] and rebuilds State for next iteration.
+            const nudge = createUserMessage({
+              content: `[goal-system] The active goal is not yet met. Evaluator reason: ${result.reason}. Continue working toward: "${activeGoal.condition}". (Use /goal clear to abandon.)`,
+              isMeta: true,
+            })
+            logForDebugging(
+              `[goal-eval] met=false reason=${result.reason} — nudging continue (turn ${updated?.turns ?? '?'}/${activeGoal.maxTurns})`,
+            )
+            return {
+              blockingErrors: [nudge],
+              preventContinuation: false,
+            }
+          }
+        }
+      } catch (err) {
+        // Defense in depth — evaluator throwing must not break stopHooks.
+        logForDebugging(`[goal-eval] threw: ${errorMessage(err)}`)
       }
     }
 

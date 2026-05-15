@@ -61,6 +61,7 @@ import { ElicitationDialog } from '../components/mcp/ElicitationDialog.js';
 import { PromptDialog } from '../components/hooks/PromptDialog.js';
 import type { PromptRequest, PromptResponse } from '../types/hooks.js';
 import PromptInput from '../components/PromptInput/PromptInput.js';
+import { GoalIndicator } from '../components/GoalIndicator.js';
 import { PromptInputQueuedCommands } from '../components/PromptInput/PromptInputQueuedCommands.js';
 import { useRemoteSession } from '../hooks/useRemoteSession.js';
 import { useDirectConnect } from '../hooks/useDirectConnect.js';
@@ -369,6 +370,43 @@ function TranscriptModeFooter(t0) {
     t5 = $[8];
   }
   return t5;
+}
+
+/** less-style ? help overlay. Replaces the footer while open (same bottom
+ *  slot as TranscriptModeFooter / TranscriptSearchBar). Two-column list of
+ *  transcript-mode keys; press any key to close. Read-only — no input
+ *  capture here, the transcript-escape-hatches useInput owns dismiss. */
+function TranscriptHelpOverlay(): React.ReactNode {
+  const toggleShortcut = useShortcutDisplay('app:toggleTranscript', 'Global', 'ctrl+o');
+  const showAllShortcut = useShortcutDisplay('transcript:toggleShowAll', 'Transcript', 'ctrl+e');
+  const zh = isZh();
+  const rows: Array<[string, string]> = [
+    ['?', zh ? '显示/隐藏帮助' : 'show/hide this help'],
+    ['/', zh ? '搜索' : 'search'],
+    ['n / N', zh ? '下一个/上一个匹配' : 'next / previous match'],
+    ['{ / }', zh ? '上一个/下一个用户消息' : 'previous / next user prompt'],
+    ['g / G', zh ? '跳到顶部/底部' : 'jump to top / bottom'],
+    ['j / k', zh ? '逐行下/上' : 'scroll line down / up'],
+    ['ctrl+u / ctrl+d', zh ? '半页上/下' : 'half-page up / down'],
+    ['ctrl+b / ctrl+f', zh ? '整页上/下' : 'full-page up / down'],
+    ['v', zh ? '在外部编辑器打开' : 'open in $VISUAL / $EDITOR'],
+    ['[', zh ? '转储到滚屏缓存' : 'dump to scrollback'],
+    [showAllShortcut, zh ? '展开/折叠详细内容' : 'expand / collapse details'],
+    [`q · esc · ${toggleShortcut}`, zh ? '退出 transcript 模式' : 'exit transcript mode']
+  ];
+  return <Box noSelect={true} flexDirection="column" alignSelf="center" borderTopDimColor={true} borderBottom={false} borderLeft={false} borderRight={false} borderStyle="single" marginTop={1} paddingX={2} paddingTop={0} paddingBottom={0} width="100%">
+      <Box width="100%">
+        <Text bold>{zh ? 'Transcript 快捷键' : 'Transcript shortcuts'}</Text>
+        <Box flexGrow={1} />
+        <Text dimColor>{zh ? '按任意键关闭' : 'press any key to close'}</Text>
+      </Box>
+      {rows.map(([k, label], i) => <Box key={i} width="100%">
+          <Box width={22} minWidth={22}>
+            <Text color="suggestion">{k}</Text>
+          </Box>
+          <Text dimColor>{label}</Text>
+        </Box>)}
+    </Box>;
 }
 
 /** less-style / bar. 1-row, same border-top styling as TranscriptModeFooter
@@ -719,6 +757,10 @@ export function REPL({
   // v-for-editor render progress. Inline in the footer — notifications
   // render inside PromptInput which isn't mounted in transcript.
   const [editorStatus, setEditorStatus] = useState('');
+  // less-style ? help overlay. Replaces the footer while open. Any key
+  // dismisses (handled in the transcript-escape-hatches useInput below).
+  // Reset on transcript exit, alongside other modal state.
+  const [showHelp, setShowHelp] = useState(false);
   // Incremented on transcript exit. Async v-render captures this at start;
   // each status write no-ops if stale (user left transcript mid-render —
   // the stable setState would otherwise stamp a ghost toast into the next
@@ -1694,10 +1736,14 @@ export function REPL({
     setInputValue,
     setToolJSX
   });
-  const showSpinner = (!toolJSX || toolJSX.showSpinner === true) && toolUseConfirmQueue.length === 0 && promptQueue.length === 0 && (
+  // v2.1.126: auto mode keeps the spinner visible while a permission ask is
+  // pending, so the spinner can flip red to signal the user. Other modes keep
+  // the legacy hide-on-queue behavior.
+  const autoModePendingPermission = toolPermissionContext.mode === 'auto' && toolUseConfirmQueue.length > 0;
+  const showSpinner = (!toolJSX || toolJSX.showSpinner === true) && (toolUseConfirmQueue.length === 0 || autoModePendingPermission) && promptQueue.length === 0 && (
   // Show spinner during input processing, API call, while teammates are running,
   // or while pending task notifications are queued (prevents spinner bounce between consecutive notifications)
-  isLoading || userInputOnProcessing || hasRunningTeammates ||
+  isLoading || userInputOnProcessing || hasRunningTeammates || autoModePendingPermission ||
   // Keep spinner visible while task notifications are queued for processing.
   // Without this, the spinner briefly disappears between consecutive notifications
   // (e.g., multiple background agents completing in rapid succession) because
@@ -4325,6 +4371,49 @@ export function REPL({
   // competing for input) — same class as g/G/j/k in ScrollKeybindingHandler.
   useInput((input, key, event) => {
     if (key.ctrl || key.meta) return;
+    // Help overlay first: while showing, ? and Esc dismiss; any other key
+    // also dismisses (less-style — any keypress closes the help screen).
+    // stopImmediatePropagation so the dismissing key doesn't ALSO fire its
+    // normal action (e.g. ? toggles, doesn't toggle-twice via a second
+    // useInput pickup). Esc still falls through to transcript:exit because
+    // that's a Global keybinding the user explicitly wants accessible.
+    if (showHelp) {
+      if (input === '?' || key.escape) {
+        setShowHelp(false);
+        event.stopImmediatePropagation();
+        return;
+      }
+      // Any printable key closes help, but doesn't consume — lets the
+      // next handler (q, {, }, /, etc.) act normally afterward. Matches
+      // less behavior: pressing q in help quits the pager.
+      setShowHelp(false);
+      // Fall through to the normal handlers below.
+    }
+    if (input === '?') {
+      // less: h opens help; we use ? since h is reserved for the
+      // top-level help command (and `h` is a free letter for future
+      // sticky-prompt header toggle). Opens a small overlay listing
+      // all transcript-mode keys.
+      setShowHelp(true);
+      event.stopImmediatePropagation();
+      return;
+    }
+    if (input === '{' || input === '}') {
+      // less/vim prompt-paragraph navigation. `{` = previous user prompt
+      // boundary (❯-prefixed row); `}` = next. Boundaries match what
+      // StickyTracker shows in the viewport header — same predicate
+      // (stickyPromptText). Idempotent at edges (no boundary found → no-op).
+      if (input === '{') {
+        jumpRef.current?.jumpToPrevPrompt();
+      } else {
+        jumpRef.current?.jumpToNextPrompt();
+      }
+      // Manual jump invalidates the search-current marker (same
+      // semantics as the ScrollKeybindingHandler's onScroll wiring).
+      jumpRef.current?.disarmSearch();
+      event.stopImmediatePropagation();
+      return;
+    }
     if (input === 'q') {
       // less: q quits the pager. ctrl+o toggles; q is the lineage exit.
       handleExitTranscript();
@@ -4406,6 +4495,7 @@ export function REPL({
       clearTimeout(editorTimerRef.current);
       setDumpMode(false);
       setEditorStatus('');
+      setShowHelp(false);
     }
   }, [inTranscript]);
   useEffect(() => {
@@ -4415,6 +4505,14 @@ export function REPL({
     // persists at its last screen coords after ctrl-c exits transcript.
     if (!inTranscript) setPositions(null);
   }, [inTranscript, searchQuery, setHighlight, setPositions]);
+  // Search and help are mutually exclusive in the same bottom slot. The
+  // search bar stopImmediatePropagation prevents the help-dismiss handler
+  // from firing on `/`; without this effect, exiting search would re-reveal
+  // a stale help overlay. Same direction as the dump/editor/search reset
+  // on transcript exit.
+  useEffect(() => {
+    if (searchOpen) setShowHelp(false);
+  }, [searchOpen]);
   const globalKeybindingProps = {
     screen,
     setScreen,
@@ -4519,14 +4617,14 @@ export function REPL({
         jumpRef.current?.setSearchQuery('');
         jumpRef.current?.setSearchQuery(searchQuery);
         setHighlight(searchQuery);
-      }} setHighlight={setHighlight} /> : <TranscriptModeFooter showAllInTranscript={showAllInTranscript} virtualScroll={true} status={editorStatus || undefined} searchBadge={searchQuery && searchCount > 0 ? {
+      }} setHighlight={setHighlight} /> : showHelp ? <TranscriptHelpOverlay /> : <TranscriptModeFooter showAllInTranscript={showAllInTranscript} virtualScroll={true} status={editorStatus || undefined} searchBadge={searchQuery && searchCount > 0 ? {
         current: searchCurrent,
         count: searchCount
       } : undefined} />} /> : <>
             {transcriptMessagesElement}
             {transcriptToolJSX}
             <SandboxViolationExpandedView />
-            <TranscriptModeFooter showAllInTranscript={showAllInTranscript} virtualScroll={false} suppressShowAll={dumpMode} status={editorStatus || undefined} />
+            {showHelp ? <TranscriptHelpOverlay /> : <TranscriptModeFooter showAllInTranscript={showAllInTranscript} virtualScroll={false} suppressShowAll={dumpMode} status={editorStatus || undefined} />}
           </>}
       </KeybindingSetup>;
     // The virtual-scroll branch (FullscreenLayout above) needs
@@ -4642,7 +4740,7 @@ export function REPL({
               {("external" as string) === 'ant' && <TungstenLiveMonitor />}
               {feature('WEB_BROWSER_TOOL') ? WebBrowserPanelModule && <WebBrowserPanelModule.WebBrowserPanel /> : null}
               <Box flexGrow={1} />
-              {showSpinner && <SpinnerWithVerb mode={streamMode} spinnerTip={spinnerTip} responseLengthRef={responseLengthRef} apiMetricsRef={apiMetricsRef} overrideMessage={spinnerMessage} spinnerSuffix={stopHookSpinnerSuffix} verbose={verbose} loadingStartTimeRef={loadingStartTimeRef} totalPausedMsRef={totalPausedMsRef} pauseStartTimeRef={pauseStartTimeRef} overrideColor={spinnerColor} overrideShimmerColor={spinnerShimmerColor} hasActiveTools={inProgressToolUseIDs.size > 0} leaderIsIdle={!isLoading} />}
+              {showSpinner && <SpinnerWithVerb mode={streamMode} spinnerTip={spinnerTip} responseLengthRef={responseLengthRef} apiMetricsRef={apiMetricsRef} overrideMessage={spinnerMessage} spinnerSuffix={stopHookSpinnerSuffix} verbose={verbose} loadingStartTimeRef={loadingStartTimeRef} totalPausedMsRef={totalPausedMsRef} pauseStartTimeRef={pauseStartTimeRef} overrideColor={spinnerColor} overrideShimmerColor={spinnerShimmerColor} hasActiveTools={inProgressToolUseIDs.size > 0} leaderIsIdle={!isLoading} autoModePending={autoModePendingPermission} />}
               {!showSpinner && !isLoading && !userInputOnProcessing && !hasRunningTeammates && isBriefOnly && !viewedAgentTask && <BriefIdleStatus />}
               {isFullscreenEnvEnabled() && <PromptInputQueuedCommands />}
               {/* v3.8 简化：移除底 ScreenFrame + StaticCharRain（过度装饰） */}
@@ -4958,6 +5056,8 @@ export function REPL({
                       {/* Skill improvement survey - appears when improvements detected (ant-only) */}
                       {("external" as string) === 'ant' && skillImprovementSurvey.suggestion && <SkillImprovementSurvey isOpen={skillImprovementSurvey.isOpen} skillName={skillImprovementSurvey.suggestion.skillName} updates={skillImprovementSurvey.suggestion.updates} handleSelect={skillImprovementSurvey.handleSelect} inputValue={inputValue} setInputValue={setInputValue} />}
                       {showIssueFlagBanner && <IssueFlagBanner />}
+                      {/* /goal active indicator (NEW-FILE:#20260515-05). Renders null when no goal is set. */}
+                      <GoalIndicator />
                       {}
                       <PromptInput debug={debug} ideSelection={ideSelection} hasSuppressedDialogs={!!hasSuppressedDialogs} isLocalJSXCommandActive={isShowingLocalJSXCommand} getToolUseContext={getToolUseContext} toolPermissionContext={toolPermissionContext} setToolPermissionContext={setToolPermissionContext} apiKeyStatus={apiKeyStatus} commands={commands} agents={agentDefinitions.activeAgents} isLoading={isLoading} onExit={handleExit} verbose={verbose} messages={messages} onAutoUpdaterResult={setAutoUpdaterResult} autoUpdaterResult={autoUpdaterResult} input={inputValue} onInputChange={setInputValue} mode={inputMode} onModeChange={setInputMode} stashedPrompt={stashedPrompt} setStashedPrompt={setStashedPrompt} submitCount={submitCount} onShowMessageSelector={handleShowMessageSelector} onMessageActionsEnter={
             // Works during isLoading — edit cancels first; uuid selection survives appends.

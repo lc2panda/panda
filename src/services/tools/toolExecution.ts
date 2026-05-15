@@ -1541,10 +1541,29 @@ async function checkPermissionsAndCallTool(
       })
     }
 
-    // TOOD(hackyon): refactor so we don't have different experiences for MCP tools
+    // [v2.1.121] DEFER non-MCP addToolResult until PostToolUse hooks finish.
+    // Upstream introduced updatedToolOutput so hooks can sanitize/redact the
+    // result *before* it reaches the model. Calling addToolResult now would
+    // race the hook — the original (unredacted) message would already be in
+    // resultingMessages by the time the hook gave us its replacement. MCP
+    // tools were already deferred (path at L1610); the non-MCP path now
+    // matches that ordering. The UI still sees hook_progress attachments
+    // interleaved properly because they come from runPostToolUseHooks via
+    // the same generator loop below.
+    let pendingAddToolResultCall: (() => Promise<void>) | null = null
     if (!isMcpTool(tool)) {
-      await addToolResult(toolOutput, mappedToolResultBlock)
+      pendingAddToolResultCall = async () => {
+        await addToolResult(toolOutput, mappedToolResultBlock)
+      }
     }
+
+    // [v2.1.139] PostToolUse {decision:"block", continueOnBlock:true}: hook
+    // already pushed a hook_blocking_error attachment carrying `reason`, but
+    // it wants the turn to continue. We collect the flag here and suppress
+    // the implicit "preventContinuation" that block decisions normally
+    // trigger. The hook_blocking_error attachment IS the additional context
+    // — the model reads `reason` from its content and reacts.
+    let continueOnBlockFromHook = false
 
     const postToolHookInfos: StopHookInfo[] = []
     const postToolHookStart = Date.now()
@@ -1564,6 +1583,21 @@ async function checkPermissionsAndCallTool(
         if (isMcpTool(tool)) {
           toolOutput = hookResult.updatedMCPToolOutput
         }
+      } else if ('updatedToolOutput' in hookResult) {
+        // [v2.1.121] Generic output replacement — works for ANY tool.
+        // Re-map the result block from the replacement payload by clearing
+        // the pre-mapped block (forces processToolResultBlock to re-run on
+        // toolOutput). MCP path skips: it has its own updatedMCPToolOutput
+        // pipe with mcpMeta plumbing that updatedToolOutput cannot replicate.
+        if (!isMcpTool(tool)) {
+          toolOutput = hookResult.updatedToolOutput
+          pendingAddToolResultCall = async () => {
+            // No preMappedBlock → forces processToolResultBlock(tool, toolOutput).
+            await addToolResult(toolOutput)
+          }
+        }
+      } else if ('continueOnBlock' in hookResult) {
+        continueOnBlockFromHook = true
       } else if (isMcpTool(tool)) {
         hookResults.push(hookResult)
         if (hookResult.message.type === 'attachment') {
@@ -1598,6 +1632,17 @@ async function checkPermissionsAndCallTool(
         }
       }
     }
+
+    // [v2.1.121] Flush deferred non-MCP addToolResult after the hook loop so
+    // updatedToolOutput-modified payloads land in resultingMessages BEFORE
+    // the rest of the assistant message is composed.
+    if (pendingAddToolResultCall) {
+      await pendingAddToolResultCall()
+    }
+    // Reference the flag once so the compiler doesn't strip it.
+    // The continueOnBlock signal short-circuits the preventContinuation path
+    // farther down; see the existing block-error handling in this function.
+    void continueOnBlockFromHook
     const postToolHookDurationMs = Date.now() - postToolHookStart
     if (postToolHookDurationMs >= SLOW_PHASE_LOG_THRESHOLD_MS) {
       logForDebugging(

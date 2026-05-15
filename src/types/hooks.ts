@@ -63,6 +63,25 @@ export const syncHookResponseSchema = lazySchema(() =>
       .optional(),
     decision: z.enum(['approve', 'block']).optional(),
     reason: z.string().describe('Explanation for the decision').optional(),
+    // [v2.1.139] When decision='block' AND continueOnBlock=true, the `reason`
+    // is fed back to the model as additional context so the model can continue
+    // the turn instead of stopping. Currently only honored by PostToolUse
+    // (parity with upstream — PreToolUse continues to terminate on block).
+    continueOnBlock: z
+      .boolean()
+      .describe(
+        'When decision="block", feed `reason` back to the model so it continues the turn instead of stopping (PostToolUse only).',
+      )
+      .optional(),
+    // [v2.1.141] Raw ANSI escape sequence written to stderr after the hook
+    // finishes. Lets hooks trigger desktop notifications, set the window title,
+    // ring the bell, etc. — no controlling terminal required.
+    terminalSequence: z
+      .string()
+      .describe(
+        'Raw ANSI escape sequence to write to stderr (e.g. window title, bell, notification trigger).',
+      )
+      .optional(),
     systemMessage: z
       .string()
       .describe('Warning message shown to the user')
@@ -103,6 +122,16 @@ export const syncHookResponseSchema = lazySchema(() =>
           updatedMCPToolOutput: z
             .unknown()
             .describe('Updates the output for MCP tools')
+            .optional(),
+          // [v2.1.121] Replace ANY tool's output (not just MCP). Hook can
+          // sanitize/redact a Bash output, rewrite a Read result, etc. before
+          // it reaches the model. Wider scope than updatedMCPToolOutput which
+          // remains for MCP-only backward compat.
+          updatedToolOutput: z
+            .unknown()
+            .describe(
+              'Replaces the tool output for any tool. Hook-side sanitization/transformation.',
+            )
             .optional(),
         }),
         z.object({
@@ -269,6 +298,12 @@ export type HookResult = {
   initialUserMessage?: string
   updatedInput?: Record<string, unknown>
   updatedMCPToolOutput?: unknown
+  /** [v2.1.121] Replace ANY tool's output, not just MCP. */
+  updatedToolOutput?: unknown
+  /** [v2.1.139] PostToolUse block decision but keep the turn going by feeding `reason` back. */
+  continueOnBlock?: boolean
+  /** [v2.1.141] Raw ANSI sequence to write to stderr (notification/title/bell). */
+  terminalSequence?: string
   permissionRequestResult?: PermissionRequestResult
   retry?: boolean
 }
@@ -284,6 +319,12 @@ export type AggregatedHookResult = {
   initialUserMessage?: string
   updatedInput?: Record<string, unknown>
   updatedMCPToolOutput?: unknown
+  /** [v2.1.121] Aggregated PostToolUse output override (last hook wins). */
+  updatedToolOutput?: unknown
+  /** [v2.1.139] Aggregated continueOnBlock flag from any matching PostToolUse hook. */
+  continueOnBlock?: boolean
+  /** [v2.1.141] Last terminalSequence emitted by a hook in this batch. */
+  terminalSequence?: string
   permissionRequestResult?: PermissionRequestResult
   retry?: boolean
 }

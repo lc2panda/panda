@@ -1,3 +1,7 @@
+// Input: dynamicMcpConfig + AppState.mcp（已存 server 状态）+ /reload-plugins 触发
+// Output: 通过 reconnectMcpServer / toggleMcpServer 回调驱动 AppState.mcp 更新
+// Pos: services/mcp/ 与 UI/AppState 的桥，托管整个会话期间的 MCP 连接生命周期
+// 一旦 reconnect 或 toggle 行为发生变化，请同步更新本头部注释，以及所属文件夹 README。
 import { feature } from 'bun:bundle'
 import { basename } from 'path'
 import { useCallback, useEffect, useRef } from 'react'
@@ -46,6 +50,7 @@ import {
   doesEnterpriseMcpConfigExist,
   filterMcpServersByPolicy,
   getClaudeCodeMcpConfigs,
+  getMcpConfigByName,
   isMcpServerDisabled,
   setMcpServerEnabled,
 } from 'src/services/mcp/config.js'
@@ -1059,7 +1064,19 @@ export function useManageMCPConnections(
         reconnectTimersRef.current.delete(serverName)
       }
 
-      const result = await reconnectMcpServerImpl(serverName, client.config)
+      // v2.1.139: /mcp Reconnect picks up `.mcp.json` edits without restarting.
+      // Re-read the on-disk config so a user who edited .mcp.json (changed
+      // command/args/env, flipped alwaysLoad, added headers) gets the fresh
+      // config applied to this reconnect instead of the stale snapshot cached
+      // in client.config from initial startup.
+      //
+      // Fall back to the cached config when the server doesn't appear on disk:
+      // dynamic (--mcp-config / SDK setMcpServers) and claude.ai connectors
+      // are not in any .mcp.json, and getMcpConfigByName would return null
+      // for them.
+      const freshConfig = getMcpConfigByName(serverName) ?? client.config
+
+      const result = await reconnectMcpServerImpl(serverName, freshConfig)
 
       onConnectionAttempt(result)
 

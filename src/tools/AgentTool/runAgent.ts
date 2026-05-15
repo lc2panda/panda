@@ -611,6 +611,27 @@ export async function* runAgent({
     )
   }
 
+  // v2.1.133: Subagents now discover skills from project / user / plugin
+  // tiers — eagerly warm the skill registry so the subagent's SkillTool
+  // listing reflects the same three-tier view as the main session, even
+  // when agentDefinition.skills is empty. getSkillToolCommands consults
+  // getCommands → getSkillDirCommands (user/project/managed) + getPluginSkills
+  // (plugin tier) + getBundledSkills, and the result is memoized so
+  // subsequent SkillTool.prompt() calls inside the agent reuse the same
+  // discovered list. Best-effort: a discovery failure must not block agent
+  // startup (the registry returns [] and SkillTool just lists nothing).
+  try {
+    const discovered = await getSkillToolCommands(getProjectRoot())
+    logForDebugging(
+      `[Subagent ${agentDefinition.agentType}] Discovered ${discovered.length} skills across project/user/plugin tiers`,
+    )
+  } catch (err) {
+    logForDebugging(
+      `[Subagent ${agentDefinition.agentType}] Tier skill discovery failed: ${err}`,
+      { level: 'warn' },
+    )
+  }
+
   // Preload skills from agent frontmatter
   const skillsToPreload = agentDefinition.skills ?? []
   if (skillsToPreload.length > 0) {

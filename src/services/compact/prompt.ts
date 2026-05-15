@@ -271,6 +271,26 @@ const NO_TOOLS_TRAILER =
   'an <analysis> block followed by a <summary> block. ' +
   'Tool calls will be rejected and you will fail the task.'
 
+// v2.1.139 (upstream): compaction prompt now asks the model to preserve
+// sensitive user instructions. Compaction otherwise often drops red-line
+// rules, persona/style directives, and one-off overrides the user gave
+// earlier in the session — these are exactly the kind of context the model
+// needs to keep behavior consistent post-compact.
+const PRESERVE_SENSITIVE_INSTRUCTIONS_SECTION = `
+
+CRITICAL — PRESERVE SENSITIVE USER INSTRUCTIONS:
+
+When summarizing, you MUST preserve verbatim (or near-verbatim) any sensitive user instructions that govern your behavior or constrain the work. These include but are not limited to:
+
+- Red-line rules, hard prohibitions, and "do not" directives (e.g. "never commit without asking", "do not modify file X", "stop after each step")
+- Style, tone, persona, and identity instructions (e.g. preferred name/title for the assistant, preferred language, formatting rules)
+- Security/privacy constraints (e.g. "never log secrets", "do not exfiltrate data", paths/files that must not be touched)
+- Workflow conventions explicitly set by the user this session (e.g. branching rules, review steps, commit-message format, who is allowed to approve)
+- One-off overrides of defaults the user issued in this session (e.g. permission overrides, temporary tool gating, model/provider choices)
+- Explicit user preferences and corrections of prior assistant behavior ("the user told you to do X differently")
+
+Record these in a dedicated section of the summary so they survive the boundary. If unsure whether a user instruction is "sensitive", err on the side of preserving it. Quote the user verbatim when the wording matters (red-lines, exact commands, file paths).`
+
 export function getPartialCompactPrompt(
   customInstructions?: string,
   direction: PartialCompactDirection = 'from',
@@ -280,6 +300,9 @@ export function getPartialCompactPrompt(
       ? PARTIAL_COMPACT_UP_TO_PROMPT
       : PARTIAL_COMPACT_PROMPT
   let prompt = NO_TOOLS_PREAMBLE + template
+
+  // v2.1.139: preserve sensitive user instructions across compaction.
+  prompt += PRESERVE_SENSITIVE_INSTRUCTIONS_SECTION
 
   if (customInstructions && customInstructions.trim() !== '') {
     prompt += `\n\nAdditional Instructions:\n${customInstructions}`
@@ -292,6 +315,9 @@ export function getPartialCompactPrompt(
 
 export function getCompactPrompt(customInstructions?: string): string {
   let prompt = NO_TOOLS_PREAMBLE + BASE_COMPACT_PROMPT
+
+  // v2.1.139: preserve sensitive user instructions across compaction.
+  prompt += PRESERVE_SENSITIVE_INSTRUCTIONS_SECTION
 
   if (customInstructions && customInstructions.trim() !== '') {
     prompt += `\n\nAdditional Instructions:\n${customInstructions}`

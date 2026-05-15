@@ -1,3 +1,6 @@
+// Input: optional arg (UUID, custom title, or PR URL); falls back to interactive picker
+// Output: resumes target session OR renders LogSelector picker
+// Pos: /resume slash command (alias /continue) entry point
 import { c as _c } from "react/compiler-runtime";
 import chalk from 'chalk';
 import type { UUID } from 'crypto';
@@ -5,7 +8,7 @@ import figures from 'figures';
 import * as React from 'react';
 import { getOriginalCwd, getSessionId } from '../../bootstrap/state.js';
 import type { CommandResultDisplay, ResumeEntrypoint } from '../../commands.js';
-import { LogSelector } from '../../components/LogSelector.js';
+import { logMatchesPrQuery, LogSelector, parsePrSearchUrl } from '../../components/LogSelector.js';
 import { MessageResponse } from '../../components/MessageResponse.js';
 import { Spinner } from '../../components/Spinner.js';
 import { useIsInsideModal } from '../../context/modalContext.js';
@@ -88,12 +91,14 @@ function ResumeError(t0) {
 }
 function ResumeCommand({
   onDone,
-  onResume
+  onResume,
+  initialSearchQuery
 }: {
   onDone: (result?: string, options?: {
     display?: CommandResultDisplay;
   }) => void;
   onResume: (sessionId: UUID, log: LogOption, entrypoint: ResumeEntrypoint) => Promise<void>;
+  initialSearchQuery?: string;
 }): React.ReactNode {
   const [logs, setLogs] = React.useState<LogOption[]>([]);
   const [worktreePaths, setWorktreePaths] = React.useState<string[]>([]);
@@ -187,7 +192,7 @@ function ResumeCommand({
         <Text> Resuming conversation…</Text>
       </Box>;
   }
-  return <LogSelector logs={logs} maxHeight={insideModal ? Math.floor(rows / 2) : rows - 2} onCancel={handleCancel} onSelect={handleSelect} onLogsChanged={() => loadLogs(showAllProjects, worktreePaths)} showAllProjects={showAllProjects} onToggleAllProjects={handleToggleAllProjects} onAgenticSearch={agenticSessionSearch} />;
+  return <LogSelector logs={logs} maxHeight={insideModal ? Math.floor(rows / 2) : rows - 2} onCancel={handleCancel} onSelect={handleSelect} onLogsChanged={() => loadLogs(showAllProjects, worktreePaths)} showAllProjects={showAllProjects} onToggleAllProjects={handleToggleAllProjects} onAgenticSearch={agenticSessionSearch} initialSearchQuery={initialSearchQuery} />;
 }
 export function filterResumableSessions(logs: LogOption[], currentSessionId: string): LogOption[] {
   return logs.filter(l => !l.isSidechain && getSessionIdFromLog(l) !== currentSessionId);
@@ -217,6 +222,28 @@ export const call: LocalJSXCommandCall = async (onDone, context, args) => {
   if (logs.length === 0) {
     const message = 'No conversations found to resume.';
     return <ResumeError message={message} args={arg} onDone={() => onDone(message)} />;
+  }
+
+  // v2.1.122: PR URL fast-path — `/resume https://.../pull/123` resolves to
+  // the session that opened that PR via the prUrl metadata.
+  const parsedPr = parsePrSearchUrl(arg);
+  if (parsedPr) {
+    const prMatches = logs.filter(l => logMatchesPrQuery(l, parsedPr)).sort((a, b) => b.modified.getTime() - a.modified.getTime());
+    if (prMatches.length === 1) {
+      const log = prMatches[0]!;
+      const sessionId = getSessionIdFromLog(log);
+      if (sessionId) {
+        const fullLog = isLiteLog(log) ? await loadFullLog(log) : log;
+        void onResume(sessionId, fullLog, 'slash_command_session_id');
+        return null;
+      }
+    }
+    if (prMatches.length > 1) {
+      // Multiple sessions touched this PR — defer to interactive picker with
+      // the URL pre-filled so the user can disambiguate.
+      return <ResumeCommand key={Date.now()} onDone={onDone} onResume={onResume} initialSearchQuery={arg} />;
+    }
+    // 0 matches falls through to the standard "session not found" error below.
   }
 
   // First, check if arg is a valid UUID

@@ -1,3 +1,8 @@
+// Input: ContextData (analyzeContextUsage 输出) + showAllSkills flag
+// Output: Ink JSX — context-usage 网格视图 + 分类/MCP/Skills/Memory 明细
+// Pos: /context 命令展示层
+//
+// v2.1.139: showAllSkills 触发 Skills 区永久可见（即使 token=0），用于 /context all。
 import { c as _c } from "react/compiler-runtime";
 import { feature } from 'bun:bundle';
 import * as React from 'react';
@@ -101,11 +106,18 @@ function groupBySource<T extends {
 }
 interface Props {
   data: ContextData;
+  /**
+   * v2.1.139: when true, force the Skills section to render even if the
+   * total skill token estimate is zero, so `/context all` always exposes
+   * the per-skill breakdown to the user.
+   */
+  showAllSkills?: boolean;
 }
 export function ContextVisualization(t0) {
-  const $ = _c(87);
+  const $ = _c(88);
   const {
-    data
+    data,
+    showAllSkills
   } = t0;
   const {
     categories,
@@ -327,9 +339,14 @@ export function ContextVisualization(t0) {
     t12 = $[59];
   }
   let t13;
-  if ($[60] !== skills) {
-    t13 = skills && skills.tokens > 0 && <Box flexDirection="column" marginTop={1}><Box><Text bold={true}>Skills</Text><Text dimColor={true}> · /skills</Text></Box>{Array.from(groupBySource(skills.skillFrontmatter).entries()).map(_temp25)}</Box>;
+  if ($[60] !== skills || $[86] !== showAllSkills) {
+    // v2.1.139: `/context all` forces the per-skill breakdown even when
+    // skills.tokens is 0, so users can always see which skills exist and how
+    // many tokens each one's frontmatter is estimated to occupy.
+    const showSkillsSection = skills && (skills.tokens > 0 || (showAllSkills && skills.skillFrontmatter.length > 0));
+    t13 = showSkillsSection && <Box flexDirection="column" marginTop={1}><Box><Text bold={true}>Skills</Text><Text dimColor={true}> · /skills{showAllSkills ? " (all)" : ""}</Text></Box>{Array.from(groupBySource(skills.skillFrontmatter).entries()).map(_temp25)}</Box>;
     $[60] = skills;
+    $[86] = showAllSkills;
     $[61] = t13;
   } else {
     t13 = $[61];

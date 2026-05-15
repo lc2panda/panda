@@ -1,3 +1,6 @@
+// Input: LogOption[] + search query (free text OR PR URL paste)
+// Output: filterable session picker; PR URL pastes resolve to authoring session
+// Pos: shared selector used by /resume (and other session pickers)
 import { c as _c } from "react/compiler-runtime";
 import chalk from 'chalk';
 import figures from 'figures';
@@ -62,6 +65,91 @@ type LogTreeNode = TreeNode<{
 function normalizeAndTruncateToWidth(text: string, maxWidth: number): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   return truncateToWidth(normalized, maxWidth);
+}
+
+/**
+ * v2.1.122: Parse a PR/MR URL pasted into the resume search box.
+ *
+ * Supports four common hosts:
+ *   GitHub.com:    https://github.com/<org>/<repo>/pull/<n>
+ *   GHE (self-hosted GitHub): https://<host>/<org>/<repo>/pull/<n>
+ *   GitLab:        https://gitlab.com/<org>/<repo>/-/merge_requests/<n>
+ *   Bitbucket:     https://bitbucket.org/<org>/<repo>/pull-requests/<n>
+ *
+ * Returns the normalized PR URL and repository slug ("<org>/<repo>") plus the
+ * PR number, or null if the query is not a recognizable PR URL.
+ */
+export type ParsedPrQuery = {
+  prUrl: string;
+  prNumber: number;
+  prRepository: string;
+  host: string;
+};
+export function parsePrSearchUrl(query: string): ParsedPrQuery | null {
+  const trimmed = query.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  // GitLab: /<org>/<repo>/-/merge_requests/<n>
+  const gitlabMatch = url.pathname.match(/^\/([^/]+\/[^/]+)\/-\/merge_requests\/(\d+)\/?$/);
+  if (gitlabMatch && gitlabMatch[1] && gitlabMatch[2]) {
+    return {
+      prUrl: trimmed,
+      prNumber: parseInt(gitlabMatch[2], 10),
+      prRepository: gitlabMatch[1],
+      host: url.host,
+    };
+  }
+  // Bitbucket: /<org>/<repo>/pull-requests/<n>
+  const bitbucketMatch = url.pathname.match(/^\/([^/]+\/[^/]+)\/pull-requests\/(\d+)\/?$/);
+  if (bitbucketMatch && bitbucketMatch[1] && bitbucketMatch[2]) {
+    return {
+      prUrl: trimmed,
+      prNumber: parseInt(bitbucketMatch[2], 10),
+      prRepository: bitbucketMatch[1],
+      host: url.host,
+    };
+  }
+  // GitHub & GHE: /<org>/<repo>/pull/<n>
+  const githubMatch = url.pathname.match(/^\/([^/]+\/[^/]+)\/pull\/(\d+)\/?$/);
+  if (githubMatch && githubMatch[1] && githubMatch[2]) {
+    return {
+      prUrl: trimmed,
+      prNumber: parseInt(githubMatch[2], 10),
+      prRepository: githubMatch[1],
+      host: url.host,
+    };
+  }
+  return null;
+}
+
+/**
+ * Match a log against a parsed PR URL. We prefer exact prUrl equality (most
+ * precise), then fall back to (prRepository, prNumber) tuple match for sessions
+ * that stored only the slug, then to bare prNumber if the slug differs in case
+ * (Bitbucket workspace names are case-insensitive in practice).
+ */
+export function logMatchesPrQuery(log: LogOption, parsed: ParsedPrQuery): boolean {
+  if (!log.prNumber) return false;
+  if (log.prUrl && log.prUrl === parsed.prUrl) return true;
+  if (log.prNumber !== parsed.prNumber) return false;
+  if (log.prRepository && log.prRepository.toLowerCase() === parsed.prRepository.toLowerCase()) {
+    return true;
+  }
+  // Fallback: same PR number + URL host present in stored URL (covers GHE / custom hosts)
+  if (log.prUrl) {
+    try {
+      const stored = new URL(log.prUrl);
+      return stored.host === parsed.host;
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 // Width of prefixes that TreeSelect will add
@@ -424,14 +512,22 @@ export function LogSelector(t0) {
     }
     let t23;
     if ($[39] !== baseFilteredLogs || $[40] !== searchQuery) {
-      const query = searchQuery.toLowerCase();
-      t23 = baseFilteredLogs.filter(log_5 => {
-        const displayedTitle = getLogDisplayTitle(log_5).toLowerCase();
-        const branch_0 = (log_5.gitBranch || "").toLowerCase();
-        const tag = (log_5.tag || "").toLowerCase();
-        const prInfo = log_5.prNumber ? `pr #${log_5.prNumber} ${log_5.prRepository || ""}`.toLowerCase() : "";
-        return displayedTitle.includes(query) || branch_0.includes(query) || tag.includes(query) || prInfo.includes(query);
-      });
+      // v2.1.122: PR URL fast-path — pasted PR/MR URLs resolve to authoring
+      // session via the prUrl/prRepository/prNumber metadata stored by
+      // gitOperationTracking.
+      const parsedPr = parsePrSearchUrl(searchQuery);
+      if (parsedPr) {
+        t23 = baseFilteredLogs.filter(log_5 => logMatchesPrQuery(log_5, parsedPr));
+      } else {
+        const query = searchQuery.toLowerCase();
+        t23 = baseFilteredLogs.filter(log_5 => {
+          const displayedTitle = getLogDisplayTitle(log_5).toLowerCase();
+          const branch_0 = (log_5.gitBranch || "").toLowerCase();
+          const tag = (log_5.tag || "").toLowerCase();
+          const prInfo = log_5.prNumber ? `pr #${log_5.prNumber} ${log_5.prRepository || ""}`.toLowerCase() : "";
+          return displayedTitle.includes(query) || branch_0.includes(query) || tag.includes(query) || prInfo.includes(query);
+        });
+      }
       $[39] = baseFilteredLogs;
       $[40] = searchQuery;
       $[41] = t23;

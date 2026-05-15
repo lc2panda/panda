@@ -1,3 +1,6 @@
+// Input: worktree slug + session config + settings (worktree.baseRef/sparsePaths/etc.)
+// Output: git worktree on disk under <repoRoot>/.pandacc/worktrees/<slug>, mutated currentWorktreeSession
+// Pos: session-isolated worktree lifecycle (create/keep/cleanup) — consumed by EnterWorktreeTool, ExitWorktreeTool, AgentTool, bridgeMain, and the --worktree CLI fast-path
 import { feature } from 'bun:bundle'
 import chalk from 'chalk'
 import { spawnSync } from 'child_process'
@@ -275,30 +278,44 @@ async function getOrCreateWorktree(
     }
     baseBranch = 'FETCH_HEAD'
   } else {
-    // If origin/<branch> already exists locally, skip fetch. In large repos
-    // (210k files, 16M objects) fetch burns ~6-8s on a local commit-graph
-    // scan before even hitting the network. A slightly stale base is fine —
-    // the user can pull in the worktree if they want latest.
-    // resolveRef reads the loose/packed ref directly; when it succeeds we
-    // already have the SHA, so the later rev-parse is skipped entirely.
-    const [defaultBranch, gitDir] = await Promise.all([
-      getDefaultBranch(),
-      resolveGitDir(repoRoot),
-    ])
-    const originRef = `origin/${defaultBranch}`
-    const originSha = gitDir
-      ? await resolveRef(gitDir, `refs/remotes/origin/${defaultBranch}`)
-      : null
-    if (originSha) {
-      baseBranch = originRef
-      baseSha = originSha
+    // v2.1.128/v2.1.133: respect settings.worktree.baseRef.
+    //   'head'  (default) — branch off the main repo's local HEAD so unpushed
+    //                       commits made on the current branch are carried into
+    //                       the worktree. The pre-v2.1.128 origin/<default>
+    //                       behavior silently dropped local work.
+    //   'fresh'           — branch off origin/<default-branch> (fetching first
+    //                       when not present locally), restoring the old behavior
+    //                       for users who prefer a clean base from upstream.
+    const baseRef = getInitialSettings().worktree?.baseRef ?? 'head'
+    if (baseRef === 'head') {
+      baseBranch = 'HEAD'
     } else {
-      const { code: fetchCode } = await execFileNoThrowWithCwd(
-        gitExe(),
-        ['fetch', 'origin', defaultBranch],
-        { cwd: repoRoot, stdin: 'ignore', env: fetchEnv },
-      )
-      baseBranch = fetchCode === 0 ? originRef : 'HEAD'
+      // 'fresh': fetch origin/<default> if missing locally, then use it.
+      // If origin/<branch> already exists locally, skip fetch. In large repos
+      // (210k files, 16M objects) fetch burns ~6-8s on a local commit-graph
+      // scan before even hitting the network. A slightly stale base is fine —
+      // the user can pull in the worktree if they want latest.
+      // resolveRef reads the loose/packed ref directly; when it succeeds we
+      // already have the SHA, so the later rev-parse is skipped entirely.
+      const [defaultBranch, gitDir] = await Promise.all([
+        getDefaultBranch(),
+        resolveGitDir(repoRoot),
+      ])
+      const originRef = `origin/${defaultBranch}`
+      const originSha = gitDir
+        ? await resolveRef(gitDir, `refs/remotes/origin/${defaultBranch}`)
+        : null
+      if (originSha) {
+        baseBranch = originRef
+        baseSha = originSha
+      } else {
+        const { code: fetchCode } = await execFileNoThrowWithCwd(
+          gitExe(),
+          ['fetch', 'origin', defaultBranch],
+          { cwd: repoRoot, stdin: 'ignore', env: fetchEnv },
+        )
+        baseBranch = fetchCode === 0 ? originRef : 'HEAD'
+      }
     }
   }
 

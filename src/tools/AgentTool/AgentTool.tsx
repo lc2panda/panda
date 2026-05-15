@@ -45,7 +45,7 @@ import { BackgroundHint } from '../BashTool/UI.js';
 import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js';
 import { spawnTeammate } from '../shared/spawnMultiAgent.js';
 import { setAgentColor } from './agentColorManager.js';
-import { agentToolResultSchema, classifyHandoffIfNeeded, emitTaskProgress, extractPartialResult, finalizeAgentTool, getLastToolUseName, runAsyncAgentLifecycle } from './agentToolUtils.js';
+import { agentToolResultSchema, classifyHandoffIfNeeded, emitTaskProgress, extractPartialResult, finalizeAgentTool, findAgentByLooseType, getLastToolUseName, normalizeAgentType, runAsyncAgentLifecycle } from './agentToolUtils.js';
 import { GENERAL_PURPOSE_AGENT } from './built-in/generalPurposeAgent.js';
 import { AGENT_TOOL_NAME, LEGACY_AGENT_TOOL_NAME, ONE_SHOT_BUILTIN_AGENT_TYPES } from './constants.js';
 import { resolveSubagentPolicy, filterSubagentTools } from './subagentPolicy.js';
@@ -307,10 +307,15 @@ export const AgentTool = buildTool({
     // Check if this is a multi-agent spawn request
     // Spawn is triggered when team_name is set (from param or context) and name is provided
     if (teamName && name) {
-      // Set agent definition color for grouped UI display before spawning
-      const agentDef = subagent_type ? toolUseContext.options.agentDefinitions.activeAgents.find(a => a.agentType === subagent_type) : undefined;
-      if (agentDef?.color) {
-        setAgentColor(subagent_type!, agentDef.color);
+      // Set agent definition color for grouped UI display before spawning.
+      // v2.1.140: subagent_type lookup is case- and separator-insensitive so
+      // "Code Reviewer" / "code_reviewer" / "CODE-REVIEWER" all resolve to the
+      // registered "code-reviewer" agent. Color/agent_type are reported using
+      // the canonical registered agentType so downstream UI is stable.
+      const agentDef = subagent_type ? findAgentByLooseType(toolUseContext.options.agentDefinitions.activeAgents, subagent_type) : undefined;
+      const canonicalAgentType = agentDef?.agentType ?? subagent_type;
+      if (agentDef?.color && canonicalAgentType) {
+        setAgentColor(canonicalAgentType, agentDef.color);
       }
       const result = await spawnTeammate({
         name,
@@ -320,7 +325,7 @@ export const AgentTool = buildTool({
         use_splitpane: true,
         plan_mode_required: spawnMode === 'plan',
         model: model ?? agentDef?.model,
-        agent_type: subagent_type,
+        agent_type: canonicalAgentType,
         invokingRequestId: assistantMessage?.requestId as string | undefined
       }, toolUseContext);
 
@@ -367,16 +372,25 @@ export const AgentTool = buildTool({
       const {
         allowedAgentTypes
       } = toolUseContext.options.agentDefinitions;
+      // v2.1.140: allowedAgentTypes membership is also case-/separator-insensitive
+      // so admin-listed "Code Reviewer" still matches a user-typed effectiveType
+      // that already came through normalizeAgentType.
+      const normalizedAllowed = allowedAgentTypes ? new Set(allowedAgentTypes.map(t => normalizeAgentType(t))) : undefined;
       const agents = filterDeniedAgents(
       // When allowedAgentTypes is set (from Agent(x,y) tool spec), restrict to those types
-      allowedAgentTypes ? allAgents.filter(a => allowedAgentTypes.includes(a.agentType)) : allAgents, appState.toolPermissionContext, AGENT_TOOL_NAME);
-      const found = agents.find(agent => agent.agentType === effectiveType);
+      normalizedAllowed ? allAgents.filter(a => normalizedAllowed.has(normalizeAgentType(a.agentType))) : allAgents, appState.toolPermissionContext, AGENT_TOOL_NAME);
+      // v2.1.140: subagent_type is case- and separator-insensitive. Resolve the
+      // user-supplied effectiveType against the registry under the normalized
+      // comparison, then promote effectiveType to the canonical agentType so
+      // downstream callers (errors, permission rules, analytics) see the
+      // registered identifier — not the user's variant.
+      const found = effectiveType ? findAgentByLooseType(agents, effectiveType) : undefined;
       if (!found) {
         // Check if the agent exists but is denied by permission rules
-        const agentExistsButDenied = allAgents.find(agent => agent.agentType === effectiveType);
+        const agentExistsButDenied = effectiveType ? findAgentByLooseType(allAgents, effectiveType) : undefined;
         if (agentExistsButDenied) {
-          const denyRule = getDenyRuleForAgent(appState.toolPermissionContext, AGENT_TOOL_NAME, effectiveType);
-          throw new Error(`Agent type '${effectiveType}' has been denied by permission rule '${AGENT_TOOL_NAME}(${effectiveType})' from ${denyRule?.source ?? 'settings'}.`);
+          const denyRule = getDenyRuleForAgent(appState.toolPermissionContext, AGENT_TOOL_NAME, agentExistsButDenied.agentType);
+          throw new Error(`Agent type '${effectiveType}' has been denied by permission rule '${AGENT_TOOL_NAME}(${agentExistsButDenied.agentType})' from ${denyRule?.source ?? 'settings'}.`);
         }
         throw new Error(`Agent type '${effectiveType}' not found. Available agents: ${agents.map(a => a.agentType).join(', ')}`);
       }

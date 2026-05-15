@@ -1,3 +1,8 @@
+// Input: 用户/项目/policy settings.json 的原始 JSON
+// Output: zod schema + 推导的 SettingsJson 类型 (validated 配置)
+// Pos: settings.json 单一真相源 — 所有 setting 字段（含 skillOverrides）定义在此
+//
+// v2.1.129: 新增 skillOverrides (off / user-invocable-only / name-only)。
 import { feature } from 'bun:bundle'
 import { z } from 'zod/v4'
 import { SandboxSettingsSchema } from '../../entrypoints/sandboxTypes.js'
@@ -468,6 +473,19 @@ export const SettingsSchema = lazySchema(() =>
               'Directories to include when creating worktrees, via git sparse-checkout (cone mode). ' +
                 'Dramatically faster in large monorepos — only the listed paths are written to disk.',
             ),
+          // v2.1.133: select the base commit for new worktree branches.
+          //   'head'  — branch off local HEAD (default since v2.1.128), preserves
+          //             unpushed commits. Was the implicit behavior before this
+          //             field existed for users who'd locally edited their branch.
+          //   'fresh' — branch off origin/<default-branch>, fetching first. Restores
+          //             the pre-v2.1.128 behavior for users who want a clean base.
+          baseRef: z
+            .enum(['head', 'fresh'])
+            .optional()
+            .describe(
+              'Base ref for new worktree branches. "head" (default) preserves unpushed commits ' +
+                'by branching from local HEAD; "fresh" fetches origin/<default-branch> for a clean base.',
+            ),
         })
         .optional()
         .describe('Git worktree configuration for --worktree flag.'),
@@ -575,6 +593,28 @@ export const SettingsSchema = lazySchema(() =>
             'NOT blocked: managed (policySettings) sources, plugin-provided customizations. ' +
             'Composes with strictKnownMarketplaces for end-to-end admin control — plugins gated by ' +
             'marketplace allowlist, everything else blocked here.',
+        ),
+      // v2.1.133: admin key controlling how SDK managedSettings merge with
+      // local/user/project settings. Only honored when set in
+      // policySettings (managed-settings.json) — user-side values are ignored
+      // for security. Read by loadSettingsFromDisk to choose merge strategy:
+      //   'merge'    — default; deep-merge policy on top of other sources.
+      //   'override' — policy wins outright; non-policy sources for the same
+      //                top-level keys are discarded before merging.
+      //   'ignore'   — policy values for keys already set by user/project/
+      //                local/flag are dropped; non-policy values are preserved.
+      // Independent of allowManagedHooksOnly /
+      // allowManagedPermissionRulesOnly which scope merge per-feature; this
+      // applies globally to all keys.
+      parentSettingsBehavior: z
+        .enum(['override', 'merge', 'ignore'])
+        .optional()
+        .describe(
+          'Admin key controlling how managed settings merge with other sources. ' +
+            '"merge" (default): deep-merge managed on top. ' +
+            '"override": managed wins, non-managed values for managed keys are discarded. ' +
+            '"ignore": managed values are dropped for keys already set elsewhere. ' +
+            'Only honored when set in policySettings (managed-settings.json).',
         ),
       // Status line for custom status line display
       statusLine: z
@@ -1019,6 +1059,21 @@ export const SettingsSchema = lazySchema(() =>
                   .array(z.string())
                   .optional()
                   .describe('Rules for the auto mode classifier deny section'),
+                // v2.1.136: unconditional auto-mode reject (bypasses allow exceptions).
+                // Patterns here are matched against the same tool-name + content
+                // string used by permissions.allow / permissions.deny (e.g.
+                // "Bash(rm -rf:*)", "FileWrite(/etc/*)"). When a tool call
+                // matches any hard_deny pattern, it is denied without prompting
+                // and without consulting the classifier, even if an allow rule
+                // would otherwise grant it. Operates only inside auto mode.
+                hard_deny: z
+                  .array(z.string())
+                  .optional()
+                  .describe(
+                    'Unconditional auto-mode reject patterns (bypasses allow exceptions). ' +
+                      'Same format as permissions.deny entries, e.g. "Bash(rm -rf:*)". ' +
+                      'Matching tool calls are denied without prompting or running the classifier.',
+                  ),
                 ...(process.env.USER_TYPE === 'ant'
                   ? {
                       // Back-compat alias for ant users; external users use soft_deny
@@ -1200,6 +1255,26 @@ export const SettingsSchema = lazySchema(() =>
         .describe(
           'Custom semantic aliases mapping task-type labels to model aliases. ' +
             'Example: {"frontend-expert": "gemini-pro", "quick-task": "haiku-latest"}',
+        ),
+      // v2.1.129: Per-skill override map. Three modes:
+      //   off                  — skill is completely hidden from listings + model
+      //   user-invocable-only  — only user-typed `/skill` works; model cannot auto-call
+      //   name-only            — skill name is exposed but SKILL.md content stays
+      //                          hidden from the model's listing (whenToUse/desc dropped)
+      // Keys are skill names (matches Command.name). Unknown skill names are
+      // ignored; unknown modes are treated as no override (skill behaves normally).
+      skillOverrides: z
+        .record(
+          z.string(),
+          z.enum(['off', 'user-invocable-only', 'name-only']),
+        )
+        .optional()
+        .describe(
+          'Per-skill override map. ' +
+            '"off" hides the skill entirely; ' +
+            '"user-invocable-only" prevents model auto-invocation; ' +
+            '"name-only" exposes the name without the SKILL.md body. ' +
+            'Keys are skill names. Skills not listed behave normally.',
         ),
     })
     .passthrough(),

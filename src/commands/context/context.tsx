@@ -1,3 +1,8 @@
+// Input: REPL 上下文消息 + 可选 args ("all" 触发 per-skill 全展开)
+// Output: ANSI 渲染后的 ContextVisualization 字符串（onDone）
+// Pos: /context (interactive) 命令入口
+//
+// v2.1.139: args="all" → 传 showAllSkills 给 ContextVisualization。
 import { feature } from 'bun:bundle';
 import * as React from 'react';
 import type { LocalJSXCommandContext } from '../../commands.js';
@@ -8,6 +13,14 @@ import type { Message } from '../../types/message.js';
 import { analyzeContextUsage } from '../../utils/analyzeContext.js';
 import { getMessagesAfterCompactBoundary } from '../../utils/messages.js';
 import { renderToAnsiString } from '../../utils/staticRender.js';
+
+// v2.1.139: `/context all` shows per-skill token estimate. The argument is
+// passed through to ContextVisualization which renders the Skills section
+// even when total skill tokens are zero (so users discover the breakdown).
+function parseShowAllSkills(args: string | undefined): boolean {
+  if (!args) return false
+  return args.trim().toLowerCase() === 'all'
+}
 
 /**
  * Apply the same context transforms query.ts does before the API call, so
@@ -27,7 +40,7 @@ function toApiView(messages: Message[]): Message[] {
   }
   return view;
 }
-export async function call(onDone: LocalJSXCommandOnDone, context: LocalJSXCommandContext): Promise<React.ReactNode> {
+export async function call(onDone: LocalJSXCommandOnDone, context: LocalJSXCommandContext, args?: string): Promise<React.ReactNode> {
   const {
     messages,
     getAppState,
@@ -56,8 +69,10 @@ export async function call(onDone: LocalJSXCommandOnDone, context: LocalJSXComma
   apiView // Original messages for API usage extraction
   );
 
+  const showAllSkills = parseShowAllSkills(args);
+
   // Render to ANSI string to preserve colors and pass to onDone like local commands do
-  const output = await renderToAnsiString(<ContextVisualization data={data} />);
+  const output = await renderToAnsiString(<ContextVisualization data={data} showAllSkills={showAllSkills} />);
   onDone(output);
   return null;
 }

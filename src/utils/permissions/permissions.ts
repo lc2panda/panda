@@ -21,6 +21,7 @@ import {
   getSettingSourceDisplayNameLowercase,
   SETTING_SOURCES,
 } from '../settings/constants.js'
+import { getAutoModeConfig } from '../settings/settings.js'
 import { plural } from '../stringUtils.js'
 import { permissionModeTitle } from './PermissionMode.js'
 import type {
@@ -49,6 +50,10 @@ import {
   permissionRuleValueFromString,
   permissionRuleValueToString,
 } from './permissionRuleParser.js'
+import {
+  matchWildcardPattern,
+  parsePermissionRule,
+} from './shellRuleMatching.js'
 import {
   deletePermissionRuleFromSettings,
   type PermissionRuleFromEditableSettings,
@@ -86,6 +91,7 @@ import {
   AUTO_REJECT_MESSAGE,
   buildClassifierUnavailableMessage,
   buildYoloRejectionMessage,
+  DENIAL_WORKAROUND_GUIDANCE,
   DONT_ASK_REJECT_MESSAGE,
 } from '../messages.js'
 import { calculateCostFromTokens } from '../modelCost.js'
@@ -302,6 +308,81 @@ export function getAskRuleForTool(
 }
 
 /**
+ * v2.1.136: Match a tool call against `settings.autoMode.hard_deny` patterns.
+ *
+ * Returns the matching pattern string on hit, or null if no hard_deny rule
+ * applies. Each pattern uses the same `Tool` or `Tool(content)` form as
+ * permissions.deny entries:
+ *   - "Bash"             — matches every Bash call.
+ *   - "Bash(rm -rf:*)"   — legacy prefix; matches commands starting with "rm -rf".
+ *   - "Bash(rm -rf *)"   — wildcard; matches "rm -rf <anything>".
+ *   - "FileWrite(/etc/*)" — wildcard against the tool's primary content arg.
+ *
+ * The primary content arg is the first string field of the tool input, which
+ * matches how Bash/FileEdit/FileWrite/etc surface their action target. This is
+ * a deliberately conservative match — rules that don't fit into a single
+ * string field (rare) simply won't trip; callers can still use a bare tool
+ * name to deny the whole tool.
+ */
+function matchAutoModeHardDeny(
+  tool: Pick<Tool, 'name' | 'mcpInfo'>,
+  input: { [key: string]: unknown },
+): string | null {
+  const config = getAutoModeConfig()
+  const patterns = config?.hard_deny
+  if (!patterns || patterns.length === 0) {
+    return null
+  }
+
+  const toolNameForMatch = getToolNameForPermissionCheck(tool)
+  // The first string field of the input is treated as the matchable content.
+  // For Bash this is `command`; for FileWrite/FileEdit it's `file_path`; etc.
+  // Tools that take only non-string args (numbers, objects) match by tool
+  // name only.
+  let primaryContent: string | undefined
+  for (const value of Object.values(input)) {
+    if (typeof value === 'string') {
+      primaryContent = value
+      break
+    }
+  }
+
+  for (const raw of patterns) {
+    const parsed = permissionRuleValueFromString(raw)
+    if (parsed.toolName !== toolNameForMatch) {
+      continue
+    }
+    // Bare tool name → unconditionally match every call.
+    if (parsed.ruleContent === undefined) {
+      return raw
+    }
+    if (primaryContent === undefined) {
+      continue
+    }
+    const shellRule = parsePermissionRule(parsed.ruleContent)
+    switch (shellRule.type) {
+      case 'exact':
+        if (primaryContent === shellRule.command) return raw
+        break
+      case 'prefix':
+        if (
+          primaryContent === shellRule.prefix ||
+          primaryContent.startsWith(shellRule.prefix + ' ')
+        ) {
+          return raw
+        }
+        break
+      case 'wildcard':
+        if (matchWildcardPattern(shellRule.pattern, primaryContent)) {
+          return raw
+        }
+        break
+    }
+  }
+  return null
+}
+
+/**
  * Check if a specific agent is denied via Agent(agentType) syntax.
  * For example, Agent(Explore) would deny the Explore agent.
  */
@@ -477,6 +558,34 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
   assistantMessage,
   toolUseID,
 ): Promise<PermissionDecision> => {
+  // v2.1.136: autoMode.hard_deny — unconditional reject patterns that bypass
+  // allow rules. Evaluated BEFORE hasPermissionsToUseToolInner so an active
+  // allow rule (steps 1c/2b inside) cannot grant a tool-call that matches a
+  // hard_deny pattern. Only fires in auto mode (or plan-mode-with-auto-active)
+  // because hard_deny lives under settings.autoMode.* and is scoped to the
+  // classifier path. For non-auto modes, normal permissions.deny is the
+  // unconditional channel.
+  if (feature('TRANSCRIPT_CLASSIFIER')) {
+    const appState = context.getAppState()
+    const inAutoMode =
+      appState.toolPermissionContext.mode === 'auto' ||
+      (appState.toolPermissionContext.mode === 'plan' &&
+        (autoModeStateModule?.isAutoModeActive() ?? false))
+    if (inAutoMode) {
+      const hardDenyMatch = matchAutoModeHardDeny(tool, input)
+      if (hardDenyMatch) {
+        return {
+          behavior: 'deny',
+          decisionReason: {
+            type: 'other',
+            reason: `Permission denied by autoMode.hard_deny rule "${hardDenyMatch}". This rule unconditionally blocks the action and is not overridden by allow entries.`,
+          },
+          message: `Permission to use ${tool.name} has been denied by autoMode.hard_deny rule "${hardDenyMatch}". ${DENIAL_WORKAROUND_GUIDANCE}`,
+        }
+      }
+    }
+  }
+
   const result = await hasPermissionsToUseToolInner(tool, input, context)
 
 
@@ -701,7 +810,9 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
         clearClassifierChecking(toolUseID)
       }
 
-      // Notify ants when classifier error dumped prompts (will be in /share)
+      // Notify ants when classifier error dumped prompts (will be in /share).
+      // v2.1.128: include actionable next-step hints (retry / /compact /
+      // --debug) so the user can self-recover without digging into logs.
       if (
         process.env.USER_TYPE === 'ant' &&
         classifierResult.errorDumpPath &&
@@ -709,7 +820,9 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
       ) {
         context.addNotification({
           key: 'auto-mode-error-dump',
-          text: `Auto mode classifier error — prompts dumped to ${classifierResult.errorDumpPath} (included in /share)`,
+          text:
+            `Auto mode classifier error — prompts dumped to ${classifierResult.errorDumpPath} (included in /share). ` +
+            `Try: retry the action, /compact the transcript, or relaunch with --debug to surface the underlying error.`,
           priority: 'immediate',
           color: 'error',
         })

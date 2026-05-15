@@ -1,3 +1,7 @@
+// Input: 当前 frame index + messageColor + stalled/warming 强度
+// Output: 单字符 spinner glyph（含 stalled-red / amber-warming / Matrix 主题颜色处理）
+// Pos: components/Spinner 子模块，glyph 渲染叶节点
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 import { c as _c } from "react/compiler-runtime";
 import * as React from 'react';
 import { Box, Text, useTheme } from '../../ink.js';
@@ -25,6 +29,10 @@ type Props = {
   stalledIntensity?: number;
   reducedMotion?: boolean;
   time?: number;
+  /** 0..1 fade into warmingTargetRGB. Subordinate to stalledIntensity. */
+  warmingIntensity?: number;
+  /** Target RGB to lerp toward when warmingIntensity > 0. */
+  warmingTargetRGB?: { r: number; g: number; b: number } | null;
 };
 export function SpinnerGlyph(t0) {
   const $ = _c(9);
@@ -33,11 +41,15 @@ export function SpinnerGlyph(t0) {
     messageColor,
     stalledIntensity: t1,
     reducedMotion: t2,
-    time: t3
+    time: t3,
+    warmingIntensity: tw1,
+    warmingTargetRGB: tw2
   } = t0;
   const stalledIntensity = t1 === undefined ? 0 : t1;
   const reducedMotion = t2 === undefined ? false : t2;
   const time = t3 === undefined ? 0 : t3;
+  const warmingIntensity = tw1 === undefined ? 0 : tw1;
+  const warmingTargetRGB = tw2 === undefined ? null : tw2;
   const [themeName] = useTheme();
   const theme = getTheme(themeName);
   // Matrix theme: opt-in via PANDA_THEME=matrix. Swaps frames to a denser
@@ -75,6 +87,16 @@ export function SpinnerGlyph(t0) {
     return t4;
   }
   const spinnerChar = SPINNER_FRAMES[frame % SPINNER_FRAMES.length];
+  // Warming (amber 10s+ / auto-mode permission red) — only when stalled isn't
+  // already driving the color and a target RGB has been provided.
+  if (stalledIntensity === 0 && warmingIntensity > 0 && warmingTargetRGB) {
+    const baseColorStr_w = theme[messageColor];
+    const baseRGB_w = baseColorStr_w ? parseRGB(baseColorStr_w) : null;
+    if (baseRGB_w) {
+      const interpolated_w = interpolateColor(baseRGB_w, warmingTargetRGB, Math.min(warmingIntensity, 1));
+      return <Box flexWrap="wrap" height={1} width={2}><Text color={toRGBColor(interpolated_w)}>{spinnerChar}</Text></Box>;
+    }
+  }
   if (stalledIntensity > 0) {
     const baseColorStr = theme[messageColor];
     const baseRGB = baseColorStr ? parseRGB(baseColorStr) : null;

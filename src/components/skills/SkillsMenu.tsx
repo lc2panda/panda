@@ -1,9 +1,12 @@
+// Input: Command[] (from context.options.commands) + onExit callback
+// Output: Dialog listing skills grouped by source, type-to-filter live narrowing
+// Pos: /skills slash command — skills browser entry
 import { c as _c } from "react/compiler-runtime";
 import capitalize from 'lodash-es/capitalize.js';
 import * as React from 'react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { type Command, type CommandBase, type CommandResultDisplay, getCommandName, type PromptCommand } from '../../commands.js';
-import { Box, Text } from '../../ink.js';
+import { Box, Text, useInput } from '../../ink.js';
 import { estimateSkillFrontmatterTokens, getSkillsPath } from '../../skills/loadSkillsDir.js';
 import { getDisplayPath } from '../../utils/file.js';
 import { formatTokens } from '../../utils/format.js';
@@ -50,6 +53,21 @@ export function SkillsMenu(t0) {
     onExit,
     commands
   } = t0;
+  // v2.1.121: type-to-filter — react to printable chars and backspace
+  // independently from the memoized skill grouping below.
+  const [filterQuery, setFilterQuery] = useState("");
+  useInput((input, key) => {
+    if (key.backspace || key.delete) {
+      setFilterQuery(prev => prev.slice(0, -1));
+      return;
+    }
+    if (key.ctrl || key.meta || key.return || key.escape || key.tab || key.upArrow || key.downArrow || key.leftArrow || key.rightArrow) {
+      return;
+    }
+    if (input && input.length > 0 && !/^\s+$/.test(input)) {
+      setFilterQuery(prev => prev + input);
+    }
+  });
   let t1;
   if ($[0] !== commands) {
     t1 = commands.filter(_temp);
@@ -58,7 +76,10 @@ export function SkillsMenu(t0) {
   } else {
     t1 = $[1];
   }
-  const skills = t1;
+  const allSkills = t1;
+  const skills = filterQuery
+    ? allSkills.filter((s: { name: string }) => s.name.toLowerCase().includes(filterQuery.toLowerCase()))
+    : allSkills;
   let groups;
   if ($[2] !== skills) {
     groups = {
@@ -99,29 +120,13 @@ export function SkillsMenu(t0) {
   }
   const handleCancel = t2;
   if (skills.length === 0) {
-    let t3;
-    if ($[6] === Symbol.for("react.memo_cache_sentinel")) {
-      t3 = <Text dimColor={true}>Create skills in .pandacc/skills/ or ~/.pandacc/skills/</Text>;
-      $[6] = t3;
-    } else {
-      t3 = $[6];
-    }
-    let t4;
-    if ($[7] === Symbol.for("react.memo_cache_sentinel")) {
-      t4 = <Text dimColor={true} italic={true}><ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="close" /></Text>;
-      $[7] = t4;
-    } else {
-      t4 = $[7];
-    }
-    let t5;
-    if ($[8] !== handleCancel) {
-      t5 = <Dialog title="Skills" subtitle="No skills found" onCancel={handleCancel} hideInputGuide={true}>{t3}{t4}</Dialog>;
-      $[8] = handleCancel;
-      $[9] = t5;
-    } else {
-      t5 = $[9];
-    }
-    return t5;
+    // Two empty states: filter mismatch vs. truly no skills installed.
+    const emptyBody = filterQuery
+      ? <Text dimColor={true}>No skills match &quot;{filterQuery}&quot;. Press backspace to edit filter.</Text>
+      : <Text dimColor={true}>Create skills in .pandacc/skills/ or ~/.pandacc/skills/</Text>;
+    const emptyHint = <Text dimColor={true} italic={true}><ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="close" /></Text>;
+    const emptySubtitle = filterQuery ? `Filter: ${filterQuery}` : "No skills found";
+    return <Dialog title="Skills" subtitle={emptySubtitle} onCancel={handleCancel} hideInputGuide={true}>{emptyBody}{emptyHint}</Dialog>;
   }
   const renderSkill = _temp3;
   let t3;
@@ -210,17 +215,13 @@ export function SkillsMenu(t0) {
   } else {
     t13 = $[30];
   }
-  let t14;
-  if ($[31] !== handleCancel || $[32] !== t12 || $[33] !== t6) {
-    t14 = <Dialog title="Skills" subtitle={t6} onCancel={handleCancel} hideInputGuide={true}>{t12}{t13}</Dialog>;
-    $[31] = handleCancel;
-    $[32] = t12;
-    $[33] = t6;
-    $[34] = t14;
-  } else {
-    t14 = $[34];
-  }
-  return t14;
+  // v2.1.121: live filter subtitle and hint — bypass memo cache because
+  // filterQuery is not tracked in the cell deps above.
+  const subtitleText = filterQuery
+    ? `${t6} · Filter: ${filterQuery}`
+    : t6;
+  const filterHint = <Text dimColor={true} italic={true}>{filterQuery ? "Type to filter · Backspace to edit · " : "Type to filter · "}<ConfigurableShortcutHint action="confirm:no" context="Confirmation" fallback="Esc" description="close" /></Text>;
+  return <Dialog title="Skills" subtitle={subtitleText} onCancel={handleCancel} hideInputGuide={true}>{t12}{filterHint}</Dialog>;
 }
 function _temp3(skill_0) {
   const estimatedTokens = estimateSkillFrontmatterTokens(skill_0);

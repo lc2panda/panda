@@ -1,3 +1,7 @@
+// Input: ScopedMcpServerConfig + transport（stdio/sse/http/ws/sdk/claudeai-proxy）
+// Output: 已连接 / 待重连 / 失败 / 需鉴权的 MCPServerConnection + 其 tool/command/resource 列表
+// Pos: services/mcp/ 中心枢纽，所有 MCP 连接 & 调用 & 工具同步都从此进/出
+// 一旦此处的连接/工具行为发生变化，请同步更新本头部注释，以及所属文件夹 README。
 import { feature } from 'bun:bundle'
 import type {
   Base64ImageSource,
@@ -958,6 +962,11 @@ export const connectToServer = memoize(
           args: finalArgs,
           env: {
             ...subprocessEnv(),
+            // v2.1.139: stdio MCP servers receive CLAUDE_PROJECT_DIR so they
+            // know the project root. Server-supplied `env` still wins on the
+            // off chance a user wants to override (rare, but consistent with
+            // how stdioRef.env shadows subprocessEnv).
+            CLAUDE_PROJECT_DIR: getOriginalCwd(),
             ...stdioRef.env,
           } as Record<string, string>,
           stderr: 'pipe', // prevents error output from the MCP server from printing to the UI
@@ -1793,7 +1802,12 @@ export const fetchToolsForClient = memoizeWithLRU(
                     .replace(/\s+/g, ' ')
                     .trim() || undefined
                 : undefined,
-            alwaysLoad: tool._meta?.['anthropic/alwaysLoad'] === true,
+            // v2.1.121: server-level `alwaysLoad: true` in mcp config promotes
+            // *every* tool to alwaysLoad (skip tool-search lazy loading). Per-tool
+            // `_meta['anthropic/alwaysLoad']` still wins individually.
+            alwaysLoad:
+              tool._meta?.['anthropic/alwaysLoad'] === true ||
+              (client.config as { alwaysLoad?: boolean }).alwaysLoad === true,
             async description() {
               return tool.description ?? ''
             },

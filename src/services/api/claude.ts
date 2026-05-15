@@ -891,6 +891,8 @@ export async function* executeNonStreamingRequest(
     model: string
     fetchOverride?: Options['fetchOverride']
     source: string
+    /** v2.1.139: subagent id surfaced in x-claude-code-agent-id header. */
+    agentId?: AgentId
   },
   retryOptions: {
     model: string
@@ -931,6 +933,11 @@ export async function* executeNonStreamingRequest(
       )
 
       try {
+        // v2.1.139: subagent tracking header on the non-streaming fallback path.
+        const subagentTrackingHeader: Record<string, string> | undefined =
+          clientOptions.agentId
+            ? { 'x-claude-code-agent-id': String(clientOptions.agentId) }
+            : undefined
         return await anthropic.beta.messages.create(
           {
             ...adjustedParams,
@@ -939,6 +946,7 @@ export async function* executeNonStreamingRequest(
           {
             signal: retryOptions.signal,
             timeout: fallbackTimeoutMs,
+            ...(subagentTrackingHeader && { headers: subagentTrackingHeader }),
           },
         )
       } catch (err) {
@@ -1980,13 +1988,22 @@ async function* queryModel(
         // Use raw stream instead of BetaMessageStream to avoid O(n²) partial JSON parsing
         // BetaMessageStream calls partialParse() on every input_json_delta, which we don't need
         // since we handle tool input accumulation ourselves
+        // v2.1.139: Subagent API requests carry x-claude-code-agent-id so server
+        // logs can correlate spawned subagent work. options.agentId is set only
+        // for subagents (main thread leaves it undefined and emits no header).
+        const subagentTrackingHeader: Record<string, string> = options.agentId
+          ? { 'x-claude-code-agent-id': String(options.agentId) }
+          : {}
         const result = await anthropic.beta.messages
           .create(
             { ...params, stream: true },
             {
               signal,
-              ...(clientRequestId && {
-                headers: { [CLIENT_REQUEST_ID_HEADER]: clientRequestId },
+              ...((clientRequestId || options.agentId) && {
+                headers: {
+                  ...(clientRequestId && { [CLIENT_REQUEST_ID_HEADER]: clientRequestId }),
+                  ...subagentTrackingHeader,
+                },
               }),
             },
           )
@@ -2730,7 +2747,7 @@ async function* queryModel(
           : 'other') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
       const result = yield* executeNonStreamingRequest(
-        { model: options.model, source: options.querySource },
+        { model: options.model, source: options.querySource, agentId: options.agentId },
         {
           model: options.model,
           fallbackModel: options.fallbackModel,
@@ -2826,7 +2843,7 @@ async function* queryModel(
       try {
         // Fall back to non-streaming mode
         const result = yield* executeNonStreamingRequest(
-          { model: options.model, source: options.querySource },
+          { model: options.model, source: options.querySource, agentId: options.agentId },
           {
             model: options.model,
             fallbackModel: options.fallbackModel,

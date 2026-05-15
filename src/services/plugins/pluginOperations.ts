@@ -1087,3 +1087,257 @@ async function performPluginUpdate({
     }
   }
 }
+
+// ============================================================================
+// Prune Operation (upstream v2.1.121)
+// ============================================================================
+
+/**
+ * 描述一个被判定为 "orphan auto-installed dependency" 的条目。
+ */
+export type OrphanPluginEntry = {
+  pluginId: string
+  reason: 'marketplace-missing' | 'plugin-delisted' | 'phantom-install'
+  /** 该 pluginId 在哪些 settings scope 的 enabledPlugins 里出现（如有） */
+  enabledScopes: Array<'userSettings' | 'projectSettings' | 'localSettings'>
+  /** 该 pluginId 在 installed_plugins.json 里的 V2 installations */
+  installations: Array<{
+    scope: PluginScope
+    projectPath?: string
+    installPath: string
+  }>
+}
+
+export type PrunePluginsResult = {
+  success: boolean
+  orphans: OrphanPluginEntry[]
+  removed: OrphanPluginEntry[]
+  message: string
+}
+
+/**
+ * 扫描 enabledPlugins + installed_plugins.json，找出所有 "孤儿自动安装依赖"。
+ *
+ * Orphan 判定（保守版 — 上游 v2.1.121 语义对齐）：
+ *   A) marketplace-missing：plugin id 形如 X@MKT，但 known_marketplaces.json
+ *      已无 MKT。常见触发：用户 `claude plugin marketplace remove MKT` 后，
+ *      若曾把 X@MKT 写到非默认 scope，cleanup 可能漏；或手工编辑 settings。
+ *   B) plugin-delisted：MKT 仍在，但 marketplace 加载后已无 X 这一项。
+ *   C) phantom-install：installed_plugins.json 中有 X@MKT 的 V2 安装记录，
+ *      但所有 scope 的 enabledPlugins 都没引用它。
+ *
+ * NOT included（保守起见）：
+ *   • 仅作为某 root 的 manifest dependency 被引入、root 已 disable 的依赖。
+ *     panda 当前 schema 没有 install_source 字段，无法可靠区分用户显式安装
+ *     vs 自动闭包安装；强行猜测会误删。后续可在 dependencyResolver 引入元
+ *     数据后扩展。
+ */
+export async function findOrphanedPlugins(): Promise<OrphanPluginEntry[]> {
+  const marketplaces = await loadKnownMarketplacesConfig()
+  const knownMarketplaceNames = new Set(Object.keys(marketplaces))
+
+  // 缓存每个 marketplace 的 plugin name 集合，避免重复 IO
+  const marketplacePluginsCache = new Map<string, Set<string> | null>()
+  async function getMarketplacePluginNames(name: string): Promise<Set<string> | null> {
+    if (marketplacePluginsCache.has(name)) {
+      return marketplacePluginsCache.get(name)!
+    }
+    try {
+      const mkt = await getMarketplace(name)
+      const set: Set<string> = new Set(
+        (mkt.plugins as Array<{ name: string }>).map(p => p.name),
+      )
+      marketplacePluginsCache.set(name, set)
+      return set
+    } catch {
+      // marketplace 数据无法加载（损坏 / 网络 / 文件缺失）— 不算 delisted，
+      // 也不算 marketplace-missing（条目还在）；保守跳过该 marketplace 下的判定。
+      marketplacePluginsCache.set(name, null)
+      return null
+    }
+  }
+
+  // 收集所有 enabledPlugins 出现的 pluginId 及其所在 scope
+  const editableSources: Array<
+    'userSettings' | 'projectSettings' | 'localSettings'
+  > = ['userSettings', 'projectSettings', 'localSettings']
+  const enabledIdToScopes = new Map<
+    string,
+    Set<'userSettings' | 'projectSettings' | 'localSettings'>
+  >()
+  for (const src of editableSources) {
+    const settings = getSettingsForSource(src)
+    const enabledMap = settings?.enabledPlugins
+    if (!enabledMap) continue
+    for (const pluginId of Object.keys(enabledMap)) {
+      const v = enabledMap[pluginId]
+      // 只关心被 enable 的（true 或 string[] 都算），false 跳过
+      if (v === false) continue
+      if (!enabledIdToScopes.has(pluginId)) {
+        enabledIdToScopes.set(pluginId, new Set())
+      }
+      enabledIdToScopes.get(pluginId)!.add(src)
+    }
+  }
+
+  // 收集 installed_plugins.json 中的所有 plugin id
+  const installedData = loadInstalledPluginsV2()
+  const installedIds = new Set(Object.keys(installedData.plugins))
+
+  const orphans: OrphanPluginEntry[] = []
+
+  // 检查所有 enabled 的 plugin
+  for (const [pluginId, scopes] of enabledIdToScopes) {
+    const { marketplace } = parsePluginIdentifier(pluginId)
+    // 内建插件没 @ 后缀 — 跳过（builtin 不可能是 orphan）
+    if (!marketplace) continue
+
+    let reason: OrphanPluginEntry['reason'] | null = null
+    if (!knownMarketplaceNames.has(marketplace)) {
+      reason = 'marketplace-missing'
+    } else {
+      const pluginNames = await getMarketplacePluginNames(marketplace)
+      if (pluginNames) {
+        const { name } = parsePluginIdentifier(pluginId)
+        if (!pluginNames.has(name)) {
+          reason = 'plugin-delisted'
+        }
+      }
+    }
+    if (!reason) continue
+
+    const installations = (installedData.plugins[pluginId] ?? []).map(i => ({
+      scope: i.scope,
+      projectPath: i.projectPath,
+      installPath: i.installPath,
+    }))
+    orphans.push({
+      pluginId,
+      reason,
+      enabledScopes: Array.from(scopes),
+      installations,
+    })
+  }
+
+  // 检查 phantom-install：installed_plugins 中有，但所有 scope 的 enabledPlugins 都没引用
+  for (const pluginId of installedIds) {
+    if (enabledIdToScopes.has(pluginId)) continue
+    // 跳过已被前面循环收录的（不会发生因为 enabledIdToScopes 没收录）
+    const installations = (installedData.plugins[pluginId] ?? []).map(i => ({
+      scope: i.scope,
+      projectPath: i.projectPath,
+      installPath: i.installPath,
+    }))
+    if (installations.length === 0) continue
+    orphans.push({
+      pluginId,
+      reason: 'phantom-install',
+      enabledScopes: [],
+      installations,
+    })
+  }
+
+  return orphans
+}
+
+/**
+ * 对扫描出的 orphans 执行清理：
+ *   • 从对应 scope 的 enabledPlugins 删除 key
+ *   • 从 installed_plugins.json 删除该 pluginId 的所有 installation
+ *   • 标记缓存版本目录为 orphaned（已有 GC 7 天回收，符合现有约定）
+ *   • 删除 plugin secrets / config / data dir
+ *
+ * dryRun = true 时只返回 orphans 列表不实际改任何东西。
+ */
+export async function prunePluginsOp(options: {
+  dryRun?: boolean
+} = {}): Promise<PrunePluginsResult> {
+  const orphans = await findOrphanedPlugins()
+  if (orphans.length === 0) {
+    return {
+      success: true,
+      orphans: [],
+      removed: [],
+      message: 'No orphan plugins found.',
+    }
+  }
+  if (options.dryRun) {
+    return {
+      success: true,
+      orphans,
+      removed: [],
+      message: `Found ${orphans.length} orphan ${plural(orphans.length, 'plugin')} (dry run, nothing removed).`,
+    }
+  }
+
+  const removed: OrphanPluginEntry[] = []
+  const editableSources: Array<
+    'userSettings' | 'projectSettings' | 'localSettings'
+  > = ['userSettings', 'projectSettings', 'localSettings']
+
+  for (const orphan of orphans) {
+    // 1) settings: 删除 enabledPlugins 中该 key
+    for (const src of orphan.enabledScopes) {
+      const settings = getSettingsForSource(src)
+      const enabledMap = settings?.enabledPlugins
+      if (!enabledMap || !(orphan.pluginId in enabledMap)) continue
+      const newEnabled: Record<string, boolean | string[] | undefined> = {
+        ...enabledMap,
+      }
+      newEnabled[orphan.pluginId] = undefined
+      const { error } = updateSettingsForSource(src, {
+        enabledPlugins: newEnabled,
+      })
+      if (error) {
+        logError(error)
+      }
+    }
+
+    // 2) installed_plugins.json: 删每个 installation
+    for (const inst of orphan.installations) {
+      // managed scope 来自只读元数据，不应该被 panda 改写 — 跳过
+      if (inst.scope === 'managed') continue
+      try {
+        removePluginInstallation(
+          orphan.pluginId,
+          inst.scope as 'user' | 'project' | 'local',
+          inst.projectPath,
+        )
+      } catch (err) {
+        logError(toError(err))
+      }
+    }
+
+    // 3) 标记 versioned cache 目录为 orphaned（7d GC 会清掉）
+    for (const inst of orphan.installations) {
+      try {
+        await markPluginVersionOrphaned(inst.installPath)
+      } catch {
+        // best-effort
+      }
+    }
+
+    // 4) 清理 plugin options / secrets / data dir（与 uninstall 行为一致）
+    try {
+      deletePluginOptions(orphan.pluginId)
+    } catch (err) {
+      logError(toError(err))
+    }
+    try {
+      await deletePluginDataDir(orphan.pluginId)
+    } catch (err) {
+      logError(toError(err))
+    }
+
+    removed.push(orphan)
+  }
+
+  clearAllCaches()
+
+  return {
+    success: true,
+    orphans,
+    removed,
+    message: `Removed ${removed.length} orphan ${plural(removed.length, 'plugin')}.`,
+  }
+}

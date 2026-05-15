@@ -29,15 +29,34 @@ const IfConditionSchema = lazySchema(() =>
 // Internal factory for individual hook schemas (shared between exported
 // discriminated union members and the HookCommandSchema factory)
 function buildHookSchemas() {
+  // [v2.1.139] Hooks may use either `command` (shell-interpreted string) OR
+  // `args` (exec-form argv array, no shell). `args[0]` is the executable;
+  // remaining items are passed verbatim — path occurrences with spaces don't
+  // need shell quoting, $tool_name / $file_path placeholders are substituted
+  // before spawn. Exactly one of the two must be set; cross-field validation
+  // applied at the outer schema level (discriminatedUnion requires pure
+  // ZodObject members, so the .refine() lives below the union).
   const BashCommandHookSchema = z.object({
     type: z.literal('command').describe('Shell command hook type'),
-    command: z.string().describe('Shell command to execute'),
+    command: z
+      .string()
+      .optional()
+      .describe(
+        'Shell command to execute (interpreted by bash/pwsh). Mutually exclusive with `args`.',
+      ),
+    args: z
+      .array(z.string())
+      .min(1)
+      .optional()
+      .describe(
+        'Exec-form argv array: args[0] is the executable, remaining items are passed verbatim (no shell interpretation). Placeholders like $tool_name / $file_path / $CLAUDE_PROJECT_DIR are substituted per-arg before spawn. Mutually exclusive with `command`.',
+      ),
     if: IfConditionSchema(),
     shell: z
       .enum(SHELL_TYPES)
       .optional()
       .describe(
-        "Shell interpreter. 'bash' uses your $SHELL (bash/zsh/sh); 'powershell' uses pwsh. Defaults to bash.",
+        "Shell interpreter (string-form only). 'bash' uses your $SHELL (bash/zsh/sh); 'powershell' uses pwsh. Defaults to bash. Ignored when `args` is set.",
       ),
     timeout: z
       .number()
@@ -67,7 +86,17 @@ function buildHookSchemas() {
   const PromptHookSchema = z.object({
     type: z.literal('prompt').describe('LLM prompt hook type'),
     prompt: z
-      .string()
+      .string({
+        // [v2.1.142] Clearer error when the `prompt` field is missing/non-string.
+        // Without this override Zod returns "Invalid input: expected string,
+        // received undefined" with no hint about which hook type.
+        message:
+          'Prompt hook (type: "prompt") requires a string `prompt` field describing what the LLM should evaluate. Use $ARGUMENTS to include the hook input JSON.',
+      })
+      .min(1, {
+        message:
+          'Prompt hook `prompt` cannot be empty. Provide instructions for the LLM (e.g. "Decide if the diff should be auto-reverted").',
+      })
       .describe(
         'Prompt to evaluate with LLM. Use $ARGUMENTS placeholder for hook input JSON.',
       ),
@@ -136,7 +165,15 @@ function buildHookSchemas() {
     // has since been refactored into VerifyPlanExecutionTool, which no
     // longer constructs AgentHook objects at all.
     prompt: z
-      .string()
+      .string({
+        // [v2.1.142] Clearer error when the `prompt` field is missing/non-string.
+        message:
+          'Agent hook (type: "agent") requires a string `prompt` field describing the verification criterion (e.g. "Verify that unit tests ran and passed."). Use $ARGUMENTS to include the hook input JSON.',
+      })
+      .min(1, {
+        message:
+          'Agent hook `prompt` cannot be empty. Provide a clear verification criterion.',
+      })
       .describe(
         'Prompt describing what to verify (e.g. "Verify that unit tests ran and passed."). Use $ARGUMENTS placeholder for hook input JSON.',
       ),
@@ -207,6 +244,11 @@ function buildHookSchemas() {
 
 /**
  * Schema for hook command (excludes function hooks - they can't be persisted)
+ *
+ * The discriminatedUnion handles type-routing; the outer .superRefine() applies
+ * cross-field invariants that discriminatedUnion members can't express (Zod
+ * requires pure ZodObject members in a discriminatedUnion). Currently enforces
+ * the `command` ⊕ `args` exclusivity introduced in v2.1.139.
  */
 export const HookCommandSchema = lazySchema(() => {
   const {
@@ -216,13 +258,39 @@ export const HookCommandSchema = lazySchema(() => {
     HttpHookSchema,
     McpToolHookSchema,
   } = buildHookSchemas()
-  return z.discriminatedUnion('type', [
-    BashCommandHookSchema,
-    PromptHookSchema,
-    AgentHookSchema,
-    HttpHookSchema,
-    McpToolHookSchema,
-  ])
+  return z
+    .discriminatedUnion('type', [
+      BashCommandHookSchema,
+      PromptHookSchema,
+      AgentHookSchema,
+      HttpHookSchema,
+      McpToolHookSchema,
+    ])
+    .superRefine((value, ctx) => {
+      // [v2.1.139] Cross-field validation for the command hook variant: exactly
+      // one of `command` / `args` must be set. Setting both is ambiguous (which
+      // would actually run?); setting neither leaves nothing to spawn. We do
+      // this at union level — putting .refine() on the inner schema would break
+      // discriminatedUnion (Zod requires pure ZodObject members).
+      if (value.type !== 'command') return
+      const hasCommand = typeof value.command === 'string' && value.command.length > 0
+      const hasArgs = Array.isArray(value.args) && value.args.length > 0
+      if (hasCommand && hasArgs) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['args'],
+          message:
+            'Command hook may set EITHER `command` (shell-string form) OR `args` (exec-form argv array), not both. Pick one: use `command` when you need shell features (pipes, redirects, glob); use `args` for safe path-with-spaces / no-shell-interpretation calls.',
+        })
+      } else if (!hasCommand && !hasArgs) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['command'],
+          message:
+            'Command hook requires either `command` (shell-interpreted string) or `args` (exec-form argv array). Neither is set — the hook has nothing to run.',
+        })
+      }
+    })
 })
 
 /**

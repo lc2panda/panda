@@ -65,6 +65,14 @@ export type JumpHandle = {
    *  re-establishes via step()→jump(). Wired from ScrollKeybindingHandler's
    *  onScroll — only fires for keyboard/wheel, not programmatic scrollTo. */
   disarmSearch: () => void;
+  /** less/vim `{` — jump to the previous user-prompt boundary (the
+   *  message rendered with the ❯ prefix). Boundary detection mirrors
+   *  StickyTracker via stickyPromptText(). The nearest boundary STRICTLY
+   *  ABOVE current scrollTop is the target; idempotent at top. */
+  jumpToPrevPrompt: () => void;
+  /** less/vim `}` — jump to the next user-prompt boundary. Nearest
+   *  boundary STRICTLY BELOW current scrollTop. Idempotent at bottom. */
+  jumpToNextPrompt: () => void;
 };
 type Props = {
   messages: RenderableMessage[];
@@ -793,6 +801,61 @@ export function VirtualMessageList({
         positions: []
       };
       startPtrRef.current = -1;
+    },
+    // less/vim `{` and `}` — prompt-boundary navigation. stickyPromptText
+    // returns non-null exactly for human-authored user prompts (❯-prefixed
+    // rows). Same predicate the sticky header walks, so the boundaries the
+    // user SEES at the top of the viewport are the same ones we jump to.
+    // Idempotent at edges (no boundary found → no-op).
+    //
+    // Uses offsets[]+listOrigin (NOT getItemTop) for position lookup —
+    // getItemTop returns -1 for non-mounted items, and only ~60 items are
+    // mounted out of potentially 9k messages. offsets[]+origin is the same
+    // estimate scrollToIndex uses; landing point may be off by a few rows
+    // until the target mounts and Yoga measures it, but the message is in
+    // the viewport. setSearchQuery uses the same origin-recovery trick at
+    // line 745–746.
+    jumpToPrevPrompt: () => {
+      const s = scrollRef.current;
+      if (!s) return;
+      const { messages: msgs, offsets, start, getItemTop } = jumpState.current;
+      const curTop = s.getScrollTop() + s.getPendingDelta();
+      const firstTop = getItemTop(start);
+      const origin = firstTop >= 0 ? firstTop - offsets[start]! : 0;
+      // Strict-above guard with 1-row tolerance: if we're already exactly
+      // at a boundary, `{` should land on the PRIOR one (less semantics).
+      let targetIdx = -1;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (stickyPromptText(msgs[i]!) === null) continue;
+        const target = Math.max(0, origin + offsets[i]! - HEADROOM);
+        if (target < curTop - 1) {
+          targetIdx = i;
+          break;
+        }
+      }
+      if (targetIdx >= 0) {
+        s.scrollTo(targetFor(targetIdx));
+      }
+    },
+    jumpToNextPrompt: () => {
+      const s = scrollRef.current;
+      if (!s) return;
+      const { messages: msgs, offsets, start, getItemTop } = jumpState.current;
+      const curTop = s.getScrollTop() + s.getPendingDelta();
+      const firstTop = getItemTop(start);
+      const origin = firstTop >= 0 ? firstTop - offsets[start]! : 0;
+      let targetIdx = -1;
+      for (let i = 0; i < msgs.length; i++) {
+        if (stickyPromptText(msgs[i]!) === null) continue;
+        const target = Math.max(0, origin + offsets[i]! - HEADROOM);
+        if (target > curTop + 1) {
+          targetIdx = i;
+          break;
+        }
+      }
+      if (targetIdx >= 0) {
+        s.scrollTo(targetFor(targetIdx));
+      }
     },
     warmSearchIndex: async () => {
       if (indexWarmed.current) return 0;

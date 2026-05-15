@@ -325,6 +325,50 @@ export type RecompactionInfo = {
 }
 
 /**
+ * Pre-trim messages by approximately `overflowTokens` worth from the head
+ * before the first summarize attempt. Mirrors the post-PTL retry path
+ * (truncateHeadForPTLRetry) but runs once upfront when the caller already
+ * knows the request will overflow — avoids a wasted near-full-context
+ * compact API call that we know is going to PTL.
+ *
+ * v2.1.142 (upstream): "Improved reactive compaction: first summarize
+ * attempt now seeds from the original request's overflow size".
+ *
+ * Returns the original messages when the gap is undefined/zero or when
+ * trimming would leave an empty summarize set.
+ */
+function seedFromOverflow(
+  messages: Message[],
+  overflowTokens: number | undefined,
+): Message[] {
+  if (!overflowTokens || overflowTokens <= 0) return messages
+  const groups = groupMessagesByApiRound(messages)
+  if (groups.length < 2) return messages
+
+  let acc = 0
+  let dropCount = 0
+  for (const g of groups) {
+    acc += roughTokenCountEstimationForMessages(
+      g as Parameters<typeof roughTokenCountEstimationForMessages>[0],
+    )
+    dropCount++
+    if (acc >= overflowTokens) break
+  }
+  // Always keep at least one group so there's something to summarize.
+  dropCount = Math.min(dropCount, groups.length - 1)
+  if (dropCount < 1) return messages
+
+  const sliced = groups.slice(dropCount).flat()
+  if (sliced[0]?.type === 'assistant') {
+    return [
+      createUserMessage({ content: PTL_RETRY_MARKER, isMeta: true }),
+      ...sliced,
+    ]
+  }
+  return sliced
+}
+
+/**
  * Build the base post-compact messages array from a CompactionResult.
  * This ensures consistent ordering across all compaction paths.
  * Order: boundaryMarker, summaryMessages, messagesToKeep, attachments, hookResults
@@ -385,6 +429,12 @@ export function mergeHookInstructions(
 /**
  * Creates a compact version of a conversation by summarizing older messages
  * and preserving recent conversation history.
+ *
+ * @param overflowTokenGap When the caller already knows the original request
+ *   overflowed the context (e.g. reactive path saw a PTL response), pass the
+ *   `actualTokens - limitTokens` gap. The first summarize attempt seeds from a
+ *   pre-trimmed message set covering that gap, avoiding a wasted near-full-
+ *   context retry. v2.1.142 upstream improvement.
  */
 export async function compactConversation(
   messages: Message[],
@@ -394,6 +444,7 @@ export async function compactConversation(
   customInstructions?: string,
   isAutoCompact: boolean = false,
   recompactionInfo?: RecompactionInfo,
+  overflowTokenGap?: number,
 ): Promise<CompactionResult> {
   try {
     if (messages.length === 0) {
@@ -444,8 +495,23 @@ export async function compactConversation(
       content: compactPrompt,
     })
 
-    let messagesToSummarize = messages
-    let retryCacheSafeParams = cacheSafeParams
+    // v2.1.142: when the caller already knows the original request overflowed
+    // (PTL response observed), pre-trim by the overflow gap before the first
+    // attempt. Saves one wasted near-full-context compact API call that we
+    // already know will PTL.
+    const seededMessages = seedFromOverflow(messages, overflowTokenGap)
+    let messagesToSummarize = seededMessages
+    let retryCacheSafeParams =
+      seededMessages !== messages
+        ? { ...cacheSafeParams, forkContextMessages: seededMessages }
+        : cacheSafeParams
+    if (seededMessages !== messages) {
+      logEvent('tengu_compact_overflow_seeded', {
+        droppedMessages: messages.length - seededMessages.length,
+        remainingMessages: seededMessages.length,
+        overflowTokenGap,
+      })
+    }
     let summaryResponse: AssistantMessage
     let summary: string | null
     let ptlAttempts = 0

@@ -742,13 +742,72 @@ function loadSettingsFromDisk(): SettingsWithErrors {
           policyErrors.push(...hkcu.errors)
         }
 
+        // v2.1.133: parentSettingsBehavior admin key controls how managed
+        // settings merge with non-managed sources.
+        //   'merge'    — deep-merge (default, current behavior).
+        //   'override' — managed wins outright: any non-managed top-level key
+        //                that managed also defines is wiped before the merge,
+        //                so the managed value lands as-is instead of being
+        //                deep-merged with non-managed leftovers.
+        //   'ignore'   — managed values are dropped for keys the user has
+        //                already set elsewhere; missing keys still come from
+        //                managed.
+        // Only honored when set in policySettings itself (the very source we
+        // are about to merge) to keep this an admin-only knob.
+        const parentBehavior = (
+          policySettings as Record<string, unknown> | null
+        )?.parentSettingsBehavior as
+          | 'override'
+          | 'merge'
+          | 'ignore'
+          | undefined
+
         // Merge the winning policy source into the settings chain
         if (policySettings) {
-          mergedSettings = mergeWith(
-            mergedSettings,
-            policySettings,
-            settingsMergeCustomizer,
-          )
+          if (parentBehavior === 'override') {
+            // Strip managed-defined top-level keys from the accumulated
+            // mergedSettings so policy's values win wholesale instead of
+            // deep-merging. Equivalent to "managed settings replace, not
+            // merge".
+            const stripped = mergedSettings as Record<string, unknown>
+            for (const key of Object.keys(policySettings)) {
+              delete stripped[key]
+            }
+            mergedSettings = mergeWith(
+              mergedSettings,
+              policySettings,
+              settingsMergeCustomizer,
+            )
+          } else if (parentBehavior === 'ignore') {
+            // Only merge keys that aren't already set by another source.
+            const filtered: Record<string, unknown> = {}
+            const baseKeys = new Set(
+              Object.keys(mergedSettings as Record<string, unknown>),
+            )
+            for (const [key, value] of Object.entries(policySettings)) {
+              if (!baseKeys.has(key)) {
+                filtered[key] = value
+              }
+            }
+            mergedSettings = mergeWith(
+              mergedSettings,
+              filtered as SettingsJson,
+              settingsMergeCustomizer,
+            )
+          } else {
+            // Default 'merge' (and any value other than the three above) —
+            // deep-merge as before.
+            mergedSettings = mergeWith(
+              mergedSettings,
+              policySettings,
+              settingsMergeCustomizer,
+            )
+          }
+          if (parentBehavior) {
+            logForDebugging(
+              `[managed-settings] parentSettingsBehavior=${parentBehavior} applied`,
+            )
+          }
         }
         for (const error of policyErrors) {
           const errorKey = `${error.file}:${error.path}:${error.message}`
@@ -957,18 +1016,25 @@ export function getUseAutoModeDuringPlan(): boolean {
  * otherwise inject classifier allow/deny rules (RCE risk).
  */
 export function getAutoModeConfig():
-  | { allow?: string[]; soft_deny?: string[]; environment?: string[] }
+  | {
+      allow?: string[]
+      soft_deny?: string[]
+      hard_deny?: string[]
+      environment?: string[]
+    }
   | undefined {
   if (feature('TRANSCRIPT_CLASSIFIER')) {
     const schema = z.object({
       allow: z.array(z.string()).optional(),
       soft_deny: z.array(z.string()).optional(),
+      hard_deny: z.array(z.string()).optional(),
       deny: z.array(z.string()).optional(),
       environment: z.array(z.string()).optional(),
     })
 
     const allow: string[] = []
     const soft_deny: string[] = []
+    const hard_deny: string[] = []
     const environment: string[] = []
 
     for (const source of [
@@ -985,6 +1051,7 @@ export function getAutoModeConfig():
       if (result.success) {
         if (result.data.allow) allow.push(...result.data.allow)
         if (result.data.soft_deny) soft_deny.push(...result.data.soft_deny)
+        if (result.data.hard_deny) hard_deny.push(...result.data.hard_deny)
         if (process.env.USER_TYPE === 'ant') {
           if (result.data.deny) soft_deny.push(...result.data.deny)
         }
@@ -993,10 +1060,16 @@ export function getAutoModeConfig():
       }
     }
 
-    if (allow.length > 0 || soft_deny.length > 0 || environment.length > 0) {
+    if (
+      allow.length > 0 ||
+      soft_deny.length > 0 ||
+      hard_deny.length > 0 ||
+      environment.length > 0
+    ) {
       return {
         ...(allow.length > 0 && { allow }),
         ...(soft_deny.length > 0 && { soft_deny }),
+        ...(hard_deny.length > 0 && { hard_deny }),
         ...(environment.length > 0 && { environment }),
       }
     }

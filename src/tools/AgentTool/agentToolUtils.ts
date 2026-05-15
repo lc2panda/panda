@@ -67,6 +67,40 @@ export type ResolvedAgentTools = {
   allowedAgentTypes?: string[]
 }
 
+/**
+ * Normalize a subagent_type string for case- and separator-insensitive matching.
+ * Input:  user-supplied subagent_type (e.g., "Code Reviewer", "code_reviewer", "CODE-REVIEWER")
+ * Output: lowercase ascii with runs of [-_\s]+ collapsed to a single "-"
+ * Pos:    src/tools/AgentTool/agentToolUtils.ts — used by AgentTool.tsx call() to
+ *         resolve effectiveType against agent registry (v2.1.140 upstream parity).
+ */
+export function normalizeAgentType(input: string | undefined): string | undefined {
+  if (input === undefined) return undefined
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[-_\s]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+/**
+ * Find an agent in `agents` whose agentType matches `requested` under the
+ * normalized comparison defined by normalizeAgentType. Returns undefined if
+ * no match. Exact (case-sensitive) match is checked first to short-circuit
+ * the common path and to disambiguate when two registered agents normalize
+ * to the same key.
+ */
+export function findAgentByLooseType<T extends { agentType: string }>(
+  agents: readonly T[],
+  requested: string,
+): T | undefined {
+  const exact = agents.find(a => a.agentType === requested)
+  if (exact) return exact
+  const normalized = normalizeAgentType(requested)
+  if (!normalized) return undefined
+  return agents.find(a => normalizeAgentType(a.agentType) === normalized)
+}
+
 export function filterToolsForAgent({
   tools,
   isBuiltIn,

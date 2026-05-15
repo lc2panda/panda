@@ -1,3 +1,8 @@
+// Input: slash invocation /web-setup (no args)
+// Output: gh token POST → sync_user_tokens, browser opened to claude.ai/code
+// Pos: registered as webCmd in src/commands.ts under CCR_REMOTE_SETUP flag.
+//      v2.1.142: shows explicit overwrite warning before replacing an existing
+//      web-side GitHub connection (upsert on sync_user_tokens is silent).
 import { execa } from 'execa';
 import * as React from 'react';
 import { useEffect, useState } from 'react';
@@ -74,6 +79,9 @@ function errorMessage(err: ImportTokenError, codeUrl: string): string {
 type Step = {
   name: 'checking';
 } | {
+  name: 'overwrite-warning';
+  token: RedactedGithubToken;
+} | {
   name: 'confirm';
   token: RedactedGithubToken;
 } | {
@@ -109,8 +117,11 @@ function Web({
             return;
           }
         case 'has_gh_token':
+          // v2.1.142: before posting the token (server-side does an upsert on
+          // sync_user_tokens, silently replacing any existing connection), warn
+          // users so they understand the implication on multi-account setups.
           setStep({
-            name: 'confirm',
+            name: 'overwrite-warning',
             token: result.token
           });
       }
@@ -157,6 +168,43 @@ function Web({
     return <LoadingState message="Connecting GitHub to Claude…" />;
   }
   const token = step.token;
+  if (step.name === 'overwrite-warning') {
+    // v2.1.142: explicit warning before the server upserts the token. The
+    // backend stores one GitHub connection per user; re-running /web-setup
+    // with a different gh login would silently replace it. Force a confirm.
+    return <Dialog title="Replace existing GitHub connection?" onCancel={handleCancel} hideInputGuide>
+        <Box flexDirection="column">
+          <Text>
+            If you have already connected GitHub on the web, running this
+            command will <Text bold>replace</Text> that connection with your
+            current <Text bold>gh auth</Text> token.
+          </Text>
+          <Text dimColor>
+            Multi-account users: confirm `gh auth status` shows the GitHub user
+            you actually want linked to Claude on the web.
+          </Text>
+        </Box>
+        <Select options={[{
+        label: 'Replace connection (proceed)',
+        value: 'continue'
+      }, {
+        label: 'Cancel',
+        value: 'cancel'
+      }]} onChange={value => {
+        if (value === 'continue') {
+          setStep({
+            name: 'confirm',
+            token
+          });
+        } else {
+          logEvent('tengu_remote_setup_result', {
+            result: 'cancelled_overwrite_warning' as SafeString
+          });
+          handleCancel();
+        }
+      }} onCancel={handleCancel} />
+      </Dialog>;
+  }
   return <Dialog title="Connect Claude on the web to GitHub?" onCancel={handleCancel} hideInputGuide>
       <Box flexDirection="column">
         <Text>

@@ -200,6 +200,59 @@ export function isValidNumericEffort(value: number): boolean {
   return Number.isInteger(value)
 }
 
+/**
+ * [v2.1.133] Shape exposed to hook subprocesses via the `effort` field of the
+ * hook input JSON. `enabled` is true when the user / model / env-override has
+ * actively chosen an effort level (so hook scripts can branch on intent), and
+ * false when the request falls back to the model's implicit default.
+ *
+ * The numeric `level` mirrors what the CLI passes to the API: 0 (low), 1
+ * (medium), 2 (high), 3 (max). This matches upstream v2.1.133 semantics.
+ */
+export interface HookEffortField {
+  level: number
+  enabled: boolean
+}
+
+const EFFORT_LEVEL_TO_NUMERIC: Record<EffortLevel, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  max: 3,
+}
+
+/**
+ * Resolve the effort signal that should be exposed to hooks for the current
+ * session. Returns `{ level, enabled }` with `enabled` reflecting whether the
+ * effort came from explicit configuration rather than the implicit default.
+ */
+export function resolveHookEffortField(
+  appStateEffortValue: EffortValue | undefined,
+): HookEffortField {
+  const envOverride = getEffortEnvOverride()
+  // env='unset' / 'auto' → effort intentionally suppressed
+  if (envOverride === null) {
+    return { level: EFFORT_LEVEL_TO_NUMERIC.high, enabled: false }
+  }
+  const explicit = envOverride ?? appStateEffortValue
+  if (explicit !== undefined) {
+    return {
+      level: EFFORT_LEVEL_TO_NUMERIC[convertEffortValueToLevel(explicit)],
+      enabled: true,
+    }
+  }
+  return { level: EFFORT_LEVEL_TO_NUMERIC.high, enabled: false }
+}
+
+/**
+ * Stringified effort level for `CLAUDE_EFFORT` env var that hook subprocesses
+ * read. Matches the value emitted in the hook input JSON's `effort.level`
+ * field (so a hook can use either source interchangeably).
+ */
+export function effortFieldToEnvValue(field: HookEffortField): string {
+  return String(field.level)
+}
+
 export function convertEffortValueToLevel(value: EffortValue): EffortLevel {
   if (typeof value === 'string') {
     // Runtime guard: value may come from remote config (GrowthBook) where

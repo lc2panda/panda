@@ -296,17 +296,32 @@ export function computeWheelStep(state: WheelAccelState, dir: 1 | -1, now: numbe
   return rows;
 }
 
-/** Read CLAUDE_CODE_SCROLL_SPEED, default 1, clamp (0, 20].
- *  Some terminals pre-multiply wheel events (ghostty discrete=3, iTerm2
- *  "faster scroll") — base=1 is correct there. Others send 1 event/notch —
- *  set CLAUDE_CODE_SCROLL_SPEED=3 to match vim/nvim/opencode. We can't
- *  detect which kind of terminal we're in, hence the knob. Called lazily
- *  from initAndLogWheelAccel so globalSettings.env has loaded. */
+/** Read scroll-speed baseline. Order:
+ *  1. CLAUDE_CODE_SCROLL_SPEED env (one-shot override, wins for the session)
+ *  2. global config `scrollSpeed` (persisted via /scroll-speed command, v2.1.139)
+ *  3. default 1
+ *  Clamp (0, 20]. Some terminals pre-multiply wheel events (ghostty
+ *  discrete=3, iTerm2 "faster scroll") — base=1 is correct there. Others
+ *  send 1 event/notch — set a higher value to match vim/nvim/opencode.
+ *  Called lazily from initAndLogWheelAccel so globalSettings.env has loaded. */
 export function readScrollSpeedBase(): number {
   const raw = process.env.CLAUDE_CODE_SCROLL_SPEED;
-  if (!raw) return 1;
-  const n = parseFloat(raw);
-  return Number.isNaN(n) || n <= 0 ? 1 : Math.min(n, 20);
+  if (raw) {
+    const n = parseFloat(raw);
+    if (!Number.isNaN(n) && n > 0) return Math.min(n, 20);
+  }
+  // Config read is best-effort — never crash wheel-init if the config file
+  // is corrupt. require() so this module stays loadable in pre-config-cache
+  // bootstrap paths (tests, headless tooling).
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getGlobalConfig } = require('../utils/config.js') as typeof import('../utils/config.js');
+    const stored = getGlobalConfig().scrollSpeed;
+    if (typeof stored === 'number' && stored > 0) return Math.min(stored, 20);
+  } catch {
+    // fallthrough to default
+  }
+  return 1;
 }
 
 /** Initial wheel accel state. xtermJs=true selects the decay curve.

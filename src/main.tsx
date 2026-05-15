@@ -980,10 +980,38 @@ async function run(): Promise<CommanderCommand> {
     // before .option('--plugin-dir', ...) in the chain — extra-typings
     // builds the type as options are added. Narrow with a runtime guard;
     // the collect accumulator + [] default guarantee string[] in practice.
+    //
+    // v2.1.128 / v2.1.129：--plugin-dir 现在也接受 .zip 文件路径，--plugin-url
+    // 拉远程 https://*.zip。两者都汇入 inline plugins 列表，loadSessionOnlyPlugins
+    // 内部通过 resolvePluginDirSource() 统一解压/缓存。安全门在 pluginArchiveLoader.ts
+    // 里：URL 必须 https://、必须 .zip、最大 100MB、解压走 unzipFile 路径遍历检测。
     const pluginDir = thisCommand.getOptionValue('pluginDir');
-    if (Array.isArray(pluginDir) && pluginDir.length > 0 && pluginDir.every(p => typeof p === 'string')) {
-      setInlinePlugins(pluginDir);
-      clearPluginCache('preAction: --plugin-dir inline plugins');
+    const pluginUrl = thisCommand.getOptionValue('pluginUrl');
+    const inlineSources: string[] = [];
+    if (Array.isArray(pluginDir) && pluginDir.every(p => typeof p === 'string')) {
+      inlineSources.push(...pluginDir);
+    }
+    if (Array.isArray(pluginUrl) && pluginUrl.every(p => typeof p === 'string')) {
+      // 提前校验 URL，失败立即用 stderr 提示并跳过 — 不传给 loader 也能 fail-fast
+      const { validatePluginUrl } = await import('./utils/plugins/pluginArchiveLoader.js');
+      for (const u of pluginUrl) {
+        const v = validatePluginUrl(u);
+        if (v.ok !== true) {
+          const reason = (v as { ok: false; reason: string }).reason;
+          process.stderr.write(`Ignoring --plugin-url: ${reason}\n`);
+          continue;
+        }
+        inlineSources.push(u);
+      }
+    }
+    if (inlineSources.length > 0) {
+      setInlinePlugins(inlineSources);
+      clearPluginCache('preAction: --plugin-dir / --plugin-url inline plugins');
+      // 注册退出清理 — 任何被解压到 os.tmpdir() 的归档目录都在这里回收。
+      // 失败容错；registerCleanup 内部以 Set 存储，重复注册同函数会被去重。
+      const { registerCleanup } = await import('./utils/cleanupRegistry.js');
+      const { cleanupSessionArchiveCache } = await import('./utils/plugins/pluginArchiveLoader.js');
+      registerCleanup(cleanupSessionArchiveCache);
     }
     runMigrations();
     profileCheckpoint('preAction_after_migrations');
@@ -1011,7 +1039,12 @@ async function run(): Promise<CommanderCommand> {
     // If not provided but flag is present, value will be true
     // The actual filtering is handled in debug.ts by parsing process.argv
     return true;
-  }).addOption(new Option('--debug-to-stderr', 'Enable debug mode (to stderr)').argParser(Boolean).hideHelp()).option('--debug-file <path>', 'Write debug logs to a specific file path (implicitly enables debug mode)', () => true).option('--verbose', 'Override verbose mode setting from config · 覆盖配置中的详细模式设置', () => true).option('-p, --print', 'Print response and exit (useful for pipes). Note: The workspace trust dialog is skipped when Claude is run with the -p mode. Only use this flag in directories you trust. · 打印响应后退出（适用于管道）', () => true).option('--bare', 'Minimal mode: skip hooks, LSP, plugin sync · 极简模式：跳过 hooks、LSP、插件同步', () => true).addOption(new Option('--init', 'Run Setup hooks with init trigger, then continue').hideHelp()).addOption(new Option('--init-only', 'Run Setup and SessionStart:startup hooks, then exit').hideHelp()).addOption(new Option('--maintenance', 'Run Setup hooks with maintenance trigger, then continue').hideHelp()).addOption(new Option('--output-format <format>', 'Output format (only works with --print): "text" (default), "json" (single result), or "stream-json" (realtime streaming)').choices(['text', 'json', 'stream-json'])).addOption(new Option('--json-schema <schema>', 'JSON Schema for structured output validation. ' + 'Example: {"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}').argParser(String)).option('--include-hook-events', 'Include all hook lifecycle events in the output stream (only works with --output-format=stream-json)', () => true).option('--include-partial-messages', 'Include partial message chunks as they arrive (only works with --print and --output-format=stream-json)', () => true).addOption(new Option('--input-format <format>', 'Input format (only works with --print): "text" (default), or "stream-json" (realtime streaming input)').choices(['text', 'stream-json'])).option('--mcp-debug', '[DEPRECATED. Use --debug instead] Enable MCP debug mode (shows MCP server errors)', () => true).option('--dangerously-skip-permissions', 'Bypass all permission checks. Recommended only for sandboxes with no internet access. · 跳过所有权限检查（仅推荐在沙盒环境中使用）', () => true).option('--allow-dangerously-skip-permissions', 'Enable bypassing all permission checks as an option, without it being enabled by default. Recommended only for sandboxes with no internet access.', () => true).addOption(new Option('--thinking <mode>', 'Thinking mode: enabled (equivalent to adaptive), disabled').choices(['enabled', 'adaptive', 'disabled']).hideHelp()).addOption(new Option('--max-thinking-tokens <tokens>', '[DEPRECATED. Use --thinking instead for newer models] Maximum number of thinking tokens (only works with --print)').argParser(Number).hideHelp()).addOption(new Option('--max-turns <turns>', 'Maximum number of agentic turns in non-interactive mode. This will early exit the conversation after the specified number of turns. (only works with --print)').argParser(Number).hideHelp()).addOption(new Option('--max-budget-usd <amount>', 'Maximum dollar amount to spend on API calls (only works with --print)').argParser(value => {
+  }).addOption(new Option('--debug-to-stderr', 'Enable debug mode (to stderr)').argParser(Boolean).hideHelp()).option('--debug-file <path>', 'Write debug logs to a specific file path (implicitly enables debug mode)', () => true).option('--verbose', 'Override verbose mode setting from config · 覆盖配置中的详细模式设置', () => true).option('-p, --print', 'Print response and exit (useful for pipes). Note: The workspace trust dialog is skipped when Claude is run with the -p mode. Only use this flag in directories you trust. · 打印响应后退出（适用于管道）', () => true).option('--bare', 'Minimal mode: skip hooks, LSP, plugin sync · 极简模式：跳过 hooks、LSP、插件同步', () => true).addOption(new Option('--init', 'Run Setup hooks with init trigger, then continue').hideHelp()).addOption(new Option('--init-only', 'Run Setup and SessionStart:startup hooks, then exit').hideHelp()).addOption(new Option('--maintenance', 'Run Setup hooks with maintenance trigger, then continue').hideHelp()).addOption(new Option('--output-format <format>', 'Output format (only works with --print): "text" (default), "json" (single result), or "stream-json" (realtime streaming)').choices(['text', 'json', 'stream-json'])).addOption(new Option('--json-schema <schema>', 'JSON Schema for structured output validation. ' + 'Example: {"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}').argParser(String)).option('--include-hook-events', 'Include all hook lifecycle events in the output stream (only works with --output-format=stream-json)', () => true).option('--include-partial-messages', 'Include partial message chunks as they arrive (only works with --print and --output-format=stream-json)', () => true).addOption(new Option('--input-format <format>', 'Input format (only works with --print): "text" (default), or "stream-json" (realtime streaming input)').choices(['text', 'stream-json'])).option('--mcp-debug', '[DEPRECATED. Use --debug instead] Enable MCP debug mode (shows MCP server errors)', () => true).option('--dangerously-skip-permissions', 'Bypass all permission checks. Recommended only for sandboxes with no internet access. · 跳过所有权限检查（仅推荐在沙盒环境中使用）', () => true).option('--allow-dangerously-skip-permissions', 'Enable bypassing all permission checks as an option, without it being enabled by default. Recommended only for sandboxes with no internet access.', () => true).addOption(new Option('--thinking <mode>', 'Thinking mode: enabled (equivalent to adaptive), disabled').choices(['enabled', 'adaptive', 'disabled']).hideHelp()).addOption(new Option('--max-thinking-tokens <tokens>', '[DEPRECATED. Use --thinking instead for newer models] Maximum number of thinking tokens (only works with --print)').argParser(Number).hideHelp()).addOption(new Option('--max-turns <turns>', 'Maximum number of agentic turns in non-interactive mode. This will early exit the conversation after the specified number of turns. (only works with --print)').argParser(Number).hideHelp()).addOption(new Option('--goal <condition>', 'Set a session goal that Claude works toward. After each turn a small fast model evaluates whether the condition is met; if not, Claude continues. Up to 4000 chars. (NEW-FILE:#20260515 — upstream v2.1.139)').argParser((v: string) => {
+    const s = String(v ?? '').trim();
+    if (!s) throw new InvalidArgumentError('--goal cannot be empty');
+    if (s.length > 4000) throw new InvalidArgumentError('--goal exceeds 4000 chars');
+    return s;
+  })).addOption(new Option('--max-budget-usd <amount>', 'Maximum dollar amount to spend on API calls (only works with --print)').argParser(value => {
     const amount = Number(value);
     if (isNaN(amount) || amount <= 0) {
       throw new Error('--max-budget-usd must be a positive number greater than 0');
@@ -1041,7 +1074,7 @@ async function run(): Promise<CommanderCommand> {
   // `mcp` and `add` as paths, then choked on --transport as an unknown
   // top-level option. Single-value + collect accumulator means each
   // --plugin-dir takes exactly one arg; repeat the flag for multiple dirs.
-  .option('--plugin-dir <path>', 'Load plugins from a directory for this session only (repeatable: --plugin-dir A --plugin-dir B)', (val: string, prev: string[]) => [...prev, val], [] as string[]).option('--disable-slash-commands', 'Disable all skills · 禁用所有技能', () => true).option('--chrome', 'Enable Panda in Chrome integration').option('--no-chrome', 'Disable Panda in Chrome integration').option('--file <specs...>', 'File resources to download at startup. Format: file_id:relative_path (e.g., --file file_abc:doc.txt file_def:img.png)').action(async (prompt, options) => {
+  .option('--plugin-dir <path>', 'Load plugins from a directory or .zip archive for this session only (v2.1.128: .zip support; repeatable: --plugin-dir A --plugin-dir B.zip)', (val: string, prev: string[]) => [...prev, val], [] as string[]).option('--plugin-url <url>', 'Fetch a .zip plugin from a remote https:// URL for this session only (v2.1.129; repeatable, https:// + .zip only)', (val: string, prev: string[]) => [...prev, val], [] as string[]).option('--disable-slash-commands', 'Disable all skills · 禁用所有技能', () => true).option('--chrome', 'Enable Panda in Chrome integration').option('--no-chrome', 'Disable Panda in Chrome integration').option('--file <specs...>', 'File resources to download at startup. Format: file_id:relative_path (e.g., --file file_abc:doc.txt file_def:img.png)').action(async (prompt, options) => {
     profileCheckpoint('action_handler_start');
 
     // --bare = one-switch minimal mode. Sets SIMPLE so all the existing
@@ -2147,6 +2180,18 @@ async function run(): Promise<CommanderCommand> {
       effectiveModel = parseUserSpecifiedModel(mainThreadAgentDefinition.model);
     }
     setMainLoopModelOverride(effectiveModel);
+
+    // /goal — apply --goal CLI flag (interactive REPL or -p headless).
+    // (NEW-FILE:#20260515 — upstream Claude Code v2.1.139)
+    const goalOpt = (options as { goal?: string }).goal;
+    if (typeof goalOpt === 'string' && goalOpt.trim().length > 0) {
+      try {
+        const { setGoal } = await import('./state/goalStore.js');
+        setGoal(goalOpt.trim());
+      } catch (err) {
+        console.error(`Warning: failed to set --goal: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
 
     // Compute resolved model for hooks (use user-specified model at launch)
     setInitialMainLoopModel(getUserSpecifiedModelSetting() || null);
@@ -4302,6 +4347,29 @@ async function run(): Promise<CommanderCommand> {
     } = await import('./cli/handlers/plugins.js');
     await pluginUpdateHandler(plugin, options);
   });
+
+  // Plugin prune command (upstream v2.1.121 — clean up orphan auto-installed dependencies)
+  pluginCmd.command('prune').description('Clean up orphan auto-installed plugin dependencies (e.g. left after marketplace removal) · 清理孤儿自动安装插件依赖').option('--dry-run', 'Print what would be removed without changing anything').option('--json', 'Output as JSON').addOption(coworkOption()).action(async (options: {
+    dryRun?: boolean;
+    json?: boolean;
+    cowork?: boolean;
+  }) => {
+    const {
+      pluginPruneHandler
+    } = await import('./cli/handlers/plugins.js');
+    await pluginPruneHandler(options);
+  });
+
+  // Plugin details command (upstream v2.1.139 → v2.1.142 — show component list + per-session token estimate, incl. LSP)
+  pluginCmd.command('details <plugin>').description('Show installation path, component list (commands/skills/agents/hooks/mcp/lsp), and per-session token estimate for a plugin · 显示插件详情与会话 token 估算').option('--json', 'Output as JSON').addOption(coworkOption()).action(async (plugin: string, options: {
+    json?: boolean;
+    cowork?: boolean;
+  }) => {
+    const {
+      pluginDetailsHandler
+    } = await import('./cli/handlers/plugins.js');
+    await pluginDetailsHandler(plugin, options);
+  });
   // END ANT-ONLY
 
   // Setup token command
@@ -4315,13 +4383,22 @@ async function run(): Promise<CommanderCommand> {
     await setupTokenHandler(root);
   });
 
-  // Agents command - list configured agents
-  program.command('agents').description('List configured agents · 列出已配置的 Agent').option('--setting-sources <sources>', 'Comma-separated list of setting sources to load (user, project, local).').action(async () => {
+  // Agents command — v2.1.139 旗舰能力：
+  //   `claude agents` (no subcommand) → Agent View TUI dashboard
+  //   `claude agents list`            → List configured agent definitions (legacy)
+  const agentsCmd = program.command('agents').description('Agent View dashboard / list configured agents · Agent View 仪表盘与定义列表').configureHelp(createSortedHelpConfig());
+  agentsCmd.command('list', { isDefault: false }).description('List configured agent definitions · 列出已配置的 Agent 定义').option('--setting-sources <sources>', 'Comma-separated list of setting sources to load (user, project, local).').action(async () => {
     const {
       agentsHandler
     } = await import('./cli/handlers/agents.js');
     await agentsHandler();
     process.exit(0);
+  });
+  agentsCmd.action(async () => {
+    const {
+      agentViewHandler
+    } = await import('./cli/handlers/agentView.js');
+    await agentViewHandler();
   });
   if (feature('TRANSCRIPT_CLASSIFIER')) {
     // Skip when tengu_auto_mode_config.enabled === 'disabled' (circuit breaker).
@@ -4662,6 +4739,21 @@ async function run(): Promise<CommanderCommand> {
       process.stderr.write(`记忆遗忘失败: ${err instanceof Error ? err.message : String(err)}\n`);
       process.exit(1);
     }
+  });
+
+  // panda project purge (v2.1.126) —— 清除指定项目的所有 panda 状态。
+  // 默认 dry-run（无 -y/-i 时不真删），--all 必须配合 -y 才生效，删除路径强制限定在 ~/.pandacc/ 内。
+  const projectCmd = program.command('project').description('Manage panda project state · 管理项目状态').configureHelp(createSortedHelpConfig());
+  projectCmd.command('purge [path]').description('Purge all panda state for a project (transcripts/state/cache/etc.) · 清除项目的所有 panda 状态').option('--dry-run', 'List what would be deleted without actually deleting').option('-y, --yes', 'Skip confirmation prompts').option('-i, --interactive', 'Confirm each file individually').option('--all', 'Purge ALL projects (dangerous - requires -y)').action(async (pathArg: string | undefined, opts: {
+    dryRun?: boolean;
+    yes?: boolean;
+    interactive?: boolean;
+    all?: boolean;
+  }) => {
+    const {
+      projectPurgeHandler
+    } = await import('./cli/handlers/projectPurge.js');
+    await projectPurgeHandler(pathArg, opts);
   });
 
   // panda skills list —— Level-0 Progressive Disclosure 索引浏览

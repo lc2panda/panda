@@ -1,3 +1,8 @@
+// Input: enabled plugin manifests + paths (commandsPath/skillsPath/root)
+// Output: Command[] for slash commands + Command[] for skills
+// Pos: Plugin → Command 转换 (commands + skills + root-SKILL.md 三路径)
+//
+// v2.1.142: 根级 SKILL.md 直接作为单 skill 注册 — 见 getPluginSkills 内联块。
 import memoize from 'lodash-es/memoize.js'
 import { basename, dirname, join } from 'path'
 import { getInlinePlugins, getSessionId } from '../../bootstrap/state.js'
@@ -888,6 +893,69 @@ export const getPluginSkills = memoize(async (): Promise<Command[]> => {
         } catch (error) {
           logForDebugging(
             `Failed to load skills from plugin ${plugin.name} default directory: ${error}`,
+            { level: 'error' },
+          )
+        }
+      }
+
+      // v2.1.142: Plugins with root-level SKILL.md (no skills/ subdirectory)
+      // are treated as a single skill. When neither skillsPath nor skillsPaths
+      // is configured but the plugin root contains SKILL.md, the entire plugin
+      // directory becomes one skill (named after the plugin). This skips the
+      // boilerplate of creating a skills/<name>/ subdirectory for the common
+      // case of "plugin == one skill".
+      if (!plugin.skillsPath && (!plugin.skillsPaths || plugin.skillsPaths.length === 0) && plugin.path) {
+        try {
+          const fs = getFsImplementation()
+          const rootSkillPath = join(plugin.path, 'SKILL.md')
+          let rootSkillContent: string | null = null
+          try {
+            rootSkillContent = await fs.readFile(rootSkillPath, {
+              encoding: 'utf-8',
+            })
+          } catch (e: unknown) {
+            // ENOENT is the expected case (plugin without root SKILL.md);
+            // log other errors so permission/IO issues are diagnosable.
+            if (!isENOENT(e)) {
+              logForDebugging(
+                `[plugin-root-skill] Failed to probe ${rootSkillPath}: ${e}`,
+                { level: 'warn' },
+              )
+            }
+          }
+
+          if (rootSkillContent !== null && !isDuplicatePath(fs, rootSkillPath, loadedPaths)) {
+            const { frontmatter, content: markdownContent } = parseFrontmatter(
+              rootSkillContent,
+              rootSkillPath,
+            )
+            // Plugin name itself becomes the skill name (no second segment),
+            // matching the documented v2.1.142 contract "plugin as single skill".
+            const file: PluginMarkdownFile = {
+              filePath: rootSkillPath,
+              baseDir: plugin.path,
+              frontmatter,
+              content: markdownContent,
+            }
+            const skill = createPluginCommand(
+              plugin.name,
+              file,
+              plugin.source,
+              plugin.manifest,
+              plugin.path,
+              true, // isSkill
+              { isSkillMode: true },
+            )
+            if (skill) {
+              pluginSkills.push(skill)
+              logForDebugging(
+                `Loaded root-level SKILL.md as single skill for plugin ${plugin.name}`,
+              )
+            }
+          }
+        } catch (error) {
+          logForDebugging(
+            `[plugin-root-skill] Failed to load root SKILL.md for ${plugin.name}: ${error}`,
             { level: 'error' },
           )
         }

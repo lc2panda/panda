@@ -407,6 +407,19 @@ export const BaseHookInputSchema = lazySchema(() =>
           'hook fires from within a subagent (alongside agent_id), or on the main thread ' +
           'of a session started with --agent (without agent_id).',
       ),
+    // [v2.1.133] Effort signal forwarded to hook subprocesses so they can
+    // branch on intent (e.g. skip expensive lint at low effort). `level` is
+    // numeric 0-3 matching low/medium/high/max; `enabled` is true only when
+    // the effort was explicitly configured (CLI --effort, /effort command,
+    // settings persistence, env CLAUDE_CODE_EFFORT_LEVEL) — false signals
+    // the model's implicit default. Optional for back-compat with hooks that
+    // run in contexts without an AppState (StatusLine, FileSuggestion).
+    effort: z
+      .object({
+        level: z.number().int().min(0).max(3),
+        enabled: z.boolean(),
+      })
+      .optional(),
   }),
 )
 

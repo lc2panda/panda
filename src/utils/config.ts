@@ -655,6 +655,12 @@ export type GlobalConfig = {
   }
 
   privacyEnhanced?: boolean
+
+  // v2.1.139: /scroll-speed — wheel-event row multiplier baseline.
+  // Mirrors CLAUDE_CODE_SCROLL_SPEED (clamp (0, 20]). env var wins so a
+  // one-shot override still works; settings via slash command persist.
+  // Read lazily by readScrollSpeedBase() — see ScrollKeybindingHandler.
+  scrollSpeed?: number
 }
 
 /**

@@ -285,6 +285,9 @@ export function buildYoloRejectionMessage(reason: string): string {
 /**
  * Build a message for when the auto mode classifier is temporarily unavailable.
  * Tells the agent to wait and retry, and suggests working on other tasks.
+ *
+ * v2.1.128: appends actionable hints (retry / /compact / --debug) so users
+ * have a concrete next step when the classifier keeps erroring out.
  */
 export function buildClassifierUnavailableMessage(
   toolName: string,
@@ -294,7 +297,8 @@ export function buildClassifierUnavailableMessage(
     `${classifierModel} is temporarily unavailable, so auto mode cannot determine the safety of ${toolName} right now. ` +
     `Wait briefly and then try this action again. ` +
     `If it keeps failing, continue with other tasks that don't require this action and come back to it later. ` +
-    `Note: reading files, searching code, and other read-only operations do not require the classifier and can still be used.`
+    `Note: reading files, searching code, and other read-only operations do not require the classifier and can still be used. ` +
+    `Try: retry the action, run /compact to shrink the transcript, or relaunch Panda with --debug to see the underlying classifier error.`
   )
 }
 
@@ -4134,6 +4138,20 @@ You have exited auto mode. The user may now want to interact more directly. You 
       ]
     }
     case 'hook_blocking_error':
+      // [v2.1.139] continueOnBlock: the hook didn't want to halt the turn —
+      // it surfaced `reason` as guidance and the model is expected to keep
+      // going. Phrase the system reminder as "additional context from hook"
+      // rather than "blocking error" so the model doesn't infer a stop.
+      if (attachment.continueOnBlock) {
+        return [
+          createUserMessage({
+            content: wrapInSystemReminder(
+              `${attachment.hookName} hook returned guidance from command "${attachment.blockingError.command}" — continue the turn taking this into account: ${attachment.blockingError.blockingError}`,
+            ),
+            isMeta: true,
+          }),
+        ]
+      }
       return [
         createUserMessage({
           content: wrapInSystemReminder(

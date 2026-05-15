@@ -46,9 +46,13 @@ export function isHookEqual(
     case 'command':
       // shell is part of identity: same command string with different
       // shells are distinct hooks. Default 'bash' so undefined === 'bash'.
+      // [v2.1.139] args[] is also identity-bearing — a command hook in
+      // exec-form is distinct from any shell-string hook even if they would
+      // run a similar program.
       return (
         b.type === 'command' &&
         a.command === b.command &&
+        JSON.stringify(a.args ?? []) === JSON.stringify(b.args ?? []) &&
         (a.shell ?? DEFAULT_HOOK_SHELL) === (b.shell ?? DEFAULT_HOOK_SHELL) &&
         sameIf(a, b)
       )
@@ -84,7 +88,12 @@ export function getHookDisplayText(
 
   switch (hook.type) {
     case 'command':
-      return hook.command
+      // [v2.1.139] args-form hooks have no `command` — fall back to argv joined.
+      return (
+        ('command' in hook && hook.command) ||
+        ('args' in hook && hook.args ? hook.args.join(' ') : '') ||
+        '<empty command>'
+      )
     case 'prompt':
       return hook.prompt
     case 'agent':

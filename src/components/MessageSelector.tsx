@@ -119,14 +119,14 @@ export function MessageSelector({
       ...summarizeInputProps,
       onChange: setSummarizeFromFeedback
     });
-    if (("external" as string) === 'ant') {
-      baseOptions.push({
-        value: 'summarize_up_to',
-        label: 'Summarize up to here',
-        ...summarizeInputProps,
-        onChange: setSummarizeUpToFeedback
-      });
-    }
+    // v2.1.141: 'Summarize up to here' externalized — compress earlier
+    // context while keeping recent turns intact. Previously gated to ant-only.
+    baseOptions.push({
+      value: 'summarize_up_to',
+      label: 'Summarize up to here',
+      ...summarizeInputProps,
+      onChange: setSummarizeUpToFeedback
+    });
     baseOptions.push({
       value: 'nevermind',
       label: 'Never mind'

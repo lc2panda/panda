@@ -167,6 +167,11 @@ import type { AppState } from '../state/AppState.js'
 import { jsonStringify, jsonParse } from './slowOperations.js'
 import { isEnvTruthy } from './envUtils.js'
 import { errorMessage, getErrnoCode } from './errors.js'
+import {
+  effortFieldToEnvValue,
+  resolveHookEffortField,
+  type HookEffortField,
+} from './effort.js'
 
 const TOOL_HOOK_EXECUTION_TIMEOUT_MS = 10 * 60 * 1000
 
@@ -498,6 +503,10 @@ interface TypedSyncHookOutput {
   stopReason?: string
   decision?: 'approve' | 'block'
   reason?: string
+  /** [v2.1.139] PostToolUse: when decision='block', keep the turn going by feeding `reason` back as additional context. */
+  continueOnBlock?: boolean
+  /** [v2.1.141] Raw ANSI sequence to write to stderr after the hook finishes. */
+  terminalSequence?: string
   systemMessage?: string
   hookSpecificOutput?:
     | {
@@ -529,6 +538,8 @@ interface TypedSyncHookOutput {
         hookEventName: 'PostToolUse'
         additionalContext?: string
         updatedMCPToolOutput?: unknown
+        /** [v2.1.121] Replace ANY tool's output (not just MCP). */
+        updatedToolOutput?: unknown
       }
     | {
         hookEventName: 'PostToolUseFailure'
@@ -626,6 +637,38 @@ function processHookJSONOutput({
         throw new Error(
           `Unknown hook decision type: ${json.decision}. Valid types are: approve, block`,
         )
+    }
+  }
+
+  // [v2.1.139] PostToolUse-only: when block-with-continueOnBlock is set, the
+  // hook wants the turn to keep going while still surfacing `reason` to the
+  // model. The block still happens (the tool output is wrapped in a blocking
+  // error attachment), but PostToolUse callers consult result.continueOnBlock
+  // to decide whether to suppress the stop signal and inject `reason` as
+  // additional context instead. Other events ignore the flag (parity with
+  // upstream — PreToolUse "block" always terminates).
+  if (
+    json.decision === 'block' &&
+    json.continueOnBlock === true &&
+    hookEvent === 'PostToolUse'
+  ) {
+    result.continueOnBlock = true
+  }
+
+  // [v2.1.141] Honor terminalSequence regardless of decision — writes a raw
+  // ANSI escape sequence to stderr (e.g. window title / bell / desktop
+  // notification trigger). No controlling terminal required: stderr is
+  // inherited by the parent CLI and forwarded to whichever sink already
+  // exists (TTY, log file, IDE channel).
+  if (typeof json.terminalSequence === 'string' && json.terminalSequence) {
+    result.terminalSequence = json.terminalSequence
+    try {
+      process.stderr.write(json.terminalSequence)
+    } catch (err) {
+      // EPIPE on detached stderr is harmless — we tried, hook still succeeds.
+      logForDebugging(
+        `Hook ${hookName} terminalSequence write failed: ${errorMessage(err)}`,
+      )
     }
   }
 
@@ -729,10 +772,16 @@ function processHookJSONOutput({
         break
       case 'PostToolUse':
         result.additionalContext = json.hookSpecificOutput.additionalContext
-        // Extract updatedMCPToolOutput if provided
+        // Extract updatedMCPToolOutput if provided (MCP-tool back-compat path)
         if (json.hookSpecificOutput.updatedMCPToolOutput) {
           result.updatedMCPToolOutput =
             json.hookSpecificOutput.updatedMCPToolOutput
+        }
+        // [v2.1.121] Extract updatedToolOutput — works for ALL tools, not just
+        // MCP. When both are set, updatedToolOutput wins for non-MCP tools and
+        // updatedMCPToolOutput remains the canonical key for MCP back-compat.
+        if (json.hookSpecificOutput.updatedToolOutput !== undefined) {
+          result.updatedToolOutput = json.hookSpecificOutput.updatedToolOutput
         }
         break
       case 'PostToolUseFailure':
@@ -844,6 +893,10 @@ async function execCommandHook(
   skillRoot?: string,
   forceSyncExecution?: boolean,
   requestPrompt?: (request: PromptRequest) => Promise<PromptResponse>,
+  // [v2.1.133] When provided, the resolved effort is exported to the hook
+  // subprocess as $CLAUDE_EFFORT (numeric stringified level). Omitted on the
+  // call sites that don't have an AppState (StatusLine, FileSuggestion).
+  effortField?: HookEffortField,
 ): Promise<{
   stdout: string
   stderr: string
@@ -902,11 +955,19 @@ async function execCommandHook(
   // reference $CLAUDE_PROJECT_DIR always resolve relative to the real repo root.
   const projectDir = getProjectRoot()
 
+  // [v2.1.139] Hooks may use either shell-form `command` or exec-form `args`.
+  // The args-form skips the shell entirely (no .sh autopath, no SHELL_PREFIX,
+  // no powershell wrapping) and substitutes placeholders per-argv to avoid
+  // shell-quote pitfalls. Validation already guarantees exactly one is set.
+  const isArgsForm =
+    Array.isArray(hook.args) && hook.args.length > 0 && !hook.command
+
   // Substitute ${CLAUDE_PLUGIN_ROOT} and ${user_config.X} in the command string.
   // Order matches MCP/LSP (plugin vars FIRST, then user config) so a user-
   // entered value containing the literal text ${CLAUDE_PLUGIN_ROOT} is treated
   // as opaque — not re-interpreted as a template.
-  let command = hook.command
+  let command = hook.command ?? ''
+  let argv: string[] = isArgsForm ? [...(hook.args as string[])] : []
   let pluginOpts: ReturnType<typeof loadPluginOptions> | undefined
   if (pluginRoot) {
     // Plugin directory gone (orphan GC race, concurrent session deleted it):
@@ -941,12 +1002,34 @@ async function execCommandHook(
       // Caught upstream like any other hook exec failure.
       command = substituteUserConfigVariables(command, pluginOpts)
     }
+    // [v2.1.139] args-form: substitute placeholders per-argv so paths with
+    // spaces don't need shell quoting. The same ${CLAUDE_PLUGIN_ROOT} and
+    // user-config templates work; later we also expose them as env vars.
+    if (isArgsForm) {
+      const dataPath = pluginId ? toHookPath(getPluginDataDir(pluginId)) : ''
+      argv = argv.map(a => {
+        let out = a.replace(/\$\{CLAUDE_PLUGIN_ROOT\}/g, () => rootPath)
+        if (pluginId) {
+          out = out.replace(/\$\{CLAUDE_PLUGIN_DATA\}/g, () => dataPath)
+        }
+        if (pluginOpts) {
+          out = substituteUserConfigVariables(out, pluginOpts)
+        }
+        return out
+      })
+    }
   }
 
   // On Windows (bash only), auto-prepend `bash` for .sh scripts so they
   // execute instead of opening in the default file handler. PowerShell
   // runs .ps1 files natively — no prepend needed.
-  if (isWindows && !isPowerShell && command.trim().match(/\.sh(\s|$|")/)) {
+  // Skipped for args-form: argv[0] is the executable directly, no shell parsing.
+  if (
+    !isArgsForm &&
+    isWindows &&
+    !isPowerShell &&
+    command.trim().match(/\.sh(\s|$|")/)
+  ) {
     if (!command.trim().startsWith('bash ')) {
       command = `bash ${command}`
     }
@@ -956,8 +1039,9 @@ async function execCommandHook(
   // (formatShellPrefixCommand uses shell-quote). This makes no sense for
   // PowerShell — see design §8.1. For now PS hooks ignore the prefix;
   // a CLAUDE_CODE_PS_SHELL_PREFIX (or shell-aware prefix) is a follow-up.
+  // args-form skips SHELL_PREFIX too: no shell means nothing to prefix.
   const finalCommand =
-    !isPowerShell && process.env.CLAUDE_CODE_SHELL_PREFIX
+    !isArgsForm && !isPowerShell && process.env.CLAUDE_CODE_SHELL_PREFIX
       ? formatShellPrefixCommand(process.env.CLAUDE_CODE_SHELL_PREFIX, command)
       : command
 
@@ -969,6 +1053,14 @@ async function execCommandHook(
   const envVars: NodeJS.ProcessEnv = {
     ...subprocessEnv(),
     CLAUDE_PROJECT_DIR: toHookPath(projectDir),
+  }
+
+  // [v2.1.133] Expose the resolved effort to the subprocess. Numeric to mirror
+  // the JSON `effort.level` field (so hook scripts can branch identically off
+  // either source). Skipped when undefined (StatusLine / FileSuggestion paths)
+  // so older scripts don't see a phantom level on contexts that had none.
+  if (effortField) {
+    envVars.CLAUDE_EFFORT = effortFieldToEnvValue(effortField)
   }
 
   // Plugin and skill hooks both set CLAUDE_PLUGIN_ROOT (skills use the same
@@ -1042,7 +1134,18 @@ async function execCommandHook(
   // startup, which will exit first. Relaxing that is phase 1 of the
   // design's implementation order (separate PR).
   let child: ChildProcessWithoutNullStreams
-  if (shellType === 'powershell') {
+  if (isArgsForm) {
+    // [v2.1.139] Exec-form: argv[0] is the executable, rest are passed verbatim.
+    // No shell involvement → no quoting, no path-with-space breakage, no glob
+    // expansion. shellType / SHELL_PREFIX / Git-Bash auto-wrap all skipped.
+    const [executable, ...restArgs] = argv
+    child = spawn(executable!, restArgs, {
+      env: envVars,
+      cwd: safeCwd,
+      // Prevent visible console window on Windows (no-op on other platforms)
+      windowsHide: true,
+    }) as ChildProcessWithoutNullStreams
+  } else if (shellType === 'powershell') {
     const pwshPath = await getCachedPowerShellPath()
     if (!pwshPath) {
       throw new Error(
@@ -1101,7 +1204,8 @@ async function execCommandHook(
       asyncResponse: { async: true, asyncTimeout: hookTimeoutMs },
       hookEvent,
       hookName,
-      command: hook.command,
+      // [v2.1.139] Surface args-form as joined argv for diagnostic strings.
+      command: hook.command ?? (hook.args ? hook.args.join(' ') : ''),
       asyncRewake: hook.asyncRewake,
       pluginId,
     })
@@ -1224,7 +1328,7 @@ async function execCommandHook(
             asyncResponse: parsed,
             hookEvent,
             hookName,
-            command: hook.command,
+            command: hook.command ?? (hook.args ? hook.args.join(' ') : ''),
             pluginId,
           })
           if (backgrounded) {
@@ -1833,9 +1937,12 @@ export async function getMatchingHooks(
           // not duplicates. Default to 'bash' so legacy configs (no shell
           // field) still dedup against explicit shell:'bash'.
           .map(m => [
+            // [v2.1.139] Either `command` (string) or `args` (string[]) is set.
+            // Use args-as-NUL-joined when args is present so two hooks differing
+            // only in argv land in distinct dedup buckets.
             hookDedupKey(
               m,
-              `${m.hook.shell ?? DEFAULT_HOOK_SHELL}\0${m.hook.command}\0${getIfCondition(m.hook)}`,
+              `${m.hook.shell ?? DEFAULT_HOOK_SHELL}\0${m.hook.command ?? (m.hook.args ?? []).join('\0')}\0${getIfCondition(m.hook)}`,
             ),
             m,
           ]),
@@ -2127,6 +2234,18 @@ async function* executeHooks({
     return
   }
 
+  // [v2.1.133] Enrich hookInput with the session's current effort signal so
+  // hooks can adapt their behavior (e.g. skip expensive lint at low effort).
+  // We splat onto a new object so callers' hookInput stays untouched. Field
+  // order matters only cosmetically — `effort` lands at the end of the JSON.
+  const effortField: HookEffortField = resolveHookEffortField(
+    appState?.effortValue,
+  )
+  const enrichedHookInput: HookInput = {
+    ...hookInput,
+    effort: effortField,
+  } as HookInput
+
   if (signal?.aborted) {
     return
   }
@@ -2162,7 +2281,7 @@ async function* executeHooks({
       : undefined
     for (const [i, { hook }] of matchingHooks.entries()) {
       if (hook.type === 'callback') {
-        await hook.callback(hookInput, toolUseID, signal, i, context)
+        await hook.callback(enrichedHookInput, toolUseID, signal, i, context)
       }
     }
     const totalDurationMs = Date.now() - batchStartTime
@@ -2236,6 +2355,8 @@ async function* executeHooks({
   // Lazy-once stringify of hookInput. Shared across all command/prompt/agent/http
   // hooks in this batch (hookInput is never mutated). Callback/function hooks
   // return before reaching this, so batches with only those pay no stringify cost.
+  // Uses enrichedHookInput so the `effort` field (v2.1.133) is part of the
+  // serialized JSON every subprocess hook receives on stdin.
   let jsonInputResult:
     | { ok: true; value: string }
     | { ok: false; error: unknown }
@@ -2245,7 +2366,10 @@ async function* executeHooks({
       return jsonInputResult
     }
     try {
-      return (jsonInputResult = { ok: true, value: jsonStringify(hookInput) })
+      return (jsonInputResult = {
+        ok: true,
+        value: jsonStringify(enrichedHookInput),
+      })
     } catch (error) {
       logError(
         Error(`Failed to stringify hook ${hookName} input`, { cause: error }),
@@ -2269,7 +2393,7 @@ async function* executeHooks({
         toolUseID,
         hook,
         hookEvent,
-        hookInput,
+        hookInput: enrichedHookInput,
         signal: abortSignal,
         hookIndex,
         toolUseContext,
@@ -2627,6 +2751,7 @@ async function* executeHooks({
         skillRoot,
         forceSyncExecution,
         boundRequestPrompt,
+        effortField,
       )
       cleanup?.()
       const durationMs = Date.now() - hookStartMs
@@ -2826,10 +2951,13 @@ async function* executeHooks({
           exitCode: result.status,
           outcome: 'error',
         })
+        // [v2.1.139] Display label uses getHookDisplayText() so args-form hooks
+        // surface a sensible value (the argv joined) rather than "undefined".
+        const displayLabel = getHookDisplayText(hook)
         yield {
           blockingError: {
-            blockingError: `[${hook.command}]: ${result.stderr || 'No stderr output'}`,
-            command: hook.command,
+            blockingError: `[${displayLabel}]: ${result.stderr || 'No stderr output'}`,
+            command: displayLabel,
           },
           outcome: 'blocking' as const,
           hook,
@@ -2995,6 +3123,33 @@ async function* executeHooks({
       )
       yield {
         updatedMCPToolOutput: result.updatedMCPToolOutput,
+      }
+    }
+
+    // [v2.1.121] Yield updatedToolOutput (any tool) — non-MCP path.
+    if (result.updatedToolOutput !== undefined) {
+      logForDebugging(
+        `Hook ${hookEvent} (${getHookDisplayText(result.hook)}) replaced tool output (updatedToolOutput)`,
+      )
+      yield {
+        updatedToolOutput: result.updatedToolOutput,
+      }
+    }
+
+    // [v2.1.139] Surface continueOnBlock so PostToolUse callers can decide to
+    // resume the turn with `reason` as additional context. Yielded alongside
+    // the blockingError that this hook already emitted (see processHookJSONOutput).
+    if (result.continueOnBlock) {
+      yield {
+        continueOnBlock: true,
+      }
+    }
+
+    // [v2.1.141] Bubble up the ANSI sequence we just wrote to stderr so the
+    // top-level batcher can attribute it / dedupe duplicates in logs.
+    if (result.terminalSequence) {
+      yield {
+        terminalSequence: result.terminalSequence,
       }
     }
 
@@ -3517,10 +3672,13 @@ async function executeHooksOutsideREPL({
         // Clear timeout if hook completes
         cleanup?.()
 
+        // [v2.1.139] hook.command is optional when args-form is used — fall
+        // back to args.join(' ') for diagnostic display.
+        const hookDisplay = hook.command ?? (hook.args ? hook.args.join(' ') : '')
         if (result.aborted) {
-          logForDebugging(`${hookName} [${hook.command}] cancelled`)
+          logForDebugging(`${hookName} [${hookDisplay}] cancelled`)
           return {
-            command: hook.command,
+            command: hookDisplay,
             succeeded: false,
             output: 'Hook cancelled',
             blocked: false,
@@ -3528,7 +3686,7 @@ async function executeHooksOutsideREPL({
         }
 
         logForDebugging(
-          `${hookName} [${hook.command}] completed with status ${result.status}`,
+          `${hookName} [${hookDisplay}] completed with status ${result.status}`,
         )
 
         // Parse JSON for any messages to print out.
@@ -3569,7 +3727,7 @@ async function executeHooksOutsideREPL({
           json && isSyncHookJSONOutput(json) ? typedJson?.systemMessage : undefined
 
         return {
-          command: hook.command,
+          command: hookDisplay,
           succeeded: result.status === 0,
           output,
           blocked,
@@ -3579,15 +3737,16 @@ async function executeHooksOutsideREPL({
       } catch (error) {
         // Clean up on error
         cleanup?.()
+        const hookDisplay = hook.command ?? (hook.args ? hook.args.join(' ') : '')
 
         const errorMessage =
           error instanceof Error ? error.message : String(error)
         logForDebugging(
-          `${hookName} [${hook.command}] failed to run: ${errorMessage}`,
+          `${hookName} [${hookDisplay}] failed to run: ${errorMessage}`,
           { level: 'error' },
         )
         return {
-          command: hook.command,
+          command: hookDisplay,
           succeeded: false,
           output: errorMessage,
           blocked: false,
@@ -5265,7 +5424,12 @@ function getHookDefinitionsForTelemetry(
 ): Array<{ type: string; command?: string; prompt?: string; name?: string }> {
   return matchedHooks.map(({ hook }) => {
     if (hook.type === 'command') {
-      return { type: 'command', command: hook.command }
+      // [v2.1.139] Either `command` (shell-string form) or `args` (exec-form)
+      // is present per the discriminatedUnion+superRefine. Surface args as a
+      // space-joined string so telemetry stays a single-field string column.
+      const surface =
+        hook.command ?? (hook.args ? hook.args.join(' ') : '<empty>')
+      return { type: 'command', command: surface }
     } else if (hook.type === 'prompt') {
       return { type: 'prompt', prompt: hook.prompt }
     } else if (hook.type === 'agent') {

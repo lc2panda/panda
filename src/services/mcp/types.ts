@@ -1,3 +1,7 @@
+// Input: 原始 MCP server 配置 JSON（来自 .mcp.json / settings / SDK 输入）
+// Output: 经 zod 校验的强类型 ScopedMcpServerConfig（含 stdio/sse/http/ws/sdk 等 transport）
+// Pos: services/mcp/ 类型与 schema 定义源，被 config.ts/client.ts/print.ts 等所有 MCP 链路引用
+// 一旦字段或 schema 发生变化，请同步更新本头部注释，以及所属文件夹的 README/md。
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import type {
   Resource,
@@ -31,6 +35,11 @@ export const McpStdioServerConfigSchema = lazySchema(() =>
     command: z.string().min(1, 'Command cannot be empty'),
     args: z.array(z.string()).default([]),
     env: z.record(z.string(), z.string()).optional(),
+    // v2.1.121: skip tool-search lazy loading for this server's tools so they
+    // appear in the initial prompt instead of being deferred. Per-tool
+    // `_meta['anthropic/alwaysLoad']` still wins on a tool-by-tool basis;
+    // this is the server-wide default applied to every tool the server reports.
+    alwaysLoad: z.boolean().optional(),
   }),
 )
 
@@ -62,6 +71,8 @@ export const McpSSEServerConfigSchema = lazySchema(() =>
     headers: z.record(z.string(), z.string()).optional(),
     headersHelper: z.string().optional(),
     oauth: McpOAuthConfigSchema().optional(),
+    // v2.1.121: see McpStdioServerConfigSchema for semantics.
+    alwaysLoad: z.boolean().optional(),
   }),
 )
 
@@ -93,6 +104,8 @@ export const McpHTTPServerConfigSchema = lazySchema(() =>
     headers: z.record(z.string(), z.string()).optional(),
     headersHelper: z.string().optional(),
     oauth: McpOAuthConfigSchema().optional(),
+    // v2.1.121: see McpStdioServerConfigSchema for semantics.
+    alwaysLoad: z.boolean().optional(),
   }),
 )
 
@@ -102,6 +115,8 @@ export const McpWebSocketServerConfigSchema = lazySchema(() =>
     url: z.string(),
     headers: z.record(z.string(), z.string()).optional(),
     headersHelper: z.string().optional(),
+    // v2.1.121: see McpStdioServerConfigSchema for semantics.
+    alwaysLoad: z.boolean().optional(),
   }),
 )
 

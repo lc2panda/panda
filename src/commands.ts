@@ -1,3 +1,9 @@
+// Input: cwd (project root) + 内置/插件/skill 目录注册表
+// Output: Command[] — slash commands、bundled skills、plugin skills、skill-dir skills
+// Pos: 所有 slash command 与 skill 的总组装层 (memoized loadAllCommands + filters)
+//
+// v2.1.129: getSkillToolCommands / getSlashCommandToolSkills 现在应用 skillOverrides
+//           settings.json 字段（off / user-invocable-only / name-only）。
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import addDir from './commands/add-dir/index.js'
 import autofixPr from './commands/autofix-pr/index.js'
@@ -8,6 +14,7 @@ import issue from './commands/issue/index.js'
 import feedback from './commands/feedback/index.js'
 import clear from './commands/clear/index.js'
 import color from './commands/color/index.js'
+import scrollSpeed from './commands/scroll-speed/index.js'
 import commit from './commands/commit.js'
 import copy from './commands/copy/index.js'
 import desktop from './commands/desktop/index.js'
@@ -130,6 +137,7 @@ import persona from './commands/persona/index.js'
 import routing from './commands/routing.js'
 import privacy from './commands/privacy.js'
 import recap from './commands/recap/index.js'
+import goal from './commands/goal/index.js'
 import permissions from './commands/permissions/index.js'
 import plan from './commands/plan/index.js'
 import fast from './commands/fast/index.js'
@@ -210,7 +218,7 @@ const usageReport: Command = {
 }
 import oauthRefresh from './commands/oauth-refresh/index.js'
 import debugToolCall from './commands/debug-tool-call/index.js'
-import { getSettingSourceName } from './utils/settings/constants.js'
+import { getSettingSourceName, type SettingSource } from './utils/settings/constants.js'
 import {
   type Command,
   getCommandName,
@@ -271,6 +279,7 @@ const COMMANDS = memoize((): Command[] => [
   chrome,
   clear,
   color,
+  scrollSpeed,
   compact,
   config,
   copy,
@@ -302,6 +311,7 @@ const COMMANDS = memoize((): Command[] => [
   routing,
   privacy,
   recap,
+  goal,
   remoteEnv,
   plugin,
   pr_comments,
@@ -574,12 +584,99 @@ export function getMcpSkillCommands(
   return []
 }
 
+// v2.1.129: skillOverrides settings.json field. Resolves the effective
+// override mode for a single skill by walking all 5 setting sources (policy
+// wins, then user, then projects, then localSettings, then flag). Lower
+// precedence sources are silently overridden — matches the merge semantics
+// of permissions.allow/deny.
+type SkillOverrideMode = 'off' | 'user-invocable-only' | 'name-only'
+function resolveSkillOverrideMode(name: string): SkillOverrideMode | undefined {
+  // Lazy require to avoid pulling settings.ts into the cli top-level import
+  // chain (commands.ts is hot-imported during bootstrap before settings.ts
+  // is ready in some pipe-mode startups).
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { getSettingsForSource } = require('./utils/settings/settings.js') as typeof import('./utils/settings/settings.js')
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  const sources: SettingSource[] = [
+    'policySettings',
+    'userSettings',
+    'projectSettings',
+    'localSettings',
+    'flagSettings',
+  ]
+  for (const source of sources) {
+    const settings = getSettingsForSource(source)
+    // skillOverrides is added by SettingsSchema (v2.1.129) but older versions
+    // of the schema may not have it. Cast through `unknown` so non-strict
+    // runtimes still resolve cleanly.
+    const overrides = (settings as unknown as { skillOverrides?: Record<string, SkillOverrideMode> } | null)?.skillOverrides
+    if (overrides && Object.prototype.hasOwnProperty.call(overrides, name)) {
+      return overrides[name]
+    }
+  }
+  return undefined
+}
+
+/**
+ * v2.1.129: Apply skillOverrides settings.json field to a skill listing.
+ *
+ * Three modes per skill:
+ *   - `off`                  drop entirely (never visible, never invocable)
+ *   - `user-invocable-only`  remain visible to user but model auto-call is
+ *                            disabled (the Skill tool's listing filter drops
+ *                            anything with `disableModelInvocation: true`).
+ *   - `name-only`            name + identity stay exposed; description and
+ *                            whenToUse are blanked so the model sees only
+ *                            the slug and must explicitly ask the user.
+ *
+ * Skills without an override entry pass through unchanged.
+ */
+function applySkillOverrides(commands: Command[]): Command[] {
+  const result: Command[] = []
+  for (const cmd of commands) {
+    const mode = resolveSkillOverrideMode(cmd.name)
+    if (mode === undefined) {
+      result.push(cmd)
+      continue
+    }
+    if (mode === 'off') {
+      // Drop — completely hidden.
+      continue
+    }
+    if (mode === 'user-invocable-only') {
+      result.push({
+        ...cmd,
+        disableModelInvocation: true,
+        userInvocable: true,
+      })
+      continue
+    }
+    if (mode === 'name-only') {
+      result.push({
+        ...cmd,
+        description: '',
+        whenToUse: undefined,
+        hasUserSpecifiedDescription: false,
+      })
+      continue
+    }
+    // Unknown mode — defensive pass-through (shouldn't happen, schema guards).
+    result.push(cmd)
+  }
+  return result
+}
+
 // SkillTool shows ALL prompt-based commands that the model can invoke
 // This includes both skills (from /skills/) and commands (from /commands/)
 export const getSkillToolCommands = memoize(
   async (cwd: string): Promise<Command[]> => {
     const allCommands = await getCommands(cwd)
-    return allCommands.filter(
+    // v2.1.129: drop / rewrite skills per `skillOverrides` BEFORE the model
+    // filter so the model-listing reflects user intent — `off` skills never
+    // appear in the SkillTool prompt and `user-invocable-only` ones are
+    // filtered out by the disableModelInvocation guard below.
+    const overridden = applySkillOverrides(allCommands)
+    return overridden.filter(
       cmd =>
         cmd.type === 'prompt' &&
         !cmd.disableModelInvocation &&
@@ -603,7 +700,12 @@ export const getSlashCommandToolSkills = memoize(
   async (cwd: string): Promise<Command[]> => {
     try {
       const allCommands = await getCommands(cwd)
-      return allCommands.filter(
+      // v2.1.129: skillOverrides also applies to the user-facing skill list.
+      // `off` skills disappear; user-invocable-only keeps them; name-only
+      // still appears but with stripped description (passes through filter
+      // because we don't require description on this path).
+      const overridden = applySkillOverrides(allCommands)
+      return overridden.filter(
         cmd =>
           cmd.type === 'prompt' &&
           cmd.source !== 'builtin' &&

@@ -2935,9 +2935,32 @@ async function loadSessionOnlyPlugins(
   const plugins: LoadedPlugin[] = []
   const errors: PluginError[] = []
 
+  // v2.1.128 / v2.1.129：source 现在可以是 https://*.zip URL 或本地 *.zip
+  // 路径。pluginArchiveLoader 把它们解压到 tmpdir 并返回真实 plugin 根，
+  // 其余流程保持不变。普通目录路径会原样返回。
+  const { resolvePluginDirSource } = await import('./pluginArchiveLoader.js')
+
   for (const [index, pluginPath] of sessionPluginPaths.entries()) {
     try {
-      const resolvedPath = resolve(pluginPath)
+      let resolvedPath: string
+      try {
+        // resolvePluginDirSource 内部对 https:// + .zip / 本地 .zip 做安全校验；
+        // 抛错时进入 catch，记录 generic-error 让 plugin list 能看到。
+        resolvedPath = await resolvePluginDirSource(pluginPath)
+      } catch (err) {
+        const errorMsg = errorMessage(err)
+        logForDebugging(
+          `Failed to resolve plugin archive ${pluginPath}: ${errorMsg}`,
+          { level: 'warn' },
+        )
+        errors.push({
+          type: 'generic-error',
+          source: `inline[${index}]`,
+          error: `Failed to resolve archive: ${errorMsg}`,
+        })
+        continue
+      }
+      resolvedPath = resolve(resolvedPath)
 
       if (!(await pathExists(resolvedPath))) {
         logForDebugging(
