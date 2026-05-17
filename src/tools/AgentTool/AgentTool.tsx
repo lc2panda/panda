@@ -19,7 +19,7 @@ import { startAgentSummarization } from '../../services/AgentSummary/agentSummar
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js';
 import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEvent } from '../../services/analytics/index.js';
 import { clearDumpState } from '../../services/api/dumpPrompts.js';
-import { completeAgentTask as completeAsyncAgent, createActivityDescriptionResolver, createProgressTracker, enqueueAgentNotification, failAgentTask as failAsyncAgent, getProgressUpdate, getTokenCountFromTracker, isLocalAgentTask, killAsyncAgent, registerAgentForeground, registerAsyncAgent, unregisterAgentForeground, updateAgentProgress as updateAsyncAgentProgress, updateProgressFromMessage } from '../../tasks/LocalAgentTask/LocalAgentTask.js';
+import { type AgentStopReason, classifyAgentStopReason, completeAgentTask as completeAsyncAgent, createActivityDescriptionResolver, createProgressTracker, enqueueAgentNotification, failAgentTask as failAsyncAgent, getProgressUpdate, getTokenCountFromTracker, isLocalAgentTask, killAsyncAgent, registerAgentForeground, registerAsyncAgent, unregisterAgentForeground, updateAgentProgress as updateAsyncAgentProgress, updateProgressFromMessage } from '../../tasks/LocalAgentTask/LocalAgentTask.js';
 import { checkRemoteAgentEligibility, formatPreconditionError, getRemoteTaskSessionUrl, registerRemoteAgentTask } from '../../tasks/RemoteAgentTask/RemoteAgentTask.js';
 import { assembleToolPool } from '../../tools.js';
 import { asAgentId } from '../../types/ids.js';
@@ -916,6 +916,10 @@ export const AgentTool = buildTool({
         // Track if an error occurred during iteration
         let syncAgentError: Error | undefined;
         let wasAborted = false;
+        // Captured from AbortController.signal.reason so the terminal summary
+        // can say "stopped (cancelled by user)" vs "stopped (interrupted by
+        // new user message)" instead of a generic "was stopped".
+        let syncStopReason: AgentStopReason | undefined;
         let worktreeResult: {
           worktreePath?: string;
           worktreeBranch?: string;
@@ -1050,13 +1054,22 @@ export const AgentTool = buildTool({
                       // Transition status BEFORE worktree cleanup so
                       // TaskOutput unblocks even if git hangs (gh-20236).
                       killAsyncAgent(backgroundedTaskId, rootSetAppState);
+                      // Backgrounded agents are aborted via task.abortController —
+                      // that is what killAsyncAgent / chat:killAgents call abort()
+                      // on. Read the cause off it; fall back to 'user_cancel'.
+                      const bgTask = toolUseContext.getAppState().tasks[backgroundedTaskId];
+                      const bgRawReason = (isLocalAgentTask(bgTask) && bgTask.abortController?.signal.aborted)
+                        ? bgTask.abortController.signal.reason
+                        : undefined;
+                      const bgStopReason = classifyAgentStopReason(bgRawReason, 'user_cancel');
                       logEvent('tengu_agent_tool_terminated', {
                         agent_type: metadata.agentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                         model: metadata.resolvedAgentModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
                         duration_ms: Date.now() - metadata.startTime,
                         is_async: true,
                         is_built_in_agent: metadata.isBuiltInAgent,
-                        reason: 'user_cancel_background' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+                        reason: 'user_cancel_background' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+                        stop_reason: bgStopReason as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
                       });
                       const worktreeResult = await cleanupWorktreeIfNeeded();
                       const partialResult = extractPartialResult(agentMessages);
@@ -1067,6 +1080,7 @@ export const AgentTool = buildTool({
                         setAppState: rootSetAppState,
                         toolUseId: toolUseContext.toolUseId,
                         finalMessage: partialResult,
+                        stopReason: bgStopReason,
                         ...worktreeResult
                       });
                       return;
@@ -1185,13 +1199,22 @@ export const AgentTool = buildTool({
           // AbortError should be re-thrown for proper interruption handling
           if (error instanceof AbortError) {
             wasAborted = true;
+            // Pull the abort cause off the controller chain. For sync agents runAgent
+            // shares toolUseContext.abortController as the agent abort controller
+            // (see runAgent.ts:553-557), so the timeout / ESC / new-message / parent
+            // signals all surface there. Default to 'user_cancel' if reason absent.
+            const rawReason = toolUseContext.abortController?.signal.aborted
+              ? toolUseContext.abortController.signal.reason
+              : undefined;
+            syncStopReason = classifyAgentStopReason(rawReason, 'user_cancel');
             logEvent('tengu_agent_tool_terminated', {
               agent_type: metadata.agentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
               model: metadata.resolvedAgentModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
               duration_ms: Date.now() - metadata.startTime,
               is_async: false,
               is_built_in_agent: metadata.isBuiltInAgent,
-              reason: 'user_cancel_sync' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+              reason: 'user_cancel_sync' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+              stop_reason: syncStopReason as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
             });
             throw error;
           }
@@ -1222,14 +1245,18 @@ export const AgentTool = buildTool({
             // NOT trigger the print.ts XML task_notification parser or the LLM loop.
             if (!wasBackgrounded) {
               const progress = getProgressUpdate(syncTracker);
+              const finalStatus = syncAgentError ? 'failed' : wasAborted ? 'stopped' : 'completed';
               enqueueSdkEvent({
                 type: 'system',
                 subtype: 'task_notification',
                 task_id: foregroundTaskId,
                 tool_use_id: toolUseContext.toolUseId,
-                status: syncAgentError ? 'failed' : wasAborted ? 'stopped' : 'completed',
+                status: finalStatus,
                 output_file: '',
                 summary: description,
+                // Surface why we stopped so SDK consumers can render a meaningful
+                // reason (VS Code subagent panel, scuttle, etc.).
+                stop_reason: finalStatus === 'stopped' ? (syncStopReason ?? 'unknown') : undefined,
                 usage: {
                   total_tokens: progress.tokenCount,
                   tool_uses: progress.toolUseCount,

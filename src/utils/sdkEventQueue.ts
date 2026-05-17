@@ -46,6 +46,13 @@ type TaskNotificationSdkEvent = {
   status: 'completed' | 'failed' | 'stopped'
   output_file: string
   summary: string
+  /** Why the task stopped. Only meaningful when status === 'stopped'. */
+  stop_reason?:
+    | 'user_cancel'
+    | 'interrupted_by_new_message'
+    | 'timeout'
+    | 'parent_abort'
+    | 'unknown'
   usage?: {
     total_tokens: number
     tool_uses: number
@@ -119,6 +126,13 @@ export function emitTaskTerminatedSdk(
     summary?: string
     outputFile?: string
     usage?: { total_tokens: number; tool_uses: number; duration_ms: number }
+    /** Only consulted when status === 'stopped'. */
+    stopReason?:
+      | 'user_cancel'
+      | 'interrupted_by_new_message'
+      | 'timeout'
+      | 'parent_abort'
+      | 'unknown'
   },
 ): void {
   enqueueSdkEvent({
@@ -130,5 +144,6 @@ export function emitTaskTerminatedSdk(
     output_file: opts?.outputFile ?? '',
     summary: opts?.summary ?? '',
     usage: opts?.usage,
+    stop_reason: status === 'stopped' ? opts?.stopReason : undefined,
   })
 }

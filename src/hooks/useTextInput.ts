@@ -1,9 +1,11 @@
+import { useRef } from 'react'
 import { isInputModeCharacter } from 'src/components/PromptInput/inputModes.js'
 import { useNotifications } from 'src/context/notifications.js'
 import stripAnsi from 'strip-ansi'
 import { markBackslashReturnUsed } from '../commands/terminalSetup/terminalSetup.js'
 import { addToHistory } from '../history.js'
 import type { Key } from '../ink.js'
+import { logForDebugging } from '../utils/debug.js'
 import type {
   InlineGhostText,
   TextInputState,
@@ -102,7 +104,29 @@ export function useTextInput({
 
   const offset = externalOffset
   const setOffset = onOffsetChange
-  const cursor = Cursor.fromText(originalValue, columns, offset)
+  // Worker Y P0 fix: track latest text + offset synchronously across keystrokes
+  // within the same discreteUpdates batch. processKeysInBatch emits all keys in
+  // a stdin chunk back-to-back via EventEmitter.emit (synchronous), and the
+  // useEventCallback ref in useInput is updated via useEffect (async under Bun
+  // where typeof window === undefined). So within the SAME batch:
+  //   1. ref.current points at the prev-commit wrappedOnInput closure
+  //   2. cursor inside that closure is Cursor.fromText(originalValue) — stale
+  //   3. cursor.insert(char) returns nextCursor with just THIS char (e.g. 'h')
+  //   4. onChange('h') schedules setState — next iteration sees same stale cursor
+  //   5. Final Enter calls handleEnter(originalValue=='') — submit dropped at
+  //      PromptInput.onSubmit L1074 (inputParam.trim() === '') early return.
+  // Comdr report: 输入正常内容按 Enter 没反应，按 ↑ 后输入恢复.
+  // Fix: maintain refs that progress through the batch in lockstep with onChange,
+  // and rebind the `cursor` let-binding at onInput entry so all the inner
+  // closures (mapKey, handleCtrl, handleMeta, handleEnter, etc.) see the live
+  // value via JavaScript closure semantics on a `let` variable.
+  const latestValueRef = useRef(originalValue)
+  const latestOffsetRef = useRef(offset)
+  latestValueRef.current = originalValue
+  latestOffsetRef.current = offset
+  // eslint-disable-next-line prefer-const — re-assigned at onInput entry to
+  // resync from refs that progress through the batch.
+  let cursor = Cursor.fromText(originalValue, columns, offset)
   const { addNotification, removeNotification } = useNotifications()
 
   const handleCtrlC = useDoublePress(
@@ -263,7 +287,19 @@ export function useTextInput({
     if (env.terminal === 'Apple_Terminal' && isModifierPressed('shift')) {
       return cursor.insert('\n')
     }
-    onSubmit?.(originalValue)
+    // Worker Y P0 fix: use cursor.text (live) instead of originalValue (stale
+    // React closure). The `cursor` let-binding is rebound at onInput entry from
+    // latestValueRef.current, so by the time handleEnter runs it reflects every
+    // prior key in this discreteUpdates batch. originalValue captured at hook
+    // execution is empty when keys are coalesced ("hello\r" arriving in a single
+    // stdin chunk), causing PromptInput.onSubmit's L1074 empty-input guard to
+    // silently drop the message — the Comdr P0 bug.
+    if (cursor.text !== originalValue) {
+      logForDebugging(
+        `[useTextInput.handleEnter] stale closure caught: originalValue.len=${originalValue.length} cursor.text.len=${cursor.text.length} — submitting live cursor.text`,
+      )
+    }
+    onSubmit?.(cursor.text)
   }
 
   function upOrHistoryUp() {
@@ -431,6 +467,22 @@ export function useTextInput({
   function onInput(input: string, key: Key): void {
     // Note: Image paste shortcut (chat:imagePaste) is handled via useKeybindings in PromptInput
 
+    // Worker Y P0 fix: rebind cursor from refs at entry so prior keys in this
+    // batch are visible. This is the critical line — without it, mapKey and
+    // all the inner closures (handleCtrl/handleMeta/handleEnter) operate on
+    // the render-time cursor (Cursor.fromText(originalValue)), losing every
+    // keystroke earlier in the same discreteUpdates batch.
+    if (
+      latestValueRef.current !== cursor.text ||
+      latestOffsetRef.current !== cursor.offset
+    ) {
+      cursor = Cursor.fromText(
+        latestValueRef.current,
+        columns,
+        latestOffsetRef.current,
+      )
+    }
+
     // Apply filter if provided
     const filteredInput = inputFilter ? inputFilter(input, key) : input
 
@@ -459,6 +511,10 @@ export function useTextInput({
       if (!cursor.equals(currentCursor)) {
         if (cursor.text !== currentCursor.text) {
           onChange(currentCursor.text)
+          // Worker Y P0 fix: sync latestValueRef so handleEnter in same batch
+          // (e.g. SSH-coalesced "\x7f...hello\r") sees the latest text.
+          latestValueRef.current = currentCursor.text
+          latestOffsetRef.current = currentCursor.offset
         }
         setOffset(currentCursor.offset)
       }
@@ -482,6 +538,12 @@ export function useTextInput({
       if (!cursor.equals(nextCursor)) {
         if (cursor.text !== nextCursor.text) {
           onChange(nextCursor.text)
+          // Worker Y P0 fix: sync latestValueRef so handleEnter in same batch
+          // sees the latest text. This handles SSH/tmux coalesce, fast typing,
+          // and paste-with-newline cases where prior keystrokes' setState has
+          // not yet been committed when Enter is processed.
+          latestValueRef.current = nextCursor.text
+          latestOffsetRef.current = nextCursor.offset
         }
         setOffset(nextCursor.offset)
       }

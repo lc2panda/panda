@@ -3274,6 +3274,13 @@ export function REPL({
   }, options?: {
     fromKeybinding?: boolean;
   }) => {
+    // Worker Y P0: trace entry input — exposes stale-closure submissions from
+    // useTextInput.handleEnter (Enter clears prompt but message not sent).
+    if (!input || input.length === 0) {
+      logForDebugging(
+        `[REPL.onSubmit] empty input received from PromptInput — possible stale closure (speculationAccept=${!!speculationAccept} fromKeybinding=${!!options?.fromKeybinding})`,
+      );
+    }
     // Re-pin scroll to bottom on submit so the user always sees the new
     // exchange (matches OpenCode's auto-scroll behavior).
     repinScroll();

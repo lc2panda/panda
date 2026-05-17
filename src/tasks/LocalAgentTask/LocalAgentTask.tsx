@@ -1,3 +1,11 @@
+// Input:  agent lifecycle events (register/progress/complete/fail/kill) +
+//         optional stopReason metadata captured from abortController.signal.
+// Output: AppState task entries, queued model-facing task_notification XML,
+//         and (via callers) emitTaskTerminatedSdk events for SDK consumers.
+// Pos:    src/tasks/LocalAgentTask/LocalAgentTask.tsx — single owner of local
+//         (foreground+background) agent task state and its terminal summary.
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
 import { getSdkAgentProgressSummariesEnabled } from '../../bootstrap/state.js';
 import { OUTPUT_FILE_TAG, STATUS_TAG, SUMMARY_TAG, TASK_ID_TAG, TASK_NOTIFICATION_TAG, TOOL_USE_ID_TAG, WORKTREE_BRANCH_TAG, WORKTREE_PATH_TAG, WORKTREE_TAG } from '../../constants/xml.js';
 import { abortSpeculation } from '../../services/PromptSuggestion/speculation.js';
@@ -193,6 +201,78 @@ export function drainPendingMessages(taskId: string, getAppState: () => AppState
 }
 
 /**
+ * Reasons an agent task can transition to a stopped/killed terminal state.
+ * Surfaced in user-facing summary so the operator knows WHY the agent stopped
+ * (was it ESC? a new message interrupting? a timeout?).
+ */
+export type AgentStopReason =
+  | 'user_cancel'
+  | 'interrupted_by_new_message'
+  | 'timeout'
+  | 'parent_abort'
+  | 'unknown';
+
+/**
+ * Human-readable phrase for each stop reason.
+ * `timeoutMs` is only consulted for 'timeout'; otherwise ignored.
+ */
+export function describeAgentStopReason(
+  reason: AgentStopReason | undefined,
+  timeoutMs?: number
+): string {
+  switch (reason) {
+    case 'user_cancel':
+      return 'cancelled by user';
+    case 'interrupted_by_new_message':
+      return 'interrupted by new user message';
+    case 'timeout':
+      return timeoutMs && timeoutMs > 0
+        ? `timed out after ${timeoutMs}ms`
+        : 'timed out';
+    case 'parent_abort':
+      return 'parent process aborted';
+    case 'unknown':
+    case undefined:
+    default:
+      return 'unknown reason';
+  }
+}
+
+/**
+ * Map a raw AbortSignal.reason (or sentinel string) to AgentStopReason.
+ * Falls back to 'unknown' when the reason is missing or unrecognized.
+ * Callers may pass `fallback` to override the default when reason is absent.
+ */
+export function classifyAgentStopReason(
+  rawReason: unknown,
+  fallback: AgentStopReason = 'unknown'
+): AgentStopReason {
+  if (typeof rawReason !== 'string') {
+    return fallback;
+  }
+  switch (rawReason) {
+    case 'user-cancel':
+    case 'user_cancel':
+    case 'kill_agents':
+    case 'escape':
+      return 'user_cancel';
+    case 'interrupt':
+    case 'interrupted_by_new_message':
+    case 'interrupt_on_submit':
+      return 'interrupted_by_new_message';
+    case 'timeout':
+      return 'timeout';
+    case 'parent_abort':
+    case 'parent-abort':
+    case 'sibling_error':
+    case 'background':
+      return 'parent_abort';
+    default:
+      return fallback;
+  }
+}
+
+/**
  * Enqueue an agent notification to the message queue.
  */
 export function enqueueAgentNotification({
@@ -205,7 +285,9 @@ export function enqueueAgentNotification({
   usage,
   toolUseId,
   worktreePath,
-  worktreeBranch
+  worktreeBranch,
+  stopReason,
+  timeoutMs
 }: {
   taskId: string;
   description: string;
@@ -221,6 +303,10 @@ export function enqueueAgentNotification({
   toolUseId?: string;
   worktreePath?: string;
   worktreeBranch?: string;
+  /** Only consulted when status === 'killed'. Drives the "stopped (...)" suffix. */
+  stopReason?: AgentStopReason;
+  /** Used to render 'timed out after Nms' when stopReason === 'timeout'. */
+  timeoutMs?: number;
 }): void {
   // Atomically check and set notified flag to prevent duplicate notifications.
   // If the task was already marked as notified (e.g., by TaskStopTool), skip
@@ -244,7 +330,12 @@ export function enqueueAgentNotification({
   // results may reference stale task output. The prompt suggestion text is
   // preserved; only the pre-computed response is discarded.
   abortSpeculation(setAppState);
-  const summary = status === 'completed' ? `Agent "${description}" completed` : status === 'failed' ? `Agent "${description}" failed: ${error || 'Unknown error'}` : `Agent "${description}" was stopped`;
+  const summary =
+    status === 'completed'
+      ? `Agent "${description}" completed`
+      : status === 'failed'
+        ? `Agent "${description}" failed: ${error || 'Unknown error'}`
+        : `Agent "${description}" stopped (${describeAgentStopReason(stopReason, timeoutMs)})`;
   const outputPath = getTaskOutputPath(taskId);
   const toolUseIdLine = toolUseId ? `\n<${TOOL_USE_ID_TAG}>${toolUseId}</${TOOL_USE_ID_TAG}>` : '';
   const resultSection = finalMessage ? `\n<result>${finalMessage}</result>` : '';
@@ -272,21 +363,30 @@ export const LocalAgentTask: Task = {
   name: 'LocalAgentTask',
   type: 'local_agent',
   async kill(taskId, setAppState) {
-    killAsyncAgent(taskId, setAppState);
+    // TaskStop / SDK stop_task hits this path — surface as user_cancel so
+    // the terminal summary reflects an explicit stop request, not 'unknown'.
+    killAsyncAgent(taskId, setAppState, 'user_cancel');
   }
 };
 
 /**
  * Kill an agent task. No-op if already killed/completed.
+ * @param abortReason - Optional cause attached to AbortController.abort(). Catch
+ *   handlers in AgentTool / runAsyncAgentLifecycle classify this to render
+ *   "stopped (cancelled by user)" / "stopped (timed out ...)" / etc.
  */
-export function killAsyncAgent(taskId: string, setAppState: SetAppState): void {
+export function killAsyncAgent(
+  taskId: string,
+  setAppState: SetAppState,
+  abortReason?: string,
+): void {
   let killed = false;
   updateTaskState<LocalAgentTaskState>(taskId, setAppState, task => {
     if (task.status !== 'running') {
       return task;
     }
     killed = true;
-    task.abortController?.abort();
+    task.abortController?.abort(abortReason);
     task.unregisterCleanup?.();
     return {
       ...task,
@@ -306,11 +406,17 @@ export function killAsyncAgent(taskId: string, setAppState: SetAppState): void {
 /**
  * Kill all running agent tasks.
  * Used by ESC cancellation in coordinator mode to stop all subagents.
+ * @param abortReason - Forwarded to each agent's AbortController so downstream
+ *   catch handlers can render a specific reason instead of 'unknown'.
  */
-export function killAllRunningAgentTasks(tasks: Record<string, TaskState>, setAppState: SetAppState): void {
+export function killAllRunningAgentTasks(
+  tasks: Record<string, TaskState>,
+  setAppState: SetAppState,
+  abortReason: string = 'user_cancel',
+): void {
   for (const [taskId, task] of Object.entries(tasks)) {
     if (task.type === 'local_agent' && task.status === 'running') {
-      killAsyncAgent(taskId, setAppState);
+      killAsyncAgent(taskId, setAppState, abortReason);
     }
   }
 }
@@ -504,9 +610,11 @@ export function registerAsyncAgent({
     diskLoaded: false
   };
 
-  // Register cleanup handler
+  // Register cleanup handler. registerCleanup fires on process shutdown / parent
+  // session teardown — surface as 'parent_abort' so the summary doesn't lie
+  // ("cancelled by user" when the user did nothing).
   const unregisterCleanup = registerCleanup(async () => {
-    killAsyncAgent(agentId, setAppState);
+    killAsyncAgent(agentId, setAppState, 'parent_abort');
   });
   taskState.unregisterCleanup = unregisterCleanup;
 

@@ -30,6 +30,7 @@ import type {
 } from '../../Tool.js'
 import { toolMatchesName } from '../../Tool.js'
 import {
+  classifyAgentStopReason,
   completeAgentTask as completeAsyncAgent,
   createActivityDescriptionResolver,
   createProgressTracker,
@@ -686,6 +687,14 @@ export async function runAsyncAgentLifecycle({
       // must fire unconditionally. Transition status BEFORE worktree cleanup
       // so TaskOutput unblocks even if git hangs (gh-20236).
       killAsyncAgent(taskId, rootSetAppState)
+      // Read AbortSignal.reason off the agent's controller so the summary can
+      // say WHY it stopped. async-from-start path: spawned by AgentTool with a
+      // fresh controller; killed via task.abortController.abort() in
+      // killAsyncAgent + TaskStop. Default to 'user_cancel'.
+      const rawReason = abortController.signal.aborted
+        ? abortController.signal.reason
+        : undefined
+      const stopReason = classifyAgentStopReason(rawReason, 'user_cancel')
       logEvent('tengu_agent_tool_terminated', {
         agent_type:
           metadata.agentType as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -696,6 +705,8 @@ export async function runAsyncAgentLifecycle({
         is_built_in_agent: metadata.isBuiltInAgent,
         reason:
           'user_kill_async' as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+        stop_reason:
+          stopReason as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
       const worktreeResult = await getWorktreeResult()
       const partialResult = extractPartialResult(agentMessages)
@@ -706,6 +717,7 @@ export async function runAsyncAgentLifecycle({
         setAppState: rootSetAppState,
         toolUseId: toolUseContext.toolUseId,
         finalMessage: partialResult,
+        stopReason,
         ...worktreeResult,
       })
       return

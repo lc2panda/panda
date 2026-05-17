@@ -561,7 +561,9 @@ export async function* runAgent({
   const agentAbortController = baseAbortController
   const agentTimeoutMs = parseInt(process.env.PANDA_AGENT_TIMEOUT_MS || '0', 10)
   const agentTimeoutId = agentTimeoutMs > 0 ? setTimeout(() => {
-    agentAbortController.abort()
+    // Pass 'timeout' as the abort reason so downstream catch handlers can
+    // surface "stopped (timed out after Nms)" instead of a generic "was stopped".
+    agentAbortController.abort('timeout')
   }, agentTimeoutMs) : undefined
 
   // Execute SubagentStart hooks and collect additional context

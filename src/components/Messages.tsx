@@ -633,20 +633,30 @@ const MessagesImpl = ({
     //   - worker: msg.isSubAgent=true 的 user/assistant 消息（来自 sub-agent 内部）
     //   - system: msg.type='system'（"Agent X completed" 等系统事件）
     // chrome key 同时考虑 isSubAgent 标记，确保 user→worker 切换也插顶标。
+    // v3.8.1（2026-05-17）：worker chrome 维度细化 + 短内容折叠。
+    //   - chromeKey 包含 subAgentName，不同 sub-agent 之间触发 chrome 边界（修复 A→B worker 无边界 bug）
+    //   - 短内容（≤80 字符且无 tool_use/result）且非首条 → 跳过 chrome 减少视觉噪音
     const isRoleMsg = msg_8.type === 'user' || msg_8.type === 'assistant' || msg_8.type === 'system';
     const isSubAgentMsg = (msg_8 as { isSubAgent?: boolean }).isSubAgent === true;
     const prevMsg = index > 0 ? renderableMessages[index - 1] : undefined;
-    const prevIsSubAgent = (prevMsg as { isSubAgent?: boolean } | undefined)?.isSubAgent === true;
-    // chromeKey: 用于跨 type+isSubAgent 维度判定 roleChanged
+    // chromeKey: 用于跨 type+isSubAgent+subAgentName 维度判定 roleChanged
     //   user             → 'user'
     //   assistant        → 'panda'
-    //   user/assistant + isSubAgent → 'worker'
+    //   user/assistant + isSubAgent → 'worker:<subAgentName>'（不同 sub-agent 分别边界）
     //   system           → 'system'
     const computeChromeKey = (m: typeof msg_8 | undefined): string | null => {
       if (!m) return null;
       const sub = (m as { isSubAgent?: boolean }).isSubAgent === true;
-      if (m.type === 'user') return sub ? 'worker' : 'user';
-      if (m.type === 'assistant') return sub ? 'worker' : 'panda';
+      if (m.type === 'user') {
+        if (!sub) return 'user';
+        const name = (m as { subAgentName?: string }).subAgentName ?? '';
+        return `worker:${name}`;
+      }
+      if (m.type === 'assistant') {
+        if (!sub) return 'panda';
+        const name = (m as { subAgentName?: string }).subAgentName ?? '';
+        return `worker:${name}`;
+      }
       if (m.type === 'system') return 'system';
       return null;
     };
@@ -663,7 +673,9 @@ const MessagesImpl = ({
     let matrixHeader: React.ReactNode = null;
     let matrixSeparator: React.ReactNode = null;
     if (matrix && roleChanged && curChromeKey !== null) {
-      const role = curChromeKey as 'user' | 'panda' | 'worker' | 'system';
+      // chromeKey 形如 'worker:xxx'，render role 取去掉 ':xxx' 后的纯角色名
+      const rawRole = curChromeKey.startsWith('worker:') ? 'worker' : curChromeKey;
+      const role = rawRole as 'user' | 'panda' | 'worker' | 'system';
       const ts = (msg_8 as { timestamp?: string }).timestamp;
       const displayName = isSubAgentMsg ? (msg_8 as { subAgentName?: string }).subAgentName : undefined;
       matrixHeader = (
@@ -677,8 +689,6 @@ const MessagesImpl = ({
       );
       // v3.8 简化：移除 ╳ ─── ╳ 扫描线（v3.7 Pro 装饰过度），matrixSeparator 保持 null
     }
-    // 标记 prevIsSubAgent 已读取（消除未使用警告，预留给后续波次的 worker→operator 出栈分隔逻辑）
-    void prevIsSubAgent;
 
     // Per-row Provider — only 2 rows re-render on selection change.
     // Wrapped BEFORE divider branch so both return paths get it.

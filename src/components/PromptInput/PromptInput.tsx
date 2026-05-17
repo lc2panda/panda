@@ -989,6 +989,15 @@ function PromptInput({
     setSuggestionsStateRaw(prev => typeof updater === 'function' ? updater(prev) : updater);
   }, []);
   const onSubmit = useCallback(async (inputParam: string, isSubmittingSlashCommand = false) => {
+    // Worker Y P0: trace stale-closure submissions from useTextInput.handleEnter.
+    // The L1074 empty-inputParam guard silently drops Enter when the closure
+    // captured the pre-batch (empty) props.value — log so the regression is
+    // visible in debug.txt even if the user never reports it explicitly.
+    if (inputParam.length === 0 && input.length > 0) {
+      logForDebugging(
+        `[PromptInput.onSubmit] STALE: inputParam empty but PromptInput.input.length=${input.length} — likely useTextInput stale closure`,
+      );
+    }
     inputParam = inputParam.trimEnd();
 
     // Don't submit if a footer indicator is being opened. Read fresh from

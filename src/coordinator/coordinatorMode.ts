@@ -160,7 +160,7 @@ Format:
 \`\`\`
 
 - \`<result>\` and \`<usage>\` are optional sections
-- The \`<summary>\` describes the outcome: "completed", "failed: {error}", or "was stopped"
+- The \`<summary>\` describes the outcome: "completed", "failed: {error}", or "stopped ({reason})" where reason is one of "cancelled by user", "interrupted by new user message", "timed out after Nms", "parent process aborted", or "unknown reason"
 - The \`<task-id>\` value is the agent ID — use SendMessage with that ID as \`to\` to continue that worker
 
 ### Example

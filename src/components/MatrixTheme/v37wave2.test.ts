@@ -14,13 +14,20 @@ import { getRoleColor, getRoleDimColor } from './matrixPalette.js'
 import type { Message } from '../../types/message.js'
 
 // 复刻 Messages.tsx 的 chromeKey 决策（保持公式同源；改一边必须同步另一边）
+// v3.8.1（2026-05-17）：worker key 包含 subAgentName，不同 sub-agent 之间触发 chrome 边界
 function computeChromeKey(
-  m: Pick<Message, 'type'> & { isSubAgent?: boolean } | undefined,
+  m: Pick<Message, 'type'> & { isSubAgent?: boolean; subAgentName?: string } | undefined,
 ): string | null {
   if (!m) return null
   const sub = m.isSubAgent === true
-  if (m.type === 'user') return sub ? 'worker' : 'user'
-  if (m.type === 'assistant') return sub ? 'worker' : 'panda'
+  if (m.type === 'user') {
+    if (!sub) return 'user'
+    return `worker:${m.subAgentName ?? ''}`
+  }
+  if (m.type === 'assistant') {
+    if (!sub) return 'panda'
+    return `worker:${m.subAgentName ?? ''}`
+  }
   if (m.type === 'system') return 'system'
   return null
 }
@@ -45,18 +52,27 @@ test('波次2 — RenderableMessage 元字段扩展（isSubAgent / subAgentName 
 
 test('波次2 — chromeKey: user→worker 切换识别（roleChanged=true）', () => {
   const prev = { type: 'user' as const }
-  const cur = { type: 'user' as const, isSubAgent: true }
+  const cur = { type: 'user' as const, isSubAgent: true, subAgentName: 'agent-a' }
   expect(computeChromeKey(prev)).toBe('user')
-  expect(computeChromeKey(cur)).toBe('worker')
+  expect(computeChromeKey(cur)).toBe('worker:agent-a')
   // roleChanged 判定：cur key !== prev key
   expect(computeChromeKey(prev) !== computeChromeKey(cur)).toBe(true)
 })
 
 test('波次2 — chromeKey: worker→panda 切换识别（sub-agent 完成回主线）', () => {
-  const prev = { type: 'assistant' as const, isSubAgent: true }
+  const prev = { type: 'assistant' as const, isSubAgent: true, subAgentName: 'agent-a' }
   const cur = { type: 'assistant' as const }
-  expect(computeChromeKey(prev)).toBe('worker')
+  expect(computeChromeKey(prev)).toBe('worker:agent-a')
   expect(computeChromeKey(cur)).toBe('panda')
+  expect(computeChromeKey(prev) !== computeChromeKey(cur)).toBe(true)
+})
+
+test('v3.8.1 — chromeKey: 不同 sub-agent 之间触发 chrome 边界（A→B worker 切换）', () => {
+  const prev = { type: 'assistant' as const, isSubAgent: true, subAgentName: 'agent-a' }
+  const cur = { type: 'assistant' as const, isSubAgent: true, subAgentName: 'agent-b' }
+  expect(computeChromeKey(prev)).toBe('worker:agent-a')
+  expect(computeChromeKey(cur)).toBe('worker:agent-b')
+  // A→B 必须触发 roleChanged（修复 v3.8 前 worker 之间无边界 bug）
   expect(computeChromeKey(prev) !== computeChromeKey(cur)).toBe(true)
 })
 
@@ -69,11 +85,11 @@ test('波次2 — chromeKey: 主线 → system event 切换', () => {
 })
 
 test('波次2 — chromeKey: 同 chrome 连续 message 不重复插顶标', () => {
-  const a = { type: 'assistant' as const, isSubAgent: true }
-  const b = { type: 'assistant' as const, isSubAgent: true }
-  // 同为 worker → 不应触发 roleChanged
-  expect(computeChromeKey(a)).toBe('worker')
-  expect(computeChromeKey(b)).toBe('worker')
+  const a = { type: 'assistant' as const, isSubAgent: true, subAgentName: 'agent-x' }
+  const b = { type: 'assistant' as const, isSubAgent: true, subAgentName: 'agent-x' }
+  // 同 sub-agent 连续 → 不应触发 roleChanged
+  expect(computeChromeKey(a)).toBe('worker:agent-x')
+  expect(computeChromeKey(b)).toBe('worker:agent-x')
   expect(computeChromeKey(a) === computeChromeKey(b)).toBe(true)
 })
 

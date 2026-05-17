@@ -186,6 +186,11 @@ export async function handlePromptSubmit(
 
   const hasImages = Object.values(pastedContents).some(isValidImagePaste)
   if (input.trim() === '') {
+    // Worker Y P0: log unexpected empty-input drops so the next regression of
+    // useTextInput stale-closure-Enter is immediately visible in debug logs.
+    logForDebugging(
+      `[handlePromptSubmit] EARLY-RETURN: input is empty — message dropped (caller=onSubmit)`,
+    )
     return
   }
 

@@ -184,12 +184,14 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
       emitTaskTerminatedSdk(taskId, 'stopped', {
         toolUseId: task.toolUseId,
         summary: task.description,
+        // chat:killAgents is always a deliberate user gesture.
+        stopReason: 'user_cancel',
       })
     }
     const summary =
       descriptions.length === 1
-        ? `Background agent "${descriptions[0]}" was stopped by the user.`
-        : `${descriptions.length} background agents were stopped by the user: ${descriptions.map(d => `"${d}"`).join(', ')}.`
+        ? `Background agent "${descriptions[0]}" stopped (cancelled by user).`
+        : `${descriptions.length} background agents stopped (cancelled by user): ${descriptions.map(d => `"${d}"`).join(', ')}.`
     enqueuePendingNotification({ value: summary, mode: 'task-notification' })
     onAgentsKilled()
     return true
