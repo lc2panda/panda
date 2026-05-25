@@ -6,6 +6,8 @@ import { create } from 'zustand';
 import * as bridge from '../ipc/bridge';
 import type { MessageEntry } from '../ipc/types';
 import { useToastStore } from './toastStore';
+import { useSessionStore } from './sessionStore';
+import { useTabStore } from './tabStore';
 
 // ---------------------------------------------------------------------------
 // Types — UIMessage union mirrors cc-haha MessageEntry (5 types)
@@ -208,6 +210,7 @@ interface StreamBuffer {
 }
 
 const streamBuffers = new Map<string, StreamBuffer>();
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getBuffer(sessionId: string): StreamBuffer {
   let buf = streamBuffers.get(sessionId);
@@ -216,6 +219,10 @@ function getBuffer(sessionId: string): StreamBuffer {
     streamBuffers.set(sessionId, buf);
   }
   return buf;
+}
+
+function isValidSessionId(sessionId: string): boolean {
+  return UUID_PATTERN.test(sessionId);
 }
 
 // ---------------------------------------------------------------------------
@@ -766,6 +773,50 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   // -- High-level bridge actions -----------------------------------------------
 
   sendMessage: (sessionId, content) => {
+    if (!isValidSessionId(sessionId)) {
+      void (async () => {
+        try {
+          const oldSession = get().sessions.get(sessionId);
+          const meta = useSessionStore
+            .getState()
+            .sessions.find((s) => s.id === sessionId);
+          const newSession = await useSessionStore
+            .getState()
+            .createSession(meta?.cwd || undefined);
+
+          useSessionStore.getState().updateSession(newSession.id, {
+            name: meta?.name ? `${meta.name} (续聊)` : newSession.name,
+            cwd: meta?.cwd ?? newSession.cwd,
+          });
+          useTabStore.getState().replaceTabSession(sessionId, newSession.id);
+
+          set((state) => {
+            const nextSession = createEmptySession(newSession.id);
+            return {
+              activeSessionId: newSession.id,
+              sessions: putSession(state.sessions, {
+                ...nextSession,
+                messages: oldSession?.messages ?? [],
+                connectionState: 'disconnected',
+              }),
+            };
+          });
+
+          get().sendMessage(newSession.id, content);
+          useToastStore.getState().addToast({
+            type: 'info',
+            message: '历史会话 ID 不是 UUID，已自动创建新会话继续发送。',
+          });
+        } catch (err) {
+          console.error('[chatStore] Failed to fork legacy session:', err);
+          useToastStore.getState().addToast({
+            type: 'error',
+            message: err instanceof Error ? err.message : 'Failed to continue historical session',
+          });
+        }
+      })();
+      return;
+    }
     const { addUserMessage } = get();
     addUserMessage(sessionId, content);
     bridge.sendMessage(sessionId, content).catch(async (err) => {

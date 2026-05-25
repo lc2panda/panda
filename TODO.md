@@ -1,6 +1,17 @@
 # TODO
 
-## 进行中 — v2.26.8 Desk Chat Release 热修（2026-05-25 15:47:20 +08:00）
+## 进行中 — v2.26.9 Desk Chat 历史会话续聊热修（2026-05-25 16:22:20 +08:00）
+
+- [x] 真实时间核验：本机 `2026-05-25 16:22:18 +08:00`，Cloudflare `2026-05-25 16:22:19 +08:00`，Apple `2026-05-25 16:22:20 +08:00`，最大偏差约 2 秒，判定通过。
+- [x] 根因复现：非 UUID 历史 `sessionId` 传给 packaged CLI 会报 `Error: Invalid session ID. Must be a valid UUID.` 并以 code=1 退出；UUID + `--permission-mode bypassPermissions` 可真实返回 `pong`。
+- [x] 修复历史续聊：Desk Chat 在非 UUID 历史会话中发送消息时自动创建新的 UUID 会话，保留当前 UI 历史消息并替换当前 tab，再把新消息发到新会话。
+- [x] 修复权限模式：renderer 迁移旧 `skip/dontAsk`，IPC 将 `auto` 映射为 CLI 稳定支持的 `default`；backend 白名单兜底未知权限模式，避免非法 `--permission-mode` 触发 code=1。
+- [x] 验证：`cd packages/panda-desk-chat && bun run build:electron` 通过；`cd packages/panda-desk-chat && bun run test src/__tests__/stores/settingsStore.test.ts` 通过 6/6；packaged CLI UUID + `bypassPermissions` 真实返回 `pong`。
+- [x] 重新打包 Desk Chat `0.2.4`：`bun run dist` 于 `2026-05-25 16:40:00 +08:00` 通过，生成 `Panda-0.2.4-arm64.dmg`、`Panda-0.2.4-arm64-mac.zip`、两个 blockmap 与 `latest-mac.yml`；资源核验 `panda-cli/dist/cli.js` 存在，`panda-cli/dist` 共 625 个文件。
+- [ ] 创建 GitHub Release `v2.26.9` 并上传安装包。
+- [ ] git push 与 npm 同步：推送 `main`、tag `v2.26.9`，发布 `@lc2panda/panda-code@2.26.9` 到 GitHub Packages。
+
+## 已完成 — v2.26.8 Desk Chat Release 热修（2026-05-25 15:47:20 +08:00）
 
 - [x] 真实时间核验：本机 `2026-05-25 15:47:20 +08:00`，Apple `2026-05-25 15:47:21 +08:00`，Cloudflare `2026-05-25 15:47:21 +08:00`，最大偏差约 1 秒，判定通过。
 - [x] 截图报错根因定位：已安装 `/Applications/Panda.app/Contents/Resources/` 与本地打包 app 均只有 `app.asar`，缺少 `dist/cli.js`；Desk Chat packaged 后端查找 `process.resourcesPath/dist/cli.js`，导致发送消息时报 `Module not found`。

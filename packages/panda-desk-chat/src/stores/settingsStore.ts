@@ -149,6 +149,23 @@ const persistedDefaults: PersistedSettings = {
   effortLevel: 'medium',
 };
 
+type LegacyPermissionMode = PermissionMode | 'skip' | 'dontAsk';
+
+function normalizeStoredPermissionMode(mode: unknown): PermissionMode {
+  if (mode === 'skip') return 'bypassPermissions';
+  if (mode === 'dontAsk') return 'bypassPermissions';
+  if (
+    mode === 'default' ||
+    mode === 'acceptEdits' ||
+    mode === 'bypassPermissions' ||
+    mode === 'plan' ||
+    mode === 'auto'
+  ) {
+    return mode;
+  }
+  return 'default';
+}
+
 function pickPersisted(state: SettingsStore): PersistedSettings {
   return {
     fontSize: state.fontSize,
@@ -159,7 +176,7 @@ function pickPersisted(state: SettingsStore): PersistedSettings {
     model: state.model,
     theme: state.theme,
     locale: state.locale,
-    permissionMode: state.permissionMode,
+    permissionMode: normalizeStoredPermissionMode(state.permissionMode),
     effortLevel: state.effortLevel,
   };
 }
@@ -172,9 +189,11 @@ function pickPersisted(state: SettingsStore): PersistedSettings {
  * TODO(IPC): 等 panda 主进程接受 `acceptEdits` 字面量后即可去掉此映射。
  */
 function toIpcPermissionMode(
-  mode: PermissionMode,
+  mode: LegacyPermissionMode,
 ): 'default' | 'plan' | 'auto' | 'bypassPermissions' {
+  if (mode === 'skip' || mode === 'dontAsk') return 'bypassPermissions';
   if (mode === 'acceptEdits') return 'default';
+  if (mode === 'auto') return 'default';
   return mode;
 }
 
@@ -239,7 +258,9 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
       const localeFinal = persisted.locale ?? getStoredLocale();
       const themeFinal = (persisted.theme ?? get().theme) as Theme;
       const effortFinal = persisted.effortLevel ?? 'medium';
-      const permissionFinal = persisted.permissionMode ?? 'default';
+      const permissionFinal = normalizeStoredPermissionMode(
+        persisted.permissionMode,
+      );
 
       // 同步 UIStore 主题（cc-haha L62-L63 行为）
       if (themeFinal === 'light' || themeFinal === 'dark') {
@@ -275,10 +296,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 
   // cc-haha L82-L90: setPermissionMode — optimistic + 失败回滚
   setPermissionMode: async (mode) => {
+    const normalizedMode = normalizeStoredPermissionMode(mode);
     const prev = get().permissionMode;
-    set({ permissionMode: mode });
+    set({ permissionMode: normalizedMode });
     try {
-      await bridge.setPermissionMode(toIpcPermissionMode(mode));
+      await bridge.setPermissionMode(toIpcPermissionMode(normalizedMode));
       get().saveSettings();
     } catch {
       set({ permissionMode: prev });
@@ -415,11 +437,13 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
       ...saved,
       ...(migratedTheme ? { theme: migratedTheme } : {}),
       ...(migratedEffort ? { effortLevel: migratedEffort } : {}),
+      permissionMode: normalizeStoredPermissionMode(saved.permissionMode),
     };
     set(merged);
     const needsPersist =
       saved.theme === 'system' ||
-      (oldEffort && !validNew.includes(oldEffort as EffortLevel));
+      (oldEffort && !validNew.includes(oldEffort as EffortLevel)) ||
+      merged.permissionMode !== saved.permissionMode;
     if (needsPersist) {
       storage.set(STORAGE_KEY, merged);
     }

@@ -6,6 +6,12 @@
 
 ---
 
+## v2.26.9 — 2026-05-25 · Panda Desk Chat 历史会话续聊热修
+- 修复历史会话续聊 code=1：当 Desk Chat 加载到非 UUID 历史 `sessionId` 并发送新消息时，自动创建新的 UUID 会话、保留当前 UI 历史消息并替换当前 tab，再继续发送，避免 CLI 拒绝非法 `--session-id`。
+- 修复权限模式 code=1：renderer 迁移旧 `skip/dontAsk`，将 UI-only `auto` 映射为 CLI 稳定支持的 `default`；Electron backend 增加权限模式白名单与未知值兜底。
+- 验证：`bun run build:electron` 通过；`settingsStore.test.ts` 6/6 通过；packaged CLI 使用 UUID + `bypassPermissions` 真实返回 `pong`，非 UUID 真实复现 `Invalid session ID`。
+- 发布目标：同步 GitHub Release `v2.26.9`，上传 Desk Chat `0.2.4` 安装包；发布 `@lc2panda/panda-code@2.26.9` 到 GitHub Packages。
+
 ## v2.26.8 — 2026-05-25 · Panda Desk Chat Release 热修
 - 修复 Desk Chat 安装包发消息失败：packaged app 现在把根 CLI 完整 bundle 复制到 `Resources/panda-cli/dist/`，后端优先使用 `panda-cli/dist/cli.js`，避免缺失 `/Applications/Panda.app/Contents/Resources/dist/cli.js`。
 - 模型核对：Desk Chat 模型列表继续从 CLI `src/utils/model/configs.ts` 同步；截图中的 Opus 4.7 / Sonnet 4.6 / Haiku 4.5 属于当前 CLI firstParty 模型。

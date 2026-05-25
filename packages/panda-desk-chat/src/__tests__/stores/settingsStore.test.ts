@@ -35,9 +35,9 @@ describe('settingsStore', () => {
 
   it('has correct default values', () => {
     const state = useSettingsStore.getState();
-    expect(state.theme).toBe('system');
+    expect(state.theme).toBe('light');
     expect(state.locale).toBe('zh');
-    expect(state.fontSize).toBe(14);
+    expect(state.fontSize).toBe(16);
     expect(state.sidebarExpanded).toBe(true);
   });
 
@@ -69,5 +69,20 @@ describe('settingsStore', () => {
   it('setFontSize updates fontSize', () => {
     useSettingsStore.getState().setFontSize(18);
     expect(useSettingsStore.getState().fontSize).toBe(18);
+  });
+
+  it('migrates legacy skip permission mode to bypassPermissions', () => {
+    localStorageMock.setItem(
+      'panda-desk:settings',
+      JSON.stringify({ permissionMode: 'skip' }),
+    );
+
+    useSettingsStore.getState().loadSettings();
+
+    expect(useSettingsStore.getState().permissionMode).toBe('bypassPermissions');
+    expect(
+      JSON.parse(localStorageMock.getItem('panda-desk:settings') || '{}')
+        .permissionMode,
+    ).toBe('bypassPermissions');
   });
 });

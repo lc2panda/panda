@@ -31,6 +31,41 @@ import type {
 
 const RESPAWN_MAX_RETRIES = 5;
 const RESPAWN_BASE_DELAY_MS = 1000; // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type CLIPermissionMode =
+  | 'acceptEdits'
+  | 'bypassPermissions'
+  | 'default'
+  | 'dontAsk'
+  | 'plan';
+
+const CLI_PERMISSION_MODES = new Set<string>([
+  'acceptEdits',
+  'bypassPermissions',
+  'default',
+  'dontAsk',
+  'plan',
+]);
+
+function isValidSessionId(sessionId: string): boolean {
+  return UUID_PATTERN.test(sessionId);
+}
+
+function normalizePermissionMode(mode?: string): CLIPermissionMode | undefined {
+  if (!mode) return undefined;
+  if (mode === 'skip') {
+    console.warn('[CLIManager] Migrating legacy permission mode "skip" to "bypassPermissions"');
+    return 'bypassPermissions';
+  }
+  if (mode === 'auto') {
+    console.warn('[CLIManager] Mapping UI-only permission mode "auto" to CLI mode "default"');
+    return 'default';
+  }
+  if (CLI_PERMISSION_MODES.has(mode)) return mode as CLIPermissionMode;
+  console.warn(`[CLIManager] Unknown permission mode "${mode}", falling back to "default"`);
+  return 'default';
+}
 
 // ---------------------------------------------------------------------------
 // Channel constants for M→R events (must match preload/chat.ts)
@@ -75,7 +110,7 @@ export class CLISession extends EventEmitter {
   private intentionalStop = false;
 
   // Options used to start the session (needed for respawn)
-  private startOptions: { model?: string; permissionMode?: string } | undefined;
+  private startOptions: { model?: string; permissionMode?: CLIPermissionMode } | undefined;
 
   // Comdr 指令: 修复 spawn race condition — sendMessage 在 spawnWithDiskProbe
   //   await 完成前调用时，this.process 还是 null/stdin 不 writable，旧实现直接
@@ -150,7 +185,10 @@ export class CLISession extends EventEmitter {
     }
 
     // Persist options for respawn; reset intentional-stop flag
-    if (options) this.startOptions = options;
+    const normalizedOptions = options
+      ? { ...options, permissionMode: normalizePermissionMode(options.permissionMode) }
+      : undefined;
+    if (normalizedOptions) this.startOptions = normalizedOptions;
     this.intentionalStop = false;
 
     this.state = 'starting';
@@ -163,12 +201,12 @@ export class CLISession extends EventEmitter {
     // with --session-id.  findSessionFile is async; use void + a spawn
     // deferred to the next microtask so start() stays sync-compatible with
     // the existing call-sites (ensureSession, respawn).
-    void this.spawnWithDiskProbe(cliPath, options);
+    void this.spawnWithDiskProbe(cliPath, normalizedOptions);
   }
 
   private async spawnWithDiskProbe(
     cliPath: string,
-    options?: { model?: string; permissionMode?: string },
+    options?: { model?: string; permissionMode?: CLIPermissionMode },
   ): Promise<void> {
     let isResume = false;
     try {
@@ -660,7 +698,7 @@ export class CLIManager {
 
   // In-memory config (set via IPC, consumed on session start)
   private currentModel: string | undefined;
-  private currentPermissionMode: string | undefined;
+  private currentPermissionMode: CLIPermissionMode | undefined;
 
   // ── Window registration (for focus-based unread clearing) ────────────
 
@@ -677,7 +715,7 @@ export class CLIManager {
   }
 
   setPermissionMode(mode: string): void {
-    this.currentPermissionMode = mode;
+    this.currentPermissionMode = normalizePermissionMode(mode);
   }
 
   // ── Session lifecycle ────────────────────────────────────────────────
@@ -693,6 +731,11 @@ export class CLIManager {
    * localStorage but were lost when the main process restarted.
    */
   private async createSessionWithId(id: string, cwd: string, name?: string): Promise<SessionInfo> {
+    if (!isValidSessionId(id)) {
+      throw new Error(
+        `Invalid desktop session id "${id}". Panda Desk Chat requires a UUID session. Please open a new chat tab.`,
+      );
+    }
     const session = new CLISession(id, cwd, name);
     this.sessions.set(id, session);
 
@@ -712,6 +755,11 @@ export class CLIManager {
    * Electron restart.
    */
   async ensureSession(sessionId: string, cwd?: string, name?: string): Promise<CLISession> {
+    if (!isValidSessionId(sessionId)) {
+      throw new Error(
+        `Invalid desktop session id "${sessionId}". Panda Desk Chat requires a UUID session. Please open a new chat tab.`,
+      );
+    }
     let session = this.sessions.get(sessionId);
     if (!session) {
       console.log(`[CLIManager] Auto-creating session for stale ID: ${sessionId}`);
