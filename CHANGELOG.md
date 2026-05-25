@@ -6,6 +6,14 @@
 
 ---
 
+## v2.26.7 — 2026-05-25 · Panda Desk Chat 发布入口与 provider/stream/drag 修补
+- README 当前桌面端入口改为 Panda Desk Chat：下载、源码运行、本地打包与使用说明指向 `packages/panda-desk-chat/BUILD.md`；`panda-on-desk` 降级为历史归档，不再作为用户安装入口。
+- CLI 启动清理：缺 Electron 时不再输出 `[panda] 桌面宠物未安装。跑 \`panda --install-desk\` 启用 ✨`，保持 `panda` 主路径干净。
+- Desk Chat stream 兜底：CLI 子进程 `error` / `exit` / SDK error 会回传 `panda:chat:stream:error`，renderer 清理 Thinking 状态并展示错误。
+- Desk Chat provider/model 同步：新增脱敏 provider snapshot，展示 `process.env`、`~/.pandacc/settings.json`、`~/.pandacc.json` / `auth login` 来源；修复 `MODEL_SET` 的 `modelId` payload 错位。
+- Desk Chat 拖动：顶部 tab 空白区标记 drag region，tab/按钮/输入控件标记 no-drag，避免拖动吞掉交互。
+- 验证：`bun run build:electron` 通过；`git diff --check` 通过；全量 Desk Chat 单测仍受既有 localStorage/tabStore 测试基线影响，已在 `CLAUDE.md` 记录。
+
 ## panda-on-desk Release Tag 历史
 
 | Tag | 触发波次 | 日期 | 说明 |

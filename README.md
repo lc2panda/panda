@@ -2,9 +2,9 @@
 
 > 懂你所有数据的 AI 伙伴 | 编码 · 助理 · 感知 · 生活
 
-[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![desktop](https://img.shields.io/badge/desktop-panda--desk--chat%400.2.2-blue)](./packages/panda-desk-chat/BUILD.md) [![version](https://img.shields.io/badge/version-v2.26.6-blue)](./TODO.md#v2260--2026-05-15--上游-v21120v21142-全量对标方案-a-激进路径-100-交付) [![checks](https://img.shields.io/badge/v2.26.6%20checks-32%20pass%20%7C%20build%20624-brightgreen)](#当前进度--v2266) [![desktop-build](https://img.shields.io/badge/desk--chat-build%20docs-blue)](./packages/panda-desk-chat/BUILD.md) [![upstream](https://img.shields.io/badge/upstream%20absorbed-v2.1.142-success)](#当前进度--v2266)
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![desktop](https://img.shields.io/badge/desktop-panda--desk--chat%400.2.2-blue)](./packages/panda-desk-chat/BUILD.md) [![version](https://img.shields.io/badge/version-v2.26.7-blue)](./TODO.md#进行中--v2267-desk-chat-发布入口与桌面端修补2026-05-25-103546-0800) [![checks](https://img.shields.io/badge/v2.26.7%20desk--chat-build-pass-brightgreen)](#当前进度--v2267) [![desktop-build](https://img.shields.io/badge/desk--chat-build%20docs-blue)](./packages/panda-desk-chat/BUILD.md) [![upstream](https://img.shields.io/badge/upstream%20absorbed-v2.1.142-success)](#当前进度--v2267)
 
-> 🤖 **当前主线：v2.26.6** — `main` / `panda/main` 均指向 `98eb2b6`（2026-05-17 20:27:51 +08:00），主包版本为 `@lc2panda/panda-code@2.26.6`。v2.26 线已完成上游 `@anthropic-ai/claude-code` v2.1.120→v2.1.142 的 14 项能力吸收，并在 v2.26.3→v2.26.6 连续修复 `/recap`、`/goal`、`/compact`、provider models、Agent stopped 文案、Matrix worker 边界与回车输入丢失等 P0/P1 问题。v2.26.6 验证记录：`bun run build` → 624 files bundled；`bun test` raceCondition + utils + matrixWave2 → 32/32 pass。
+> 🤖 **当前主线：v2.26.7** — `main` 已包含 `904ef24`（2026-05-25 14:37:56 +08:00）与 v2.26.7 发版补丁，主包版本为 `@lc2panda/panda-code@2.26.7`。v2.26 线已完成上游 `@anthropic-ai/claude-code` v2.1.120→v2.1.142 的 14 项能力吸收，并在 v2.26.7 修复 Panda Desk Chat 发布入口、provider snapshot、stream error 兜底、model IPC 与窗口拖动。
 
 > 🖥️ **桌面端主线：Panda Desk Chat** — 当前 UI 桌面端为 `@panda/desk-chat@0.2.2`，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。`panda-on-desk` 桌面宠物线降级为 v2.25.x 历史归档，暂不作为用户下载/安装入口。
 
@@ -21,20 +21,19 @@
 
 | 版本 | 运行时 | 亮点 |
 |------|--------|-----|
-| 2.26.6 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 上游 v2.1.142 能力对标 · `/goal` 旗舰命令 · Agent View Tier 1 · Hooks v2 扩展 · provider models 实测重写 · Matrix worker 边界修复 · 回车输入 race 修复 |
+| 2.26.7 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 发布入口 · provider snapshot · stream error 兜底 · model IPC 修复 · 顶部拖动修复 |
 
-## 当前进度 · v2.26.6
+## 当前进度 · v2.26.7
 
 | 维度 | 状态 |
 |------|------|
-| 主线提交 | `98eb2b6` · `fix: v2.26.6 三 P0 修复（Agent stopped 文案 + Matrix worker 边界 + 回车输入丢失）` |
-| 本地/远端 | `main` 与 `panda/main` 对齐；远端 `refs/heads/main` 同为 `98eb2b6` |
-| 包版本 | `@lc2panda/panda-code@2.26.6`；`@panda/desk-chat@0.2.2`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
+| 主线提交 | `904ef24` · `fix: v2.26.7 desk-chat desktop entry and provider sync` |
+| 本地/远端 | 本地 `main` 已包含 v2.26.7；远端推送以后以 `panda/main` 为准 |
+| 包版本 | `@lc2panda/panda-code@2.26.7`；`@panda/desk-chat@0.2.2`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
 | 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.142；npm 上游已继续到 v2.1.150，v2.1.143+ 作为后续评估范围，不在本 README 虚报为已吸收 |
-| v2.26.0 交付 | 4 wave / 14 任务：Hook + Spinner + Transcript、`/goal`、Agent View Tier 1、plugin/project/skill/MCP/compact 等中高价值能力 |
-| v2.26.6 修复 | Agent stopped 停止原因分类、不同 sub-agent 的 Matrix worker chrome 边界、Bun 批量输入下回车清空但未发送 race |
-| 验证证据 | v2.26.0：68/68 单测 + build 623 files；v2.26.6：32/32 单测 + build 624 files |
-| 发布状态 | 代码主线已到 v2.26.6；公开 Git tag 仍停在 `v2.25.58`；Desk Chat 公开安装资产以 GitHub Release 实际可见为准，`panda-on-desk-v1.0.4` 仅作历史归档 |
+| v2.26.7 修复 | README 改推 Panda Desk Chat；CLI 启动不再提示桌宠安装；Desk Chat provider/model 同步 CLI 配置；stream error 回 idle/error；顶部 drag region 修复 |
+| 验证证据 | `bun run build:electron` 通过；`git diff --check` 通过；旧桌宠强入口检索清空；Desk Chat 全量单测旧基线失败已记录于 `CLAUDE.md` |
+| 发布状态 | 代码主线已到 v2.26.7；Desk Chat 公开安装资产以 GitHub Release 实际可见为准，`panda-on-desk-v1.0.4` 仅作历史归档 |
 
 ---
 
