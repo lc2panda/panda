@@ -12,6 +12,7 @@
 - 增强诊断：`stream:error` 现在携带 `stderrTail`、`cwd`、`cliPath`、`bunPath`、`configDir`、`resourcesPath`、`logPath`；主进程写入 Electron logs 目录 `panda-desk-chat-main.log`。
 - 防绕过兜底：session control 对非 UUID 历史只读会话提前返回中文错误，不进入 CLI。
 - 验证：`tabStore.test.ts` + `chatStore.test.ts` + `sessionStore.test.ts` 51/51 通过；Desk Chat `tsc -b` 与 `bun run build:electron` 通过；packaged CLI 历史 UUID resume 可启动，当前 API `429 rate_limit` 阻止 assistant result 完成。
+- 发布：GitHub Release `v2.26.11` 已上传 Desk Chat `0.2.6` 的 DMG、zip、两个 blockmap 与 `latest-mac.yml`；`@lc2panda/panda-code@2.26.11` 已发布到 GitHub Packages。
 
 ## v2.26.10 — 2026-05-25 · Panda Desk Chat 历史对话只读加载热修
 - 修复打开历史对话即报 code=1：Desk Chat 切换历史会话时只读取 `~/.pandacc/projects` 历史，不再自动 `focusSession` / spawn CLI。

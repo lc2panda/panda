@@ -35,7 +35,7 @@
 | 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.142；npm 上游已继续到 v2.1.150，v2.1.143+ 作为后续评估范围，不在本 README 虚报为已吸收 |
 | v2.26.11 修复 | Desk Chat restoreTabs 改读 `~/.pandacc/projects` 磁盘历史；tab 切换保持 UI-only，不触发 CLI focus；CLI code=1 不再自动 5 次重启刷屏，并在 UI/日志中带 stderr、cwd、cliPath、bunPath、configDir、logPath 诊断 |
 | 验证证据 | `cd packages/panda-desk-chat && bun run test src/__tests__/stores/tabStore.test.ts src/__tests__/stores/chatStore.test.ts src/__tests__/stores/sessionStore.test.ts` 51/51 通过；`npx tsc -b --pretty false --incremental false` 通过；`bun run build:electron` 通过；packaged CLI 历史 UUID resume 可启动，当前实测受 API `429 rate_limit` 限制未完成 result |
-| 发布状态 | 代码主线已到 v2.26.11；Desk Chat 公开安装资产以 GitHub Release latest 为准，`panda-on-desk-v1.0.4` 仅作历史归档 |
+| 发布状态 | v2.26.11 已发布到 [GitHub Releases](https://github.com/lc2panda/panda/releases/tag/v2.26.11)；Desk Chat 0.2.6 安装资产已上传，`panda-on-desk-v1.0.4` 仅作历史归档 |
 
 ---
 

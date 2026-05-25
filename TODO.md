@@ -10,7 +10,8 @@
 - [x] 验证：`cd packages/panda-desk-chat && bun run test src/__tests__/stores/tabStore.test.ts src/__tests__/stores/chatStore.test.ts src/__tests__/stores/sessionStore.test.ts` 通过 51/51；`npx tsc -b --pretty false --incremental false` 通过；`bun run build:electron` 通过。
 - [x] packaged CLI 历史 UUID resume smoke：真实 `~/.pandacc/projects/-Users-panda-Downloads-cc-panda/7398afd6-82a3-4653-81a2-349f8d6ec4fe.jsonl` 可启动并进入 `system init`，但后续 API 返回 `429 rate_limit` 重试，未作为 assistant result 成功闭环。
 - [x] 重新打包 Desk Chat `0.2.6`：`cd packages/panda-desk-chat && bun run dist` 于 `2026-05-25 17:43:00 +08:00` 通过，生成 `Panda-0.2.6-arm64.dmg`（145 MB）、`Panda-0.2.6-arm64-mac.zip`（139 MB）、两个 blockmap 与 `latest-mac.yml`；资源核验 `panda-cli/dist/cli.js` 存在，`panda-cli/dist` 共 625 个文件，`bun .../cli.js --version` 返回 `2.1.142 (Panda)`。
-- [ ] 发布 GitHub Release `v2.26.11` 并发布 `@lc2panda/panda-code@2.26.11` 到 GitHub Packages。
+- [x] 安装版复核：Comdr 后续截图仍是旧短错误；`2026-05-25 17:47:36 +08:00` 复核发现 `/Applications/Panda.app` 仍为 `0.2.5`，已从 `Panda-0.2.6-arm64.dmg` 替换为 `0.2.6`；`app.asar` sha256 与 release app 均为 `e3344f21d1246195c2c50c30e16356bf6ac6d086c643c400c00b4ed59756503a`。
+- [x] 发布 GitHub Release `v2.26.11` 并发布 `@lc2panda/panda-code@2.26.11` 到 GitHub Packages：Release URL `https://github.com/lc2panda/panda/releases/tag/v2.26.11`，资产 `latest-mac.yml`、`Panda-0.2.6-arm64.dmg`、`Panda-0.2.6-arm64-mac.zip`、两个 blockmap 均为 `uploaded`；`npm view @lc2panda/panda-code@2.26.11 version --registry=https://npm.pkg.github.com` 返回 `2.26.11`。
 
 ## 已完成 — v2.26.10 Desk Chat 历史对话只读加载热修（2026-05-25 16:55:25 +08:00）
 
