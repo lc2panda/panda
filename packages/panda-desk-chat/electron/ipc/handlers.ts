@@ -223,6 +223,7 @@ function loadModelsFromCLI(): CLIModelEntry[] {
     pathResolve(__dirname_handlers, '../../../../src/utils/model/configs.ts'),
     pathResolve(process.cwd(), 'src/utils/model/configs.ts'),
     pathResolve(process.cwd(), '../../src/utils/model/configs.ts'),
+    pathResolve(process.resourcesPath || '', 'panda-cli/cli-configs.ts'),
     pathResolve(process.resourcesPath || '', 'cli-configs.ts'),
   ];
   let source = '';

@@ -6,6 +6,12 @@
 
 ---
 
+## v2.26.8 — 2026-05-25 · Panda Desk Chat Release 热修
+- 修复 Desk Chat 安装包发消息失败：packaged app 现在把根 CLI 完整 bundle 复制到 `Resources/panda-cli/dist/`，后端优先使用 `panda-cli/dist/cli.js`，避免缺失 `/Applications/Panda.app/Contents/Resources/dist/cli.js`。
+- 模型核对：Desk Chat 模型列表继续从 CLI `src/utils/model/configs.ts` 同步；截图中的 Opus 4.7 / Sonnet 4.6 / Haiku 4.5 属于当前 CLI firstParty 模型。
+- README 简化：`1.1.1 Panda Desk Chat（UI 桌面端）` 只保留 GitHub Releases latest 下载入口，不再提供 UI 源码安装说明。
+- 发布目标：同步 GitHub Release `v2.26.8`，上传 Desk Chat 安装包；验证记录以 `CLAUDE.md` 为准。
+
 ## v2.26.7 — 2026-05-25 · Panda Desk Chat 发布入口与 provider/stream/drag 修补
 - README 当前桌面端入口改为 Panda Desk Chat：下载、源码运行、本地打包与使用说明指向 `packages/panda-desk-chat/BUILD.md`；`panda-on-desk` 降级为历史归档，不再作为用户安装入口。
 - CLI 启动清理：缺 Electron 时不再输出 `[panda] 桌面宠物未安装。跑 \`panda --install-desk\` 启用 ✨`，保持 `panda` 主路径干净。

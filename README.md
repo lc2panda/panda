@@ -2,11 +2,11 @@
 
 > 懂你所有数据的 AI 伙伴 | 编码 · 助理 · 感知 · 生活
 
-[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![desktop](https://img.shields.io/badge/desktop-panda--desk--chat%400.2.2-blue)](./packages/panda-desk-chat/BUILD.md) [![version](https://img.shields.io/badge/version-v2.26.7-blue)](./TODO.md#进行中--v2267-desk-chat-发布入口与桌面端修补2026-05-25-103546-0800) [![checks](https://img.shields.io/badge/v2.26.7%20desk--chat-build-pass-brightgreen)](#当前进度--v2267) [![desktop-build](https://img.shields.io/badge/desk--chat-build%20docs-blue)](./packages/panda-desk-chat/BUILD.md) [![upstream](https://img.shields.io/badge/upstream%20absorbed-v2.1.142-success)](#当前进度--v2267)
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![desktop](https://img.shields.io/badge/desktop-panda--desk--chat%400.2.3-blue)](https://github.com/lc2panda/panda/releases/latest) [![version](https://img.shields.io/badge/version-v2.26.8-blue)](./TODO.md#进行中--v2268-desk-chat-release-热修2026-05-25-154720-0800) [![checks](https://img.shields.io/badge/v2.26.8%20desk--chat-build-pass-brightgreen)](#当前进度--v2268) [![upstream](https://img.shields.io/badge/upstream%20absorbed-v2.1.142-success)](#当前进度--v2268)
 
-> 🤖 **当前主线：v2.26.7** — `main` 已包含 `904ef24`（2026-05-25 14:37:56 +08:00）与 v2.26.7 发版补丁，主包版本为 `@lc2panda/panda-code@2.26.7`。v2.26 线已完成上游 `@anthropic-ai/claude-code` v2.1.120→v2.1.142 的 14 项能力吸收，并在 v2.26.7 修复 Panda Desk Chat 发布入口、provider snapshot、stream error 兜底、model IPC 与窗口拖动。
+> 🤖 **当前主线：v2.26.8** — `main` 已包含 v2.26.7 Desk Chat 修补与 v2.26.8 Release 热修，主包版本为 `@lc2panda/panda-code@2.26.8`。v2.26 线已完成上游 `@anthropic-ai/claude-code` v2.1.120→v2.1.142 的 14 项能力吸收，并在 v2.26.8 修复 Panda Desk Chat 安装包缺 CLI bundle 导致发消息失败的问题。
 
-> 🖥️ **桌面端主线：Panda Desk Chat** — 当前 UI 桌面端为 `@panda/desk-chat@0.2.2`，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。`panda-on-desk` 桌面宠物线降级为 v2.25.x 历史归档，暂不作为用户下载/安装入口。
+> 🖥️ **桌面端主线：Panda Desk Chat** — 当前 UI 桌面端为 `@panda/desk-chat@0.2.3`，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。`panda-on-desk` 桌面宠物线降级为 v2.25.x 历史归档，暂不作为用户下载/安装入口。
 
 > 此项目的任何功能、架构更新，必须在结束后同步更新相关文档。这是我们契约的一部分。
 
@@ -21,19 +21,20 @@
 
 | 版本 | 运行时 | 亮点 |
 |------|--------|-----|
+| 2.26.8 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 安装包 CLI bundle 修复 · GitHub Release 同步 |
 | 2.26.7 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 发布入口 · provider snapshot · stream error 兜底 · model IPC 修复 · 顶部拖动修复 |
 
-## 当前进度 · v2.26.7
+## 当前进度 · v2.26.8
 
 | 维度 | 状态 |
 |------|------|
-| 主线提交 | `904ef24` · `fix: v2.26.7 desk-chat desktop entry and provider sync` |
-| 本地/远端 | 本地 `main` 已包含 v2.26.7；远端推送以后以 `panda/main` 为准 |
-| 包版本 | `@lc2panda/panda-code@2.26.7`；`@panda/desk-chat@0.2.2`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
+| 主线提交 | v2.26.8 Release 热修提交；详见 `git log` |
+| 本地/远端 | 本地 `main` 已包含 v2.26.8；远端推送以后以 `panda/main` 为准 |
+| 包版本 | `@lc2panda/panda-code@2.26.8`；`@panda/desk-chat@0.2.3`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
 | 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.142；npm 上游已继续到 v2.1.150，v2.1.143+ 作为后续评估范围，不在本 README 虚报为已吸收 |
-| v2.26.7 修复 | README 改推 Panda Desk Chat；CLI 启动不再提示桌宠安装；Desk Chat provider/model 同步 CLI 配置；stream error 回 idle/error；顶部 drag region 修复 |
-| 验证证据 | `bun run build:electron` 通过；`git diff --check` 通过；旧桌宠强入口检索清空；Desk Chat 全量单测旧基线失败已记录于 `CLAUDE.md` |
-| 发布状态 | 代码主线已到 v2.26.7；Desk Chat 公开安装资产以 GitHub Release 实际可见为准，`panda-on-desk-v1.0.4` 仅作历史归档 |
+| v2.26.8 修复 | Desk Chat 安装包包含完整 root CLI bundle，修复 `/Applications/Panda.app/Contents/Resources/dist/cli.js` 缺失导致发消息失败；README 仅保留 Release 下载入口 |
+| 验证证据 | `bun run build` 通过；Desk Chat 打包后需验证 `Resources/panda-cli/dist/cli.js` 存在；旧 Desk Chat 全量单测旧基线失败已记录于 `CLAUDE.md` |
+| 发布状态 | 代码主线已到 v2.26.8；Desk Chat 公开安装资产以 GitHub Release latest 为准，`panda-on-desk-v1.0.4` 仅作历史归档 |
 
 ---
 
@@ -78,39 +79,9 @@ panda
 
 ### 1.1.1 Panda Desk Chat（UI 桌面端）— 下载、安装与使用
 
-Panda 当前推荐的桌面端是 `panda-desk-chat`：图形化对话、多会话管理、设置面板、定时任务、连接器、更新检查都集中在这个 UI 客户端。`panda-on-desk` 桌面宠物线暂不成熟，本 README 不再把它作为下载或安装入口。
+Panda 当前推荐的 UI 桌面端是 `Panda Desk Chat`。请从 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest) 下载最新桌面安装包；安装后直接启动 `Panda`，服务商、认证与模型配置会读取本机 `panda` CLI 的现有配置。
 
-#### 下载桌面安装包
-
-- 优先查看 [GitHub Releases](https://github.com/lc2panda/panda/releases)，寻找 `Panda` / `panda-desk-chat` / `@panda/desk-chat` 对应资产。
-- 当前仓库内 `@panda/desk-chat@0.2.2` 仍标记为 `private: true`，公开 npm 包不可验证；不要通过 npm 公共源安装它。
-- 如果 Release 尚未公开对应资产，请使用源码运行或本地打包。
-
-#### 源码运行
-
-```bash
-git clone https://github.com/lc2panda/panda.git cc-panda
-cd cc-panda
-bun install
-cd packages/panda-desk-chat
-bun run dev:electron
-```
-
-#### 本地打包
-
-```bash
-cd packages/panda-desk-chat
-bun run build:electron
-bun run dist
-```
-
-打包产物输出到 `packages/panda-desk-chat/release/`。更多构建细节见 [`packages/panda-desk-chat/BUILD.md`](./packages/panda-desk-chat/BUILD.md)。
-
-#### 使用方式
-
-1. 先用 CLI 完成认证：`panda auth login`，或在 `~/.pandacc/settings.json` 配置 `env.ANTHROPIC_*`。
-2. 启动 Desk Chat 后，在设置页检查服务商、模型、权限模式与任务配置。
-3. 从输入框发送消息；多会话、历史会话、定时任务与连接器在左侧/设置页中管理。
+`panda-on-desk` 桌面宠物线暂不成熟，本 README 不再把它作为下载或安装入口。`panda-desk-chat` 暂不提供源码安装说明。
 
 > 历史归档：`panda-on-desk` 是 v2.25.x 的桌面宠物实验线，源码仍保留在 [`packages/panda-on-desk/`](./packages/panda-on-desk/)，最终历史 tag 为 [`panda-on-desk-v1.0.4`](https://github.com/lc2panda/panda/releases/tag/panda-on-desk-v1.0.4)。详见 [`packages/panda-on-desk/STATUS.md`](./packages/panda-on-desk/STATUS.md) 与 [`packages/panda-on-desk/RELEASE_NOTES_v2.25.md`](./packages/panda-on-desk/RELEASE_NOTES_v2.25.md)。
 

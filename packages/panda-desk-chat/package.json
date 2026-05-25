@@ -1,6 +1,6 @@
 {
   "name": "@panda/desk-chat",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "description": "Panda Code desktop chat UI — React + Vite + Tailwind 4",
@@ -27,6 +27,19 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../../dist",
+        "to": "panda-cli/dist",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../src/utils/model/configs.ts",
+        "to": "panda-cli/cli-configs.ts"
+      }
     ],
     "mac": {
       "target": ["dmg", "zip"],

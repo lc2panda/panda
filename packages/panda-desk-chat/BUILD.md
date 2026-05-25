@@ -35,15 +35,20 @@ cd packages/panda-desk-chat
 ```bash
 cd packages/panda-desk-chat
 
-# 1. 构建 renderer + main + preload
-ELECTRON=true npx vite build
+# 1. 先在仓库根目录构建 panda CLI bundle（Desk Chat 运行时会 spawn 它）
+cd ../..
+bun run build
+cd packages/panda-desk-chat
 
-# 2. 跑 electron-builder（跳过自动签名 — 内部分发用 ad-hoc 签名即可）
-CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac dmg --arm64
+# 2. 构建 renderer + main + preload
+bun run build:electron
+
+# 3. 跑 electron-builder（会把根 dist/**/* 放进 Resources/panda-cli/dist/）
+bun run dist
 # 也可加 --x64 同时打 Intel 包
 
 # 产物
-ls release/Panda-0.2.0-arm64.dmg
+ls release/Panda-0.2.3-arm64.dmg
 ```
 
 ### 3.2 Windows 上打 Windows exe + zip
@@ -53,16 +58,19 @@ ls release/Panda-0.2.0-arm64.dmg
 
 cd packages\panda-desk-chat
 
-# 1. 构建（Windows 的 ELECTRON 环境变量设置）
-$env:ELECTRON="true"; npx vite build
+# 1. 先在仓库根目录构建 panda CLI bundle
+cd ..\..
+bun run build
+cd packages\panda-desk-chat
 
-# 2. electron-builder 直接产 NSIS exe + zip
-npx electron-builder --win --x64
+# 2. 构建并打包
+bun run build:electron
+bunx electron-builder --win --x64
 
 # 产物
 dir release\
-# Panda Setup 0.2.0.exe   ← NSIS 安装器（推荐分发）
-# Panda-0.2.0-win.zip     ← 免安装版
+# Panda Setup 0.2.3.exe   ← NSIS 安装器（推荐分发）
+# Panda-0.2.3-win.zip     ← 免安装版
 ```
 
 ### 3.3 macOS 上跨平台打 Windows 包（已验证可用）
@@ -71,8 +79,8 @@ dir release\
 
 ```bash
 cd packages/panda-desk-chat
-ELECTRON=true npx vite build
-CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --win --x64
+bun run build:electron
+bunx electron-builder --win --x64
 # 产物同 3.2
 ```
 
@@ -82,10 +90,10 @@ CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --win --x64
 
 ```bash
 cd packages/panda-desk-chat
-ELECTRON=true npx vite build
-npx electron-builder --linux AppImage deb --x64
-# release/Panda-0.2.0.AppImage
-# release/panda_0.2.0_amd64.deb
+bun run build:electron
+bunx electron-builder --linux AppImage deb --x64
+# release/Panda-0.2.3.AppImage
+# release/panda_0.2.3_amd64.deb
 ```
 
 ## 四、关键配置文件
@@ -93,6 +101,7 @@ npx electron-builder --linux AppImage deb --x64
 | 文件 | 作用 |
 |------|------|
 | `package.json` `build.*` | electron-builder 配置（productName / icon / target / publish） |
+| `package.json` `build.extraResources` | 必须把仓库根 `dist/**/*` 复制到 `Resources/panda-cli/dist/`，否则安装包内发消息会报缺 `cli.js` |
 | `vite.config.ts` `base` | **必须保持 `"./"`** — Electron `file://` 协议下绝对路径会指向系统根，导致黑屏 |
 | `index.html` | 同上，`<script src="./fouc.js">` 不能写 `/` 开头 |
 | `public/icon.icns` `public/icon.ico` `public/icon.png` | 三平台图标，由 `pandalogo.jpeg` 派生 |
@@ -125,13 +134,15 @@ npx --yes png-to-ico public/app-icon.png > public/icon.ico
 
 1. `git pull` 最新 main
 2. 按 三 章节命令打对应平台包
-3. 产物放在 `packages/panda-desk-chat/release/`（已被 `.gitignore` 排除）
-4. 把 dmg / exe / zip 上传到 GitHub Release（手动 / `gh release create`）
-5. 如需 panda CLI 同步发版：bump 根 `package.json` version → `npm publish`（GitHub Packages registry，需 `~/.npmrc` 配 `//npm.pkg.github.com/:_authToken=`）
+3. 验证 `release/mac-arm64/Panda.app/Contents/Resources/panda-cli/dist/cli.js` 存在，且 `panda-cli/dist/` 内有根 CLI chunks
+4. 产物放在 `packages/panda-desk-chat/release/`（已被 `.gitignore` 排除）
+5. 把 dmg / exe / zip 上传到 GitHub Release（手动 / `gh release create`）
+6. 如需 panda CLI 同步发版：bump 根 `package.json` version → `npm publish`（GitHub Packages registry，需 `~/.npmrc` 配 `//npm.pkg.github.com/:_authToken=`）
 
 ## 七、常见坑
 
 - **dmg 装后黑屏** → vite `base` 不是 `"./"`，重新检查 `vite.config.ts`
+- **发消息报 `Module not found ... Resources/dist/cli.js`** → 安装包缺根 CLI bundle；先跑根 `bun run build`，确认 `package.json build.extraResources` 把 `../../dist/**/*` 放进 `Resources/panda-cli/dist/`，再重新 `bun run dist`
 - **NSIS 打包卡 download** → electron-builder 镜像首次下载 wine + winCodeSign，需要科学上网；下次缓存命中
 - **"unable to access github"** → git config 里有 proxy 失效，跑两次 `git push` 通常能恢复
 - **node_modules 大** → bun workspace 链接到根 `node_modules`，子包打包时 electron-builder 自动遍历

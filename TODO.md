@@ -1,6 +1,17 @@
 # TODO
 
-## 进行中 — v2.26.7 Desk Chat 发布入口与桌面端修补（2026-05-25 10:35:46 +08:00）
+## 进行中 — v2.26.8 Desk Chat Release 热修（2026-05-25 15:47:20 +08:00）
+
+- [x] 真实时间核验：本机 `2026-05-25 15:47:20 +08:00`，Apple `2026-05-25 15:47:21 +08:00`，Cloudflare `2026-05-25 15:47:21 +08:00`，最大偏差约 1 秒，判定通过。
+- [x] 截图报错根因定位：已安装 `/Applications/Panda.app/Contents/Resources/` 与本地打包 app 均只有 `app.asar`，缺少 `dist/cli.js`；Desk Chat packaged 后端查找 `process.resourcesPath/dist/cli.js`，导致发送消息时报 `Module not found`。
+- [x] 修复策略：打包时复制根 `dist/**/*` 到 `Resources/panda-cli/dist/`，并让 `cli-manager.ts` 优先查找 `panda-cli/dist/cli.js`，保留旧 `Resources/dist/cli.js` fallback。
+- [x] 模型核对：当前截图中的 `Claude Opus 4.7`、`Claude Sonnet 4.6`、`claude-haiku-4-5` 与 `src/utils/model/configs.ts` 的 firstParty 模型源对齐；UI 的 `Custom Provider` 展示来自 CLI provider snapshot，不另造模型。
+- [x] README：`1.1.1 Panda Desk Chat（UI 桌面端）— 下载、安装与使用` 已简化为 GitHub Releases latest 下载入口，不再提供 UI 源码安装说明。
+- [x] 重新打包 Desk Chat `0.2.3`，验证 `Resources/panda-cli/dist/cli.js` 与 chunks 存在；`bun run dist` 于 `2026-05-25 15:59:32 +08:00` 通过，生成 `Panda-0.2.3-arm64.dmg` 与 `Panda-0.2.3-arm64-mac.zip`。
+- [ ] 创建/更新 GitHub Release `v2.26.8` 并上传 Desk Chat 安装包。
+- [ ] git push；如需 npm 同步，发布 `@lc2panda/panda-code@2.26.8` 到 GitHub Packages。
+
+## 已完成 — v2.26.7 Desk Chat 发布入口与桌面端修补（2026-05-25 10:35:46 +08:00）
 
 - [x] 真实时间核验：本机 `2026-05-25 10:35:44 +08:00`，Apple `2026-05-25 10:35:45 +08:00`，Cloudflare `2026-05-25 10:35:46 +08:00`，最大偏差约 2 秒，判定通过。
 - [x] git 历史/框架源码审计：确认 `panda-on-desk` 为历史桌宠线，`panda-desk-chat@0.2.2` 为当前 UI 桌面端；当前 main/panda/main 为 `98eb2b6`。

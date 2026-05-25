@@ -124,8 +124,21 @@ export class CLISession extends EventEmitter {
       return fromDirname;
     }
 
-    // 3) Packaged app: CLI bundled as extraResource
-    return path.join(process.resourcesPath, 'dist/cli.js');
+    // 3) Packaged app: CLI bundled as extraResource. Keep legacy Resources/dist
+    //    as a fallback, but the release app stores the full root bundle under
+    //    Resources/panda-cli/dist because cli.js dynamically imports chunks.
+    const packagedCandidates = [
+      path.join(process.resourcesPath, 'panda-cli/dist/cli.js'),
+      path.join(process.resourcesPath, 'dist/cli.js'),
+    ];
+    const found = packagedCandidates.find((candidate) => existsSync(candidate));
+    if (found) return found;
+    console.error(
+      `[CLISession] Packaged CLI not found. Searched:\n` +
+      packagedCandidates.map((candidate, idx) => `  ${idx + 1}) ${candidate}`).join('\n') +
+      `\nRebuild the desktop app after root CLI build: cd <project-root> && bun run build && cd packages/panda-desk-chat && bun run dist`,
+    );
+    return packagedCandidates[0]!;
   }
 
   // ── Start CLI subprocess ─────────────────────────────────────────────
