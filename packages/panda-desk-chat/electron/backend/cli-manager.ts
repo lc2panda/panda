@@ -40,6 +40,7 @@ const MR = {
   STREAM_START:   'panda:chat:stream:start',
   STREAM_DELTA:   'panda:chat:stream:delta',
   STREAM_END:     'panda:chat:stream:end',
+  STREAM_ERROR:   'panda:chat:stream:error',
   SESSION_UPDATED:'panda:session:updated',
   TOOL_USE_START: 'panda:tool:use:start',
   TOOL_USE_END:   'panda:tool:use:end',
@@ -233,6 +234,9 @@ export class CLISession extends EventEmitter {
       console.log(`[CLISession:${this.id}] Exited: code=${code} signal=${signal}`);
       this.cleanup();
       if (!this.intentionalStop) {
+        this.emitStreamError(
+          `CLI process exited before completing the response (code=${code ?? 'null'} signal=${signal ?? 'null'}). ${this.lastStderr()}`,
+        );
         this.scheduleRespawn('exit', code, signal);
       } else {
         this.state = 'stopped';
@@ -245,6 +249,7 @@ export class CLISession extends EventEmitter {
       console.error(`[CLISession:${this.id}] Process error:`, err);
       this.cleanup();
       if (!this.intentionalStop) {
+        this.emitStreamError(`CLI process failed to start: ${err.message}`);
         this.scheduleRespawn('error', null, null, err.message);
       } else {
         this.state = 'error';
@@ -280,6 +285,9 @@ export class CLISession extends EventEmitter {
         break;
       case 'tool_result':
         this.handleToolResult(msg as SDKToolResultMessage);
+        break;
+      case 'error':
+        this.handleErrorMessage(msg as { error?: string; message?: string });
         break;
       case 'keep_alive':
         // Heartbeat — no action needed
@@ -411,6 +419,12 @@ export class CLISession extends EventEmitter {
     });
   }
 
+  private handleErrorMessage(msg: { error?: string; message?: string }): void {
+    const error = msg.error || msg.message || this.lastStderr() || 'CLI returned an error';
+    this.state = 'error';
+    this.emitStreamError(error);
+  }
+
   // ── Control request handler ──────────────────────────────────────────
 
   private handleControlRequest(msg: SDKControlRequest): void {
@@ -536,6 +550,18 @@ export class CLISession extends EventEmitter {
     }
     // Clear process reference so respawn can call start() again
     this.process = null;
+  }
+
+  private lastStderr(): string {
+    return this.stderrBuffer.join('').trim().slice(-2000);
+  }
+
+  private emitStreamError(error: string): void {
+    this.emit('stream:error', {
+      sessionId: this.id,
+      messageId: this.currentMessageId || randomUUID(),
+      error,
+    });
   }
 
   // ── Auto-respawn with exponential backoff ─────────────────────────
@@ -768,6 +794,10 @@ export class CLIManager {
         notificationManager.notify('Panda Code', 'New message from assistant', undefined, session.id);
         notificationManager.incrementUnread();
       }
+    });
+
+    session.on('stream:error', (data) => {
+      send(MR.STREAM_ERROR, data);
     });
 
     session.on('tool:use:start', (data) => {

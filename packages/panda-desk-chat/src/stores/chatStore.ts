@@ -254,6 +254,7 @@ export interface ChatStore {
     finishReason: string,
     tokenUsage?: TokenUsage,
   ) => void;
+  failStreaming: (sessionId: string, messageId: string, error: string) => void;
 
   // Tool actions
   startToolUse: (
@@ -563,6 +564,43 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
                   (tokenUsage.cacheWrite ?? 0),
               }
             : session.tokenUsage,
+        }),
+      };
+    }),
+
+  failStreaming: (sessionId, messageId, error) =>
+    set((state) => {
+      const session = getSession(state.sessions, sessionId);
+      if (!session) return state;
+      const content = [{ type: 'text', text: error }];
+      const existing = session.messages.some((m) => m.id === messageId);
+      const messages = existing
+        ? session.messages.map((m) =>
+            m.id === messageId && m.type === 'assistant'
+              ? { ...m, content, streamingContent: undefined }
+              : m,
+          )
+        : [
+            ...session.messages,
+            {
+              id: messageId,
+              type: 'system' as const,
+              content: error,
+              timestamp: Date.now(),
+            },
+          ];
+      streamBuffers.delete(sessionId);
+      return {
+        sessions: putSession(state.sessions, {
+          ...session,
+          messages,
+          chatState: 'idle',
+          connectionState: 'error',
+          streamingText: '',
+          streamingToolInput: '',
+          activeToolUseId: null,
+          activeToolName: null,
+          pendingPermission: null,
         }),
       };
     }),
@@ -1173,6 +1211,25 @@ export function setupBridgeListeners(): void {
     store().endStreaming(sessionId, messageId, finishReason, tokenUsage);
     store().setConnectionState(sessionId, 'connected');
     activeSessions.delete(sessionId);
+  }));
+
+  refs.unsubs.push(bridge.onStreamError((payload) => {
+    const { sessionId, messageId, error } = payload as {
+      sessionId: string;
+      messageId: string;
+      error: string;
+    };
+    if (flushTimer != null) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    store().flushStreamBuffer(sessionId);
+    store().failStreaming(sessionId, messageId, error);
+    activeSessions.delete(sessionId);
+    useToastStore.getState().addToast({
+      type: 'error',
+      message: error,
+    });
   }));
 
   // tool:start

@@ -1,5 +1,19 @@
 # TODO
 
+## 进行中 — v2.26.7 Desk Chat 发布入口与桌面端修补（2026-05-25 10:35:46 +08:00）
+
+- [x] 真实时间核验：本机 `2026-05-25 10:35:44 +08:00`，Apple `2026-05-25 10:35:45 +08:00`，Cloudflare `2026-05-25 10:35:46 +08:00`，最大偏差约 2 秒，判定通过。
+- [x] git 历史/框架源码审计：确认 `panda-on-desk` 为历史桌宠线，`panda-desk-chat@0.2.2` 为当前 UI 桌面端；当前 main/panda/main 为 `98eb2b6`。
+- [x] 权威资料检索：Electron drag region / IPC、npm README 发布机制、Node `process.env` 环境变量读取均已纳入证据。
+- [x] README：将 `1.1.1 桌面宠物（panda-on-desk）— 两种装法` 替换为 Panda Desk Chat UI 桌面端下载、安装与使用；桌宠降级为历史归档，不再作为用户下载入口。
+- [x] CLI 启动：移除 `[panda] 桌面宠物未安装。跑 \`panda --install-desk\` 启用 ✨` 提示/校验。
+- [x] Desk Chat：修复输入后长期 `Thinking...` 的错误/退出/stream 兜底回写。
+- [x] Desk Chat：修复 `设置 - 服务商` 为空，展示 CLI 的环境变量、`auth login`、`settings.json` 配置快照，并修复模型设置 IPC payload 错位。
+- [x] Desk Chat：修复顶部空白区域不可拖动窗口，避免破坏 tab 点击/关闭/右键/重排。
+- [x] 验证：单元/集成/桌面端构建或可替代验证完成后记录命令与结果。
+- [x] git：完成文档与代码变更提交，保留可追溯提交信息。
+- 验证记录（2026-05-25 14:32:38 +08:00）：`bun run build:electron` 通过；`bun run test` 失败于既有 `localStorage.getItem` 测试环境与 `tabStore` 旧断言基线；`bun test src/desk/launcher.test.ts src/desk/launcher.integration.test.ts src/desk/e2e-install-spawn.test.ts` 通过 launcher/launcher.integration，失败于 `e2e-install-spawn.test.ts:355` 的 tmpdir 路径既有断言；`rg` 确认 README 不再保留旧强安装入口或启动提示。
+
 ## 已完成 ✅
 
 ### Packages

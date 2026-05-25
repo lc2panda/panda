@@ -1,5 +1,5 @@
-// Input: ipcMain handle registrations + CLI backend manager (W7-2), WindowManager, notificationManager, appUpdater, cronScheduler
-// Output: IPC request handlers (CLI backend + window manager + scheduled tasks + pandacc scanner) — connected to CLIManager + WindowManager + nativeTheme + notifications + updater + CronScheduler + pandacc-scanner
+// Input: ipcMain handle registrations + CLI backend manager (W7-2), WindowManager, notificationManager, appUpdater, cronScheduler, pandacc provider snapshot
+// Output: IPC request handlers (CLI backend + window manager + scheduled tasks + pandacc scanner/provider snapshot) — connected to CLIManager + WindowManager + nativeTheme + notifications + updater + CronScheduler + pandacc-scanner
 // Pos: Main process IPC layer — routes renderer requests to backend services
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -71,6 +71,7 @@ import {
   listPlugins as scanPlugins,
   getPandaEnv as readPandaEnv,
   setPandaEnvKey as writePandaEnvKey,
+  getProviderSnapshot as readProviderSnapshot,
   getComputerUseStatusEx as scanComputerUse,
   listInstalledApps as scanInstalledApps,
   getAuthorizedApps as readAuthorizedApps,
@@ -107,6 +108,7 @@ const CH = {
   SLASH_COMMANDS:      'panda:chat:slash-commands',
   MODEL_LIST:          'panda:chat:model:list',
   MODEL_SET:           'panda:chat:model:set',
+  PROVIDER_SNAPSHOT:   'panda:provider:snapshot',
   PERMISSION_MODE_SET: 'panda:chat:permission-mode:set',
   // Theme
   THEME_GET_SYSTEM:    'panda:theme:get-system',
@@ -261,16 +263,19 @@ const AVAILABLE_MODELS = cliModels.length > 0
       id: m.id,
       name: `Claude ${FAMILY_DISPLAY[m.family]} ${Math.floor(m.version / 10)}.${m.version % 10}`,
       provider: 'anthropic' as const,
+      maxTokens: m.family === 'haiku' ? 16_000 : m.family === 'opus' ? 32_000 : 64_000,
+      supportsVision: true,
+      supportsThinking: true,
     }))
   : [
       // Fallback hardcode（CLI 源码 fs 读全部失败时兜底；保持跟 cc-panda/src/utils/model/configs.ts 一致）
-      { id: 'claude-opus-4-7',            name: 'Claude Opus 4.7',   provider: 'anthropic' as const },
-      { id: 'claude-opus-4-6',            name: 'Claude Opus 4.6',   provider: 'anthropic' as const },
-      { id: 'claude-opus-4-5-20251101',   name: 'Claude Opus 4.5',   provider: 'anthropic' as const },
-      { id: 'claude-opus-4-1-20250805',   name: 'Claude Opus 4.1',   provider: 'anthropic' as const },
-      { id: 'claude-sonnet-4-6',          name: 'Claude Sonnet 4.6', provider: 'anthropic' as const },
-      { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'anthropic' as const },
-      { id: 'claude-haiku-4-5-20251001',  name: 'Claude Haiku 4.5',  provider: 'anthropic' as const },
+      { id: 'claude-opus-4-7',            name: 'Claude Opus 4.7',   provider: 'anthropic' as const, maxTokens: 32_000, supportsVision: true, supportsThinking: true },
+      { id: 'claude-opus-4-6',            name: 'Claude Opus 4.6',   provider: 'anthropic' as const, maxTokens: 32_000, supportsVision: true, supportsThinking: true },
+      { id: 'claude-opus-4-5-20251101',   name: 'Claude Opus 4.5',   provider: 'anthropic' as const, maxTokens: 32_000, supportsVision: true, supportsThinking: true },
+      { id: 'claude-opus-4-1-20250805',   name: 'Claude Opus 4.1',   provider: 'anthropic' as const, maxTokens: 32_000, supportsVision: true, supportsThinking: true },
+      { id: 'claude-sonnet-4-6',          name: 'Claude Sonnet 4.6', provider: 'anthropic' as const, maxTokens: 64_000, supportsVision: true, supportsThinking: true },
+      { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'anthropic' as const, maxTokens: 64_000, supportsVision: true, supportsThinking: true },
+      { id: 'claude-haiku-4-5-20251001',  name: 'Claude Haiku 4.5',  provider: 'anthropic' as const, maxTokens: 16_000, supportsVision: true, supportsThinking: true },
     ];
 
 console.log('[handlers] AVAILABLE_MODELS loaded:', AVAILABLE_MODELS.length, 'models, source=', cliModels.length > 0 ? 'panda CLI configs.ts (live fs read)' : 'fallback hardcode');
@@ -449,8 +454,21 @@ export function registerIpcHandlers(): void {
     return AVAILABLE_MODELS;
   });
 
-  ipcMain.handle(CH.MODEL_SET, async (_event, payload: { model: string }) => {
-    cliManager.setModel(payload.model);
+  ipcMain.handle(CH.MODEL_SET, async (_event, payload: { model?: string; modelId?: string }) => {
+    const model = payload?.modelId ?? payload?.model;
+    if (!model) {
+      throw new Error('panda:chat:model:set requires { modelId }');
+    }
+    cliManager.setModel(model);
+  });
+
+  ipcMain.handle(CH.PROVIDER_SNAPSHOT, async () => {
+    try {
+      return await readProviderSnapshot();
+    } catch (err) {
+      console.error('[IPC] PROVIDER_SNAPSHOT failed:', err);
+      return null;
+    }
   });
 
   ipcMain.handle(CH.PERMISSION_MODE_SET, async (_event, payload: { mode: string }) => {

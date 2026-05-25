@@ -199,20 +199,9 @@ export function maybeSpawnOnDesk(opts: MaybeSpawnOnDeskOptions = {}): void {
       const launchCjs = locatePandaOnDeskLaunch()
       if (!launchCjs) return
 
-      // W4-T1 增强：spawn 前先 checkElectronInstalled，缺 electron 时打印 friendly hint
-      // 而非让 launch.cjs 撞 'Cannot find module electron' 静默崩
+      // Desk pet is not a public launch path yet.  Missing Electron must stay
+      // silent so every `panda` startup keeps the CLI path clean.
       if (!checkElectronInstalled()) {
-        if (!_hintPrinted) {
-          _hintPrinted = true
-          try {
-            // hint 走 stderr，避免污染用户 stdout pipe；中文 + emoji 与 postinstall 风格一致
-            process.stderr.write(
-              '[panda] 桌面宠物未安装。跑 `panda --install-desk` 启用 ✨\n',
-            )
-          } catch {
-            // tty 异常忽略
-          }
-        }
         return
       }
 

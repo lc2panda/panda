@@ -1,5 +1,5 @@
-// Input: providerStore (CRUD/test/activate) + settingsStore.fetchAll
-// Output: provider list (Official + saved) + Add/Edit Modal with preset chips, models mapping, settings.json textarea
+// Input: providerStore (CRUD/test/activate + CLI provider snapshot) + settingsStore.fetchAll
+// Output: provider list (CLI synced official + saved) + Add/Edit Modal with preset chips, models mapping, settings.json textarea
 // Pos: Settings tab — first entry, also exports ProviderFormModal
 //
 // Source 1:1: cc-haha desktop/src/pages/Settings.tsx L100-L670 (ProviderSettings + ProviderFormModal)
@@ -100,6 +100,8 @@ function modelsToMapping(models: Provider['models']): ModelMapping {
 export function PdProviderSettings() {
   const providers = useProviderStore((s) => s.providers);
   const activeProviderId = useProviderStore((s) => s.activeProviderId);
+  const cliSnapshot = useProviderStore((s) => s.cliSnapshot);
+  const syncCliSnapshot = useProviderStore((s) => s.syncCliSnapshot);
   const setActiveProvider = useProviderStore((s) => s.setActiveProvider);
   const removeProvider = useProviderStore((s) => s.removeProvider);
   const fetchSettings = useSettingsStore((s) => s.fetchAll);
@@ -117,6 +119,7 @@ export function PdProviderSettings() {
 
   // panda providerStore 已经初始化过；这里调一次 fetchSettings 同步 model 列表
   useEffect(() => {
+    void syncCliSnapshot();
     void fetchSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -204,6 +207,41 @@ export function PdProviderSettings() {
           {t('settings.providers.addProvider')}
         </PdButton>
       </div>
+
+      {cliSnapshot && (
+        <div className="mb-3 rounded-xl border border-[var(--pd-color-border)] bg-[var(--pd-color-surface-container-low)] px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold text-[var(--pd-color-text-primary)]">
+                CLI 当前服务商：{cliSnapshot.activeProviderName}
+              </div>
+              <div className="mt-1 text-[11px] text-[var(--pd-color-text-tertiary)]">
+                {cliSnapshot.baseUrl} · {cliSnapshot.currentModel}
+              </div>
+            </div>
+            <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+              cliSnapshot.auth.configured
+                ? 'bg-[var(--pd-color-success)]/12 text-[var(--pd-color-success)]'
+                : 'bg-[var(--pd-color-warning)]/12 text-[var(--pd-color-warning)]'
+            }`}>
+              {cliSnapshot.auth.configured ? `已认证 · ${cliSnapshot.auth.method}` : '未检测到认证'}
+            </span>
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-[var(--pd-color-text-tertiary)]">
+            <div>settings.json：{cliSnapshot.sources.settingsJson.exists ? cliSnapshot.sources.settingsJson.path : '未找到'}</div>
+            <div>.pandacc.json：{cliSnapshot.sources.globalConfig.exists ? cliSnapshot.sources.globalConfig.path : '未找到'}</div>
+            <div>
+              配置来源：
+              {[
+                ...cliSnapshot.sources.processEnvKeys.map((key) => `process.env:${key}`),
+                ...cliSnapshot.sources.settingsJson.envKeys.map((key) => `settings.json:${key}`),
+                cliSnapshot.sources.globalConfig.hasThirdPartyProvider ? 'auth login:thirdPartyProvider' : '',
+                cliSnapshot.sources.globalConfig.hasOAuthAccount ? 'auth login:oauthAccount' : '',
+              ].filter(Boolean).join(' / ') || '无'}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Official provider — always visible at top */}
       <div
@@ -409,9 +447,21 @@ export function PdProviderSettings() {
 //   "不可用"误导。
 
 function ClaudeOfficialLogin() {
-  // Renderer 拿不到 process.env，但能从 settingsStore 看 activeProviderName。
+  const cliSnapshot = useProviderStore((s) => s.cliSnapshot);
   return (
     <div className="flex flex-col gap-2 text-sm">
+      {cliSnapshot && (
+        <div className="rounded-lg border border-[var(--pd-color-border)] bg-[var(--pd-color-surface-container-lowest)] px-3 py-2 text-xs text-[var(--pd-color-text-secondary)]">
+          <div>当前模型：{cliSnapshot.currentModel}</div>
+          <div>Base URL：{cliSnapshot.baseUrl}</div>
+          <div>
+            认证状态：
+            {cliSnapshot.auth.configured
+              ? ` 已配置（${cliSnapshot.auth.method}${cliSnapshot.auth.account ? ` · ${cliSnapshot.auth.account}` : ''}）`
+              : ' 未检测到'}
+          </div>
+        </div>
+      )}
       <div className="text-[var(--pd-color-text-secondary)] leading-relaxed">
         Anthropic 官方服务商通过以下任一方式认证（按优先级）：
       </div>

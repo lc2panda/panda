@@ -1,5 +1,5 @@
 // Input: Electron contextBridge + ipcRenderer APIs
-// Output: window.pandaAPI — type-safe IPC client matching PandaChatAPI interface (27 channels + update + window + pandacc namespaces)
+// Output: window.pandaAPI — type-safe IPC client matching PandaChatAPI interface (chat/config/provider + update + window + pandacc namespaces)
 // Pos: Electron preload script — sole bridge between renderer and main process
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -16,6 +16,7 @@ const CH = {
   CHAT_STREAM_START:   'panda:chat:stream:start',
   CHAT_STREAM_DELTA:   'panda:chat:stream:delta',
   CHAT_STREAM_END:     'panda:chat:stream:end',
+  CHAT_STREAM_ERROR:   'panda:chat:stream:error',
   CHAT_STOP:           'panda:chat:stop',
   CHAT_WINDOW_TOGGLE:  'panda:chat:window:toggle',
   // Session management
@@ -42,6 +43,7 @@ const CH = {
   SLASH_COMMANDS:      'panda:chat:slash-commands',
   MODEL_LIST:          'panda:chat:model:list',
   MODEL_SET:           'panda:chat:model:set',
+  PROVIDER_SNAPSHOT:   'panda:provider:snapshot',
   PERMISSION_MODE_SET: 'panda:chat:permission-mode:set',
   CLIPBOARD_PASTE_IMG: 'panda:chat:clipboard:paste-image',
   // Theme
@@ -149,6 +151,7 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     onStreamStart: createSubscription(CH.CHAT_STREAM_START),
     onStreamDelta: createSubscription(CH.CHAT_STREAM_DELTA),
     onStreamEnd: createSubscription(CH.CHAT_STREAM_END),
+    onStreamError: createSubscription(CH.CHAT_STREAM_ERROR),
     onWindowToggle: createSubscription(CH.CHAT_WINDOW_TOGGLE),
   },
   session: {
@@ -181,6 +184,7 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     getSlashCommands: (payload: unknown) => ipcRenderer.invoke(CH.SLASH_COMMANDS, payload),
     getModels: (payload: unknown) => ipcRenderer.invoke(CH.MODEL_LIST, payload),
     setModel: (payload: unknown) => ipcRenderer.invoke(CH.MODEL_SET, payload),
+    getProviderSnapshot: () => ipcRenderer.invoke(CH.PROVIDER_SNAPSHOT),
     setPermissionMode: (payload: unknown) => ipcRenderer.invoke(CH.PERMISSION_MODE_SET, payload),
   },
   notification: {

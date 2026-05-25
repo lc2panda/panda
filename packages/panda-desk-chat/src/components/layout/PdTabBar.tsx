@@ -258,6 +258,8 @@ export function PdTabBar() {
 
       <div
         ref={scrollRef}
+        data-drag-region
+        data-tauri-drag-region
         className="tab-bar-hit-area flex-1 flex items-stretch overflow-x-hidden"
         onDragOver={(e) => e.preventDefault()}
         onMouseDown={handleScrollRegionMouseDown}
@@ -385,6 +387,7 @@ const TabItem = forwardRef<HTMLDivElement, {
     <div
       ref={ref}
       data-dragging={isDragging ? 'true' : 'false'}
+      data-no-drag
       onClick={onClick}
       onMouseDown={onMouseDown}
       onContextMenu={onContextMenu}

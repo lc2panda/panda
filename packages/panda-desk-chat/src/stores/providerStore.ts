@@ -1,10 +1,11 @@
-// Input: Provider/model configuration synced from CLI backend
-// Output: Available providers and models for model selector UI
+// Input: Provider/model configuration and redacted CLI provider snapshot synced from backend
+// Output: Available providers, models, and CLI provider status for model selector/settings UI
 // Pos: State layer — consumed by model selector dropdown, provider settings panel
 
 import { create } from 'zustand';
 import { storage } from '../lib/storage';
 import * as bridge from '../ipc/bridge';
+import type { ProviderSnapshot } from '../ipc/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,6 +42,7 @@ type PersistedProviderState = {
 export interface ProviderStore {
   providers: Provider[];
   activeProviderId: string | null;
+  cliSnapshot: ProviderSnapshot | null;
 
   // Actions
   setProviders: (providers: Provider[]) => void;
@@ -52,6 +54,7 @@ export interface ProviderStore {
   getAvailableModels: () => ModelInfo[];
   loadProviders: () => void;
   saveProviders: () => void;
+  syncCliSnapshot: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +106,7 @@ const defaultProvider: Provider = {
 export const useProviderStore = create<ProviderStore>()((set, get) => ({
   providers: [defaultProvider],
   activeProviderId: 'anthropic',
+  cliSnapshot: null,
 
   setProviders: (providers) => {
     set({ providers });
@@ -163,6 +167,56 @@ export const useProviderStore = create<ProviderStore>()((set, get) => ({
     const { providers, activeProviderId } = get();
     storage.set(PROVIDERS_STORAGE_KEY, { providers, activeProviderId });
   },
+
+  syncCliSnapshot: async () => {
+    const snapshot = await bridge.getProviderSnapshot();
+    if (!snapshot) return;
+    set((state) => {
+      const id = snapshot.activeProviderId || 'anthropic';
+      const modelIds = Array.from(
+        new Set([
+          snapshot.models.main,
+          snapshot.models.opus,
+          snapshot.models.sonnet,
+          snapshot.models.haiku,
+          snapshot.currentModel,
+        ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0)),
+      );
+      const fallbackModels = state.providers.find((p) => p.id === 'anthropic')?.models ?? defaultModels;
+      const models = modelIds.length > 0
+        ? modelIds.map((modelId) => {
+            const known = fallbackModels.find((m) => m.id === modelId);
+            return known ?? {
+              id: modelId,
+              name: modelId,
+              provider: id,
+              maxTokens: /haiku/i.test(modelId) ? 16_000 : /opus/i.test(modelId) ? 32_000 : 64_000,
+              supportsVision: true,
+              supportsThinking: true,
+            };
+          })
+        : fallbackModels;
+      const nextProvider: Provider = {
+        id,
+        name: snapshot.activeProviderName,
+        type: snapshot.providerType === 'custom' ? 'anthropic' : snapshot.providerType,
+        isActive: true,
+        models,
+        baseUrl: snapshot.baseUrl,
+      };
+      const seen = new Set<string>();
+      const providers = [nextProvider, ...state.providers]
+        .map((p) => (p.id === id ? { ...p, ...nextProvider } : { ...p, isActive: p.id === id ? true : p.isActive }))
+        .filter((p) => {
+          if (seen.has(p.id)) return false;
+          seen.add(p.id);
+          return true;
+        })
+        .map((p) => ({ ...p, isActive: p.id === id }));
+      storage.set(PROVIDERS_STORAGE_KEY, { providers, activeProviderId: id });
+      return { providers, activeProviderId: id, cliSnapshot: snapshot };
+    });
+  },
 }));
 
 useProviderStore.getState().loadProviders();
@@ -181,8 +235,11 @@ export function setupProviderBridge(): void {
   if (providerBridgeInitialized) return;
   providerBridgeInitialized = true;
 
-  // In production, fetch model list from backend
+  // In production, fetch model/provider status from backend
   if (!bridge.isDevMode()) {
+    useProviderStore.getState().syncCliSnapshot()
+      .catch((err: unknown) => console.error('[providerStore] getProviderSnapshot failed:', err));
+
     bridge.getModels()
       .then((models) => {
         if (models.length > 0) {

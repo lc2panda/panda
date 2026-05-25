@@ -9,7 +9,7 @@
 export type SDKMessageType =
   | 'assistant' | 'user' | 'result' | 'system'
   | 'tool_use' | 'tool_result' | 'stream_event'
-  | 'control_request' | 'control_response' | 'keep_alive';
+  | 'control_request' | 'control_response' | 'keep_alive' | 'error';
 
 // Content blocks
 export interface TextBlock { type: 'text'; text: string }
@@ -82,9 +82,15 @@ export interface SDKSystemMessage extends SDKMessageBase {
   subtype?: string;
 }
 
+export interface SDKErrorMessage extends SDKMessageBase {
+  type: 'error';
+  error?: string;
+  message?: string;
+}
+
 export type SDKMessage =
   | SDKAssistantMessage | SDKResultMessage | SDKStreamEvent
-  | SDKControlRequest | SDKToolResultMessage | SDKSystemMessage
+  | SDKControlRequest | SDKToolResultMessage | SDKSystemMessage | SDKErrorMessage
   | SDKMessageBase;
 
 // === CLI stdin 输入类型 (SDKUserMessage 协议) ===

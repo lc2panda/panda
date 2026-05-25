@@ -1,5 +1,5 @@
 // Input: Zod schemas from ./schemas.ts
-// Output: TypeScript types inferred from Zod + PandaChatAPI named interface (C-5) + UpdateStatus type + DiskSessionMeta/MessageEntry/SessionDetail (pd:sessions:* IPC, cc-haha-aligned) + ScheduledTask types (panda:schedule:* IPC) + Pandacc Skills/Agents/Plugins/Env/ComputerUse types
+// Output: TypeScript types inferred from Zod + PandaChatAPI named interface (C-5) + provider snapshot + UpdateStatus type + DiskSessionMeta/MessageEntry/SessionDetail (pd:sessions:* IPC, cc-haha-aligned) + ScheduledTask types (panda:schedule:* IPC) + Pandacc Skills/Agents/Plugins/Env/ComputerUse types
 // Pos: IPC type layer — consumed by bridge.ts, chat renderer components, and main process handlers
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -87,6 +87,30 @@ export type ModelListResponse       = z.infer<typeof modelListResponseSchema>;
 export type ModelSetPayload         = z.infer<typeof modelSetSchema>;
 export type PermissionModePayload   = z.infer<typeof permissionModeSetSchema>;
 export type ClipboardPastePayload   = z.infer<typeof clipboardPasteImageSchema>;
+
+export interface ProviderSnapshot {
+  activeProviderId: string;
+  activeProviderName: string;
+  providerType: 'anthropic' | 'openai' | 'openrouter' | 'custom';
+  baseUrl: string;
+  currentModel: string;
+  auth: {
+    configured: boolean;
+    method: 'process.env' | 'settings.json' | 'auth login' | 'oauthAccount' | 'none';
+    account?: string;
+  };
+  models: {
+    main?: string;
+    haiku?: string;
+    sonnet?: string;
+    opus?: string;
+  };
+  sources: {
+    settingsJson: { path: string; exists: boolean; envKeys: string[] };
+    globalConfig: { path: string; exists: boolean; hasThirdPartyProvider: boolean; hasOAuthAccount: boolean };
+    processEnvKeys: string[];
+  };
+}
 
 // ─── Disk-based session types (pd:sessions:* IPC channels) ────────────────
 
@@ -205,6 +229,7 @@ export interface PandaChatAPI {
     onStreamStart(cb: (payload: ChatStreamStartPayload) => void): Unsubscribe;
     onStreamDelta(cb: (payload: ChatStreamDeltaPayload) => void): Unsubscribe;
     onStreamEnd(cb: (payload: ChatStreamEndPayload) => void): Unsubscribe;
+    onStreamError(cb: (payload: { sessionId: string; messageId: string; error: string }) => void): Unsubscribe;
     onWindowToggle(cb: (payload: ChatWindowTogglePayload) => void): Unsubscribe;
   };
   session: {
@@ -238,6 +263,7 @@ export interface PandaChatAPI {
     getSlashCommands(payload: SlashCommandsRequest): Promise<SlashCommandsResponse>;
     getModels(payload: ModelListRequest): Promise<ModelListResponse>;
     setModel(payload: ModelSetPayload): Promise<void>;
+    getProviderSnapshot(): Promise<ProviderSnapshot | null>;
     setPermissionMode(payload: PermissionModePayload): Promise<void>;
   };
   notification: {

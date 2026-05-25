@@ -1,6 +1,6 @@
 // Input: window.pandaAPI injected by preload/chat.ts via contextBridge (named API)
 //        In dev mode: DevMockRelay provides full simulated backend (chat + session + config + fs)
-// Output: Type-safe IPC client for chat renderer components (+ auto-update bridge + disk session access)
+// Output: Type-safe IPC client for chat renderer components (+ provider snapshot + auto-update bridge + disk session access)
 // Pos: IPC bridge layer — sole entry point for renderer → main communication
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
@@ -26,6 +26,7 @@ import type {
   FsListResponse,
   SlashCommandsResponse,
   ModelListResponse,
+  ProviderSnapshot,
   WindowInitPayload,
   DiskSessionMeta,
   SessionDetail,
@@ -204,6 +205,14 @@ export function onStreamEnd(
     return () => relay.off('stream:end', wrapped);
   }
   return getPandaAPI().chat.onStreamEnd(callback);
+}
+
+/** Subscribe to stream-error events. Returns unsubscribe function. */
+export function onStreamError(
+  callback: (payload: { sessionId: string; messageId: string; error: string }) => void,
+): Unsubscribe {
+  if (IS_DEV) return () => {};
+  return getPandaAPI().chat.onStreamError(callback);
 }
 
 /** Subscribe to window toggle events. Returns unsubscribe function. */
@@ -423,13 +432,19 @@ export async function getModels(): Promise<ModelListResponse> {
   return getPandaAPI().config.getModels({});
 }
 
+/** Get redacted provider/auth snapshot from panda CLI config. */
+export async function getProviderSnapshot(): Promise<ProviderSnapshot | null> {
+  if (IS_DEV) return null;
+  return getPandaAPI().config.getProviderSnapshot();
+}
+
 /** Set the active model for a session. */
 export async function setModel(
   sessionId: string,
   modelId: string,
 ): Promise<void> {
   if (IS_DEV) return getDevRelay().setModel(sessionId, modelId);
-  return getPandaAPI().config.setModel({ sessionId, modelId });
+  return getPandaAPI().config.setModel(sessionId ? { sessionId, modelId } : { modelId });
 }
 
 /** Set the permission mode. */

@@ -262,7 +262,7 @@ export const modelListResponseSchema = z.array(modelInfoSchema);
 // ─── 22. Model: set (renderer → main) ──────────────────────────────────────
 
 export const modelSetSchema = z.object({
-  sessionId: z.string().min(1),
+  sessionId: z.string().min(1).optional(),
   modelId: z.string().min(1),
 });
 

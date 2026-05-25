@@ -1,5 +1,5 @@
-// Input: ~/.pandacc/{skills,agents,plugins,settings.json,computer-use} 真实文件 + macOS systemPreferences (TCC) + spawn(system_profiler/mdfind) + shell.openExternal
-// Output: SkillItem[] / AgentItem[] / PluginItem[] / EnvVars / ComputerUseStatusEx (+permissions) / InstalledApp[] / AuthorizedApp[] / open-settings void
+// Input: ~/.pandacc/{skills,agents,plugins,settings.json,computer-use} + ~/.pandacc.json 真实文件 + macOS systemPreferences (TCC) + spawn(system_profiler/mdfind) + shell.openExternal
+// Output: SkillItem[] / AgentItem[] / PluginItem[] / EnvVars / ProviderSnapshot / ComputerUseStatusEx (+permissions) / InstalledApp[] / AuthorizedApp[] / open-settings void
 // Pos: electron main — 扫描真实 ~/.pandacc 配置目录供 Settings sub-tab 使用
 //
 // Comdr 指令: 扫描 panda 默认配置目录 ~/.pandacc/，对接 Skills/Agents/Plugins/ComputerUse/Env 5 个 Settings sub-tab。
@@ -34,6 +34,7 @@ const AGENTS_DIR = () => path.join(pandaccRoot(), 'agents');
 const PLUGINS_INSTALLED_JSON = () =>
   path.join(pandaccRoot(), 'plugins', 'installed_plugins.json');
 const SETTINGS_JSON = () => path.join(pandaccRoot(), 'settings.json');
+const GLOBAL_CONFIG_JSON = () => path.join(os.homedir(), '.pandacc.json');
 const COMPUTER_USE_DIR = () => path.join(pandaccRoot(), 'computer-use');
 
 // ─── 公共类型 ────────────────────────────────────────────────────────────────
@@ -100,6 +101,30 @@ export interface ComputerUseStatusEx {
   grantedApps: AuthorizedApp[];
   // Comdr 指令: ComputerUse 完整实现 - cc-haha 对标 — 加 macOS TCC 实测权限
   permissions: ComputerUsePermissions;
+}
+
+export interface ProviderSnapshot {
+  activeProviderId: string;
+  activeProviderName: string;
+  providerType: 'anthropic' | 'openai' | 'openrouter' | 'custom';
+  baseUrl: string;
+  currentModel: string;
+  auth: {
+    configured: boolean;
+    method: 'process.env' | 'settings.json' | 'auth login' | 'oauthAccount' | 'none';
+    account?: string;
+  };
+  models: {
+    main?: string;
+    haiku?: string;
+    sonnet?: string;
+    opus?: string;
+  };
+  sources: {
+    settingsJson: { path: string; exists: boolean; envKeys: string[] };
+    globalConfig: { path: string; exists: boolean; hasThirdPartyProvider: boolean; hasOAuthAccount: boolean };
+    processEnvKeys: string[];
+  };
 }
 
 // grants.json 格式 — cc-haha API 对齐
@@ -355,6 +380,153 @@ export async function getPandaEnv(): Promise<Record<string, string>> {
   } catch {
     return {};
   }
+}
+
+type ThirdPartyProviderConfig = {
+  name?: string;
+  baseURL?: string;
+  apiKey?: string;
+  model?: string;
+  mode?: 'api_key' | 'chatgpt_backend';
+  accessToken?: string;
+  refreshToken?: string;
+  email?: string;
+};
+
+type GlobalConfigSnapshot = {
+  thirdPartyProvider?: ThirdPartyProviderConfig;
+  oauthAccount?: {
+    emailAddress?: string;
+    displayName?: string;
+    organizationName?: string | null;
+  };
+  model?: string;
+};
+
+function pickEnvValue(
+  key: string,
+  settingsEnv: Record<string, string>,
+): { value: string; source: 'process.env' | 'settings.json' } | null {
+  const processValue = process.env[key];
+  if (typeof processValue === 'string' && processValue.trim()) {
+    return { value: processValue, source: 'process.env' };
+  }
+  const settingsValue = settingsEnv[key];
+  if (typeof settingsValue === 'string' && settingsValue.trim()) {
+    return { value: settingsValue, source: 'settings.json' };
+  }
+  return null;
+}
+
+function providerTypeFrom(name: string, baseUrl: string): ProviderSnapshot['providerType'] {
+  const haystack = `${name} ${baseUrl}`.toLowerCase();
+  if (haystack.includes('openrouter')) return 'openrouter';
+  if (haystack.includes('openai') || haystack.includes('chatgpt')) return 'openai';
+  if (haystack.includes('anthropic') || haystack.includes('claude')) return 'anthropic';
+  return baseUrl.includes('anthropic.com') ? 'anthropic' : 'custom';
+}
+
+function configuredEnvKeys(env: Record<string, string>, keys: string[]): string[] {
+  return keys.filter((key) => {
+    const value = env[key];
+    return typeof value === 'string' && value.trim().length > 0;
+  });
+}
+
+export async function getProviderSnapshot(): Promise<ProviderSnapshot> {
+  const settingsEnv = await getPandaEnv();
+  const settingsPath = SETTINGS_JSON();
+  const globalPath = GLOBAL_CONFIG_JSON();
+  let globalExists = false;
+  let globalConfig: GlobalConfigSnapshot = {};
+  try {
+    const raw = await fs.readFile(globalPath, 'utf8');
+    globalExists = true;
+    const parsed = JSON.parse(raw) as GlobalConfigSnapshot;
+    if (parsed && typeof parsed === 'object') globalConfig = parsed;
+  } catch {
+    globalExists = false;
+  }
+
+  let settingsExists = false;
+  try {
+    const s = await fs.stat(settingsPath);
+    settingsExists = s.isFile();
+  } catch {
+    settingsExists = false;
+  }
+
+  const relevantEnvKeys = [
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_AUTH_TOKEN',
+    'ANTHROPIC_BASE_URL',
+    'ANTHROPIC_MODEL',
+    'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+    'ANTHROPIC_DEFAULT_SONNET_MODEL',
+    'ANTHROPIC_DEFAULT_OPUS_MODEL',
+  ];
+  const processEnvKeys = configuredEnvKeys(process.env as Record<string, string>, relevantEnvKeys);
+  const settingsEnvKeys = configuredEnvKeys(settingsEnv, relevantEnvKeys);
+
+  const thirdParty = globalConfig.thirdPartyProvider;
+  const baseUrl =
+    pickEnvValue('ANTHROPIC_BASE_URL', settingsEnv)?.value ||
+    thirdParty?.baseURL ||
+    'https://api.anthropic.com';
+  const currentModel =
+    pickEnvValue('ANTHROPIC_MODEL', settingsEnv)?.value ||
+    thirdParty?.model ||
+    globalConfig.model ||
+    pickEnvValue('ANTHROPIC_DEFAULT_OPUS_MODEL', settingsEnv)?.value ||
+    'claude-opus-4-7';
+  const rawName = thirdParty?.name || (baseUrl.includes('anthropic.com') ? 'Anthropic' : 'Custom Provider');
+  const providerType = providerTypeFrom(rawName, baseUrl);
+
+  const apiKey = pickEnvValue('ANTHROPIC_API_KEY', settingsEnv);
+  const authToken = pickEnvValue('ANTHROPIC_AUTH_TOKEN', settingsEnv);
+  let auth: ProviderSnapshot['auth'] = { configured: false, method: 'none' };
+  if (apiKey) auth = { configured: true, method: apiKey.source };
+  else if (authToken) auth = { configured: true, method: authToken.source };
+  else if (thirdParty?.apiKey || thirdParty?.accessToken || thirdParty?.refreshToken) {
+    auth = {
+      configured: true,
+      method: 'auth login',
+      account: thirdParty.email,
+    };
+  } else if (globalConfig.oauthAccount) {
+    auth = {
+      configured: true,
+      method: 'oauthAccount',
+      account: globalConfig.oauthAccount.emailAddress || globalConfig.oauthAccount.displayName,
+    };
+  }
+
+  const models = {
+    main: currentModel,
+    haiku: pickEnvValue('ANTHROPIC_DEFAULT_HAIKU_MODEL', settingsEnv)?.value,
+    sonnet: pickEnvValue('ANTHROPIC_DEFAULT_SONNET_MODEL', settingsEnv)?.value,
+    opus: pickEnvValue('ANTHROPIC_DEFAULT_OPUS_MODEL', settingsEnv)?.value,
+  };
+
+  return {
+    activeProviderId: providerType === 'anthropic' ? 'anthropic' : `${providerType}-cli`,
+    activeProviderName: rawName,
+    providerType,
+    baseUrl,
+    currentModel,
+    auth,
+    models,
+    sources: {
+      settingsJson: { path: settingsPath, exists: settingsExists, envKeys: settingsEnvKeys },
+      globalConfig: {
+        path: globalPath,
+        exists: globalExists,
+        hasThirdPartyProvider: !!thirdParty,
+        hasOAuthAccount: !!globalConfig.oauthAccount,
+      },
+      processEnvKeys,
+    },
+  };
 }
 
 /**

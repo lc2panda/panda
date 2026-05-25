@@ -13,6 +13,7 @@ vi.mock('@/ipc/bridge', () => ({
   onStreamStart: vi.fn(() => () => {}),
   onStreamDelta: vi.fn(() => () => {}),
   onStreamEnd: vi.fn(() => () => {}),
+  onStreamError: vi.fn(() => () => {}),
   onToolUseStart: vi.fn(() => () => {}),
   onToolUseEnd: vi.fn(() => () => {}),
   onPermissionRequest: vi.fn(() => () => {}),
