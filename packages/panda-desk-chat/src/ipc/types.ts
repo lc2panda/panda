@@ -53,6 +53,23 @@ export type ChatSendPayload         = z.infer<typeof chatSendSchema>;
 export type ChatStreamStartPayload  = z.infer<typeof chatStreamStartSchema>;
 export type ChatStreamDeltaPayload  = z.infer<typeof chatStreamDeltaSchema>;
 export type ChatStreamEndPayload    = z.infer<typeof chatStreamEndSchema>;
+export interface ChatStreamErrorPayload {
+  sessionId: string;
+  messageId: string;
+  error: string;
+  reason?: 'exit' | 'spawn-error' | 'cli-error';
+  exitCode?: number | null;
+  signal?: string | null;
+  cwd?: string;
+  cliPath?: string;
+  bunPath?: string;
+  args?: string[];
+  stderrTail?: string;
+  isPackaged?: boolean;
+  resourcesPath?: string;
+  configDir?: string;
+  logPath?: string;
+}
 export type ChatStopPayload         = z.infer<typeof chatStopSchema>;
 export type ChatWindowTogglePayload = z.infer<typeof chatWindowToggleSchema>;
 
@@ -229,7 +246,7 @@ export interface PandaChatAPI {
     onStreamStart(cb: (payload: ChatStreamStartPayload) => void): Unsubscribe;
     onStreamDelta(cb: (payload: ChatStreamDeltaPayload) => void): Unsubscribe;
     onStreamEnd(cb: (payload: ChatStreamEndPayload) => void): Unsubscribe;
-    onStreamError(cb: (payload: { sessionId: string; messageId: string; error: string }) => void): Unsubscribe;
+    onStreamError(cb: (payload: ChatStreamErrorPayload) => void): Unsubscribe;
     onWindowToggle(cb: (payload: ChatWindowTogglePayload) => void): Unsubscribe;
   };
   session: {

@@ -23,6 +23,7 @@ const ACTION_TO_SLASH: Record<SessionControlAction, string> = {
   branch: '/branch',
   resume: '/resume',
 };
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface SessionControlResult {
   ok: boolean;
@@ -46,6 +47,13 @@ export async function dispatchSessionControl(
 ): Promise<SessionControlResult> {
   if (!sessionId || typeof sessionId !== 'string') {
     return { ok: false, command: '', error: 'sessionId required' };
+  }
+  if (!UUID_PATTERN.test(sessionId)) {
+    return {
+      ok: false,
+      command: '',
+      error: '历史只读会话不能执行会话控制；请先发送消息创建新的 UUID 续聊会话。',
+    };
   }
   if (!Object.prototype.hasOwnProperty.call(ACTION_TO_SLASH, action)) {
     return { ok: false, command: '', error: `unknown action: ${action}` };

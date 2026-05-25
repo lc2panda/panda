@@ -1,6 +1,18 @@
 # TODO
 
-## 进行中 — v2.26.10 Desk Chat 历史对话只读加载热修（2026-05-25 16:55:25 +08:00）
+## 进行中 — v2.26.11 Desk Chat 历史会话错误诊断与恢复修补（2026-05-25 17:30:41 +08:00）
+
+- [x] 真实时间核验：本机 `2026-05-25 17:20:38 +08:00`，Cloudflare `2026-05-25 17:20:39 +08:00`，Apple `2026-05-25 17:20:39 +08:00`，最大偏差约 1 秒，判定通过。
+- [x] 用户截图复核：`2026-05-25 17:20:38 +08:00` 截图仍显示历史会话中重复追加 `CLI process exited before completing the response (code=1 signal=null).`；v2.26.10 不能再记录为真实闭环。
+- [x] 修复历史 tab 恢复：`tabStore.restoreTabs()` 改读 `bridge.listAllSessions()` / `~/.pandacc/projects` 磁盘历史，不再依赖 live `cliManager.listSessions()`；`setActiveTab()` 兼容内部 tab.id 并解析回 sessionId，tab 切换不触发 CLI focus。
+- [x] 修复 code=1 刷屏与诊断缺失：CLI 子进程异常退出不再自动 5 次 respawn；`stream:error` payload 增加 `stderrTail`、`cwd`、`cliPath`、`bunPath`、`configDir`、`resourcesPath`、`logPath`；主进程日志写入 Electron logs 目录的 `panda-desk-chat-main.log`。
+- [x] 会话控制兜底：`session-controls.ts` 对非 UUID 历史只读会话提前返回中文错误，避免绕过前端后再进入 CLI。
+- [x] 验证：`cd packages/panda-desk-chat && bun run test src/__tests__/stores/tabStore.test.ts src/__tests__/stores/chatStore.test.ts src/__tests__/stores/sessionStore.test.ts` 通过 51/51；`npx tsc -b --pretty false --incremental false` 通过；`bun run build:electron` 通过。
+- [x] packaged CLI 历史 UUID resume smoke：真实 `~/.pandacc/projects/-Users-panda-Downloads-cc-panda/7398afd6-82a3-4653-81a2-349f8d6ec4fe.jsonl` 可启动并进入 `system init`，但后续 API 返回 `429 rate_limit` 重试，未作为 assistant result 成功闭环。
+- [x] 重新打包 Desk Chat `0.2.6`：`cd packages/panda-desk-chat && bun run dist` 于 `2026-05-25 17:43:00 +08:00` 通过，生成 `Panda-0.2.6-arm64.dmg`（145 MB）、`Panda-0.2.6-arm64-mac.zip`（139 MB）、两个 blockmap 与 `latest-mac.yml`；资源核验 `panda-cli/dist/cli.js` 存在，`panda-cli/dist` 共 625 个文件，`bun .../cli.js --version` 返回 `2.1.142 (Panda)`。
+- [ ] 发布 GitHub Release `v2.26.11` 并发布 `@lc2panda/panda-code@2.26.11` 到 GitHub Packages。
+
+## 已完成 — v2.26.10 Desk Chat 历史对话只读加载热修（2026-05-25 16:55:25 +08:00）
 
 - [x] 真实时间核验：本机 `2026-05-25 16:55:24 +08:00`，Cloudflare `2026-05-25 16:55:25 +08:00`，Apple `2026-05-25 16:55:25 +08:00`，最大偏差约 1 秒，判定通过。
 - [x] 根因定位：打开历史对话时 `ActiveSession` 挂载会调用 `connectToSession()`，继而触发 `sessionStore.setActiveSession()` / `bridge.focusSession()`，导致只读历史加载也启动 CLI；非 UUID 历史 id 会触发 CLI code=1。
@@ -9,6 +21,7 @@
 - [x] 重新打包 Desk Chat `0.2.5`：`bun run dist` 于 `2026-05-25 17:08:00 +08:00` 通过，生成 `Panda-0.2.5-arm64.dmg`、`Panda-0.2.5-arm64-mac.zip`、两个 blockmap 与 `latest-mac.yml`；资源核验 `panda-cli/dist/cli.js` 存在，`panda-cli/dist` 共 625 个文件。
 - [x] 创建 GitHub Release `v2.26.10` 并上传安装包：`latest-mac.yml`、`Panda-0.2.5-arm64.dmg`、`Panda-0.2.5-arm64-mac.zip`、两个 blockmap 已上传，Release URL `https://github.com/lc2panda/panda/releases/tag/v2.26.10`。
 - [x] git push 与 npm 同步：`main` 与 tag `v2.26.10` 已推送；`@lc2panda/panda-code@2.26.10` 已发布到 GitHub Packages，`npm view` 返回 `2.26.10`。
+- [!] 复核修正：Comdr 于 `2026-05-25 17:20:38 +08:00` 提供截图证明 v2.26.10 用户场景仍未闭环；后续修复转入 v2.26.11。
 
 ## 已完成 — v2.26.9 Desk Chat 历史会话续聊热修（2026-05-25 16:22:20 +08:00）
 

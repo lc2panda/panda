@@ -13,6 +13,7 @@ import type {
   ChatStreamStartPayload,
   ChatStreamDeltaPayload,
   ChatStreamEndPayload,
+  ChatStreamErrorPayload,
   ChatWindowTogglePayload,
   SessionListResponse,
   SessionCreateResponse,
@@ -209,7 +210,7 @@ export function onStreamEnd(
 
 /** Subscribe to stream-error events. Returns unsubscribe function. */
 export function onStreamError(
-  callback: (payload: { sessionId: string; messageId: string; error: string }) => void,
+  callback: (payload: ChatStreamErrorPayload) => void,
 ): Unsubscribe {
   if (IS_DEV) return () => {};
   return getPandaAPI().chat.onStreamError(callback);

@@ -6,11 +6,19 @@
 
 ---
 
+## v2.26.11 — 2026-05-25 · Panda Desk Chat 历史会话错误诊断与恢复修补
+- 修复用户截图复核仍重复 `CLI process exited ... code=1`：tab 恢复改从 `~/.pandacc/projects` 读取磁盘历史，不再依赖 live CLI session list；tab 激活只更新 UI 状态，不触发 CLI focus。
+- 修复 code=1 刷屏：CLI 子进程异常退出后不再自动 respawn 5 次，避免同一错误连续追加到聊天记录。
+- 增强诊断：`stream:error` 现在携带 `stderrTail`、`cwd`、`cliPath`、`bunPath`、`configDir`、`resourcesPath`、`logPath`；主进程写入 Electron logs 目录 `panda-desk-chat-main.log`。
+- 防绕过兜底：session control 对非 UUID 历史只读会话提前返回中文错误，不进入 CLI。
+- 验证：`tabStore.test.ts` + `chatStore.test.ts` + `sessionStore.test.ts` 51/51 通过；Desk Chat `tsc -b` 与 `bun run build:electron` 通过；packaged CLI 历史 UUID resume 可启动，当前 API `429 rate_limit` 阻止 assistant result 完成。
+
 ## v2.26.10 — 2026-05-25 · Panda Desk Chat 历史对话只读加载热修
 - 修复打开历史对话即报 code=1：Desk Chat 切换历史会话时只读取 `~/.pandacc/projects` 历史，不再自动 `focusSession` / spawn CLI。
 - 修复后台 re-materialise 误触发：主进程 session list 为空时不再拿历史 active id 自动启动 CLI；只有合法 UUID 会话才允许 focus 复活。
 - 验证：`bun run build:electron` 通过；`sessionStore.test.ts` + `settingsStore.test.ts` 12/12 通过，覆盖非 UUID 历史会话不调用 CLI focus。
 - 发布目标：同步 GitHub Release `v2.26.10`，上传 Desk Chat `0.2.5` 安装包；发布 `@lc2panda/panda-code@2.26.10` 到 GitHub Packages。
+- 复核勘误：Comdr 于 `2026-05-25 17:20:38 +08:00` 提供截图证明用户安装场景仍会重复显示 code=1；v2.26.10 仅保留为一次未完全闭环的热修记录，真实闭环转入 v2.26.11。
 
 ## v2.26.9 — 2026-05-25 · Panda Desk Chat 历史会话续聊热修
 - 修复历史会话续聊 code=1：当 Desk Chat 加载到非 UUID 历史 `sessionId` 并发送新消息时，自动创建新的 UUID 会话、保留当前 UI 历史消息并替换当前 tab，再继续发送，避免 CLI 拒绝非法 `--session-id`。

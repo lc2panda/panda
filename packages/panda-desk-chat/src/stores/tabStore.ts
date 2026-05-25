@@ -205,9 +205,15 @@ export const useTabStore = create<TabStore>()((set, get) => ({
 
   // cc-haha L79-L82: setActiveTab — 切换激活 sessionId
   setActiveTab: (sessionId) => {
+    const resolvedSessionId =
+      get().tabs.find((t) => t.sessionId === sessionId || t.id === sessionId)
+        ?.sessionId ?? sessionId;
     set((s) => ({
-      tabs: s.tabs.map((t) => ({ ...t, isActive: t.sessionId === sessionId })),
-      activeTabId: sessionId,
+      tabs: s.tabs.map((t) => ({
+        ...t,
+        isActive: t.sessionId === resolvedSessionId,
+      })),
+      activeTabId: resolvedSessionId,
     }));
     get().saveTabs();
   },
@@ -286,12 +292,15 @@ export const useTabStore = create<TabStore>()((set, get) => ({
       const data = JSON.parse(raw) as TabPersistence;
       if (!data.openTabs || data.openTabs.length === 0) return;
 
-      // panda IPC: bridge.listSessions() 替换 cc-haha sessionsApi.list({ limit: 200 })
-      const list = await bridge.listSessions();
-      // SessionListResponse 是数组；为保险按 ducktype 处理
-      const arr = Array.isArray(list)
-        ? list
-        : (list as unknown as { sessions?: Array<{ id: string; title?: string }> }).sessions ?? [];
+      // panda history tabs must be restored from ~/.pandacc disk history, not
+      // cliManager's live in-memory sessions; listSessions() can be empty after
+      // every Electron restart and would silently drop valid historical tabs.
+      let arr: Array<{ id: string; title?: string; name?: string }> = [];
+      try {
+        arr = await bridge.listAllSessions();
+      } catch (err) {
+        console.warn('[tabStore] listAllSessions failed during restore:', err);
+      }
       const existingIds = new Set(arr.map((s) => s.id));
 
       const validTabs: Tab[] = data.openTabs

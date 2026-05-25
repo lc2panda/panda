@@ -7,7 +7,7 @@
 import { ChildProcess, spawn } from 'node:child_process';
 import { createInterface, type Interface as ReadlineInterface } from 'node:readline';
 import { EventEmitter } from 'node:events';
-import { existsSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -22,15 +22,9 @@ import { windowManager } from '../window-manager';
 import type {
   SDKMessage, SDKStreamEvent, SDKControlRequest, SDKResultMessage,
   SDKToolResultMessage, CLIInput, UserInput, ControlResponse,
-  SessionState, SessionInfo, ContentBlock,
+  SessionState, SessionInfo, ContentBlock, CLIStreamErrorPayload,
 } from './types';
 
-// ---------------------------------------------------------------------------
-// Respawn configuration
-// ---------------------------------------------------------------------------
-
-const RESPAWN_MAX_RETRIES = 5;
-const RESPAWN_BASE_DELAY_MS = 1000; // Exponential backoff: 1s, 2s, 4s, 8s, 16s
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type CLIPermissionMode =
@@ -104,13 +98,17 @@ export class CLISession extends EventEmitter {
   private currentToolName: string | null = null;
   private currentToolInput: string = '';
 
-  // Auto-respawn state
+  // Kept for legacy cleanup hooks; errors no longer auto-respawn to avoid UI spam.
   private respawnCount = 0;
   private respawnTimer: ReturnType<typeof setTimeout> | null = null;
   private intentionalStop = false;
 
-  // Options used to start the session (needed for respawn)
+  // Options used to start the session.
   private startOptions: { model?: string; permissionMode?: CLIPermissionMode } | undefined;
+  private lastCliPath = '';
+  private lastBunPath = '';
+  private lastSpawnArgs: string[] = [];
+  private lastLogPath = '';
 
   // Comdr 指令: 修复 spawn race condition — sendMessage 在 spawnWithDiskProbe
   //   await 完成前调用时，this.process 还是 null/stdin 不 writable，旧实现直接
@@ -193,6 +191,7 @@ export class CLISession extends EventEmitter {
 
     this.state = 'starting';
     const cliPath = this.resolveCLIPath();
+    this.lastCliPath = cliPath;
 
     // Disk probe: does this sessionId already exist on disk?  If yes, use
     // --resume so the CLI picks up the prior transcript (and enable
@@ -243,9 +242,15 @@ export class CLISession extends EventEmitter {
       args.push('--permission-mode', options.permissionMode);
     }
 
+    const bunPath = resolveBunPath();
+    this.lastBunPath = bunPath;
+    this.lastSpawnArgs = [...args];
+    this.writeDiagnosticLog(
+      `[spawn${isResume ? ':resume' : ':new'}] cwd=${this.cwd} bun=${bunPath} args=${args.join(' ')}`,
+    );
     console.log(`[CLISession:${this.id}] Spawning${isResume ? ' (resume)' : ''}: bun ${args.join(' ')}`);
 
-    this.process = spawn(resolveBunPath(), args, {
+    this.process = spawn(bunPath, args, {
       cwd: this.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env },
@@ -271,6 +276,7 @@ export class CLISession extends EventEmitter {
       this.process.stderr.on('data', (chunk: Buffer) => {
         const text = chunk.toString();
         this.stderrBuffer.push(text);
+        this.writeDiagnosticLog(`[stderr] ${text.trimEnd()}`);
         // Keep buffer bounded
         if (this.stderrBuffer.length > 200) {
           this.stderrBuffer.splice(0, 100);
@@ -285,10 +291,21 @@ export class CLISession extends EventEmitter {
       console.log(`[CLISession:${this.id}] Exited: code=${code} signal=${signal}`);
       this.cleanup();
       if (!this.intentionalStop) {
-        this.emitStreamError(
-          `CLI process exited before completing the response (code=${code ?? 'null'} signal=${signal ?? 'null'}). ${this.lastStderr()}`,
-        );
-        this.scheduleRespawn('exit', code, signal);
+        const stderrTail = this.lastStderr();
+        this.emitStreamError({
+          reason: 'exit',
+          exitCode: code,
+          signal,
+          error:
+            `CLI process exited before completing the response (code=${code ?? 'null'} signal=${signal ?? 'null'}).` +
+            (stderrTail ? `\n\nstderr:\n${stderrTail}` : ''),
+          stderrTail,
+        });
+        this.state = 'error';
+        this.emit('error', {
+          sessionId: this.id,
+          error: `CLI process exited (code=${code ?? 'null'} signal=${signal ?? 'null'})`,
+        });
       } else {
         this.state = 'stopped';
         this.emit('exit', { sessionId: this.id, code, signal });
@@ -300,8 +317,12 @@ export class CLISession extends EventEmitter {
       console.error(`[CLISession:${this.id}] Process error:`, err);
       this.cleanup();
       if (!this.intentionalStop) {
-        this.emitStreamError(`CLI process failed to start: ${err.message}`);
-        this.scheduleRespawn('error', null, null, err.message);
+        this.emitStreamError({
+          reason: 'spawn-error',
+          error: `CLI process failed to start: ${err.message}`,
+          stderrTail: this.lastStderr(),
+        });
+        this.state = 'error';
       } else {
         this.state = 'error';
         this.emit('error', { sessionId: this.id, error: err.message });
@@ -473,7 +494,11 @@ export class CLISession extends EventEmitter {
   private handleErrorMessage(msg: { error?: string; message?: string }): void {
     const error = msg.error || msg.message || this.lastStderr() || 'CLI returned an error';
     this.state = 'error';
-    this.emitStreamError(error);
+    this.emitStreamError({
+      reason: 'cli-error',
+      error,
+      stderrTail: this.lastStderr(),
+    });
   }
 
   // ── Control request handler ──────────────────────────────────────────
@@ -607,56 +632,43 @@ export class CLISession extends EventEmitter {
     return this.stderrBuffer.join('').trim().slice(-2000);
   }
 
-  private emitStreamError(error: string): void {
+  private writeDiagnosticLog(line: string): void {
+    try {
+      const logDir = app.getPath('logs');
+      mkdirSync(logDir, { recursive: true });
+      this.lastLogPath = path.join(logDir, 'panda-desk-chat-main.log');
+      appendFileSync(
+        this.lastLogPath,
+        `${new Date().toISOString()} [CLISession:${this.id}] ${line}\n`,
+      );
+    } catch {
+      /* best-effort diagnostic log */
+    }
+  }
+
+  private emitStreamError(input: string | Partial<CLIStreamErrorPayload>): void {
+    const payload = typeof input === 'string' ? { error: input } : input;
+    const error = payload.error || this.lastStderr() || 'CLI returned an error';
+    this.writeDiagnosticLog(`[stream:error] ${error}`);
     this.emit('stream:error', {
       sessionId: this.id,
       messageId: this.currentMessageId || randomUUID(),
       error,
-    });
+      reason: payload.reason,
+      exitCode: payload.exitCode,
+      signal: payload.signal,
+      cwd: this.cwd,
+      cliPath: this.lastCliPath,
+      bunPath: this.lastBunPath,
+      args: this.lastSpawnArgs,
+      stderrTail: payload.stderrTail ?? this.lastStderr(),
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      configDir: process.env.PANDA_CONFIG_DIR || path.join(app.getPath('home'), '.pandacc'),
+      logPath: this.lastLogPath,
+    } satisfies CLIStreamErrorPayload);
   }
 
-  // ── Auto-respawn with exponential backoff ─────────────────────────
-
-  private scheduleRespawn(
-    reason: 'exit' | 'error',
-    code: number | null,
-    signal: string | null,
-    errorMsg?: string,
-  ): void {
-    if (this.respawnCount >= RESPAWN_MAX_RETRIES) {
-      console.error(
-        `[CLISession:${this.id}] Respawn limit reached (${RESPAWN_MAX_RETRIES}). Giving up.`,
-      );
-      this.state = 'error';
-      this.emit('error', {
-        sessionId: this.id,
-        error: `CLI process ${reason} (${errorMsg ?? `code=${code} signal=${signal}`}). Auto-reconnect failed after ${RESPAWN_MAX_RETRIES} attempts.`,
-      });
-      return;
-    }
-
-    const delay = RESPAWN_BASE_DELAY_MS * Math.pow(2, this.respawnCount);
-    this.respawnCount++;
-    this.state = 'reconnecting';
-
-    console.log(
-      `[CLISession:${this.id}] Scheduling respawn #${this.respawnCount}/${RESPAWN_MAX_RETRIES} in ${delay}ms (reason: ${reason})`,
-    );
-
-    // Notify frontend about reconnecting state
-    this.emit('stateChange', {
-      sessionId: this.id,
-      state: 'reconnecting' as SessionState,
-      respawnAttempt: this.respawnCount,
-      maxRetries: RESPAWN_MAX_RETRIES,
-    });
-
-    this.respawnTimer = setTimeout(() => {
-      this.respawnTimer = null;
-      console.log(`[CLISession:${this.id}] Respawning now (attempt #${this.respawnCount})`);
-      this.start(this.startOptions);
-    }, delay);
-  }
 
   /** Call when session is confirmed healthy (first prompt received) */
   resetRespawnCount(): void {

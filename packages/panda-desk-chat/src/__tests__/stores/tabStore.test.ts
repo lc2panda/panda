@@ -2,13 +2,43 @@
 // Output: state assertions validating tab lifecycle and ordering
 // Pos: test layer — validates tabStore logic
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import * as bridge from '@/ipc/bridge';
 import { useTabStore } from '@/stores/tabStore';
+
+vi.mock('@/ipc/bridge', () => ({
+  listSessions: vi.fn().mockResolvedValue([]),
+  listAllSessions: vi.fn().mockResolvedValue([]),
+  focusSession: vi.fn().mockResolvedValue(undefined),
+}));
+
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
+Object.defineProperty(globalThis, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+});
 
 describe('tabStore', () => {
   beforeEach(() => {
     // Reset store to pristine state
     useTabStore.setState({ tabs: [], activeTabId: null });
+    localStorageMock.clear();
+    vi.mocked(bridge.focusSession).mockClear();
+    vi.mocked(bridge.listAllSessions).mockResolvedValue([]);
   });
 
   // ── addTab ─────────────────────────────────────────────────────────────
@@ -23,7 +53,7 @@ describe('tabStore', () => {
       expect(tabs[0].title).toBe('Session 1');
       expect(tabs[0].isActive).toBe(true);
       expect(tabs[0].isPinned).toBe(false);
-      expect(activeTabId).toBe(tabs[0].id);
+      expect(activeTabId).toBe('s1');
     });
 
     it('deactivates previous tabs when adding a new one', () => {
@@ -65,13 +95,13 @@ describe('tabStore', () => {
       useTabStore.getState().addTab('s1', 'A');
       useTabStore.getState().addTab('s2', 'B');
       // s2 is active
-      const activeId = useTabStore.getState().activeTabId!;
+      const activeId = useTabStore.getState().tabs[1].id;
 
       useTabStore.getState().removeTab(activeId);
 
       const { tabs, activeTabId } = useTabStore.getState();
       expect(tabs).toHaveLength(1);
-      expect(activeTabId).toBe(tabs[0].id);
+      expect(activeTabId).toBe('s1');
       expect(tabs[0].isActive).toBe(true);
     });
 
@@ -109,9 +139,20 @@ describe('tabStore', () => {
       useTabStore.getState().setActiveTab(firstTabId);
 
       const { tabs, activeTabId } = useTabStore.getState();
-      expect(activeTabId).toBe(firstTabId);
+      expect(activeTabId).toBe('s1');
       expect(tabs.find((t) => t.id === firstTabId)!.isActive).toBe(true);
       expect(tabs.filter((t) => t.id !== firstTabId).every((t) => !t.isActive)).toBe(true);
+    });
+
+    it('keeps tab activation local and does not focus a CLI session', () => {
+      const historicalSessionId = '00000000-0000-4000-8000-000000000001';
+      useTabStore.getState().openTab(historicalSessionId, 'Historical');
+      const internalTabId = useTabStore.getState().tabs[0].id;
+
+      useTabStore.getState().setActiveTab(internalTabId);
+
+      expect(useTabStore.getState().activeTabId).toBe(historicalSessionId);
+      expect(bridge.focusSession).not.toHaveBeenCalled();
     });
   });
 
@@ -198,7 +239,7 @@ describe('tabStore', () => {
       // Should keep A (pinned) and C (target)
       expect(tabs).toHaveLength(2);
       expect(tabs.map((t) => t.sessionId).sort()).toEqual(['s1', 's3']);
-      expect(activeTabId).toBe(tabC);
+      expect(activeTabId).toBe('s3');
     });
   });
 
@@ -229,7 +270,41 @@ describe('tabStore', () => {
       expect(tabs).toHaveLength(1);
       expect(tabs[0].sessionId).toBe('s2');
       expect(tabs[0].isActive).toBe(true);
-      expect(activeTabId).toBe(tabB);
+      expect(activeTabId).toBe('s2');
+    });
+  });
+
+  // ── restoreTabs ────────────────────────────────────────────────────────
+
+  describe('restoreTabs', () => {
+    it('restores valid disk history tabs without focusing CLI sessions', async () => {
+      const historicalSessionId = '00000000-0000-4000-8000-000000000002';
+      vi.mocked(bridge.listAllSessions).mockResolvedValue([
+        {
+          id: historicalSessionId,
+          title: 'Disk History',
+          projectPath: '/Users/panda/project',
+          messageCount: 1,
+          lastModified: '2026-05-25T09:25:57.000Z',
+        },
+      ]);
+      localStorage.setItem(
+        'panda-open-tabs',
+        JSON.stringify({
+          openTabs: [{ sessionId: historicalSessionId, title: 'Persisted' }],
+          activeTabId: historicalSessionId,
+        }),
+      );
+
+      await useTabStore.getState().restoreTabs();
+
+      const { tabs, activeTabId } = useTabStore.getState();
+      expect(bridge.listAllSessions).toHaveBeenCalled();
+      expect(tabs).toHaveLength(1);
+      expect(tabs[0].sessionId).toBe(historicalSessionId);
+      expect(tabs[0].title).toBe('Disk History');
+      expect(activeTabId).toBe(historicalSessionId);
+      expect(bridge.focusSession).not.toHaveBeenCalled();
     });
   });
 

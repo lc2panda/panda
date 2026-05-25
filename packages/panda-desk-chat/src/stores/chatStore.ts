@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import * as bridge from '../ipc/bridge';
+import type { ChatStreamErrorPayload } from '../ipc/types';
 import type { MessageEntry } from '../ipc/types';
 import { useToastStore } from './toastStore';
 import { useSessionStore } from './sessionStore';
@@ -261,7 +262,11 @@ export interface ChatStore {
     finishReason: string,
     tokenUsage?: TokenUsage,
   ) => void;
-  failStreaming: (sessionId: string, messageId: string, error: string) => void;
+  failStreaming: (
+    sessionId: string,
+    messageId: string,
+    error: string | ChatStreamErrorPayload,
+  ) => void;
 
   // Tool actions
   startToolUse: (
@@ -579,7 +584,8 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     set((state) => {
       const session = getSession(state.sessions, sessionId);
       if (!session) return state;
-      const content = [{ type: 'text', text: error }];
+      const errorText = formatStreamError(error);
+      const content = [{ type: 'text', text: errorText }];
       const existing = session.messages.some((m) => m.id === messageId);
       const messages = existing
         ? session.messages.map((m) =>
@@ -592,7 +598,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
             {
               id: messageId,
               type: 'system' as const,
-              content: error,
+              content: errorText,
               timestamp: Date.now(),
             },
           ];
@@ -1108,6 +1114,28 @@ function extractText(content: unknown): string {
   return parts.join('\n');
 }
 
+function formatStreamError(error: string | ChatStreamErrorPayload): string {
+  if (typeof error === 'string') return error;
+  const lines = [error.error];
+  const details = [
+    error.reason ? `reason=${error.reason}` : null,
+    error.exitCode !== undefined ? `exitCode=${error.exitCode}` : null,
+    error.signal !== undefined ? `signal=${error.signal}` : null,
+    error.cwd ? `cwd=${error.cwd}` : null,
+    error.cliPath ? `cliPath=${error.cliPath}` : null,
+    error.bunPath ? `bunPath=${error.bunPath}` : null,
+    error.configDir ? `configDir=${error.configDir}` : null,
+    error.logPath ? `logPath=${error.logPath}` : null,
+  ].filter(Boolean);
+  if (details.length) {
+    lines.push('', '诊断信息:', ...details.map((detail) => `- ${detail}`));
+  }
+  if (error.stderrTail && !error.error.includes(error.stderrTail)) {
+    lines.push('', 'stderr:', error.stderrTail);
+  }
+  return lines.join('\n');
+}
+
 /** Re-exported for renderer dispatch (PdMessageList + PdToolResultBlock). */
 export { extractText, extractThinking };
 
@@ -1265,21 +1293,18 @@ export function setupBridgeListeners(): void {
   }));
 
   refs.unsubs.push(bridge.onStreamError((payload) => {
-    const { sessionId, messageId, error } = payload as {
-      sessionId: string;
-      messageId: string;
-      error: string;
-    };
+    const streamError = payload as ChatStreamErrorPayload;
+    const { sessionId, messageId } = streamError;
     if (flushTimer != null) {
       clearTimeout(flushTimer);
       flushTimer = null;
     }
     store().flushStreamBuffer(sessionId);
-    store().failStreaming(sessionId, messageId, error);
+    store().failStreaming(sessionId, messageId, streamError);
     activeSessions.delete(sessionId);
     useToastStore.getState().addToast({
       type: 'error',
-      message: error,
+      message: streamError.error,
     });
   }));
 

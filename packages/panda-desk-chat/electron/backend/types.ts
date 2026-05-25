@@ -135,3 +135,21 @@ export interface SessionInfo {
   state: SessionState;
   createdAt: number;
 }
+
+export interface CLIStreamErrorPayload {
+  sessionId: string;
+  messageId: string;
+  error: string;
+  reason?: 'exit' | 'spawn-error' | 'cli-error';
+  exitCode?: number | null;
+  signal?: string | null;
+  cwd?: string;
+  cliPath?: string;
+  bunPath?: string;
+  args?: string[];
+  stderrTail?: string;
+  isPackaged?: boolean;
+  resourcesPath?: string;
+  configDir?: string;
+  logPath?: string;
+}
