@@ -8,8 +8,8 @@
 - [x] 修复权限模式：renderer 迁移旧 `skip/dontAsk`，IPC 将 `auto` 映射为 CLI 稳定支持的 `default`；backend 白名单兜底未知权限模式，避免非法 `--permission-mode` 触发 code=1。
 - [x] 验证：`cd packages/panda-desk-chat && bun run build:electron` 通过；`cd packages/panda-desk-chat && bun run test src/__tests__/stores/settingsStore.test.ts` 通过 6/6；packaged CLI UUID + `bypassPermissions` 真实返回 `pong`。
 - [x] 重新打包 Desk Chat `0.2.4`：`bun run dist` 于 `2026-05-25 16:40:00 +08:00` 通过，生成 `Panda-0.2.4-arm64.dmg`、`Panda-0.2.4-arm64-mac.zip`、两个 blockmap 与 `latest-mac.yml`；资源核验 `panda-cli/dist/cli.js` 存在，`panda-cli/dist` 共 625 个文件。
-- [ ] 创建 GitHub Release `v2.26.9` 并上传安装包。
-- [ ] git push 与 npm 同步：推送 `main`、tag `v2.26.9`，发布 `@lc2panda/panda-code@2.26.9` 到 GitHub Packages。
+- [x] 创建 GitHub Release `v2.26.9` 并上传安装包：`latest-mac.yml`、`Panda-0.2.4-arm64.dmg`、`Panda-0.2.4-arm64-mac.zip`、两个 blockmap 已上传，Release URL `https://github.com/lc2panda/panda/releases/tag/v2.26.9`。
+- [x] git push 与 npm 同步：`main` 与 tag `v2.26.9` 已推送；`@lc2panda/panda-code@2.26.9` 已发布到 GitHub Packages，`npm view` 返回 `2.26.9`。
 
 ## 已完成 — v2.26.8 Desk Chat Release 热修（2026-05-25 15:47:20 +08:00）
 
