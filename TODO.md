@@ -7,8 +7,8 @@
 - [x] 修复策略：历史对话切换只更新 active id 并读取 `~/.pandacc/projects` 历史，不再 focus/spawn CLI；仅合法 UUID 会话才允许 focus 复活；后台空 session list 不再自动 re-materialise 历史 active id。
 - [x] 验证：`cd packages/panda-desk-chat && bun run build:electron` 通过；`cd packages/panda-desk-chat && bun run test src/__tests__/stores/sessionStore.test.ts src/__tests__/stores/settingsStore.test.ts` 通过 12/12。
 - [x] 重新打包 Desk Chat `0.2.5`：`bun run dist` 于 `2026-05-25 17:08:00 +08:00` 通过，生成 `Panda-0.2.5-arm64.dmg`、`Panda-0.2.5-arm64-mac.zip`、两个 blockmap 与 `latest-mac.yml`；资源核验 `panda-cli/dist/cli.js` 存在，`panda-cli/dist` 共 625 个文件。
-- [ ] 创建 GitHub Release `v2.26.10` 并上传安装包。
-- [ ] git push 与 npm 同步：推送 `main`、tag `v2.26.10`，发布 `@lc2panda/panda-code@2.26.10` 到 GitHub Packages。
+- [x] 创建 GitHub Release `v2.26.10` 并上传安装包：`latest-mac.yml`、`Panda-0.2.5-arm64.dmg`、`Panda-0.2.5-arm64-mac.zip`、两个 blockmap 已上传，Release URL `https://github.com/lc2panda/panda/releases/tag/v2.26.10`。
+- [x] git push 与 npm 同步：`main` 与 tag `v2.26.10` 已推送；`@lc2panda/panda-code@2.26.10` 已发布到 GitHub Packages，`npm view` 返回 `2.26.10`。
 
 ## 已完成 — v2.26.9 Desk Chat 历史会话续聊热修（2026-05-25 16:22:20 +08:00）
 
