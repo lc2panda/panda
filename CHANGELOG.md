@@ -6,6 +6,12 @@
 
 ---
 
+## v2.26.10 — 2026-05-25 · Panda Desk Chat 历史对话只读加载热修
+- 修复打开历史对话即报 code=1：Desk Chat 切换历史会话时只读取 `~/.pandacc/projects` 历史，不再自动 `focusSession` / spawn CLI。
+- 修复后台 re-materialise 误触发：主进程 session list 为空时不再拿历史 active id 自动启动 CLI；只有合法 UUID 会话才允许 focus 复活。
+- 验证：`bun run build:electron` 通过；`sessionStore.test.ts` + `settingsStore.test.ts` 12/12 通过，覆盖非 UUID 历史会话不调用 CLI focus。
+- 发布目标：同步 GitHub Release `v2.26.10`，上传 Desk Chat `0.2.5` 安装包；发布 `@lc2panda/panda-code@2.26.10` 到 GitHub Packages。
+
 ## v2.26.9 — 2026-05-25 · Panda Desk Chat 历史会话续聊热修
 - 修复历史会话续聊 code=1：当 Desk Chat 加载到非 UUID 历史 `sessionId` 并发送新消息时，自动创建新的 UUID 会话、保留当前 UI 历史消息并替换当前 tab，再继续发送，避免 CLI 拒绝非法 `--session-id`。
 - 修复权限模式 code=1：renderer 迁移旧 `skip/dontAsk`，将 UI-only `auto` 映射为 CLI 稳定支持的 `default`；Electron backend 增加权限模式白名单与未知值兜底。

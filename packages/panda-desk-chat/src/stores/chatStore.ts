@@ -823,7 +823,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       // If the backend says session not found, focus it (triggers auto-create)
       // then retry once.
       const msg = err instanceof Error ? err.message : String(err);
-      if (/not found|no.*session/i.test(msg)) {
+      if (isValidSessionId(sessionId) && /not found|no.*session/i.test(msg)) {
         console.warn('[chatStore] Session stale, re-materialising:', sessionId);
         try {
           await bridge.focusSession(sessionId);

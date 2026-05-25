@@ -48,7 +48,7 @@ bun run dist
 # 也可加 --x64 同时打 Intel 包
 
 # 产物
-ls release/Panda-0.2.4-arm64.dmg
+ls release/Panda-0.2.5-arm64.dmg
 ```
 
 ### 3.2 Windows 上打 Windows exe + zip
@@ -69,8 +69,8 @@ bunx electron-builder --win --x64
 
 # 产物
 dir release\
-# Panda Setup 0.2.4.exe   ← NSIS 安装器（推荐分发）
-# Panda-0.2.4-win.zip     ← 免安装版
+# Panda Setup 0.2.5.exe   ← NSIS 安装器（推荐分发）
+# Panda-0.2.5-win.zip     ← 免安装版
 ```
 
 ### 3.3 macOS 上跨平台打 Windows 包（已验证可用）
@@ -92,8 +92,8 @@ bunx electron-builder --win --x64
 cd packages/panda-desk-chat
 bun run build:electron
 bunx electron-builder --linux AppImage deb --x64
-# release/Panda-0.2.4.AppImage
-# release/panda_0.2.4_amd64.deb
+# release/Panda-0.2.5.AppImage
+# release/panda_0.2.5_amd64.deb
 ```
 
 ## 四、关键配置文件

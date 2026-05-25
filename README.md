@@ -2,11 +2,11 @@
 
 > 懂你所有数据的 AI 伙伴 | 编码 · 助理 · 感知 · 生活
 
-[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![desktop](https://img.shields.io/badge/desktop-panda--desk--chat%400.2.4-blue)](https://github.com/lc2panda/panda/releases/latest) [![version](https://img.shields.io/badge/version-v2.26.9-blue)](./TODO.md#进行中--v2269-desk-chat-历史会话续聊热修2026-05-25-162220-0800) [![checks](https://img.shields.io/badge/v2.26.9%20desk--chat-build-pass-brightgreen)](#当前进度--v2269) [![upstream](https://img.shields.io/badge/upstream%20absorbed-v2.1.142-success)](#当前进度--v2269)
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![desktop](https://img.shields.io/badge/desktop-panda--desk--chat%400.2.5-blue)](https://github.com/lc2panda/panda/releases/latest) [![version](https://img.shields.io/badge/version-v2.26.10-blue)](./TODO.md#进行中--v22610-desk-chat-历史对话只读加载热修2026-05-25-165525-0800) [![checks](https://img.shields.io/badge/v2.26.10%20desk--chat-build-pass-brightgreen)](#当前进度--v22610) [![upstream](https://img.shields.io/badge/upstream%20absorbed-v2.1.142-success)](#当前进度--v22610)
 
-> 🤖 **当前主线：v2.26.9** — `main` 已包含 v2.26.7 Desk Chat 修补与 v2.26.9 Release 热修，主包版本为 `@lc2panda/panda-code@2.26.9`。v2.26 线已完成上游 `@anthropic-ai/claude-code` v2.1.120→v2.1.142 的 14 项能力吸收，并在 v2.26.9 修复 Panda Desk Chat 安装包缺 CLI bundle、历史 session-id 续聊与旧权限模式导致发消息失败的问题。
+> 🤖 **当前主线：v2.26.10** — `main` 已包含 v2.26.7 Desk Chat 修补与 v2.26.10 Release 热修，主包版本为 `@lc2panda/panda-code@2.26.10`。v2.26 线已完成上游 `@anthropic-ai/claude-code` v2.1.120→v2.1.142 的 14 项能力吸收，并在 v2.26.10 修复 Panda Desk Chat 打开历史对话即触发 CLI code=1、历史 session-id 续聊与旧权限模式导致发消息失败的问题。
 
-> 🖥️ **桌面端主线：Panda Desk Chat** — 当前 UI 桌面端为 `@panda/desk-chat@0.2.4`，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。`panda-on-desk` 桌面宠物线降级为 v2.25.x 历史归档，暂不作为用户下载/安装入口。
+> 🖥️ **桌面端主线：Panda Desk Chat** — 当前 UI 桌面端为 `@panda/desk-chat@0.2.5`，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。`panda-on-desk` 桌面宠物线降级为 v2.25.x 历史归档，暂不作为用户下载/安装入口。
 
 > 此项目的任何功能、架构更新，必须在结束后同步更新相关文档。这是我们契约的一部分。
 
@@ -21,20 +21,20 @@
 
 | 版本 | 运行时 | 亮点 |
 |------|--------|-----|
-| 2.26.9 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 历史会话续聊修复 · 权限模式清洗 · GitHub Release 同步 |
+| 2.26.10 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 历史对话只读加载 · 续聊修复 · 权限模式清洗 |
 | 2.26.7 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 发布入口 · provider snapshot · stream error 兜底 · model IPC 修复 · 顶部拖动修复 |
 
-## 当前进度 · v2.26.9
+## 当前进度 · v2.26.10
 
 | 维度 | 状态 |
 |------|------|
-| 主线提交 | v2.26.9 Release 热修提交；详见 `git log` |
-| 本地/远端 | 本地 `main` 已包含 v2.26.9；远端推送以后以 `panda/main` 为准 |
-| 包版本 | `@lc2panda/panda-code@2.26.9`；`@panda/desk-chat@0.2.4`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
+| 主线提交 | v2.26.10 Release 热修提交；详见 `git log` |
+| 本地/远端 | 本地 `main` 已包含 v2.26.10；远端推送以后以 `panda/main` 为准 |
+| 包版本 | `@lc2panda/panda-code@2.26.10`；`@panda/desk-chat@0.2.5`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
 | 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.142；npm 上游已继续到 v2.1.150，v2.1.143+ 作为后续评估范围，不在本 README 虚报为已吸收 |
-| v2.26.9 修复 | Desk Chat 会在历史非 UUID session-id 续聊时自动创建 UUID 会话继续发送，并清洗旧 `skip` / UI-only `auto` 权限模式，避免 CLI code=1 退出；安装包继续包含完整 root CLI bundle |
+| v2.26.10 修复 | Desk Chat 打开历史对话时只读取 `~/.pandacc/projects` 历史，不再 focus/spawn CLI；非 UUID session-id 续聊时自动创建 UUID 会话继续发送，并清洗旧 `skip` / UI-only `auto` 权限模式 |
 | 验证证据 | `bun run build` 通过；Desk Chat 打包后需验证 `Resources/panda-cli/dist/cli.js` 存在；旧 Desk Chat 全量单测旧基线失败已记录于 `CLAUDE.md` |
-| 发布状态 | 代码主线已到 v2.26.9；Desk Chat 公开安装资产以 GitHub Release latest 为准，`panda-on-desk-v1.0.4` 仅作历史归档 |
+| 发布状态 | 代码主线已到 v2.26.10；Desk Chat 公开安装资产以 GitHub Release latest 为准，`panda-on-desk-v1.0.4` 仅作历史归档 |
 
 ---
 

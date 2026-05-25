@@ -90,6 +90,7 @@ export interface SessionStore {
 
 const SESSIONS_KEY = 'sessions';
 const ACTIVE_ID_KEY = 'sessions:activeId';
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -148,6 +149,10 @@ function deriveProjects(list: SessionMeta[]): string[] {
     if (s.cwd) set.add(s.cwd);
   }
   return Array.from(set).sort();
+}
+
+function isValidSessionId(sessionId: string): boolean {
+  return UUID_PATTERN.test(sessionId);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +286,7 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
   setActiveSession: (id) => {
     set({ activeSessionId: id });
     storage.set(ACTIVE_ID_KEY, id);
-    if (id) {
+    if (id && isValidSessionId(id)) {
       bridge.focusSession(id).catch((err: unknown) => {
         console.error('[sessionStore] bridge.focusSession failed:', err);
       });
@@ -481,20 +486,6 @@ export function setupSessionBridge(): void {
               new Date(a.lastActive ?? 0).getTime(),
           );
           store.setSessions(merged);
-        } else {
-          const { activeSessionId } = useSessionStore.getState();
-          if (activeSessionId) {
-            console.log(
-              '[sessionStore] Backend empty, re-materialising active session:',
-              activeSessionId,
-            );
-            bridge.focusSession(activeSessionId).catch((err: unknown) =>
-              console.warn(
-                '[sessionStore] Failed to re-materialise session:',
-                err,
-              ),
-            );
-          }
         }
       })
       .catch((err: unknown) =>

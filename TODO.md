@@ -1,6 +1,16 @@
 # TODO
 
-## 进行中 — v2.26.9 Desk Chat 历史会话续聊热修（2026-05-25 16:22:20 +08:00）
+## 进行中 — v2.26.10 Desk Chat 历史对话只读加载热修（2026-05-25 16:55:25 +08:00）
+
+- [x] 真实时间核验：本机 `2026-05-25 16:55:24 +08:00`，Cloudflare `2026-05-25 16:55:25 +08:00`，Apple `2026-05-25 16:55:25 +08:00`，最大偏差约 1 秒，判定通过。
+- [x] 根因定位：打开历史对话时 `ActiveSession` 挂载会调用 `connectToSession()`，继而触发 `sessionStore.setActiveSession()` / `bridge.focusSession()`，导致只读历史加载也启动 CLI；非 UUID 历史 id 会触发 CLI code=1。
+- [x] 修复策略：历史对话切换只更新 active id 并读取 `~/.pandacc/projects` 历史，不再 focus/spawn CLI；仅合法 UUID 会话才允许 focus 复活；后台空 session list 不再自动 re-materialise 历史 active id。
+- [x] 验证：`cd packages/panda-desk-chat && bun run build:electron` 通过；`cd packages/panda-desk-chat && bun run test src/__tests__/stores/sessionStore.test.ts src/__tests__/stores/settingsStore.test.ts` 通过 12/12。
+- [x] 重新打包 Desk Chat `0.2.5`：`bun run dist` 于 `2026-05-25 17:08:00 +08:00` 通过，生成 `Panda-0.2.5-arm64.dmg`、`Panda-0.2.5-arm64-mac.zip`、两个 blockmap 与 `latest-mac.yml`；资源核验 `panda-cli/dist/cli.js` 存在，`panda-cli/dist` 共 625 个文件。
+- [ ] 创建 GitHub Release `v2.26.10` 并上传安装包。
+- [ ] git push 与 npm 同步：推送 `main`、tag `v2.26.10`，发布 `@lc2panda/panda-code@2.26.10` 到 GitHub Packages。
+
+## 已完成 — v2.26.9 Desk Chat 历史会话续聊热修（2026-05-25 16:22:20 +08:00）
 
 - [x] 真实时间核验：本机 `2026-05-25 16:22:18 +08:00`，Cloudflare `2026-05-25 16:22:19 +08:00`，Apple `2026-05-25 16:22:20 +08:00`，最大偏差约 2 秒，判定通过。
 - [x] 根因复现：非 UUID 历史 `sessionId` 传给 packaged CLI 会报 `Error: Invalid session ID. Must be a valid UUID.` 并以 code=1 退出；UUID + `--permission-mode bypassPermissions` 可真实返回 `pong`。
