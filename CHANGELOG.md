@@ -12,7 +12,7 @@
 - Desk Chat stream 兜底：CLI 子进程 `error` / `exit` / SDK error 会回传 `panda:chat:stream:error`，renderer 清理 Thinking 状态并展示错误。
 - Desk Chat provider/model 同步：新增脱敏 provider snapshot，展示 `process.env`、`~/.pandacc/settings.json`、`~/.pandacc.json` / `auth login` 来源；修复 `MODEL_SET` 的 `modelId` payload 错位。
 - Desk Chat 拖动：顶部 tab 空白区标记 drag region，tab/按钮/输入控件标记 no-drag，避免拖动吞掉交互。
-- 验证：`bun run build:electron` 通过；`git diff --check` 通过；全量 Desk Chat 单测仍受既有 localStorage/tabStore 测试基线影响，已在 `CLAUDE.md` 记录。
+- 验证与发布：`bun run build:electron`、根包 `bun run build`、`bun run dist` 通过；macOS arm64 `Panda-0.2.2-arm64.dmg` / `.zip` 于 `2026-05-25 15:35:56 +08:00` 重打包；`main` 已 push 到 `panda/main`；`@lc2panda/panda-code@2.26.7` 已发布到 GitHub Packages 并通过 `npm view` 验证。全量 Desk Chat 单测仍受既有 localStorage/tabStore 测试基线影响，已在 `CLAUDE.md` 记录。
 
 ## panda-on-desk Release Tag 历史
 

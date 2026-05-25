@@ -12,6 +12,9 @@
 - [x] Desk Chat：修复顶部空白区域不可拖动窗口，避免破坏 tab 点击/关闭/右键/重排。
 - [x] 验证：单元/集成/桌面端构建或可替代验证完成后记录命令与结果。
 - [x] git：完成文档与代码变更提交，保留可追溯提交信息。
+- [x] 桌面端重新打包：`cd packages/panda-desk-chat && bun run dist` 于 `2026-05-25 15:35:56 +08:00` 通过，生成 macOS arm64 `Panda-0.2.2-arm64.dmg` 与 `Panda-0.2.2-arm64-mac.zip`；notarization 因未配置 `notarize` 选项被 electron-builder 跳过。
+- [x] 远端同步：`git push panda main` 于 `2026-05-25 15:32:00 +08:00` 成功，`main` 推至 `panda/main`。
+- [x] GitHub Packages：`npm publish --registry=https://npm.pkg.github.com` 于 `2026-05-25 15:33:00 +08:00` 成功发布 `@lc2panda/panda-code@2.26.7`；`npm view @lc2panda/panda-code@2.26.7 version --registry=https://npm.pkg.github.com` 返回 `2.26.7`。
 - 验证记录（2026-05-25 14:32:38 +08:00）：`bun run build:electron` 通过；`bun run test` 失败于既有 `localStorage.getItem` 测试环境与 `tabStore` 旧断言基线；`bun test src/desk/launcher.test.ts src/desk/launcher.integration.test.ts src/desk/e2e-install-spawn.test.ts` 通过 launcher/launcher.integration，失败于 `e2e-install-spawn.test.ts:355` 的 tmpdir 路径既有断言；`rg` 确认 README 不再保留旧强安装入口或启动提示。
 
 ## 已完成 ✅
