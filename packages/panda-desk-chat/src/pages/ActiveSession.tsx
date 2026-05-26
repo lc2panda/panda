@@ -1,5 +1,5 @@
 // Input:  activeId（必填）+ session（PerSessionState 切片）— ChatPage 在 hasMessages || isStreaming 时挂载
-// Output: cc-haha ActiveSession 1:1 — 顶部 status bar（member 模式，panda 永远不出）/ Hero（empty 分支）/
+// Output: cc-haha ActiveSession 1:1 — 顶部 status bar（member 模式，panda 永远不出）/ Hero（empty 分支）/ 显式 onSend 发送 /
 //         session header（非 member）+ MessageList + SessionTaskBar + TeamStatusBar + Composer + ComputerUsePermissionModal
 // Pos:    Page layer — ChatPage 路由分支：activeSession.messages.length > 0 || isStreaming 时挂载
 //
@@ -15,7 +15,7 @@
 //
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { useI18n } from '../hooks/useI18n';
 import { useTabStore } from '../stores/tabStore';
 import { useSessionStore } from '../stores/sessionStore';
@@ -43,6 +43,13 @@ export const ActiveSession: React.FC<ActiveSessionProps> = ({ activeId, session:
 
   // cc-haha L17: activeTabId — panda 直接拿 prop activeId，避免 store 读两次
   const activeTabId = activeId;
+
+  const handleSendMessage = useCallback(
+    (text: string) => {
+      useChatStore.getState().sendMessage(activeTabId, text);
+    },
+    [activeTabId],
+  );
 
   // cc-haha L18: sessions（list）
   const sessions = useSessionStore((s) => s.sessions);
@@ -271,6 +278,7 @@ export const ActiveSession: React.FC<ActiveSessionProps> = ({ activeId, session:
         sessionId={activeTabId}
         isStreaming={isActive}
         variant={isEmpty && !isMemberSession ? 'hero' : 'default'}
+        onSend={handleSendMessage}
       />
 
       {/* cc-haha L211-L216: ComputerUsePermissionModal（仅非 member） */}

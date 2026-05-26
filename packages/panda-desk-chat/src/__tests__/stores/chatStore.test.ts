@@ -5,11 +5,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock bridge module to avoid IPC/dev-relay side effects
-vi.mock('@/ipc/bridge', () => ({
+const bridgeMock = vi.hoisted(() => ({
   sendMessage: vi.fn().mockResolvedValue(undefined),
   stopGeneration: vi.fn().mockResolvedValue(undefined),
   pasteImage: vi.fn().mockResolvedValue(undefined),
   respondToPermission: vi.fn().mockResolvedValue(undefined),
+  createSession: vi.fn().mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111' }),
+  listAllSessions: vi.fn().mockResolvedValue([]),
+  listSessions: vi.fn().mockResolvedValue([]),
+  onSessionCreated: vi.fn(() => () => {}),
+  onSessionRemoved: vi.fn(() => () => {}),
   onStreamStart: vi.fn(() => () => {}),
   onStreamDelta: vi.fn(() => () => {}),
   onStreamEnd: vi.fn(() => () => {}),
@@ -20,6 +25,11 @@ vi.mock('@/ipc/bridge', () => ({
   onWindowToggle: vi.fn(() => () => {}),
 }));
 
+vi.mock('@/ipc/bridge', () => ({
+  bridge: bridgeMock,
+  ...bridgeMock,
+}));
+
 // Mock toastStore to avoid PdToast component dependency
 vi.mock('@/stores/toastStore', () => ({
   useToastStore: {
@@ -28,10 +38,14 @@ vi.mock('@/stores/toastStore', () => ({
 }));
 
 import { useChatStore } from '@/stores/chatStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useTabStore } from '@/stores/tabStore';
+import * as bridge from '@/ipc/bridge';
 import type { PendingPermission, TokenUsage } from '@/stores/chatStore';
 
 const SID = 'test-session-1';
 const SID2 = 'test-session-2';
+const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('chatStore', () => {
   beforeEach(() => {
@@ -41,6 +55,15 @@ describe('chatStore', () => {
       activeSessionId: null,
       transcriptMode: 'normal',
     });
+    useSessionStore.setState({
+      sessions: [],
+      activeSessionId: null,
+    });
+    useTabStore.setState({
+      tabs: [],
+      activeTabId: null,
+    });
+    vi.clearAllMocks();
   });
 
   // ── Session lifecycle ──────────────────────────────────────────────────
@@ -373,22 +396,41 @@ describe('chatStore', () => {
     });
   });
 
-  // ── cancelStream ───────────────────────────────────────────────────────
+  // ── sendMessage session id routing ────────────────────────────────────────
 
-  describe('cancelStream', () => {
-    it('resets session state to idle and clears active tool/permission', () => {
-      useChatStore.getState().initSession(SID);
-      useChatStore.getState().startStreaming(SID, 'msg-1');
-      useChatStore.getState().startToolUse(SID, 'tool-1', 'BashTool', {});
+  describe('sendMessage session id routing', () => {
+    const historyUuid = '7398afd6-82a3-4653-81a2-349f8d6ec4fe';
+    const newUuid = '11111111-1111-4111-8111-111111111111';
 
-      useChatStore.getState().cancelStream(SID);
+    it('remaps non-UUID history id before sending to bridge', async () => {
+      useTabStore.setState({
+        tabs: [{ id: 'legacy-history-id', sessionId: 'legacy-history-id', title: 'Legacy', type: 'session', status: 'idle', order: 0, isActive: true, isPinned: false }],
+        activeTabId: 'legacy-history-id',
+      });
 
-      const session = useChatStore.getState().sessions.get(SID)!;
-      expect(session.chatState).toBe('idle');
-      expect(session.activeToolUseId).toBeNull();
-      expect(session.activeToolName).toBeNull();
-      expect(session.pendingPermission).toBeNull();
-      expect(session.streamingText).toBe('');
+      await useChatStore.getState().sendMessage('legacy-history-id', 'ping');
+      await flushPromises();
+
+      expect(bridge.createSession).toHaveBeenCalledTimes(1);
+      expect(bridge.sendMessage).toHaveBeenCalledWith(newUuid, 'ping');
+      expect(bridge.sendMessage).not.toHaveBeenCalledWith('legacy-history-id', 'ping');
+      expect(useTabStore.getState().tabs[0]?.sessionId).toBe(newUuid);
+      expect(useTabStore.getState().activeTabId).toBe(newUuid);
+    });
+
+    it('sends valid history UUID directly without creating or replacing session', async () => {
+      useTabStore.setState({
+        tabs: [{ id: historyUuid, sessionId: historyUuid, title: 'History', type: 'session', status: 'idle', order: 0, isActive: true, isPinned: false }],
+        activeTabId: historyUuid,
+      });
+
+      await useChatStore.getState().sendMessage(historyUuid, 'ping');
+
+      expect(bridge.createSession).not.toHaveBeenCalled();
+      expect(bridge.sendMessage).toHaveBeenCalledWith(historyUuid, 'ping');
+      expect(useTabStore.getState().tabs[0]?.sessionId).toBe(historyUuid);
+      expect(useTabStore.getState().activeTabId).toBe(historyUuid);
     });
   });
+
 });

@@ -1,5 +1,5 @@
 // Input: tabStore.activeTabId（cc-haha 真理源）+ chatStore (per-session state) + sessionStore (sessions list)
-// Output: 路由入口 — 根据 activeTabId/hasMessages/isStreaming 切换 EmptySession / ActiveSession
+// Output: 路由入口 — activeTabId 存在即保留 ActiveSession 发送路径，缺 chat session 时用安全 stub 兜底
 // Pos: App 主内容路由
 //
 // cc-haha 1:1 对标重写（v5 — 修 activeId 来源 bug）:
@@ -12,11 +12,28 @@
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
 import React from 'react';
-import { useChatStore } from '../stores/chatStore';
+import { useChatStore, type PerSessionState } from '../stores/chatStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useTabStore } from '../stores/tabStore';
 import { EmptySession } from './EmptySession';
 import { ActiveSession } from './ActiveSession';
+
+const createSessionStub = (sessionId: string): PerSessionState => ({
+  sessionId,
+  messages: [],
+  chatState: 'idle',
+  connectionState: 'disconnected',
+  streamingText: '',
+  streamingToolInput: '',
+  activeToolUseId: null,
+  activeToolName: null,
+  activeThinkingId: null,
+  pendingPermission: null,
+  tokenUsage: { input: 0, output: 0 },
+  elapsedSeconds: 0,
+  statusVerb: '',
+  routingInfo: null,
+});
 
 export interface ChatPageProps {
   className?: string;
@@ -49,10 +66,10 @@ export const ChatPage: React.FC<ChatPageProps> = ({ className }) => {
         minHeight: 0,
       }}
     >
-      {showConversation && activeTabId && activeSession ? (
-        <ActiveSession activeId={activeTabId} session={activeSession} />
+      {showConversation && activeTabId ? (
+        <ActiveSession activeId={activeTabId} session={activeSession ?? createSessionStub(activeTabId)} />
       ) : (
-        <EmptySession activeId={null} />
+        <EmptySession activeId={activeSession?.sessionId ?? null} />
       )}
     </div>
   );
