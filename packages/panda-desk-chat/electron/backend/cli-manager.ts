@@ -7,11 +7,11 @@
 import { ChildProcess, spawn } from 'node:child_process';
 import { createInterface, type Interface as ReadlineInterface } from 'node:readline';
 import { EventEmitter } from 'node:events';
-import { appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { findSessionFile } from './disk-session-scanner';
+import { findSessionFile, getSessionLaunchInfo } from './disk-session-scanner';
 import { resolveBunPath } from './binPath';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -250,10 +250,19 @@ export class CLISession extends EventEmitter {
     );
     console.log(`[CLISession:${this.id}] Spawning${isResume ? ' (resume)' : ''}: bun ${args.join(' ')}`);
 
+    // v2.26.14 Bug B fix (1:1 align cc-haha conversationService.buildChildEnv):
+    // panda-cli (forked from upstream claude-code) reads CALLER_DIR/PWD in its
+    // preload.tsx bootstrap path and may chdir away from the spawn-time cwd.
+    // Force-inject CALLER_DIR + PWD = this.cwd so the child cannot drift to "/"
+    // even if Electron main process was launched from Finder with cwd="/".
     this.process = spawn(bunPath, args, {
       cwd: this.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env },
+      env: {
+        ...process.env,
+        CALLER_DIR: this.cwd,
+        PWD: this.cwd,
+      },
     });
 
     // Comdr 指令: spawn 完成 + stdin 已 ready → flush 所有挂起的 sendMessage 调用。
@@ -774,8 +783,46 @@ export class CLIManager {
     }
     let session = this.sessions.get(sessionId);
     if (!session) {
-      console.log(`[CLIManager] Auto-creating session for stale ID: ${sessionId}`);
-      await this.createSessionWithId(sessionId, cwd || process.cwd(), name);
+      // v2.26.14 Bug B fix (1:1 align cc-haha conversationService.startSession):
+      // Resume a historical session whose UUID still lives in renderer localStorage
+      // but whose live CLI process was lost (Electron restart) must NOT fall back
+      // to process.cwd() (= "/" when launched by Finder) — that breaks `panda-cli
+      // --resume` because the transcript was recorded under a different project
+      // path. Resolve cwd from the on-disk ~/.pandacc/projects/*/{sessionId}.jsonl
+      // launch info (session-meta.workDir → entries[].cwd → desanitize projectDir)
+      // before spawning. Throw a typed error when no valid workDir can be found,
+      // so renderer surfaces a clear diagnostic instead of silently spawning at "/".
+      let resolvedCwd = cwd;
+      if (!resolvedCwd) {
+        try {
+          const launch = await getSessionLaunchInfo(sessionId);
+          if (launch?.workDir) {
+            resolvedCwd = launch.workDir;
+          }
+        } catch (err) {
+          console.warn(
+            `[CLIManager] getSessionLaunchInfo(${sessionId}) failed: ${(err as Error)?.message ?? err}`,
+          );
+        }
+      }
+      if (!resolvedCwd) {
+        const error = new Error(
+          `Cannot resume session ${sessionId}: workDir not found on disk and no cwd provided by renderer`,
+        );
+        (error as Error & { code?: string }).code = 'WORKDIR_NOT_FOUND';
+        throw error;
+      }
+      if (!existsSync(resolvedCwd) || !statSync(resolvedCwd).isDirectory()) {
+        const error = new Error(
+          `Working directory does not exist or is not a directory: ${resolvedCwd}`,
+        );
+        (error as Error & { code?: string }).code = 'WORKDIR_INVALID';
+        throw error;
+      }
+      console.log(
+        `[CLIManager] Auto-creating session for stale ID: ${sessionId} (resolved cwd=${resolvedCwd}${cwd ? '' : ' from disk jsonl'})`,
+      );
+      await this.createSessionWithId(sessionId, resolvedCwd, name);
       session = this.sessions.get(sessionId)!;
     }
     return session;

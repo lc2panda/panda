@@ -29,3 +29,6 @@ TODO.md
 # Non-project files
 wechat-article-林巧芸小传.md
 monitor/tmp/
+
+# Stray Electron main bundle dropped to repo root by build:electron in some configs
+/main.js

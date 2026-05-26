@@ -620,10 +620,20 @@ export async function getSessionLaunchInfo(
   if (!found) return null;
 
   const entries = await readJsonlFile(found.filePath);
-  const workDir =
-    resolveWorkDirFromEntries(entries) ??
-    desanitizeProjectPath(found.projectDir) ??
-    process.cwd();
+  // v2.26.14 Bug B fix (1:1 align cc-haha): the previous `process.cwd()`
+  // tail-fallback silently spawned panda-cli at "/" when Electron main was
+  // launched from Finder, breaking `panda-cli --resume` for any historical
+  // session whose transcript was recorded under a real project directory.
+  // Strict precedence: session-meta.workDir → entries[].cwd → desanitize
+  // projectDir. No silent "/"-style fallback — callers must handle null.
+  let workDir = resolveWorkDirFromEntries(entries);
+  if (!workDir) {
+    const desanitized = desanitizeProjectPath(found.projectDir);
+    if (desanitized) workDir = desanitized;
+  }
+  if (!workDir) {
+    return null;
+  }
 
   let customTitle: string | undefined;
   let transcriptMessageCount = 0;
