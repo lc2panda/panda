@@ -91,7 +91,7 @@ export const ActiveSession: React.FC<ActiveSessionProps> = ({ activeId, session:
     }
   }, [activeTabId, isMemberSession, connectToSession]);
 
-  // cc-haha L39-L62: shouldPollTasks 副作用 — 只在 chatState !== 'idle' 或当前 tracked + 有未完成任务 时轮询
+  // cc-haha L39-L62: shouldPollTasks 副作用 — 只在 chatState !== 'idle' 或当前 tracked + 有进行中任务 时轮询
   useEffect(() => {
     if (!activeTabId || isMemberSession) return;
 
