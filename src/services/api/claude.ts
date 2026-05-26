@@ -680,7 +680,7 @@ export function userMessageToMessageParam(
             type: 'text',
             text: message.message.content,
             ...(enablePromptCaching && {
-              cache_control: getCacheControl({ querySource }),
+              cache_control: getCacheControl({ querySource, isSystemLevel: true }),
             }),
           },
         ],
@@ -692,7 +692,7 @@ export function userMessageToMessageParam(
           ..._,
           ...(i === message.message.content.length - 1
             ? enablePromptCaching
-              ? { cache_control: getCacheControl({ querySource }) }
+              ? { cache_control: getCacheControl({ querySource, isSystemLevel: true }) }
               : {}
             : {}),
         })),
@@ -725,7 +725,7 @@ export function assistantMessageToMessageParam(
             type: 'text',
             text: message.message.content,
             ...(enablePromptCaching && {
-              cache_control: getCacheControl({ querySource }),
+              cache_control: getCacheControl({ querySource, isSystemLevel: true }),
             }),
           },
         ],
@@ -740,7 +740,7 @@ export function assistantMessageToMessageParam(
           _.type !== 'redacted_thinking' &&
           (feature('CONNECTOR_TEXT') ? !isConnectorTextBlock(_) : true)
             ? enablePromptCaching
-              ? { cache_control: getCacheControl({ querySource }) }
+              ? { cache_control: getCacheControl({ querySource, isSystemLevel: true }) }
               : {}
             : {}),
         })),
