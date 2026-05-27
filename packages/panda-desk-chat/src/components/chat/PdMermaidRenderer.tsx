@@ -80,15 +80,11 @@ function parseSvgMetrics(svg: string): SvgMetrics | null {
 
 async function loadMermaid(): Promise<MermaidLike | null> {
   try {
-    // Optional dependency — `mermaid` may not be installed yet. We resolve the
-    // module name through a runtime variable so TypeScript does not require
-    // type declarations and the bundler treats it as an external request that
-    // can fail gracefully at runtime.
-    const moduleName = 'mermaid'
-    const dynamicImport = (specifier: string) =>
-      // eslint-disable-next-line no-new-func
-      Function('s', 'return import(s)')(specifier) as Promise<unknown>
-    const mod = (await dynamicImport(moduleName)) as { default?: MermaidLike } | MermaidLike
+    // v2.27.2 Bug H 真补：改用标准字面量动态 import，让 Vite 看到 'mermaid' 字面量
+    // 后自动 code-split 出 lazy chunk。原 Function('s','return import(s)') 黑魔法
+    // 在 dev 模式可跑（Node ESM），但 packaged Vite 构建产物里完全找不到 mermaid
+    // chunk，导致 packaged 100% 失效。
+    const mod = (await import('mermaid')) as { default?: MermaidLike } | MermaidLike
     const instance = mod && typeof mod === 'object' && 'default' in mod && mod.default
       ? mod.default
       : (mod as MermaidLike)

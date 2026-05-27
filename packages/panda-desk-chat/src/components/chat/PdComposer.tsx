@@ -63,7 +63,7 @@ type Attachment = {
 // panda 兼容旧 props 形态（EmptySession/ActiveSession 调用面）
 export type PdComposerProps = {
   sessionId: string;
-  onSend?: (content: string) => void;
+  onSend?: (content: string, attachments?: Array<{ mediaType: string; data: string }>) => void;
   onStop?: () => void;
   isStreaming?: boolean;
   disabled?: boolean;
@@ -421,14 +421,14 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(function
     //   1:1 对齐 cc-haha EmptySession.tsx L183-254（独立 handleSubmit 直 await
     //   createSession 再 sendMessage，无 activeTabId 守卫）+ ChatInput.tsx L298-336
     //   （非空场景才走 sendMessage(activeTabId!,...))。
+    const finalAttachments = wireAttachments.length > 0 ? wireAttachments : undefined;
     if (onSend) {
-      // EmptySession 路径：sessionId 尚未创建，由父组件 handleSendNew 负责
-      // createSession + sendMessage；此处仅传 text，attachments 暂不携带
-      // （EmptySession 场景几乎不会带附件，后续可在父组件扩参支持）。
-      onSend(text);
+      // EmptySession / ActiveSession 路径：把 attachments 一并透传，由父组件转给 chatStore.sendMessage
+      // 修复 v2.27.1 Bug E：之前丢弃 attachments 导致图片附件被静默吞掉。
+      onSend(text, finalAttachments);
     } else {
       if (!activeTabId) return;
-      sendMessage(activeTabId, text, wireAttachments.length > 0 ? wireAttachments : undefined);
+      sendMessage(activeTabId, text, finalAttachments);
     }
     setInput('');
     setAttachments([]);

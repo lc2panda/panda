@@ -39,15 +39,15 @@ export const EmptySession: React.FC<EmptySessionProps> = ({ activeId }) => {
 
   // cc-haha L183-254: handleSubmit — 已有会话直发；无会话先创建再发
   const handleSendExisting = useCallback(
-    (content: string) => {
+    (content: string, attachments?: Array<{ mediaType: string; data: string }>) => {
       if (!content.trim() || !activeId) return;
-      sendMessage(activeId, content);
+      sendMessage(activeId, content, attachments);
     },
     [sendMessage, activeId],
   );
 
   const handleSendNew = useCallback(
-    async (content: string) => {
+    async (content: string, attachments?: Array<{ mediaType: string; data: string }>) => {
       if (!content.trim()) return;
       try {
         // cc-haha L230: createSession(workDir || undefined)
@@ -59,7 +59,7 @@ export const EmptySession: React.FC<EmptySessionProps> = ({ activeId }) => {
         // cc-haha L233: connectToSession(sessionId)
         connectToSession(session.id);
         // cc-haha L243: sendMessage(sessionId, text, attachmentPayload)
-        sendMessage(session.id, content);
+        sendMessage(session.id, content, attachments);
       } catch (error) {
         // cc-haha L246-250: addToast on failure
         addToast({

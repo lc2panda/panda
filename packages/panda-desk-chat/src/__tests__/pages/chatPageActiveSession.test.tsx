@@ -147,7 +147,7 @@ describe('Desk Chat 页面发送路径', () => {
     renderToStaticMarkup(<ActiveSession activeId={historyUuid} session={sessionState(historyUuid)} />);
 
     expect(storeProbe.chatState.sendMessage).toHaveBeenCalledTimes(1);
-    expect(storeProbe.chatState.sendMessage).toHaveBeenCalledWith(historyUuid, 'ping');
-    expect(storeProbe.chatState.sendMessage).not.toHaveBeenCalledWith(null, 'ping');
+    expect(storeProbe.chatState.sendMessage).toHaveBeenCalledWith(historyUuid, 'ping', undefined);
+    expect(storeProbe.chatState.sendMessage).not.toHaveBeenCalledWith(null, 'ping', undefined);
   });
 });

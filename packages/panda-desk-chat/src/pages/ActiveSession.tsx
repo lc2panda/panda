@@ -45,8 +45,8 @@ export const ActiveSession: React.FC<ActiveSessionProps> = ({ activeId, session:
   const activeTabId = activeId;
 
   const handleSendMessage = useCallback(
-    (text: string) => {
-      useChatStore.getState().sendMessage(activeTabId, text);
+    (text: string, attachments?: Array<{ mediaType: string; data: string }>) => {
+      useChatStore.getState().sendMessage(activeTabId, text, attachments);
     },
     [activeTabId],
   );
