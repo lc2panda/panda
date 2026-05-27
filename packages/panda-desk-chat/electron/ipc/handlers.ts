@@ -98,6 +98,21 @@ import {
   previewSessionRewind,
   executeSessionRewind,
 } from '../backend/session-rewind-service';
+// v2.27.1 webhook notification service
+import {
+  sendWebhookNotification,
+  type FeishuConfig,
+  type TelegramConfig,
+  type NotificationPayload,
+} from '../backend/webhook-notification-service';
+// v2.27.1 CLI Task V2 后端
+import {
+  cliTaskService,
+  type CliTaskCreateInput,
+  type CliTaskFilter,
+  type CliTaskUpdateInput,
+  type CliBackendTaskStatus,
+} from '../backend/cli-task-service';
 
 // ---------------------------------------------------------------------------
 // IPC channel constants (must match preload/chat.ts)
@@ -199,6 +214,15 @@ const CH = {
   SESSION_REWIND_EXECUTE: 'session:rewind:execute',
   // v2.27.1 MCP 启动前置检查
   MCP_PREFLIGHT:        'mcp:preflight',
+  // v2.27.1 外部 webhook 通知（飞书 + Telegram）
+  WEBHOOK_NOTIFY:       'webhook:notify',
+  // v2.27.1 CLI Task V2 后端
+  CLI_TASK_CREATE:  'cli-task:create',
+  CLI_TASK_LIST:    'cli-task:list',
+  CLI_TASK_GET:     'cli-task:get',
+  CLI_TASK_UPDATE:  'cli-task:update',
+  CLI_TASK_CANCEL:  'cli-task:cancel',
+  CLI_TASK_DELETE:  'cli-task:delete',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -1059,7 +1083,38 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning + teams + audit + memdir + connectors + session-control + shell-open-terminal + title-generate + session-rewind + mcp-preflight connected)');
+  // v2.27.1 CLI Task V2 handlers
+  ipcMain.handle(CH.CLI_TASK_CREATE, async (_event, input: CliTaskCreateInput) => {
+    return cliTaskService.createTask(input);
+  });
+
+  ipcMain.handle(CH.CLI_TASK_LIST, async (_event, filter?: CliTaskFilter) => {
+    return cliTaskService.listTasks(filter);
+  });
+
+  ipcMain.handle(CH.CLI_TASK_GET, async (_event, taskId: string) => {
+    return cliTaskService.getTask(taskId);
+  });
+
+  ipcMain.handle(
+    CH.CLI_TASK_UPDATE,
+    async (
+      _event,
+      payload: { taskId: string; status: CliBackendTaskStatus; partial?: Omit<CliTaskUpdateInput, 'status'> },
+    ) => {
+      return cliTaskService.updateTaskStatus(payload.taskId, payload.status, payload.partial);
+    },
+  );
+
+  ipcMain.handle(CH.CLI_TASK_CANCEL, async (_event, taskId: string) => {
+    return cliTaskService.cancelTask(taskId);
+  });
+
+  ipcMain.handle(CH.CLI_TASK_DELETE, async (_event, taskId: string) => {
+    return cliTaskService.deleteTask(taskId);
+  });
+
+  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning + teams + audit + memdir + connectors + session-control + shell-open-terminal + title-generate + session-rewind + mcp-preflight + cli-task connected)');
 }
 
 // ---------------------------------------------------------------------------
@@ -1150,6 +1205,26 @@ function registerScheduleHandlers(): void {
       valid,
       nextRunAt: nextMs ? new Date(nextMs).toISOString() : null,
     };
+  });
+
+  // v2.27.1 外部 webhook 通知
+  ipcMain.handle(CH.WEBHOOK_NOTIFY, async (
+    _event,
+    payload: {
+      channel: 'feishu' | 'telegram';
+      config: FeishuConfig | TelegramConfig;
+      notification: NotificationPayload;
+    },
+  ) => {
+    if (!payload?.channel || !payload.config || !payload.notification) {
+      return { ok: false, error: 'webhook:notify 缺少必要参数' };
+    }
+    if (payload.channel === 'feishu') {
+      return sendWebhookNotification('feishu', payload.config as FeishuConfig, payload.notification);
+    } else if (payload.channel === 'telegram') {
+      return sendWebhookNotification('telegram', payload.config as TelegramConfig, payload.notification);
+    }
+    return { ok: false, error: `未知 webhook 通道：${payload.channel}` };
   });
 }
 

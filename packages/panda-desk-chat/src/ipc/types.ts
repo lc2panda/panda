@@ -268,6 +268,11 @@ export interface PandaChatAPI {
     getHistory(sessionId: string): Promise<SessionDetail | null>;
     /** 遗留 IPC 修复 #1: cc-haha sessionsApi.getGitInfo (panda:session:git-info). */
     getGitInfo(sessionId: string, cwd?: string): Promise<GitInfo>;
+    /** v2.27.1 P3: 清理占位 session（transcript=0 且 mtime>24h）。 */
+    cleanupPlaceholders(opts?: {
+      projectsDir?: string;
+      dryRun?: boolean;
+    }): Promise<{ removed: string[]; kept: string[]; error?: string }>;
   };
   tool: {
     respondPermission(payload: ToolPermResponsePayload): Promise<void>;
@@ -412,6 +417,50 @@ export interface PandaChatAPI {
   mcp?: {
     preflight(config: McpServerConfig): Promise<McpPreflightResult>;
   };
+  // v2.27.1 CLI Task V2 namespace
+  tasks?: {
+    create(input: CliTaskCreateInput): Promise<CliBackendTask>;
+    list(filter?: CliTaskFilter): Promise<CliBackendTask[]>;
+    get(taskId: string): Promise<CliBackendTask | null>;
+    update(payload: {
+      taskId: string;
+      status: CliBackendTaskStatus;
+      partial?: { result?: unknown; error?: string; payload?: Record<string, unknown> };
+    }): Promise<CliBackendTask>;
+    cancel(taskId: string): Promise<{ ok: boolean }>;
+    delete(taskId: string): Promise<{ ok: boolean }>;
+  };
+  // v2.27.1 外部 webhook 通知（飞书 + Telegram）
+  webhook?: {
+    notify(input: {
+      channel: 'feishu' | 'telegram';
+      config: FeishuWebhookConfig | TelegramWebhookConfig;
+      notification: WebhookNotificationPayload;
+    }): Promise<{ ok: boolean; error?: string }>;
+  };
+}
+
+// ─── Webhook notification types (v2.27.1) ────────────────────────────────────
+
+export interface FeishuWebhookConfig {
+  webhookUrl: string;
+  /** 飞书 v2 签名密钥（可选） */
+  secret?: string;
+}
+
+export interface TelegramWebhookConfig {
+  botToken: string;
+  chatId: string;
+}
+
+export type WebhookChannelType = 'feishu' | 'telegram';
+
+export type WebhookNotificationLevel = 'info' | 'warn' | 'error';
+
+export interface WebhookNotificationPayload {
+  title: string;
+  body: string;
+  level?: WebhookNotificationLevel;
 }
 
 // ─── Session rewind types (v2.27.1) ──────────────────────────────────────────
@@ -949,6 +998,38 @@ export interface McpPreflightCheck {
 export interface McpPreflightResult {
   ok: boolean;
   checks: McpPreflightCheck[];
+}
+
+// ─── CLI Task V2 types (v2.27.1) ─────────────────────────────────────────────
+
+export type CliBackendTaskStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface CliBackendTask {
+  id: string;
+  title: string;
+  status: CliBackendTaskStatus;
+  createdAt: string;
+  updatedAt: string;
+  sessionId?: string;
+  payload?: Record<string, unknown>;
+  result?: unknown;
+  error?: string;
+}
+
+export interface CliTaskCreateInput {
+  title: string;
+  sessionId?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface CliTaskFilter {
+  status?: CliBackendTaskStatus;
+  sessionId?: string;
 }
 
 // ─── Global augmentation for window.pandaAPI ────────────────────────────────

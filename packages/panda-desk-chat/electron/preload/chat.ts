@@ -126,6 +126,17 @@ const CH = {
   SESSION_REWIND_EXECUTE: 'session:rewind:execute',
   // v2.27.1 MCP 启动前置检查
   MCP_PREFLIGHT:        'mcp:preflight',
+  // v2.27.1 CLI Task V2 后端
+  CLI_TASK_CREATE:  'cli-task:create',
+  CLI_TASK_LIST:    'cli-task:list',
+  CLI_TASK_GET:     'cli-task:get',
+  CLI_TASK_UPDATE:  'cli-task:update',
+  CLI_TASK_CANCEL:  'cli-task:cancel',
+  CLI_TASK_DELETE:  'cli-task:delete',
+  // v2.27.1 P3 占位 session 清理
+  SESSION_CLEANUP_PLACEHOLDER: 'session:cleanup-placeholder',
+  // v2.27.1 外部 webhook 通知（飞书 + Telegram）
+  WEBHOOK_NOTIFY:       'webhook:notify',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -177,6 +188,9 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     // 遗留 IPC 修复 #1: cc-haha sessionsApi.getGitInfo 对齐
     getGitInfo: (sessionId: string, cwd?: string) =>
       ipcRenderer.invoke(CH.SESSION_GIT_INFO, { sessionId, cwd }),
+    // v2.27.1 P3: 占位 session 清理
+    cleanupPlaceholders: (opts?: { projectsDir?: string; dryRun?: boolean }) =>
+      ipcRenderer.invoke(CH.SESSION_CLEANUP_PLACEHOLDER, opts ?? {}),
   },
   tool: {
     respondPermission: (payload: unknown) => ipcRenderer.invoke(CH.TOOL_PERM_RESPONSE, payload),
@@ -346,5 +360,18 @@ contextBridge.exposeInMainWorld('pandaAPI', {
   // v2.27.1 MCP 启动前置检查 namespace
   mcp: {
     preflight: (config: unknown) => ipcRenderer.invoke(CH.MCP_PREFLIGHT, config),
+  },
+  // v2.27.1 CLI Task V2 namespace
+  tasks: {
+    create: (input: unknown) => ipcRenderer.invoke(CH.CLI_TASK_CREATE, input),
+    list: (filter?: unknown) => ipcRenderer.invoke(CH.CLI_TASK_LIST, filter),
+    get: (taskId: string) => ipcRenderer.invoke(CH.CLI_TASK_GET, taskId),
+    update: (payload: unknown) => ipcRenderer.invoke(CH.CLI_TASK_UPDATE, payload),
+    cancel: (taskId: string) => ipcRenderer.invoke(CH.CLI_TASK_CANCEL, taskId),
+    delete: (taskId: string) => ipcRenderer.invoke(CH.CLI_TASK_DELETE, taskId),
+  },
+  // v2.27.1 外部 webhook 通知 namespace
+  webhook: {
+    notify: (payload: unknown) => ipcRenderer.invoke(CH.WEBHOOK_NOTIFY, payload),
   },
 });

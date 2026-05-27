@@ -76,6 +76,11 @@ import type {
   // v2.27.1 MCP preflight
   McpServerConfig,
   McpPreflightResult,
+  // v2.27.1 CLI Task V2
+  type CliBackendTask,
+  type CliTaskCreateInput,
+  type CliTaskFilter,
+  type CliBackendTaskStatus,
 } from './types';
 import {
   DevMockRelay,
@@ -333,6 +338,27 @@ export async function getGitInfo(sessionId: string, cwd?: string): Promise<GitIn
   } catch (err) {
     console.warn('[bridge] getGitInfo failed:', err);
     return empty;
+  }
+}
+
+/** v2.27.1 P3: Clean up placeholder sessions (transcript=0 + mtime>24h). */
+export async function cleanupPlaceholders(opts?: {
+  projectsDir?: string;
+  dryRun?: boolean;
+}): Promise<{ removed: string[]; kept: string[]; error?: string }> {
+  if (IS_DEV) {
+    console.info('[bridge] cleanupPlaceholders dev no-op', opts);
+    return { removed: [], kept: [] };
+  }
+  try {
+    return await getPandaAPI().session.cleanupPlaceholders(opts);
+  } catch (err) {
+    console.warn('[bridge] cleanupPlaceholders failed:', err);
+    return {
+      removed: [],
+      kept: [],
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -1132,6 +1158,9 @@ export async function generateTitle(payload: {
 
 // ─── v2.27.1 MCP 启动前置检查 ────────────────────────────────────────────────
 
+// This marker prevents duplicate insertion
+// CLI_TASK_BRIDGE_MARKER
+
 export async function preflightMcpServer(
   config: McpServerConfig,
 ): Promise<McpPreflightResult> {
@@ -1150,5 +1179,71 @@ export async function preflightMcpServer(
       ok: false,
       checks: [{ name: 'bridge_error', ok: false, level: 'error', detail: err instanceof Error ? err.message : String(err) }],
     };
+  }
+}
+
+// ─── v2.27.1 CLI Task V2 ─────────────────────────────────────────────────────
+
+export async function createCliTask(input: CliTaskCreateInput): Promise<CliBackendTask> {
+  const api = getPandaAPI();
+  if (!api.tasks?.create) throw new Error('[bridge] tasks.create not available');
+  return api.tasks.create(input);
+}
+
+export async function listCliTasks(filter?: CliTaskFilter): Promise<CliBackendTask[]> {
+  if (IS_DEV) return [];
+  try {
+    const api = getPandaAPI();
+    if (!api.tasks?.list) return [];
+    return await api.tasks.list(filter);
+  } catch (err) {
+    console.warn('[bridge] listCliTasks failed:', err);
+    return [];
+  }
+}
+
+export async function getCliTask(taskId: string): Promise<CliBackendTask | null> {
+  if (IS_DEV) return null;
+  try {
+    const api = getPandaAPI();
+    if (!api.tasks?.get) return null;
+    return await api.tasks.get(taskId);
+  } catch (err) {
+    console.warn('[bridge] getCliTask failed:', err);
+    return null;
+  }
+}
+
+export async function updateCliTask(
+  taskId: string,
+  status: CliBackendTaskStatus,
+  partial?: { result?: unknown; error?: string; payload?: Record<string, unknown> },
+): Promise<CliBackendTask> {
+  const api = getPandaAPI();
+  if (!api.tasks?.update) throw new Error('[bridge] tasks.update not available');
+  return api.tasks.update({ taskId, status, partial });
+}
+
+export async function cancelCliTask(taskId: string): Promise<{ ok: boolean }> {
+  if (IS_DEV) return { ok: false };
+  try {
+    const api = getPandaAPI();
+    if (!api.tasks?.cancel) return { ok: false };
+    return await api.tasks.cancel(taskId);
+  } catch (err) {
+    console.warn('[bridge] cancelCliTask failed:', err);
+    return { ok: false };
+  }
+}
+
+export async function deleteCliTask(taskId: string): Promise<{ ok: boolean }> {
+  if (IS_DEV) return { ok: false };
+  try {
+    const api = getPandaAPI();
+    if (!api.tasks?.delete) return { ok: false };
+    return await api.tasks.delete(taskId);
+  } catch (err) {
+    console.warn('[bridge] deleteCliTask failed:', err);
+    return { ok: false };
   }
 }

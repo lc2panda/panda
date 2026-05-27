@@ -1,10 +1,12 @@
-// Input: Claude.ai OAuth authorization URL + login status polling
-// Output: status / login / logout / polling actions for ClaudeOfficialLogin (PdProviderSettings)
-// Pos: State layer — drives ClaudeOfficialLogin component
+// Input: (compat shim — delegates to pandaOAuthStore for IPC-backed state)
+// Output: re-exports all of pandaOAuthStore + legacy HahaOAuthStore stub for existing imports
+// Pos: State layer — backward-compat wrapper; new code should import from pandaOAuthStore directly.
 //
-// Source 1:1: cc-haha desktop/src/stores/hahaOAuthStore.ts shape
-//   panda 完全没有 OAuth 后端 → 全降级到 stub TODO，UI 显示"未实现"占位。
+// v2.27.1: pandaOAuthStore implements real IPC-backed OAuth status read.
+//   hahaOAuthStore is retained as a compat re-export so existing component imports don't break.
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
+
+export * from './pandaOAuthStore';
 
 import { create } from 'zustand';
 
