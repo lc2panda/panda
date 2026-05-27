@@ -388,11 +388,17 @@ export interface PandaChatAPI {
     readPlan(projectSlug: string, slug: string): Promise<LearningPlanDetail | null>;
     readFlashcards(projectSlug: string, topic: string): Promise<LearningFlashcardSet | null>;
   };
-  // Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据扫描 namespace
+  // Comdr 指令: Agent Teams — 落盘数据扫描（只读）+ CRUD namespace
   teams: {
     list(): Promise<TeamMeta[]>;
     detail(name: string): Promise<TeamDetail | null>;
     enabledStatus(): Promise<boolean>;
+    // CRUD（v2.27.1 新增）
+    listAll?(dir?: string): Promise<AgentTeamRecord[]>;
+    get?(id: string, dir?: string): Promise<AgentTeamRecord | null>;
+    create?(input: AgentTeamCreateInput): Promise<AgentTeamRecord>;
+    update?(id: string, partial: AgentTeamUpdateInput): Promise<AgentTeamRecord>;
+    delete?(id: string): Promise<{ ok: boolean }>;
   };
   // Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读 namespace
   audit: {
@@ -466,6 +472,14 @@ export interface PandaChatAPI {
       config: FeishuWebhookConfig | TelegramWebhookConfig;
       notification: WebhookNotificationPayload;
     }): Promise<{ ok: boolean; error?: string }>;
+  };
+  // v2.27.1 agentService CRUD namespace
+  agents?: {
+    list(dir?: string): Promise<AgentServiceRecord[]>;
+    get(id: string, dir?: string): Promise<AgentServiceRecord | null>;
+    create(input: AgentServiceCreateInput): Promise<AgentServiceRecord>;
+    update(id: string, partial: AgentServiceUpdateInput): Promise<AgentServiceRecord>;
+    delete(id: string): Promise<{ ok: boolean }>;
   };
 }
 
@@ -1081,6 +1095,99 @@ export interface CliTaskFilter {
   status?: CliBackendTaskStatus;
   sessionId?: string;
 }
+
+// ─── Plugin/Skill/Adapter/Settings stub types (v2.27.1 stash-in-progress) ─────
+// These types are used by bridge.ts plugin/skill/adapter/settings functions.
+// Full definitions will be provided when the related stash is committed.
+
+export interface PluginServiceItem {
+  id: string;
+  name: string;
+  version?: string;
+  enabled?: boolean;
+  [key: string]: unknown;
+}
+
+export interface SkillServiceItem {
+  id: string;
+  name: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+export interface SkillServiceDetail extends SkillServiceItem {
+  content?: string;
+}
+
+export interface AdapterServiceItem {
+  id: string;
+  platform: string;
+  enabled?: boolean;
+  [key: string]: unknown;
+}
+
+export interface PandaSettings {
+  model?: string;
+  env?: Record<string, string>;
+  [key: string]: unknown;
+}
+
+export interface PandaSettingsPatch {
+  model?: string;
+  env?: Record<string, string>;
+  [key: string]: unknown;
+}
+
+// ─── agentService types (v2.27.1) ────────────────────────────────────────────
+
+export interface AgentServiceRecord {
+  id: string;
+  path: string;
+  name: string;
+  description: string;
+  model: string;
+  tools: string[];
+  maxTurns: number | null;
+  systemPrompt: string;
+  meta: Record<string, unknown>;
+}
+
+export interface AgentServiceCreateInput {
+  id?: string;
+  name: string;
+  description?: string;
+  model?: string;
+  tools?: string[];
+  maxTurns?: number;
+  systemPrompt?: string;
+  meta?: Record<string, unknown>;
+}
+
+export type AgentServiceUpdateInput = Partial<AgentServiceCreateInput>;
+
+// ─── teamService types (v2.27.1) ─────────────────────────────────────────────
+
+export interface AgentTeamRecord {
+  id: string;
+  path: string;
+  displayName: string;
+  description: string;
+  members: string[];
+  coordinator: string | null;
+  settings: Record<string, unknown>;
+  hasConfig: boolean;
+}
+
+export interface AgentTeamCreateInput {
+  id?: string;
+  displayName: string;
+  description?: string;
+  members?: string[];
+  coordinator?: string;
+  settings?: Record<string, unknown>;
+}
+
+export type AgentTeamUpdateInput = Partial<AgentTeamCreateInput>;
 
 // ─── Global augmentation for window.pandaAPI ────────────────────────────────
 

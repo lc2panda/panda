@@ -81,6 +81,14 @@ import type {
   CliTaskCreateInput,
   CliTaskFilter,
   CliBackendTaskStatus,
+  // v2.27.1 agentService CRUD
+  AgentServiceRecord,
+  AgentServiceCreateInput,
+  AgentServiceUpdateInput,
+  // v2.27.1 teamService CRUD
+  AgentTeamRecord,
+  AgentTeamCreateInput,
+  AgentTeamUpdateInput,
 } from './types';
 // v2.27.1 webhook + OAuth types — explicit import to avoid TS2206 in the main import type block
 import type {
@@ -88,6 +96,13 @@ import type {
   TelegramWebhookConfig,
   WebhookNotificationPayload,
   OAuthStatus,
+  // v2.27.1 Plugin/Skill/Adapter/Settings stash worker types
+  PluginServiceItem,
+  SkillServiceItem,
+  SkillServiceDetail,
+  AdapterServiceItem,
+  PandaSettings,
+  PandaSettingsPatch,
 } from './types';
 import {
   DevMockRelay,
@@ -1490,4 +1505,68 @@ export async function sendWebhookNotification(
     console.warn('[bridge] sendWebhookNotification failed:', err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+// v2.27.1 agentService CRUD bridge helpers ───────────────────────────────────
+
+export async function listAgentsService(dir?: string): Promise<AgentServiceRecord[]> {
+  if (IS_DEV) return [];
+  try { return await (getPandaAPI().agents?.list(dir) ?? []); }
+  catch (err) { console.warn('[bridge] agents.list failed:', err); return []; }
+}
+
+export async function getAgentService(id: string, dir?: string): Promise<AgentServiceRecord | null> {
+  if (IS_DEV) return null;
+  try { return await (getPandaAPI().agents?.get(id, dir) ?? null); }
+  catch (err) { console.warn('[bridge] agents.get failed:', err); return null; }
+}
+
+export async function createAgentService(input: AgentServiceCreateInput): Promise<AgentServiceRecord> {
+  const api = getPandaAPI();
+  if (!api.agents?.create) throw new Error('agents.create IPC not available');
+  return api.agents.create(input);
+}
+
+export async function updateAgentService(id: string, partial: AgentServiceUpdateInput): Promise<AgentServiceRecord> {
+  const api = getPandaAPI();
+  if (!api.agents?.update) throw new Error('agents.update IPC not available');
+  return api.agents.update(id, partial);
+}
+
+export async function deleteAgentService(id: string): Promise<{ ok: boolean }> {
+  if (IS_DEV) return { ok: false };
+  try { return await (getPandaAPI().agents?.delete(id) ?? { ok: false }); }
+  catch (err) { console.warn('[bridge] agents.delete failed:', err); return { ok: false }; }
+}
+
+// v2.27.1 teamService CRUD bridge helpers ────────────────────────────────────
+
+export async function listTeamsService(dir?: string): Promise<AgentTeamRecord[]> {
+  if (IS_DEV) return [];
+  try { return await (getPandaAPI().teams?.listAll?.(dir) ?? []); }
+  catch (err) { console.warn('[bridge] teams.listAll failed:', err); return []; }
+}
+
+export async function getTeamService(id: string, dir?: string): Promise<AgentTeamRecord | null> {
+  if (IS_DEV) return null;
+  try { return await (getPandaAPI().teams?.get?.(id, dir) ?? null); }
+  catch (err) { console.warn('[bridge] teams.get failed:', err); return null; }
+}
+
+export async function createTeamService(input: AgentTeamCreateInput): Promise<AgentTeamRecord> {
+  const api = getPandaAPI();
+  if (!api.teams?.create) throw new Error('teams.create IPC not available');
+  return api.teams.create(input);
+}
+
+export async function updateTeamService(id: string, partial: AgentTeamUpdateInput): Promise<AgentTeamRecord> {
+  const api = getPandaAPI();
+  if (!api.teams?.update) throw new Error('teams.update IPC not available');
+  return api.teams.update(id, partial);
+}
+
+export async function deleteTeamService(id: string): Promise<{ ok: boolean }> {
+  if (IS_DEV) return { ok: false };
+  try { return await (getPandaAPI().teams?.delete?.(id) ?? { ok: false }); }
+  catch (err) { console.warn('[bridge] teams.delete failed:', err); return { ok: false }; }
 }
