@@ -12,6 +12,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { findSessionFile, getSessionLaunchInfo } from './disk-session-scanner';
+import { findOccupyingInteractiveSession } from './pid-registry';
 import { resolveBunPath } from './binPath';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -675,6 +676,9 @@ export class CLISession extends EventEmitter {
       resourcesPath: process.resourcesPath,
       configDir: process.env.PANDA_CONFIG_DIR || path.join(app.getPath('home'), '.pandacc'),
       logPath: this.lastLogPath,
+      code: payload.code,
+      occupierPid: payload.occupierPid,
+      occupierCwd: payload.occupierCwd,
     } satisfies CLIStreamErrorPayload);
   }
 
@@ -782,6 +786,26 @@ export class CLIManager {
       );
     }
     let session = this.sessions.get(sessionId);
+    // v2.27.0 Bug C 修复：在 spawn 子进程前检测 panda-cli PID registry，
+    // 若同一 sessionId 已被终端 `panda --resume` interactive REPL 持有，
+    // 抛 typed Error code=SESSION_OCCUPIED。Desk Chat 与终端 REPL 共用磁盘
+    // jsonl + control 协议状态，并发会造成消息错乱/双写崩溃。
+    // 仅对 in-memory session 未命中的场景检查（已 attach 的 Desk Chat 自身
+    // session 不属于 panda-cli registry 范畴）。
+    if (!session) {
+      const occupier = findOccupyingInteractiveSession(sessionId);
+      if (occupier) {
+        const error = new Error(
+          `Session ${sessionId} is currently held by panda-cli REPL (pid=${occupier.pid}). Close the terminal REPL or open a new chat tab.`,
+        );
+        (error as Error & { code?: string; pid?: number; sessionCwd?: string }).code =
+          'SESSION_OCCUPIED';
+        (error as Error & { code?: string; pid?: number; sessionCwd?: string }).pid = occupier.pid;
+        (error as Error & { code?: string; pid?: number; sessionCwd?: string }).sessionCwd =
+          occupier.cwd;
+        throw error;
+      }
+    }
     if (!session) {
       // v2.26.14 Bug B fix (1:1 align cc-haha conversationService.startSession):
       // Resume a historical session whose UUID still lives in renderer localStorage
@@ -846,7 +870,13 @@ export class CLIManager {
   }
 
   async focusSession(sessionId: string): Promise<SessionInfo | null> {
-    const session = await this.ensureSession(sessionId);
+    let session: CLISession;
+    try {
+      session = await this.ensureSession(sessionId);
+    } catch (err) {
+      this.surfaceManagerLevelError(sessionId, err);
+      throw err;
+    }
 
     // Re-start stopped sessions
     if (session.state === 'stopped' || session.state === 'error') {
@@ -863,8 +893,45 @@ export class CLIManager {
   // ── Message routing ──────────────────────────────────────────────────
 
   async sendMessage(sessionId: string, content: string, attachments?: Array<{ mediaType: string; data: string }>): Promise<void> {
-    const session = await this.ensureSession(sessionId);
+    let session: CLISession;
+    try {
+      session = await this.ensureSession(sessionId);
+    } catch (err) {
+      this.surfaceManagerLevelError(sessionId, err);
+      throw err;
+    }
     session.sendMessage(content, attachments);
+  }
+
+  /**
+   * v2.27.0 Bug C：ensureSession 抛出的 typed Error 在子进程未启动时无 CLISession
+   * 可挂载 stream:error，直接通过 windowManager 广播 STREAM_ERROR 到对应窗口，
+   * renderer 的 onStreamError 即可消费 code='SESSION_OCCUPIED' 并弹中文提示。
+   */
+  private surfaceManagerLevelError(sessionId: string, err: unknown): void {
+    if (!err || typeof err !== 'object') return;
+    const typed = err as Error & {
+      code?: string;
+      pid?: number;
+      sessionCwd?: string;
+    };
+    const payload: CLIStreamErrorPayload = {
+      sessionId,
+      messageId: randomUUID(),
+      error: typed.message ?? String(err),
+      reason: 'cli-error',
+      code: typed.code,
+      occupierPid: typed.pid,
+      occupierCwd: typed.sessionCwd,
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      configDir: process.env.PANDA_CONFIG_DIR || path.join(app.getPath('home'), '.pandacc'),
+    };
+    try {
+      windowManager.sendToSession(sessionId, MR.STREAM_ERROR, payload);
+    } catch (broadcastErr) {
+      console.error('[CLIManager] failed to surface manager-level error:', broadcastErr);
+    }
   }
 
   stopStream(sessionId: string): void {

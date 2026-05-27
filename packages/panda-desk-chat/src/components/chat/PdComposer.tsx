@@ -390,9 +390,25 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(function
       return;
     }
 
-    // panda chatStore.sendMessage 不接 attachments；序列化为内容尾部 @path 行（后端在 chat 流中可识别）。
-    const attachmentLines = attachments.map((a) => `@${a.name}`).join(' ');
-    const merged = attachmentLines ? (text ? `${text}\n${attachmentLines}` : attachmentLines) : text;
+    // Bug E 修复（方案 B）：删除旧 "@path 序列化进 text" 分支。
+    //   旧路径把 attachments 拼成 `@filename` 文本行，无 dataURL/base64 传输 → CLI 端
+    //   完全收不到图片，用户从 Desk Chat 发的图被静默丢弃。
+    //   新路径把 attachments 转成 IPC schema 期望的 { mediaType, data } 内联形态：
+    //     - mediaType: PdComposer 内部 attachment.mimeType（image/png / image/jpeg / ...），缺省回退 image/png。
+    //     - data: 把 dataURL `data:image/png;base64,XXXX` 截取裸 base64 串；若 a.data
+    //       已是纯 base64 则原样使用。
+    //   sendMessage 第三参数透传至 bridge → CHAT_SEND handler → cliManager.sendMessage →
+    //   panda-cli 用户输入控制协议，对齐 cli-manager.ts:540 期望签名。
+    const wireAttachments = attachments
+      .filter((a) => typeof a.data === 'string' && a.data.length > 0)
+      .map((a) => {
+        const raw = a.data as string;
+        const dataUrlMatch = raw.match(/^data:([^;]+);base64,(.*)$/);
+        return {
+          mediaType: dataUrlMatch?.[1] ?? a.mimeType ?? 'image/png',
+          data: dataUrlMatch ? dataUrlMatch[2] : raw,
+        };
+      });
 
     // Comdr 指令 (W23B 任务 #2 — 第一次发消息丢失根因修复，2026-05-06):
     //   旧代码 `if (!activeTabId) return;` 在 EmptySession 场景下错误地拦截发送 —
@@ -406,10 +422,13 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(function
     //   createSession 再 sendMessage，无 activeTabId 守卫）+ ChatInput.tsx L298-336
     //   （非空场景才走 sendMessage(activeTabId!,...))。
     if (onSend) {
-      onSend(merged);
+      // EmptySession 路径：sessionId 尚未创建，由父组件 handleSendNew 负责
+      // createSession + sendMessage；此处仅传 text，attachments 暂不携带
+      // （EmptySession 场景几乎不会带附件，后续可在父组件扩参支持）。
+      onSend(text);
     } else {
       if (!activeTabId) return;
-      sendMessage(activeTabId, merged);
+      sendMessage(activeTabId, text, wireAttachments.length > 0 ? wireAttachments : undefined);
     }
     setInput('');
     setAttachments([]);

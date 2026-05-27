@@ -412,8 +412,9 @@ describe('chatStore', () => {
       await flushPromises();
 
       expect(bridge.createSession).toHaveBeenCalledTimes(1);
-      expect(bridge.sendMessage).toHaveBeenCalledWith(newUuid, 'ping');
-      expect(bridge.sendMessage).not.toHaveBeenCalledWith('legacy-history-id', 'ping');
+      // v2.27.0 Bug E：sendMessage 三参（attachments?: undefined）
+      expect(bridge.sendMessage).toHaveBeenCalledWith(newUuid, 'ping', undefined);
+      expect(bridge.sendMessage).not.toHaveBeenCalledWith('legacy-history-id', 'ping', undefined);
       expect(useTabStore.getState().tabs[0]?.sessionId).toBe(newUuid);
       expect(useTabStore.getState().activeTabId).toBe(newUuid);
     });
@@ -427,9 +428,48 @@ describe('chatStore', () => {
       await useChatStore.getState().sendMessage(historyUuid, 'ping');
 
       expect(bridge.createSession).not.toHaveBeenCalled();
-      expect(bridge.sendMessage).toHaveBeenCalledWith(historyUuid, 'ping');
+      // v2.27.0 Bug E：sendMessage 三参（attachments?: undefined）
+      expect(bridge.sendMessage).toHaveBeenCalledWith(historyUuid, 'ping', undefined);
       expect(useTabStore.getState().tabs[0]?.sessionId).toBe(historyUuid);
       expect(useTabStore.getState().activeTabId).toBe(historyUuid);
+    });
+  });
+
+  // ── v2.27.0 Bug E: attachments passthrough ───────────────────────────────
+
+  describe('sendMessage attachments passthrough (Bug E)', () => {
+    const sessionId = '22222222-2222-4222-8222-222222222222';
+
+    it('forwards attachments array as the third bridge.sendMessage arg', async () => {
+      useTabStore.setState({
+        tabs: [{ id: sessionId, sessionId, title: 'Att', type: 'session', status: 'idle', order: 0, isActive: true, isPinned: false }],
+        activeTabId: sessionId,
+      });
+
+      const attachments = [
+        { mediaType: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgAAIAAAUAAen63NgAAAAASUVORK5CYII=' },
+      ];
+
+      await useChatStore.getState().sendMessage(sessionId, 'with image', attachments);
+      await flushPromises();
+
+      expect(bridge.sendMessage).toHaveBeenCalledTimes(1);
+      expect(bridge.sendMessage).toHaveBeenCalledWith(sessionId, 'with image', attachments);
+    });
+
+    it('passes attachments after legacy session id remap', async () => {
+      const newUuid = '11111111-1111-4111-8111-111111111111';
+      useTabStore.setState({
+        tabs: [{ id: 'legacy-id', sessionId: 'legacy-id', title: 'Legacy', type: 'session', status: 'idle', order: 0, isActive: true, isPinned: false }],
+        activeTabId: 'legacy-id',
+      });
+
+      const attachments = [{ mediaType: 'image/jpeg', data: 'abc==' }];
+
+      await useChatStore.getState().sendMessage('legacy-id', 'hi', attachments);
+      await flushPromises();
+
+      expect(bridge.sendMessage).toHaveBeenCalledWith(newUuid, 'hi', attachments);
     });
   });
 

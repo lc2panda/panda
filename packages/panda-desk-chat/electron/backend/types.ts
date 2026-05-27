@@ -152,4 +152,10 @@ export interface CLIStreamErrorPayload {
   resourcesPath?: string;
   configDir?: string;
   logPath?: string;
+  // v2.27.0 Bug C：当 ensureSession 检测到 panda-cli PID registry 占用时附带
+  // 'SESSION_OCCUPIED' 与占位 PID/cwd，renderer 据此弹中文友好提示。
+  // 其它 typed code 也可在此扩展（WORKDIR_NOT_FOUND/WORKDIR_INVALID 等）。
+  code?: 'SESSION_OCCUPIED' | 'WORKDIR_NOT_FOUND' | 'WORKDIR_INVALID' | string;
+  occupierPid?: number;
+  occupierCwd?: string;
 }

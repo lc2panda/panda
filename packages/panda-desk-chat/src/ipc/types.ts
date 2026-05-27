@@ -69,6 +69,10 @@ export interface ChatStreamErrorPayload {
   resourcesPath?: string;
   configDir?: string;
   logPath?: string;
+  // v2.27.0 Bug C：manager 层 typed error 代码，renderer 据此映射中文友好提示。
+  code?: 'SESSION_OCCUPIED' | 'WORKDIR_NOT_FOUND' | 'WORKDIR_INVALID' | string;
+  occupierPid?: number;
+  occupierCwd?: string;
 }
 export type ChatStopPayload         = z.infer<typeof chatStopSchema>;
 export type ChatWindowTogglePayload = z.infer<typeof chatWindowToggleSchema>;

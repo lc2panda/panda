@@ -304,7 +304,11 @@ export interface ChatStore {
   flushStreamBuffer: (sessionId: string) => void;
 
   // High-level actions — wired to IPC bridge
-  sendMessage: (sessionId: string, content: string) => void;
+  sendMessage: (
+    sessionId: string,
+    content: string,
+    attachments?: Array<{ mediaType: string; data: string }>,
+  ) => void;
   respondPermission: (
     sessionId: string,
     toolUseId: string,
@@ -778,7 +782,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
   // -- High-level bridge actions -----------------------------------------------
 
-  sendMessage: (sessionId, content) => {
+  sendMessage: (sessionId, content, attachments) => {
     if (!isValidSessionId(sessionId)) {
       void (async () => {
         try {
@@ -808,7 +812,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
             };
           });
 
-          get().sendMessage(newSession.id, content);
+          get().sendMessage(newSession.id, content, attachments);
           useToastStore.getState().addToast({
             type: 'info',
             message: '历史会话 ID 不是 UUID，已自动创建新会话继续发送。',
@@ -825,7 +829,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     }
     const { addUserMessage } = get();
     addUserMessage(sessionId, content);
-    bridge.sendMessage(sessionId, content).catch(async (err) => {
+    // Bug E 修复（方案 B）：附件作为第三参数原样透传到 bridge → IPC → cli-manager，
+    // 不再走 PdComposer 旧的 @path 序列化分支，避免 base64 串被拼进 text 后看不见且不能识别。
+    bridge.sendMessage(sessionId, content, attachments).catch(async (err) => {
       // If the backend says session not found, focus it (triggers auto-create)
       // then retry once.
       const msg = err instanceof Error ? err.message : String(err);
@@ -833,7 +839,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         console.warn('[chatStore] Session stale, re-materialising:', sessionId);
         try {
           await bridge.focusSession(sessionId);
-          await bridge.sendMessage(sessionId, content);
+          await bridge.sendMessage(sessionId, content, attachments);
           return; // retry succeeded
         } catch (retryErr) {
           console.error('[chatStore] Retry after re-create also failed:', retryErr);
@@ -1111,7 +1117,9 @@ function extractText(content: unknown): string {
       parts.push(raw.text);
     }
   }
-  return parts.join('\n');
+  // Bug D F1 修复：多个 text block 拼接使用空行分隔，恢复 markdown 段落边界，
+  // 避免相邻 block 被 react-markdown 合并成连续段落（无段落间距 + 行内拼接）。
+  return parts.join('\n\n');
 }
 
 function formatStreamError(error: string | ChatStreamErrorPayload): string {
@@ -1302,9 +1310,19 @@ export function setupBridgeListeners(): void {
     store().flushStreamBuffer(sessionId);
     store().failStreaming(sessionId, messageId, streamError);
     activeSessions.delete(sessionId);
+    // v2.27.0 Bug C：typed code 映射中文友好提示。原始英文 error 仍写入消息流，
+    // toast 给最终用户读得懂的指引。
+    const friendlyMessage =
+      streamError.code === 'SESSION_OCCUPIED'
+        ? '该会话正由终端 REPL 持有，请关闭终端或新建会话。'
+        : streamError.code === 'WORKDIR_NOT_FOUND'
+          ? '历史会话的工作目录已不存在，请新建会话或恢复目录。'
+          : streamError.code === 'WORKDIR_INVALID'
+            ? '历史会话的工作目录无效，请新建会话。'
+            : streamError.error;
     useToastStore.getState().addToast({
       type: 'error',
-      message: streamError.error,
+      message: friendlyMessage,
     });
   }));
 

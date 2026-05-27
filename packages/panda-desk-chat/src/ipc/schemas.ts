@@ -50,10 +50,13 @@ export const IPC_CHANNELS = {
 
 // ─── Shared sub-schemas ────────────────────────────────────────────────────────
 
+// Bug E 修复（方案 B）：附件 schema 改为 { mediaType, data } base64 内联形态，
+// 与 electron/ipc/handlers.ts CHAT_SEND handler 期望（Array<{ mediaType: string; data: string }>）
+// 以及 cli-manager.sendMessage / interactive REPL 控制协议保持一致。
+// 旧 { type, path } 形态已废弃 — Desk Chat 不依赖外置文件路径，全程 dataURL → base64。
 const attachmentSchema = z.object({
-  type: z.enum(['image', 'file']),
-  path: z.string(),
-  mimeType: z.string().optional(),
+  mediaType: z.string(),
+  data: z.string(),
 });
 
 const tokenUsageSchema = z.object({

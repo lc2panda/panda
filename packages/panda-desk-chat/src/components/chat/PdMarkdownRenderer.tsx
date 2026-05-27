@@ -129,6 +129,16 @@ function useMarkdownComponents(): Components {
           return <PdMermaidRenderer code={codeText} />
         }
 
+        // Bug D F2 修复：streaming 阶段 assistant 可能先吐出空 fence（```\n```），
+        // 此时 codeText 为空、codeChildren 也为空数组 → 直接返回 null 避免渲染
+        // 空 PdCodeViewer 框造成视觉闪烁。等下一帧 token 填入再正常渲染。
+        const childrenArr = codeChildren as React.ReactNode[] | React.ReactNode
+        const hasNoCodeChildren =
+          !codeChildren || (Array.isArray(childrenArr) && childrenArr.length === 0)
+        if (!codeText.trim() && hasNoCodeChildren) {
+          return null
+        }
+
         return (
           <div className="my-4">
             <PdCodeViewer
