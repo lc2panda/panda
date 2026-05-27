@@ -73,6 +73,9 @@ import type {
   // Comdr 指令 cc-haha 路线 A: PdSessionControls fork/branch/resume
   SessionControlAction,
   SessionControlResult,
+  // v2.27.1 MCP preflight
+  McpServerConfig,
+  McpPreflightResult,
 } from './types';
 import {
   DevMockRelay,
@@ -1039,6 +1042,52 @@ export async function openSystemTerminal(cwd?: string): Promise<{ ok: boolean; e
   }
 }
 
+// v2.27.1 sessionRewindService ────────────────────────────────────────────────
+
+export async function previewRewind(
+  sessionId: string,
+  userTurnIndex: number,
+): Promise<import('./types').RewindPreview> {
+  const fallback: import('./types').RewindPreview = {
+    targetTurn: userTurnIndex,
+    messagesAfter: 0,
+    filesAffected: [],
+    canRollback: false,
+    reason: '预览功能不可用（开发模式）',
+  };
+  if (IS_DEV) return fallback;
+  try {
+    const api = getPandaAPI();
+    if (!api.rewind?.preview) return fallback;
+    return await api.rewind.preview(sessionId, userTurnIndex);
+  } catch (err) {
+    console.warn('[bridge] previewRewind failed:', err);
+    return { ...fallback, reason: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function executeRewind(
+  sessionId: string,
+  userTurnIndex: number,
+  options?: { restoreFiles?: boolean },
+): Promise<import('./types').RewindResult> {
+  const fallback: import('./types').RewindResult = {
+    ok: false,
+    backupPath: '',
+    restoredFiles: [],
+    error: '执行功能不可用（开发模式）',
+  };
+  if (IS_DEV) return fallback;
+  try {
+    const api = getPandaAPI();
+    if (!api.rewind?.execute) return fallback;
+    return await api.rewind.execute(sessionId, userTurnIndex, options);
+  } catch (err) {
+    console.warn('[bridge] executeRewind failed:', err);
+    return { ...fallback, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 // ─── Comdr 指令 cc-haha 路线 A: 会话控制 fork/branch/resume slash 注入 ───────
 
 export async function dispatchSessionControl(
@@ -1057,6 +1106,49 @@ export async function dispatchSessionControl(
       ok: false,
       command: '',
       error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+// v2.27.1 titleService
+export async function generateTitle(payload: {
+  sessionId: string;
+  jsonlPath?: string;
+  firstUserMessage: string;
+  firstAssistantMessage?: string;
+  provider?: { apiKey: string; baseUrl?: string };
+}): Promise<{ title: string; source: 'ai' | 'fallback' }> {
+  const fallback = { title: payload.firstUserMessage?.slice(0, 32) || '新对话', source: 'fallback' as const };
+  if (IS_DEV) return fallback;
+  try {
+    const api = getPandaAPI();
+    if (!api.title?.generate) return fallback;
+    return await api.title.generate(payload);
+  } catch (err) {
+    console.warn('[bridge] generateTitle failed:', err);
+    return fallback;
+  }
+}
+
+// ─── v2.27.1 MCP 启动前置检查 ────────────────────────────────────────────────
+
+export async function preflightMcpServer(
+  config: McpServerConfig,
+): Promise<McpPreflightResult> {
+  if (IS_DEV) {
+    return { ok: true, checks: [{ name: 'dev_mode', ok: true, level: 'warning', detail: 'dev mode — skipped' }] };
+  }
+  try {
+    const api = getPandaAPI();
+    if (!api.mcp?.preflight) {
+      return { ok: false, checks: [{ name: 'ipc_unavailable', ok: false, level: 'error', detail: 'mcp.preflight IPC not available' }] };
+    }
+    return await api.mcp.preflight(config);
+  } catch (err) {
+    console.warn('[bridge] preflightMcpServer failed:', err);
+    return {
+      ok: false,
+      checks: [{ name: 'bridge_error', ok: false, level: 'error', detail: err instanceof Error ? err.message : String(err) }],
     };
   }
 }

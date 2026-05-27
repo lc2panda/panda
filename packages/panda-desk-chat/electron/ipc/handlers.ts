@@ -83,6 +83,16 @@ import {
 import { notificationManager } from '../notification';
 import { appUpdater } from '../updater';
 import { windowManager } from '../window-manager';
+// v2.27.1 titleService
+import {
+  generateSessionTitle as runGenerateSessionTitle,
+  type TitleGenerateInput,
+} from '../backend/title-service';
+// v2.27.1 sessionRewindService
+import {
+  previewSessionRewind,
+  executeSessionRewind,
+} from '../backend/session-rewind-service';
 
 // ---------------------------------------------------------------------------
 // IPC channel constants (must match preload/chat.ts)
@@ -177,6 +187,11 @@ const CH = {
   SESSION_CONTROL:      'panda:session:control',
   // Bug F G5: 跳转系统终端
   SHELL_OPEN_TERMINAL:  'shell:openTerminal',
+  // v2.27.1 titleService
+  TITLE_GENERATE:       'title:generate',
+  // v2.27.1 sessionRewindService
+  SESSION_REWIND_PREVIEW: 'session:rewind:preview',
+  SESSION_REWIND_EXECUTE: 'session:rewind:execute',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -970,7 +985,61 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning + teams + audit + memdir + connectors + session-control + shell-open-terminal connected)');
+  // v2.27.1 titleService
+  ipcMain.handle(CH.TITLE_GENERATE, async (_event, payload: TitleGenerateInput) => {
+    try {
+      return await runGenerateSessionTitle(payload);
+    } catch (err) {
+      console.error('[IPC] TITLE_GENERATE failed:', err);
+      return { title: payload.firstUserMessage?.slice(0, 32) || '新对话', source: 'fallback' };
+    }
+  });
+
+  // v2.27.1 sessionRewindService — preview
+  ipcMain.handle(
+    CH.SESSION_REWIND_PREVIEW,
+    async (_event, payload: { sessionId: string; userTurnIndex: number }) => {
+      try {
+        return await previewSessionRewind(payload.sessionId, payload.userTurnIndex);
+      } catch (err) {
+        console.error('[IPC] SESSION_REWIND_PREVIEW failed:', err);
+        return {
+          targetTurn: payload.userTurnIndex,
+          messagesAfter: 0,
+          filesAffected: [],
+          canRollback: false,
+          reason: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
+
+  // v2.27.1 sessionRewindService — execute
+  ipcMain.handle(
+    CH.SESSION_REWIND_EXECUTE,
+    async (
+      _event,
+      payload: { sessionId: string; userTurnIndex: number; options?: { restoreFiles?: boolean } },
+    ) => {
+      try {
+        return await executeSessionRewind(
+          payload.sessionId,
+          payload.userTurnIndex,
+          payload.options,
+        );
+      } catch (err) {
+        console.error('[IPC] SESSION_REWIND_EXECUTE failed:', err);
+        return {
+          ok: false,
+          backupPath: '',
+          restoredFiles: [],
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
+
+  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning + teams + audit + memdir + connectors + session-control + shell-open-terminal + title-generate + session-rewind connected)');
 }
 
 // ---------------------------------------------------------------------------

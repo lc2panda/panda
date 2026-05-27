@@ -119,6 +119,11 @@ const CH = {
   SESSION_CONTROL:      'panda:session:control',
   // Bug F G5: 跳转系统终端
   SHELL_OPEN_TERMINAL:  'shell:openTerminal',
+  // v2.27.1 titleService
+  TITLE_GENERATE:       'title:generate',
+  // v2.27.1 sessionRewindService
+  SESSION_REWIND_PREVIEW: 'session:rewind:preview',
+  SESSION_REWIND_EXECUTE: 'session:rewind:execute',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -315,5 +320,25 @@ contextBridge.exposeInMainWorld('pandaAPI', {
   shell: {
     openTerminal: (args?: { cwd?: string }) =>
       ipcRenderer.invoke(CH.SHELL_OPEN_TERMINAL, args ?? {}),
+  },
+  // v2.27.1 titleService
+  title: {
+    generate: (payload: {
+      sessionId: string;
+      jsonlPath?: string;
+      firstUserMessage: string;
+      firstAssistantMessage?: string;
+      provider?: { apiKey: string; baseUrl?: string };
+    }) => ipcRenderer.invoke(CH.TITLE_GENERATE, payload),
+  },
+  // v2.27.1 sessionRewindService namespace
+  rewind: {
+    preview: (sessionId: string, userTurnIndex: number) =>
+      ipcRenderer.invoke(CH.SESSION_REWIND_PREVIEW, { sessionId, userTurnIndex }),
+    execute: (
+      sessionId: string,
+      userTurnIndex: number,
+      options?: { restoreFiles?: boolean },
+    ) => ipcRenderer.invoke(CH.SESSION_REWIND_EXECUTE, { sessionId, userTurnIndex, options }),
   },
 });

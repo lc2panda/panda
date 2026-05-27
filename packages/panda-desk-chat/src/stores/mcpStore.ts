@@ -11,6 +11,7 @@
 import { create } from 'zustand';
 import { storage } from '../lib/storage';
 import type { McpServerRecord, McpUpsertPayload } from '../types/mcp';
+import * as bridge from '../ipc/bridge';
 
 const STORAGE_KEY = 'mcp-servers';
 
@@ -101,8 +102,19 @@ export const useMcpStore = create<McpStore>()((set, get) => ({
     }
   },
 
-  // TODO(IPC): panda 缺 mcpApi.create；本地直接写入。
+  // TODO(IPC): panda 缺 mcpApi.create；本地直接写入。preflight 前置检查已接通。
   createServer: async (name, payload, _cwd) => {
+    // v2.27.1: preflight 检查 — 失败时不添加，设 error 并抛出
+    const result = await bridge.preflightMcpServer(payload.config as Parameters<typeof bridge.preflightMcpServer>[0]);
+    if (!result.ok) {
+      const failedChecks = result.checks
+        .filter((c: { level: string; ok: boolean }) => c.level === 'error' && !c.ok)
+        .map((c: { detail?: string; name: string }) => c.detail || c.name)
+        .join('；');
+      const msg = `MCP 服务器 "${name}" 前置检查失败：${failedChecks}`;
+      set({ error: msg });
+      throw new Error(msg);
+    }
     const record = deriveDefaults(name, payload);
     const next = [...get().servers, record];
     set({ servers: next });

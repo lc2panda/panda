@@ -1222,6 +1222,8 @@ function messageEntryToUIMessage(entry: MessageEntry): UIMessage {
 //   驱动稳定。activeSessions 仍需保留追踪并发 session。
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 const activeSessions = new Set<string>();
+// v2.27.1 titleService: 已触发标题生成的 sessionId 集合（幂等保护，重启后清空）
+const titleGeneratedSessions = new Set<string>();
 
 // Comdr 指令 (任务 2 — 消息流刷新 bug 根因修复):
 //   将 listener 句柄持久化到 globalThis，HMR 重载新模块时可以解除旧 listener
@@ -1298,6 +1300,35 @@ export function setupBridgeListeners(): void {
     store().endStreaming(sessionId, messageId, finishReason, tokenUsage);
     store().setConnectionState(sessionId, 'connected');
     activeSessions.delete(sessionId);
+
+    // v2.27.1 titleService: 首条 assistant 完成后触发一次 AI 标题生成
+    if (!titleGeneratedSessions.has(sessionId)) {
+      const currentTab = useTabStore.getState().tabs.find((t) => t.sessionId === sessionId);
+      const currentTitle = currentTab?.title ?? '';
+      const isDefaultTitle = !currentTitle || /^(新对话|对话\s*\d*|New (Chat|Session|Conversation)\s*\d*)$/i.test(currentTitle.trim());
+      if (currentTab && isDefaultTitle) {
+        titleGeneratedSessions.add(sessionId);
+        const sess = store().sessions.get(sessionId);
+        const msgs = sess?.messages ?? [];
+        const firstUser = msgs.find((m) => m.type === 'user');
+        const firstAssistant = msgs.find((m) => m.type === 'assistant');
+        const firstUserText = firstUser && 'content' in firstUser
+          ? (typeof firstUser.content === 'string' ? firstUser.content : JSON.stringify(firstUser.content)).slice(0, 500)
+          : '';
+        const firstAssistantText = firstAssistant && 'content' in firstAssistant
+          ? (typeof firstAssistant.content === 'string' ? firstAssistant.content : JSON.stringify(firstAssistant.content)).slice(0, 500)
+          : '';
+        bridge.generateTitle({
+          sessionId,
+          firstUserMessage: firstUserText,
+          firstAssistantMessage: firstAssistantText,
+        }).then((res) => {
+          if (res.title) {
+            useTabStore.getState().updateTabTitle(sessionId, res.title);
+          }
+        }).catch(() => { /* 静默 fallback，不影响主对话 */ });
+      }
+    }
   }));
 
   refs.unsubs.push(bridge.onStreamError((payload) => {

@@ -389,6 +389,46 @@ export interface PandaChatAPI {
   shell: {
     openTerminal(args?: { cwd?: string }): Promise<{ ok: boolean; error?: string }>;
   };
+  // v2.27.1 sessionRewindService namespace
+  rewind?: {
+    preview(sessionId: string, userTurnIndex: number): Promise<RewindPreview>;
+    execute(
+      sessionId: string,
+      userTurnIndex: number,
+      options?: { restoreFiles?: boolean },
+    ): Promise<RewindResult>;
+  };
+  // v2.27.1 titleService
+  title?: {
+    generate(input: {
+      sessionId: string;
+      jsonlPath?: string;
+      firstUserMessage: string;
+      firstAssistantMessage?: string;
+      provider?: { apiKey: string; baseUrl?: string };
+    }): Promise<{ title: string; source: 'ai' | 'fallback' }>;
+  };
+  // v2.27.1 MCP 启动前置检查 namespace
+  mcp?: {
+    preflight(config: McpServerConfig): Promise<McpPreflightResult>;
+  };
+}
+
+// ─── Session rewind types (v2.27.1) ──────────────────────────────────────────
+
+export interface RewindPreview {
+  targetTurn: number;
+  messagesAfter: number;
+  filesAffected: string[];
+  canRollback: boolean;
+  reason?: string;
+}
+
+export interface RewindResult {
+  ok: boolean;
+  backupPath: string;
+  restoredFiles: string[];
+  error?: string;
 }
 
 // ─── Window init event payload ────────────────────────────────────────────
@@ -873,6 +913,42 @@ export interface SessionControlResult {
   ok: boolean;
   command: string;
   error?: string;
+}
+
+// ─── v2.27.1 MCP preflight types (renderer-safe, no backend import) ─────────
+
+export interface StdioMcpConfig {
+  type: 'stdio';
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+}
+
+export interface SseMcpConfig {
+  type: 'sse';
+  url: string;
+  headers?: Record<string, string>;
+}
+
+export interface HttpMcpConfig {
+  type: 'http';
+  url: string;
+  headers?: Record<string, string>;
+}
+
+export type McpServerConfig = StdioMcpConfig | SseMcpConfig | HttpMcpConfig;
+
+export interface McpPreflightCheck {
+  name: string;
+  ok: boolean;
+  detail?: string;
+  level: 'error' | 'warning';
+}
+
+export interface McpPreflightResult {
+  ok: boolean;
+  checks: McpPreflightCheck[];
 }
 
 // ─── Global augmentation for window.pandaAPI ────────────────────────────────
