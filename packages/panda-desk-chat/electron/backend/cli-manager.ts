@@ -771,6 +771,21 @@ export class CLISession extends EventEmitter {
     const payload = typeof input === 'string' ? { error: input } : input;
     const error = payload.error || this.lastStderr() || 'CLI returned an error';
     this.writeDiagnosticLog(`[stream:error] ${error}`);
+    this.writeDiagnosticLog(
+      [
+        `[stream:error:diag]`,
+        `  reason=${payload.reason} exitCode=${payload.exitCode} signal=${payload.signal}`,
+        `  cwd=${this.cwd}`,
+        `  cliPath=${this.lastCliPath}`,
+        `  bunPath=${this.lastBunPath}`,
+        `  configDir=${process.env.PANDA_CONFIG_DIR || path.join(app.getPath('home'), '.pandacc')}`,
+        `  resourcesPath=${process.resourcesPath ?? '(unset)'}`,
+        `  args=${JSON.stringify(this.lastSpawnArgs ?? [])}`,
+        `  stderrTail (last 2KB):`,
+        `${payload.stderrTail ?? this.lastStderr() ?? '(empty)'}`,
+        `  --- end stream:error:diag ---`,
+      ].join('\n'),
+    );
     this.emit('stream:error', {
       sessionId: this.id,
       messageId: this.currentMessageId || randomUUID(),
