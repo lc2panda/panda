@@ -143,6 +143,11 @@ export class CLISession extends EventEmitter {
   private rl: ReadlineInterface | null = null;
   private stderrBuffer: string[] = [];
 
+  // v2.27.4-diag: spawn 全量诊断字段（仅观测，不改业务行为）
+  private stdoutBytes = 0;
+  private stderrDiagBytes = 0;
+  private spawnTimeMs = 0;
+
   // Current assistant message ID (from message_start, used in stream events)
   private currentMessageId: string = '';
 
@@ -313,11 +318,65 @@ export class CLISession extends EventEmitter {
     // 清除 shell 残留的 ANTHROPIC_*/OPENAI_*/GOOGLE_*/AWS_*/VERTEX_* token，
     // 按 providerConfig 注入对应 provider env key，避免多 provider 切换时老 token
     // 污染新 provider 调用。CALLER_DIR/PWD 强制注入（Bug B 规则，v2.26.14 建立）。
+    const childEnv = buildChildEnv({ cwd: this.cwd, provider: this.providerConfig, managedOAuth: true });
+    // v2.27.4-diag: dump childEnv keys (top 30, secrets masked)
+    {
+      const envKeys = Object.keys(childEnv).sort();
+      const envSummary = envKeys.slice(0, 30).map(
+        (k) => `${k}=${/TOKEN|KEY|SECRET|PASSWORD/i.test(k) ? '***' : String((childEnv as Record<string, string>)[k]).slice(0, 60)}`
+      ).join(' | ');
+      this.writeDiagnosticLog(`[diag:childEnv] totalKeys=${envKeys.length} sample(30)=${envSummary}`);
+    }
+
+    // v2.27.4-diag: 重置诊断计数器
+    this.stdoutBytes = 0;
+    this.stderrDiagBytes = 0;
+    this.spawnTimeMs = Date.now();
+
     this.process = spawn(bunPath, args, {
       cwd: this.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: buildChildEnv({ cwd: this.cwd, provider: this.providerConfig, managedOAuth: true }),
+      env: childEnv,
     });
+
+    // v2.27.4-diag: stdout 字节计数 + 首 2KB 落盘（与 readline 并存，纯观测）
+    {
+      let stdoutFirstChunk: Buffer | null = null;
+      this.process.stdout?.on('data', (chunk: Buffer) => {
+        this.stdoutBytes += chunk.length;
+        if (!stdoutFirstChunk) {
+          stdoutFirstChunk = chunk.subarray(0, Math.min(chunk.length, 2048));
+          this.writeDiagnosticLog(
+            `[diag:stdout-first] bytes=${chunk.length} preview=${JSON.stringify(stdoutFirstChunk.toString('utf8'))}`,
+          );
+        }
+      });
+    }
+
+    // v2.27.4-diag: heartbeat 定时器 1s/5s/15s/30s（observability only）
+    {
+      const diagTimers: ReturnType<typeof setTimeout>[] = [];
+      [1000, 5000, 15000, 30000].forEach((delay) => {
+        const t = setTimeout(() => {
+          if (this.process && !this.process.killed) {
+            this.writeDiagnosticLog(
+              `[diag:heartbeat] ${delay}ms after spawn — pid=${this.process.pid} stdoutBytes=${this.stdoutBytes} stderrBytes=${this.stderrDiagBytes} alive=true`,
+            );
+          }
+        }, delay);
+        diagTimers.push(t);
+      });
+      this.process.once('close', (code, signal) => {
+        diagTimers.forEach(clearTimeout);
+        const aliveMs = Date.now() - this.spawnTimeMs;
+        this.writeDiagnosticLog(
+          `[diag:close] code=${code} signal=${signal} aliveMs=${aliveMs} totalStdoutBytes=${this.stdoutBytes} totalStderrBytes=${this.stderrDiagBytes}`,
+        );
+      });
+      this.process.once('disconnect', () => {
+        this.writeDiagnosticLog(`[diag:disconnect] pid=${this.process?.pid}`);
+      });
+    }
 
     // v2.27.0 P0-2：启动期窗口计时与 stderr 收集。spawn 同步返回后立刻启动，
     // 用 dedicated chunk buffer（与 stderrBuffer 解耦），exit handler 顶部分类用。
@@ -349,6 +408,11 @@ export class CLISession extends EventEmitter {
     // ── stderr: collect for diagnostics ──────────────────────────────
     if (this.process.stderr) {
       this.process.stderr.on('data', (chunk: Buffer) => {
+        // v2.27.4-diag: stderr 字节计数
+        this.stderrDiagBytes += chunk.length;
+        this.writeDiagnosticLog(
+          `[diag:stderr] bytes=${chunk.length} content=${JSON.stringify(chunk.toString('utf8').slice(0, 1024))}`,
+        );
         const text = chunk.toString();
         this.stderrBuffer.push(text);
         // v2.27.0 P0-2：grace 窗口内额外收集 stderr，用于早退分类（关键字匹配）。
@@ -455,7 +519,16 @@ export class CLISession extends EventEmitter {
 
   // ── NDJSON line handler ──────────────────────────────────────────────
 
+  // v2.27.4-diag: 首行诊断标记（验证 readline 是否触发）
+  private _diagFirstLineSeen = false;
+
   private handleLine(line: string): void {
+    if (!this._diagFirstLineSeen) {
+      this._diagFirstLineSeen = true;
+      this.writeDiagnosticLog(
+        `[diag:first-line] received from panda-cli stdout: ${line.slice(0, 200)}`,
+      );
+    }
     if (!line.trim()) return;
 
     let msg: SDKMessage;
