@@ -1310,16 +1310,45 @@ export function setupBridgeListeners(): void {
     store().flushStreamBuffer(sessionId);
     store().failStreaming(sessionId, messageId, streamError);
     activeSessions.delete(sessionId);
-    // v2.27.0 Bug C：typed code 映射中文友好提示。原始英文 error 仍写入消息流，
-    // toast 给最终用户读得懂的指引。
-    const friendlyMessage =
-      streamError.code === 'SESSION_OCCUPIED'
-        ? '该会话正由终端 REPL 持有，请关闭终端或新建会话。'
-        : streamError.code === 'WORKDIR_NOT_FOUND'
-          ? '历史会话的工作目录已不存在，请新建会话或恢复目录。'
-          : streamError.code === 'WORKDIR_INVALID'
-            ? '历史会话的工作目录无效，请新建会话。'
-            : streamError.error;
+    // v2.27.0 Bug C / P0-1 阶段 2：typed code 映射中文友好提示。原始英文 error
+    // 仍写入消息流，toast 给最终用户读得懂的指引。
+    //
+    // errorClass 是 ConversationStartupError.toJSON() 的镜像，含 context 字段：
+    // - spawn-failed.detail = err.message
+    // - start-failed.exitCode / stderrTail
+    // - 等等。chatStore 这层只读简单字段，复杂结构留给 details 面板。
+    const errCode = streamError.code;
+    const errClass = (streamError as ChatStreamErrorPayload & {
+      errorClass?: {
+        code: string;
+        message: string;
+        retryable: boolean;
+        context?: {
+          detail?: string;
+          exitCode?: number | string;
+          stderrTail?: string;
+        };
+      };
+    }).errorClass;
+    const ctx = errClass?.context ?? {};
+    let friendlyMessage: string;
+    if (errCode === 'SESSION_OCCUPIED' || errCode === 'PANDA_CLI_SESSION_CONFLICT') {
+      friendlyMessage = '该会话正由另一个 panda 实例持有，请关闭终端或新建会话。';
+    } else if (errCode === 'WORKDIR_NOT_FOUND' || errCode === 'PANDA_WORKDIR_NOT_FOUND') {
+      friendlyMessage = '历史会话的工作目录已不存在，请新建会话或恢复目录。';
+    } else if (errCode === 'WORKDIR_INVALID' || errCode === 'PANDA_WORKDIR_INVALID') {
+      friendlyMessage = '历史会话的工作目录无效，请新建会话。';
+    } else if (errCode === 'PANDA_CLI_AUTH_REQUIRED') {
+      friendlyMessage = '需要登录：请运行 `panda /login` 后重试。';
+    } else if (errCode === 'PANDA_CLI_SPAWN_FAILED') {
+      friendlyMessage = `启动失败：${ctx.detail ?? '未知错误'}`;
+    } else if (errCode === 'PANDA_CLI_START_FAILED') {
+      const ec = ctx.exitCode ?? '?';
+      const tail = (ctx.stderrTail ?? '').slice(-200);
+      friendlyMessage = `启动异常（退出码 ${ec}）${tail ? `：${tail}` : ''}`;
+    } else {
+      friendlyMessage = streamError.error;
+    }
     useToastStore.getState().addToast({
       type: 'error',
       message: friendlyMessage,

@@ -15,6 +15,11 @@ import { findSessionFile, getSessionLaunchInfo } from './disk-session-scanner';
 import { findOccupyingInteractiveSession } from './pid-registry';
 import { resolveBunPath } from './binPath';
 import { verifyCliIntegrity, formatVerifyResult } from './cli-integrity';
+import {
+  buildStartupError,
+  isPandaConversationStartupError,
+  type PandaConversationStartupError,
+} from './conversation-startup-error';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -82,6 +87,46 @@ const MR = {
 // CLISession — single CLI subprocess lifecycle
 // ---------------------------------------------------------------------------
 
+/**
+ * v2.27.0 P0-2：panda-cli spawn 之后的"启动期窗口"长度（毫秒）。
+ *
+ * 在此窗口内若子进程退出，cli-manager 视为"启动失败"并按 stderr 关键字
+ * 二次分类成 PANDA_CLI_AUTH_REQUIRED / PANDA_CLI_SESSION_CONFLICT /
+ * PANDA_CLI_START_FAILED。窗口结束后退出走既有 stream:error 'exit' 路径。
+ *
+ * 3000ms 来自 cc-haha 蓝本的实证经验（panda-cli 首条 NDJSON 通常 < 2s 出现）。
+ */
+export const STARTUP_GRACE_MS = 3000;
+
+/**
+ * v2.27.0 P0-2：早退分类的纯逻辑（无 IO / 无 timer），便于单测覆盖。
+ *
+ * 关键字优先级：auth → session-conflict → start-failed（兜底）。
+ * 这与 cc-haha 的处理顺序一致：明确的认证缺失优先级最高，next 是端口/会话冲突，
+ * 最后才是兜底 start-failed（含 exitCode 与 stderr 尾巴用于诊断）。
+ */
+export function classifyStartupExit(
+  stderrTail: string,
+  exitCode: number | null,
+  sessionId: string,
+): PandaConversationStartupError {
+  if (
+    /(not logged in|run\s+\/?login|sign in again|please log\s*in|unauthorized|401|authentication required)/i.test(
+      stderrTail,
+    )
+  ) {
+    return buildStartupError('auth-required', { stderrTail });
+  }
+  if (/session\s*id.*already in use|session.*occupied|session.*conflict/i.test(stderrTail)) {
+    return buildStartupError('session-conflict', { sessionId });
+  }
+  return buildStartupError('start-failed', {
+    exitCode: exitCode ?? -1,
+    stderrTail,
+    detail: `CLI 启动后 ${STARTUP_GRACE_MS}ms 内退出`,
+  });
+}
+
 export class CLISession extends EventEmitter {
   readonly id: string;
   readonly cwd: string;
@@ -111,6 +156,12 @@ export class CLISession extends EventEmitter {
   private lastBunPath = '';
   private lastSpawnArgs: string[] = [];
   private lastLogPath = '';
+
+  // v2.27.0 P0-2：startup-grace 状态。spawn 后 STARTUP_GRACE_MS 内若 exit，
+  // 视为启动失败并按 stderr 关键字二次分类；graceOver=true 后退出走既有路径。
+  private startupGraceOver = false;
+  private startupGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  private startupStderrChunks: string[] = [];
 
   // Comdr 指令: 修复 spawn race condition — sendMessage 在 spawnWithDiskProbe
   //   await 完成前调用时，this.process 还是 null/stdin 不 writable，旧实现直接
@@ -267,6 +318,18 @@ export class CLISession extends EventEmitter {
       },
     });
 
+    // v2.27.0 P0-2：启动期窗口计时与 stderr 收集。spawn 同步返回后立刻启动，
+    // 用 dedicated chunk buffer（与 stderrBuffer 解耦），exit handler 顶部分类用。
+    this.startupGraceOver = false;
+    this.startupStderrChunks = [];
+    if (this.startupGraceTimer) clearTimeout(this.startupGraceTimer);
+    this.startupGraceTimer = setTimeout(() => {
+      this.startupGraceOver = true;
+      this.startupGraceTimer = null;
+      // chunks 可以释放以节省内存（exit 路径已不再读）
+      this.startupStderrChunks = [];
+    }, STARTUP_GRACE_MS);
+
     // Comdr 指令: spawn 完成 + stdin 已 ready → flush 所有挂起的 sendMessage 调用。
     //   stdio:'pipe' 模式下 stdin 在 spawn 同步返回时就 writable=true，但保险起见
     //   监听 once('open') 兜底。
@@ -287,6 +350,11 @@ export class CLISession extends EventEmitter {
       this.process.stderr.on('data', (chunk: Buffer) => {
         const text = chunk.toString();
         this.stderrBuffer.push(text);
+        // v2.27.0 P0-2：grace 窗口内额外收集 stderr，用于早退分类（关键字匹配）。
+        // 窗口结束后 startupGraceOver=true，停止累积。
+        if (!this.startupGraceOver) {
+          this.startupStderrChunks.push(text);
+        }
         this.writeDiagnosticLog(`[stderr] ${text.trimEnd()}`);
         // Keep buffer bounded
         if (this.stderrBuffer.length > 200) {
@@ -300,8 +368,35 @@ export class CLISession extends EventEmitter {
     // ── Process exit ─────────────────────────────────────────────────
     this.process.on('exit', (code, signal) => {
       console.log(`[CLISession:${this.id}] Exited: code=${code} signal=${signal}`);
+      // v2.27.0 P0-2：清理 grace 计时；判定是否在窗口内退出。
+      const earlyExit = !this.startupGraceOver;
+      if (this.startupGraceTimer) {
+        clearTimeout(this.startupGraceTimer);
+        this.startupGraceTimer = null;
+      }
+      const earlyStderrTail = this.startupStderrChunks.join('').slice(-2048);
       this.cleanup();
       if (!this.intentionalStop) {
+        if (earlyExit) {
+          // P0-2：grace 窗口内退出 → 用 classifyStartupExit 纯函数二次分类。
+          // 关闭 graceOver 防止 cleanup/race 重复进入。
+          this.startupGraceOver = true;
+          const startupErr = classifyStartupExit(earlyStderrTail, code, this.id);
+          this.emitStreamError({
+            reason: 'startup-early-exit',
+            exitCode: code,
+            signal,
+            error: startupErr.message,
+            stderrTail: earlyStderrTail,
+            ...this.startupErrorPayload(startupErr),
+          });
+          this.state = 'error';
+          this.emit('error', {
+            sessionId: this.id,
+            error: startupErr.message,
+          });
+          return; // 不走既有 exit 路径
+        }
         const stderrTail = this.lastStderr();
         this.emitStreamError({
           reason: 'exit',
@@ -326,12 +421,26 @@ export class CLISession extends EventEmitter {
     // ── Process error (e.g. ENOENT) ──────────────────────────────────
     this.process.on('error', (err) => {
       console.error(`[CLISession:${this.id}] Process error:`, err);
+      // v2.27.0 P0-2：清理 grace 计时（spawn 失败时也要释放）。
+      if (this.startupGraceTimer) {
+        clearTimeout(this.startupGraceTimer);
+        this.startupGraceTimer = null;
+      }
       this.cleanup();
       if (!this.intentionalStop) {
+        // v2.27.0 P0-1 阶段 2：构造 PANDA_CLI_SPAWN_FAILED typed Error，
+        // emitStreamError 注入 errorClass 让 renderer 弹精确 toast。
+        const startupErr = buildStartupError('spawn-failed', {
+          bunPath: this.lastBunPath,
+          cliPath: this.lastCliPath,
+          detail: err.message,
+          cause: err,
+        });
         this.emitStreamError({
           reason: 'spawn-error',
-          error: `CLI process failed to start: ${err.message}`,
+          error: startupErr.message,
           stderrTail: this.lastStderr(),
+          ...this.startupErrorPayload(startupErr),
         });
         this.state = 'error';
       } else {
@@ -680,7 +789,25 @@ export class CLISession extends EventEmitter {
       code: payload.code,
       occupierPid: payload.occupierPid,
       occupierCwd: payload.occupierCwd,
+      // v2.27.0 P0-1 阶段 2：透传 ConversationStartupError.toJSON()，renderer
+      // (chatStore) 据此读 context（detail/stderrTail/exitCode 等）渲染 toast。
+      errorClass: payload.errorClass,
     } satisfies CLIStreamErrorPayload);
+  }
+
+  /**
+   * v2.27.0 P0-1 阶段 2：把 ConversationStartupError 序列化为 emitStreamError 的
+   * payload 增量，统一供 spawn-error / startup-early-exit / control-path 调用。
+   * 旧 code 字段（'SESSION_OCCUPIED' / 'WORKDIR_NOT_FOUND' / 'WORKDIR_INVALID'）
+   * 由 PANDA_* 新 code 覆盖，但 payload.code 仍是字符串字段，向后兼容旧 renderer。
+   */
+  private startupErrorPayload(
+    err: PandaConversationStartupError,
+  ): Pick<CLIStreamErrorPayload, 'code' | 'errorClass'> {
+    return {
+      code: err.code,
+      errorClass: err.toJSON(),
+    };
   }
 
 
@@ -863,15 +990,15 @@ export class CLIManager {
     if (!session) {
       const occupier = findOccupyingInteractiveSession(sessionId);
       if (occupier) {
-        const error = new Error(
-          `Session ${sessionId} is currently held by panda-cli REPL (pid=${occupier.pid}). Close the terminal REPL or open a new chat tab.`,
-        );
-        (error as Error & { code?: string; pid?: number; sessionCwd?: string }).code =
-          'SESSION_OCCUPIED';
-        (error as Error & { code?: string; pid?: number; sessionCwd?: string }).pid = occupier.pid;
-        (error as Error & { code?: string; pid?: number; sessionCwd?: string }).sessionCwd =
-          occupier.cwd;
-        throw error;
+        // v2.27.0 P0-1 阶段 2：改用 ConversationStartupError 工厂统一抛
+        // PANDA_CLI_SESSION_CONFLICT。占用 PID/cwd 通过 detail 字段携带（context
+        // interface 不含 occupiedBy* 自定义字段，按蓝本走 detail 文案）。
+        // emitStreamError 会读取 toJSON() 注入 errorClass payload，renderer
+        // 据此弹中文 toast。
+        throw buildStartupError('session-conflict', {
+          sessionId,
+          detail: `pid=${occupier.pid}, cwd=${occupier.cwd}`,
+        });
       }
     }
     if (!session) {
@@ -898,18 +1025,13 @@ export class CLIManager {
         }
       }
       if (!resolvedCwd) {
-        const error = new Error(
-          `Cannot resume session ${sessionId}: workDir not found on disk and no cwd provided by renderer`,
-        );
-        (error as Error & { code?: string }).code = 'WORKDIR_NOT_FOUND';
-        throw error;
+        // v2.27.0 P0-1 阶段 2：改用 ConversationStartupError 工厂统一抛
+        // PANDA_WORKDIR_NOT_FOUND（retryable=false：用户必须重新选 cwd）。
+        throw buildStartupError('workdir-not-found', { sessionId });
       }
       if (!existsSync(resolvedCwd) || !statSync(resolvedCwd).isDirectory()) {
-        const error = new Error(
-          `Working directory does not exist or is not a directory: ${resolvedCwd}`,
-        );
-        (error as Error & { code?: string }).code = 'WORKDIR_INVALID';
-        throw error;
+        // v2.27.0 P0-1 阶段 2：PANDA_WORKDIR_INVALID（retryable=false）。
+        throw buildStartupError('workdir-invalid', { sessionId, workDir: resolvedCwd });
       }
       console.log(
         `[CLIManager] Auto-creating session for stale ID: ${sessionId} (resolved cwd=${resolvedCwd}${cwd ? '' : ' from disk jsonl'})`,
@@ -974,27 +1096,46 @@ export class CLIManager {
   /**
    * v2.27.0 Bug C：ensureSession 抛出的 typed Error 在子进程未启动时无 CLISession
    * 可挂载 stream:error，直接通过 windowManager 广播 STREAM_ERROR 到对应窗口，
-   * renderer 的 onStreamError 即可消费 code='SESSION_OCCUPIED' 并弹中文提示。
+   * renderer 的 onStreamError 即可消费 code（旧 SESSION_OCCUPIED 或新 PANDA_*）
+   * 并弹中文提示。
+   *
+   * v2.27.0 P0-1 阶段 2：识别 PandaConversationStartupError 优先注入 errorClass
+   * （chatStore 据此读 context 渲染精确文案）；旧 typed Error.code 路径保留向后兼容。
    */
   private surfaceManagerLevelError(sessionId: string, err: unknown): void {
     if (!err || typeof err !== 'object') return;
-    const typed = err as Error & {
-      code?: string;
-      pid?: number;
-      sessionCwd?: string;
-    };
-    const payload: CLIStreamErrorPayload = {
-      sessionId,
-      messageId: randomUUID(),
-      error: typed.message ?? String(err),
-      reason: 'cli-error',
-      code: typed.code,
-      occupierPid: typed.pid,
-      occupierCwd: typed.sessionCwd,
-      isPackaged: app.isPackaged,
-      resourcesPath: process.resourcesPath,
-      configDir: process.env.PANDA_CONFIG_DIR || path.join(app.getPath('home'), '.pandacc'),
-    };
+    let payload: CLIStreamErrorPayload;
+    if (isPandaConversationStartupError(err)) {
+      payload = {
+        sessionId,
+        messageId: randomUUID(),
+        error: err.message,
+        reason: 'cli-error',
+        code: err.code,
+        errorClass: err.toJSON(),
+        isPackaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+        configDir: process.env.PANDA_CONFIG_DIR || path.join(app.getPath('home'), '.pandacc'),
+      };
+    } else {
+      const typed = err as Error & {
+        code?: string;
+        pid?: number;
+        sessionCwd?: string;
+      };
+      payload = {
+        sessionId,
+        messageId: randomUUID(),
+        error: typed.message ?? String(err),
+        reason: 'cli-error',
+        code: typed.code,
+        occupierPid: typed.pid,
+        occupierCwd: typed.sessionCwd,
+        isPackaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+        configDir: process.env.PANDA_CONFIG_DIR || path.join(app.getPath('home'), '.pandacc'),
+      };
+    }
     try {
       windowManager.sendToSession(sessionId, MR.STREAM_ERROR, payload);
     } catch (broadcastErr) {

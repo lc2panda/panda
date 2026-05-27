@@ -140,7 +140,9 @@ export interface CLIStreamErrorPayload {
   sessionId: string;
   messageId: string;
   error: string;
-  reason?: 'exit' | 'spawn-error' | 'cli-error';
+  // v2.27.0 P0-2：'startup-early-exit' 表示 panda-cli 在 STARTUP_GRACE_MS 窗口内
+  // 退出（认证缺失 / 端口冲突 / 启动期异常）。renderer 据此把错误归入 startup 类。
+  reason?: 'exit' | 'spawn-error' | 'cli-error' | 'startup-early-exit';
   exitCode?: number | null;
   signal?: string | null;
   cwd?: string;
@@ -154,8 +156,33 @@ export interface CLIStreamErrorPayload {
   logPath?: string;
   // v2.27.0 Bug C：当 ensureSession 检测到 panda-cli PID registry 占用时附带
   // 'SESSION_OCCUPIED' 与占位 PID/cwd，renderer 据此弹中文友好提示。
-  // 其它 typed code 也可在此扩展（WORKDIR_NOT_FOUND/WORKDIR_INVALID 等）。
-  code?: 'SESSION_OCCUPIED' | 'WORKDIR_NOT_FOUND' | 'WORKDIR_INVALID' | string;
+  // v2.27.0 P0-1 阶段 2：cli-manager 改用 ConversationStartupError 工厂统一
+  // 抛 6 个 PANDA_* code（PANDA_WORKDIR_NOT_FOUND / PANDA_WORKDIR_INVALID /
+  // PANDA_CLI_SESSION_CONFLICT / PANDA_CLI_SPAWN_FAILED / PANDA_CLI_AUTH_REQUIRED /
+  // PANDA_CLI_START_FAILED）。旧 code（SESSION_OCCUPIED / WORKDIR_NOT_FOUND /
+  // WORKDIR_INVALID）保留作向后兼容，仅由 b7d9239 之前的旧 callers 偶发产生。
+  code?:
+    | 'SESSION_OCCUPIED'
+    | 'WORKDIR_NOT_FOUND'
+    | 'WORKDIR_INVALID'
+    | 'PANDA_WORKDIR_NOT_FOUND'
+    | 'PANDA_WORKDIR_INVALID'
+    | 'PANDA_CLI_SESSION_CONFLICT'
+    | 'PANDA_CLI_SPAWN_FAILED'
+    | 'PANDA_CLI_AUTH_REQUIRED'
+    | 'PANDA_CLI_START_FAILED'
+    | string;
   occupierPid?: number;
   occupierCwd?: string;
+  // v2.27.0 P0-1 阶段 2：ConversationStartupError.toJSON() 的结构序列化。
+  // chatStore 据此读 context（如 spawn-failed.detail / start-failed.stderrTail）
+  // 渲染更精确的 toast 文案。字段与 ConversationStartupErrorPayload 一致；
+  // context 用 unknown 接收 narrow union 类型，chatStore 端按 code 分支安全 cast。
+  errorClass?: {
+    name: string;
+    code: string;
+    message: string;
+    retryable: boolean;
+    context?: unknown;
+  };
 }
