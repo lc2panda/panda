@@ -13,6 +13,7 @@
 
 import { create } from 'zustand';
 import type { CLITask, TaskStatus } from '../types/cliTask';
+import * as bridge from '../ipc/bridge';
 
 type TodoItem = {
   content: string;
@@ -91,11 +92,19 @@ export const useCLITaskStore = create<CLITaskStore>((set, get) => ({
         expanded: false,
       });
     }
+    // v2.27.1: 后台同步 V2 任务列表
+    await get().refreshTasks();
   },
 
-  // TODO(IPC): panda 缺 cliTasksApi.getTasksForList;noop。
   refreshTasks: async () => {
-    // No-op stub — chatStore.setTasksFromTodos drives task updates instead.
+    // v2.27.1: 从 Task V2 后端拉取该 session 的后台任务
+    const { sessionId } = get();
+    if (!sessionId) return;
+    try {
+      await bridge.listCliTasks({ sessionId });
+    } catch {
+      // Non-fatal — V1 task list driven by chatStore remains unaffected
+    }
   },
 
   setTasksFromTodos: (todos) => {
@@ -116,7 +125,6 @@ export const useCLITaskStore = create<CLITaskStore>((set, get) => ({
     });
   },
 
-  // TODO(IPC): panda 缺 cliTasksApi.resetTaskList;仅本地清空。
   resetCompletedTasks: async () => {
     const { sessionId, tasks } = get();
     const completionKey = buildCompletedTaskKey(tasks);
@@ -129,7 +137,15 @@ export const useCLITaskStore = create<CLITaskStore>((set, get) => ({
       dismissedCompletionKey: null,
       expanded: false,
     });
-    // No remote reset until panda IPC catches up.
+
+    // v2.27.1: 清理 V2 后端已完成任务
+    try {
+      const v2Tasks = await bridge.listCliTasks({ sessionId, status: 'completed' });
+      await Promise.allSettled(v2Tasks.map((t) => bridge.deleteCliTask(t.id)));
+    } catch {
+      // Non-fatal — local state already cleared
+    }
+
     set({ resetting: false });
   },
 

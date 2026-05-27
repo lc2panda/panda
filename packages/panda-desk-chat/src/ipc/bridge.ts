@@ -77,10 +77,17 @@ import type {
   McpServerConfig,
   McpPreflightResult,
   // v2.27.1 CLI Task V2
-  type CliBackendTask,
-  type CliTaskCreateInput,
-  type CliTaskFilter,
-  type CliBackendTaskStatus,
+  CliBackendTask,
+  CliTaskCreateInput,
+  CliTaskFilter,
+  CliBackendTaskStatus,
+} from './types';
+// v2.27.1 webhook + OAuth types — explicit import to avoid TS2206 in the main import type block
+import type {
+  FeishuWebhookConfig,
+  TelegramWebhookConfig,
+  WebhookNotificationPayload,
+  OAuthStatus,
 } from './types';
 import {
   DevMockRelay,
@@ -1245,5 +1252,45 @@ export async function deleteCliTask(taskId: string): Promise<{ ok: boolean }> {
   } catch (err) {
     console.warn('[bridge] deleteCliTask failed:', err);
     return { ok: false };
+  }
+}
+
+// v2.27.1 pandaOAuthService stub (实现由 oauth-service worker 完成)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getOAuthStatus(_configDir?: string): Promise<any> {
+  if (IS_DEV) return null;
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const oauthApi = (api as any).oauth as { getStatus?: (configDir?: string) => Promise<unknown> } | undefined;
+    if (!oauthApi?.getStatus) return null;
+    return await oauthApi.getStatus(_configDir);
+  } catch (err) {
+    console.warn('[bridge] getOAuthStatus failed:', err);
+    return null;
+  }
+}
+
+// v2.27.1 外部 webhook 通知（飞书 + Telegram）
+export async function sendWebhookNotification(
+  channel: 'feishu' | 'telegram',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  config: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  notification: any,
+): Promise<{ ok: boolean; error?: string }> {
+  if (IS_DEV) {
+    console.log('[bridge][dev] sendWebhookNotification', channel, notification);
+    return { ok: true };
+  }
+  try {
+    const api = getPandaAPI();
+    if (!api.webhook?.notify) {
+      return { ok: false, error: 'webhook.notify IPC not available' };
+    }
+    return await api.webhook.notify({ channel, config, notification });
+  } catch (err) {
+    console.warn('[bridge] sendWebhookNotification failed:', err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

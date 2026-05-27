@@ -34,13 +34,6 @@ export function PdTerminalSettings() {
   );
   const [error] = useState<string | null>(null);
 
-  const clearTerminal = () => {
-    /* TODO(IPC): xterm host 接通后接入。 */
-  };
-  const startTerminal = () => {
-    /* TODO(IPC): xterm host 接通后接入。 */
-  };
-
   return (
     <div className="flex h-full min-h-[620px] flex-col overflow-hidden">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -53,15 +46,6 @@ export function PdTerminalSettings() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={clearTerminal}
-            disabled
-            className="inline-flex h-8 items-center gap-1.5 rounded-[var(--pd-radius-md)] border border-[var(--pd-color-border)] px-2.5 text-xs font-medium text-[var(--pd-color-text-secondary)] transition-colors hover:bg-[var(--pd-color-surface-hover)] hover:text-[var(--pd-color-text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">mop</span>
-            {t('settings.terminal.clear')}
-          </button>
           <button
             type="button"
             onClick={() => { void openSystemTerminal(); }}

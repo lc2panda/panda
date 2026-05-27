@@ -463,6 +463,24 @@ export interface WebhookNotificationPayload {
   level?: WebhookNotificationLevel;
 }
 
+// ─── OAuth status types (v2.27.1 pandaOAuthService stub) ─────────────────────
+
+export interface OAuthStatus {
+  /** OAuth 认证状态 */
+  authenticated: boolean;
+  /** 认证来源（如有）：'oauth'|'api-key'|'none' */
+  source?: string;
+  /** 认证失败原因（如有） */
+  reason?: string;
+  /** 登录帐号信息（如有） */
+  account?: {
+    email?: string;
+    displayName?: string;
+  };
+  /** 最后一次校验时间（ISO 8601） */
+  checkedAt?: string;
+}
+
 // ─── Session rewind types (v2.27.1) ──────────────────────────────────────────
 
 export interface RewindPreview {

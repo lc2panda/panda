@@ -13,7 +13,9 @@ import {
   listAllSessions as diskListAllSessions,
   getSessionDetail as diskGetSessionDetail,
   getSessionLaunchInfo as diskGetSessionLaunchInfo,
+  cleanupPlaceholderSessions,
 } from '../backend/disk-session-scanner';
+import { openSystemTerminal as shellOpenTerminal } from '../backend/shell-launcher';
 import {
   scanLearningPlans as scanLearningPlansBackend,
   scanFlashcards as scanFlashcardsBackend,
@@ -223,6 +225,8 @@ const CH = {
   CLI_TASK_UPDATE:  'cli-task:update',
   CLI_TASK_CANCEL:  'cli-task:cancel',
   CLI_TASK_DELETE:  'cli-task:delete',
+  // v2.27.1 P3 占位 session 清理
+  SESSION_CLEANUP_PLACEHOLDER: 'session:cleanup-placeholder',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -993,28 +997,32 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  // Bug F G5: 跳转系统终端 —————————————————————————————————————————
+  // Bug F G5: 跳转系统终端（shell-launcher 跨平台）————————————————————
   ipcMain.handle(CH.SHELL_OPEN_TERMINAL, async (_event, args: { cwd?: string } = {}) => {
-    const cwd = args?.cwd || process.env.HOME || '/';
     try {
-      if (process.platform === 'darwin') {
-        childSpawn('open', ['-a', 'Terminal', cwd], { detached: true, stdio: 'ignore' }).unref();
-        return { ok: true };
-      }
-      if (process.platform === 'linux') {
-        childSpawn('x-terminal-emulator', [], { detached: true, stdio: 'ignore', cwd }).unref();
-        return { ok: true };
-      }
-      if (process.platform === 'win32') {
-        childSpawn('cmd.exe', ['/c', 'start', 'cmd'], { detached: true, stdio: 'ignore', cwd }).unref();
-        return { ok: true };
-      }
-      return { ok: false, error: 'unsupported-platform' };
+      return await shellOpenTerminal({ cwd: args?.cwd });
     } catch (err) {
       console.error('[IPC] SHELL_OPEN_TERMINAL failed:', err);
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
   });
+
+  // v2.27.1 P3: 占位 session 清理 ——————————————————————————————————
+  ipcMain.handle(
+    CH.SESSION_CLEANUP_PLACEHOLDER,
+    async (_event, args: { projectsDir?: string; dryRun?: boolean } = {}) => {
+      try {
+        return await cleanupPlaceholderSessions(args.projectsDir, { dryRun: args.dryRun });
+      } catch (err) {
+        console.error('[IPC] SESSION_CLEANUP_PLACEHOLDER failed:', err);
+        return {
+          removed: [] as string[],
+          kept: [] as string[],
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
 
   // v2.27.1 titleService
   ipcMain.handle(CH.TITLE_GENERATE, async (_event, payload: TitleGenerateInput) => {

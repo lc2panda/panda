@@ -82,6 +82,11 @@ export interface SessionStore {
   saveSessions: () => void;
   /** panda：从 .pandacc 磁盘读取并合并。 */
   loadSessionsFromDisk: () => Promise<void>;
+  /** v2.27.1 P3: 清理占位 session（transcript=0 且 mtime>24h）。仅暴露 API，不主动触发。 */
+  cleanupPlaceholders: (opts?: {
+    projectsDir?: string;
+    dryRun?: boolean;
+  }) => Promise<{ removed: string[]; kept: string[]; error?: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -433,6 +438,20 @@ export const useSessionStore = create<SessionStore>()((set, get) => ({
         '[sessionStore] Failed to load sessions from disk:',
         err,
       );
+    }
+  },
+
+  // v2.27.1 P3: 清理占位 session
+  cleanupPlaceholders: async (opts) => {
+    try {
+      return await bridge.cleanupPlaceholders(opts);
+    } catch (err) {
+      console.error('[sessionStore] cleanupPlaceholders failed:', err);
+      return {
+        removed: [],
+        kept: [],
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   },
 }));
