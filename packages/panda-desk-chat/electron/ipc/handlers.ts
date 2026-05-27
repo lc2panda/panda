@@ -88,6 +88,11 @@ import {
   generateSessionTitle as runGenerateSessionTitle,
   type TitleGenerateInput,
 } from '../backend/title-service';
+// v2.27.1 mcpHostPreflight
+import {
+  preflightMcpServer,
+  type McpServerConfig,
+} from '../backend/mcp-preflight';
 // v2.27.1 sessionRewindService
 import {
   previewSessionRewind,
@@ -192,6 +197,8 @@ const CH = {
   // v2.27.1 sessionRewindService
   SESSION_REWIND_PREVIEW: 'session:rewind:preview',
   SESSION_REWIND_EXECUTE: 'session:rewind:execute',
+  // v2.27.1 MCP 启动前置检查
+  MCP_PREFLIGHT:        'mcp:preflight',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -1039,7 +1046,20 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning + teams + audit + memdir + connectors + session-control + shell-open-terminal + title-generate + session-rewind connected)');
+  // v2.27.1 MCP 启动前置检查
+  ipcMain.handle(CH.MCP_PREFLIGHT, async (_event, config: McpServerConfig) => {
+    try {
+      return await preflightMcpServer(config);
+    } catch (err) {
+      console.error('[IPC] MCP_PREFLIGHT failed:', err);
+      return {
+        ok: false,
+        checks: [{ name: 'internal', ok: false, detail: err instanceof Error ? err.message : String(err), level: 'error' }],
+      };
+    }
+  });
+
+  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning + teams + audit + memdir + connectors + session-control + shell-open-terminal + title-generate + session-rewind + mcp-preflight connected)');
 }
 
 // ---------------------------------------------------------------------------

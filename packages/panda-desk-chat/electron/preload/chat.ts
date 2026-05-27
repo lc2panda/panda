@@ -124,6 +124,8 @@ const CH = {
   // v2.27.1 sessionRewindService
   SESSION_REWIND_PREVIEW: 'session:rewind:preview',
   SESSION_REWIND_EXECUTE: 'session:rewind:execute',
+  // v2.27.1 MCP 启动前置检查
+  MCP_PREFLIGHT:        'mcp:preflight',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -340,5 +342,9 @@ contextBridge.exposeInMainWorld('pandaAPI', {
       userTurnIndex: number,
       options?: { restoreFiles?: boolean },
     ) => ipcRenderer.invoke(CH.SESSION_REWIND_EXECUTE, { sessionId, userTurnIndex, options }),
+  },
+  // v2.27.1 MCP 启动前置检查 namespace
+  mcp: {
+    preflight: (config: unknown) => ipcRenderer.invoke(CH.MCP_PREFLIGHT, config),
   },
 });
