@@ -4,8 +4,8 @@
 #
 # 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
-appId: com.pandaai.panda-desk-chat
-productName: Panda Chat
+appId: com.pandaai.desk-chat
+productName: Panda
 copyright: Copyright © 2026 PandaAI
 
 directories:
@@ -50,10 +50,11 @@ nsis:
 
 extraResources:
   - from: ../../dist
-    to: dist
+    to: panda-cli/dist
     filter:
-      - "cli.js"
       - "**/*"
+  - from: ../../src/utils/model/configs.ts
+    to: panda-cli/cli-configs.ts
 
 asar: true
 

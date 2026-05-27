@@ -1,6 +1,8 @@
 // Input: electron-builder AfterPackContext (appOutDir, packager, electronPlatformName)
 // Output: writes Resources/panda-cli/cli-manifest.json after extraResources copy
 // Pos: wired via electron-builder.yml `afterPack: ./scripts/afterPack.cjs`
+// Note: productFilename from packager.appInfo must match the actual .app dir name;
+//       fallback: enumerate appOutDir/*.app when the named path does not exist.
 
 'use strict';
 
@@ -46,7 +48,26 @@ function resolveResourcesPath(context) {
     const productName =
       (context.packager && context.packager.appInfo && context.packager.appInfo.productFilename) ||
       'Panda';
-    return join(appOutDir, `${productName}.app`, 'Contents', 'Resources');
+    const primary = join(appOutDir, `${productName}.app`, 'Contents', 'Resources');
+    if (existsSync(primary)) return primary;
+    // Fallback: enumerate *.app dirs when productFilename diverges from the actual bundle name
+    try {
+      const entries = readdirSync(appOutDir);
+      for (const entry of entries) {
+        if (entry.endsWith('.app')) {
+          const candidate = join(appOutDir, entry, 'Contents', 'Resources');
+          if (existsSync(candidate)) {
+            console.log(
+              `[afterPack] productFilename="${productName}" not found; using actual bundle "${entry}"`,
+            );
+            return candidate;
+          }
+        }
+      }
+    } catch (_) {
+      // ignore readdir errors, fall through to primary
+    }
+    return primary;
   }
   return join(appOutDir, 'resources');
 }
