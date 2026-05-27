@@ -226,29 +226,29 @@ describe('initDefaultPandaccSettings', () => {
     expect(existsSync(join(deep, 'settings.json'))).toBe(true)
   })
 
-  // ─── v2.25.53+ 长跑爆点修复 ──────────────────────────────────────────
-  test('v2.25.53+ 默认值：PANDA_DEBUG=0 / TIMEOUT=600000 / FORK_TIMEOUT=600000', () => {
+  // ─── v2.27.x Bug G 修复：默认 0=禁用，回归 v2.20.9 语义 ─────────────
+  test('v2.27.x Bug G 默认值：PANDA_DEBUG=0 / TIMEOUT=0 / FORK_TIMEOUT=0', () => {
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
     const written = JSON.parse(
       readFileSync(join(tmpRoot, 'settings.json'), 'utf-8'),
     )
-    // 这三项必须按新默认写入（首次安装的新用户拿到的应是降级后的安全默认）
+    // v2.27.x Bug G：TIMEOUT 默认恢复为 '0'（禁用），与 runAgent.ts / forkedAgent.ts 对齐
     expect(written.env.PANDA_DEBUG).toBe('0')
-    expect(written.env.PANDA_AGENT_TIMEOUT_MS).toBe('600000')
-    expect(written.env.PANDA_FORK_TIMEOUT_MS).toBe('600000')
+    expect(written.env.PANDA_AGENT_TIMEOUT_MS).toBe('0')
+    expect(written.env.PANDA_FORK_TIMEOUT_MS).toBe('0')
     // 其他保持的字段验证（防止误改）
     expect(written.env.PANDA_AGENT_MAX_TURNS).toBe('200')
     expect(written.env.PANDA_THEME).toBe('matrix')
   })
 
-  test('v2.25.53+ migration：旧 PANDA_AGENT_TIMEOUT_MS=0 → 600000', () => {
+  test('v2.27.x Bug G migration：已落盘的 PANDA_AGENT_TIMEOUT_MS=600000 → 0', () => {
     const path = join(tmpRoot, 'settings.json')
     writeFileSync(
       path,
       JSON.stringify(
         {
-          env: { ...PANDA_DEFAULTS, PANDA_AGENT_TIMEOUT_MS: '0' },
+          env: { ...PANDA_DEFAULTS, PANDA_AGENT_TIMEOUT_MS: '600000' },
         },
         null,
         2,
@@ -261,16 +261,16 @@ describe('initDefaultPandaccSettings', () => {
     expect(result.newlyAddedKeys).not.toContain('PANDA_AGENT_TIMEOUT_MS')
 
     const written = JSON.parse(readFileSync(path, 'utf-8'))
-    expect(written.env.PANDA_AGENT_TIMEOUT_MS).toBe('600000')
+    expect(written.env.PANDA_AGENT_TIMEOUT_MS).toBe('0')
   })
 
-  test('v2.25.53+ migration：旧 PANDA_FORK_TIMEOUT_MS=0 → 600000', () => {
+  test('v2.27.x Bug G migration：已落盘的 PANDA_FORK_TIMEOUT_MS=600000 → 0', () => {
     const path = join(tmpRoot, 'settings.json')
     writeFileSync(
       path,
       JSON.stringify(
         {
-          env: { ...PANDA_DEFAULTS, PANDA_FORK_TIMEOUT_MS: '0' },
+          env: { ...PANDA_DEFAULTS, PANDA_FORK_TIMEOUT_MS: '600000' },
         },
         null,
         2,
@@ -280,7 +280,7 @@ describe('initDefaultPandaccSettings', () => {
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
     const written = JSON.parse(readFileSync(path, 'utf-8'))
-    expect(written.env.PANDA_FORK_TIMEOUT_MS).toBe('600000')
+    expect(written.env.PANDA_FORK_TIMEOUT_MS).toBe('0')
   })
 
   test('v2.25.53+ migration 不动 PANDA_DEBUG（用户可能故意开诊断模式）', () => {

@@ -36,12 +36,12 @@ export const PANDA_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   PANDA_AGENT_MAX_TURNS: '200',
   PANDA_AGENT_PER_TURN_LIMIT: '2',
   PANDA_AGENT_MAX_OUTPUT_TOKENS: '65536',
-  // v2.25.53: '0' → '600000'(10 min)  '0' = 永不超时，长跑 agent 永不释放是
-  // 内存爆点之一（2026-04-26 实测 8h Bun runtime segfault Peak RSS 1.67 GB）。
-  // 10 分钟硬上限保留绝大多数实际任务（agent fork 通常在 ≤ 10 min 内完成），
-  // 同时阻断"卡死 agent 永远占内存"的情况。Comdr 已有的 '0' 会被 migration 区迁移。
-  PANDA_AGENT_TIMEOUT_MS: '600000',
-  PANDA_FORK_TIMEOUT_MS: '600000',
+  // v2.20.9 语义：移除默认硬超时，env opt-in（默认 0=禁用）。
+  // v2.27.x Bug G 修复：回退 v2.25.53 改动，与 runAgent.ts:559-562 /
+  // forkedAgent.ts:837-839 注释对齐。复杂 agent 任务单次 >10min 会触发误 abort；
+  // 用户需主动设 PANDA_AGENT_TIMEOUT_MS=600000 才启用硬超时。
+  PANDA_AGENT_TIMEOUT_MS: '0',
+  PANDA_FORK_TIMEOUT_MS: '0',
   PANDA_CACHE_TEXT_KEEP_LAST: '5',
   PANDA_CACHE_TEXT_MIN_SIZE: '1500',
   PANDA_FORCE_CACHE_STRATEGY: 'explicit',
@@ -184,17 +184,16 @@ export function initDefaultPandaccSettings(options?: {
     mergedEnv.PANDA_AGENT_MAX_TURNS = '200'
     migrated = true
   }
-  // Migration v2.25.53+: PANDA_AGENT_TIMEOUT_MS / PANDA_FORK_TIMEOUT_MS '0' → '600000'
-  // 旧默认 '0' = 永不超时，是 long-running session 内存爆点之一（实测 8h Bun
-  // runtime segfault Peak RSS 1.67 GB，见 monitor/audit-pandacc-storage-2026-04-26.md）。
-  // 仅迁移"明确为 0"的旧默认值；用户显式设的 '300000' / '900000' 等保留不动。
-  // 不迁移 PANDA_DEBUG：用户可能故意开诊断模式，强制改 '0' 会丢失场景。
-  if (mergedEnv.PANDA_AGENT_TIMEOUT_MS === '0') {
-    mergedEnv.PANDA_AGENT_TIMEOUT_MS = '600000'
+  // Migration v2.27.x Bug G：反转 v2.25.53 迁移。
+  // 已落盘的 '600000'（由 v2.25.53 migration 强制写入）还原为 '0'，恢复 v2.20.9
+  // "默认禁用超时，env opt-in" 语义。用户显式设的 '300000' / '900000' 等保留不动。
+  // 不触碰 PANDA_DEBUG：用户可能故意开诊断模式，强制改 '0' 会丢失场景。
+  if (mergedEnv.PANDA_AGENT_TIMEOUT_MS === '600000') {
+    mergedEnv.PANDA_AGENT_TIMEOUT_MS = '0'
     migrated = true
   }
-  if (mergedEnv.PANDA_FORK_TIMEOUT_MS === '0') {
-    mergedEnv.PANDA_FORK_TIMEOUT_MS = '600000'
+  if (mergedEnv.PANDA_FORK_TIMEOUT_MS === '600000') {
+    mergedEnv.PANDA_FORK_TIMEOUT_MS = '0'
     migrated = true
   }
 
