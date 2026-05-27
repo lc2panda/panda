@@ -56,3 +56,7 @@ extraResources:
       - "**/*"
 
 asar: true
+
+# afterPack: 生成 panda-cli/cli-manifest.json (sha256 完整性校验清单)
+# 必须在 extraResources 复制完成后运行，写入 Resources/panda-cli/cli-manifest.json
+afterPack: ./scripts/afterPack.cjs

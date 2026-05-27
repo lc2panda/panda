@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { findSessionFile, getSessionLaunchInfo } from './disk-session-scanner';
 import { findOccupyingInteractiveSession } from './pid-registry';
 import { resolveBunPath } from './binPath';
+import { verifyCliIntegrity, formatVerifyResult } from './cli-integrity';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -725,6 +726,12 @@ export class CLIManager {
   private currentModel: string | undefined;
   private currentPermissionMode: CLIPermissionMode | undefined;
 
+  // v2.27.0 P1: sidecar (panda-cli) sha256 完整性校验。每个 CLIManager 实例只
+  // 校验一次（panda-cli/dist/*.js 在 packaged app 中是只读的，校验结果稳定）。
+  // dev 模式（无 manifest）走 missingManifest=true 分支只 console.warn 不阻塞。
+  private cliIntegrityChecked = false;
+  private cliIntegrityCachePromise: Promise<void> | null = null;
+
   // ── Window registration (for focus-based unread clearing) ────────────
 
   registerWindow(win: BrowserWindow): void {
@@ -741,6 +748,63 @@ export class CLIManager {
 
   setPermissionMode(mode: string): void {
     this.currentPermissionMode = normalizePermissionMode(mode);
+  }
+
+  // ── CLI integrity (v2.27.0 P1) ───────────────────────────────────────
+
+  /**
+   * 校验 Resources/panda-cli/*.js 文件 sha256 与 cli-manifest.json 一致。
+   * 每个 CLIManager 实例只执行一次（packaged Resources 在运行期是只读的）。
+   *
+   * 失败时抛 plain Error，code='CLI_INTEGRITY_FAILED'，mismatches/missingFiles
+   * 作为附加字段，供 cli-manager 调用方（IPC 层）转 stream:error payload。
+   *
+   * 兼容性约定：本任务暂用 plain Error + code 字段，**不** 引入 ConversationStartupError
+   * 体系的新 reason —— 避开与 P0-1 阶段 2 worker 的 conversation-startup-error.ts
+   * 改动冲突。后续可在不破坏 callers 的前提下接入。
+   */
+  private async ensureCliIntegrity(): Promise<void> {
+    if (this.cliIntegrityChecked) return;
+    if (this.cliIntegrityCachePromise) {
+      await this.cliIntegrityCachePromise;
+      return;
+    }
+    this.cliIntegrityCachePromise = (async () => {
+      const resourcesPath = process.resourcesPath;
+      const result = await verifyCliIntegrity(resourcesPath);
+      if (result.missingManifest) {
+        // dev / older install: warn but do not block
+        console.warn(
+          `[CLIManager] CLI integrity skipped (manifest missing at ${resourcesPath}/panda-cli/cli-manifest.json) — assuming dev mode`,
+        );
+        this.cliIntegrityChecked = true;
+        return;
+      }
+      if (!result.ok) {
+        const msg = formatVerifyResult(result);
+        const err = new Error(msg) as Error & {
+          code?: string;
+          mismatches?: string[];
+          missingFiles?: string[];
+          manifestVersion?: string;
+        };
+        err.code = 'CLI_INTEGRITY_FAILED';
+        err.mismatches = result.mismatches;
+        err.missingFiles = result.missingFiles;
+        err.manifestVersion = result.manifestVersion;
+        // 不缓存失败结果：若用户重新安装/修复 .app，下次 ensureSession 应重新校验
+        throw err;
+      }
+      console.log(
+        `[CLIManager] CLI integrity ok (version=${result.manifestVersion ?? 'unknown'}, generatedAt=${result.manifestGeneratedAt ?? 'unknown'})`,
+      );
+      this.cliIntegrityChecked = true;
+    })();
+    try {
+      await this.cliIntegrityCachePromise;
+    } finally {
+      this.cliIntegrityCachePromise = null;
+    }
   }
 
   // ── Session lifecycle ────────────────────────────────────────────────
@@ -785,6 +849,10 @@ export class CLIManager {
         `Invalid desktop session id "${sessionId}". Panda Desk Chat requires a UUID session. Please open a new chat tab.`,
       );
     }
+    // v2.27.0 P1：在首次 spawn panda-cli 前对 Resources/panda-cli/*.js 做 sha256
+    // 完整性校验，抓 DMG 传输错误/磁盘损坏/误改造成的 code=1 静默失败。
+    // dev 模式（无 cli-manifest.json）走 missingManifest=true，只 console.warn 不阻塞。
+    await this.ensureCliIntegrity();
     let session = this.sessions.get(sessionId);
     // v2.27.0 Bug C 修复：在 spawn 子进程前检测 panda-cli PID registry，
     // 若同一 sessionId 已被终端 `panda --resume` interactive REPL 持有，
