@@ -468,15 +468,18 @@ export interface WebhookNotificationPayload {
 export interface OAuthStatus {
   /** OAuth 认证状态 */
   authenticated: boolean;
-  /** 认证来源（如有）：'oauth'|'api-key'|'none' */
+  /** 认证来源：'oauth'|'api-key'|'config'|'none' */
   source?: string;
   /** 认证失败原因（如有） */
   reason?: string;
-  /** 登录帐号信息（如有） */
-  account?: {
-    email?: string;
-    displayName?: string;
-  };
+  /** 帐号邮箱 */
+  email?: string;
+  /** 显示名称 */
+  displayName?: string;
+  /** 组织名称 */
+  organizationName?: string;
+  /** 帐号 UUID */
+  accountUuid?: string;
   /** 最后一次校验时间（ISO 8601） */
   checkedAt?: string;
 }

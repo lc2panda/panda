@@ -778,3 +778,104 @@ export async function cleanupPlaceholderSessions(
 
   return { removed, kept };
 }
+
+// ─── Placeholder session cleanup ─────────────────────────────────────────────
+
+export interface CleanupPlaceholderOptions {
+  /** When true, log candidates but do not delete (default: false). */
+  dryRun?: boolean;
+}
+
+export interface CleanupPlaceholderResult {
+  removed: string[];
+  kept: string[];
+}
+
+/**
+ * Scan all project directories under `projectsDir` (default: PANDACC_ROOT) for
+ * "placeholder" sessions: transcript count == 0 AND file mtime older than 24 h.
+ * In dry-run mode, candidates are reported but not deleted.
+ */
+export async function cleanupPlaceholderSessions(
+  projectsDir?: string,
+  options: CleanupPlaceholderOptions = {},
+): Promise<CleanupPlaceholderResult> {
+  const dir = projectsDir ?? PANDACC_ROOT;
+  const { dryRun = false } = options;
+  const removed: string[] = [];
+  const kept: string[] = [];
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+
+  let projectDirs: string[];
+  try {
+    projectDirs = await fs.readdir(dir);
+  } catch {
+    return { removed, kept };
+  }
+
+  for (const projectSlug of projectDirs) {
+    const projectPath = path.join(dir, projectSlug);
+    let pStat: Awaited<ReturnType<typeof fs.stat>>;
+    try {
+      pStat = await fs.stat(projectPath);
+    } catch {
+      continue;
+    }
+    if (!pStat.isDirectory()) continue;
+
+    let files: string[];
+    try {
+      files = await fs.readdir(projectPath);
+    } catch {
+      continue;
+    }
+
+    for (const file of files) {
+      if (!file.endsWith(".jsonl")) continue;
+      const filePath = path.join(projectPath, file);
+      let fStat: Awaited<ReturnType<typeof fs.stat>>;
+      try {
+        fStat = await fs.stat(filePath);
+      } catch {
+        continue;
+      }
+
+      if (fStat.mtimeMs > cutoff) {
+        kept.push(filePath);
+        continue;
+      }
+
+      const entries = await readJsonlFile(filePath);
+      let transcriptCount = 0;
+      for (const entry of entries) {
+        if (entry.isMeta) continue;
+        const role = (entry as { message?: { role?: string } }).message?.role;
+        if (role === "user" || role === "assistant") transcriptCount++;
+      }
+
+      if (transcriptCount > 0) {
+        kept.push(filePath);
+        continue;
+      }
+
+      if (dryRun) {
+        console.info(`[disk-session-scanner] cleanup dry-run would remove: ${filePath}`);
+        removed.push(filePath);
+      } else {
+        try {
+          await fs.unlink(filePath);
+          console.info(`[disk-session-scanner] cleanup removed placeholder: ${filePath}`);
+          removed.push(filePath);
+        } catch (err) {
+          const code = (err as NodeJS.ErrnoException).code;
+          if (code !== "ENOENT") {
+            console.warn(`[disk-session-scanner] cleanup unlink failed: ${filePath}`, err);
+          }
+          kept.push(filePath);
+        }
+      }
+    }
+  }
+
+  return { removed, kept };
+}
