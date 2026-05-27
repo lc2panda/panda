@@ -43,6 +43,9 @@ export interface SDKAssistantMessage extends SDKMessageBase {
 
 export interface SDKResultMessage extends SDKMessageBase {
   type: 'result';
+  subtype?: 'success' | 'error_during_execution' | 'error';
+  is_error?: boolean;
+  errors?: string[];
   result?: string;
   cost_usd?: number;
   duration_ms?: number;

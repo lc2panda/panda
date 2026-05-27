@@ -42,6 +42,7 @@ import { PdFileSearchMenu, type PdFileSearchMenuHandle } from './PdFileSearchMen
 import { PdLocalSlashCommandPanel, type LocalSlashCommandName } from './PdLocalSlashCommandPanel';
 import { getSlashCommands, getGitInfo } from '../../ipc/bridge';
 import type { GitInfo } from '../../ipc/types';
+import { downsampleImageIfNeeded } from '../../utils/imageDownsample';
 import {
   FALLBACK_SLASH_COMMANDS,
   findSlashTrigger,
@@ -518,16 +519,24 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(function
 
       const id = `att-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
+        // v2.27.5 方案 A：超 1900×1900 自动等比缩放，防 CLI 2000×2000 硬拒
+        const ds = await downsampleImageIfNeeded(reader.result as string);
+        if (ds.wasResized) {
+          useUIStore.getState().addToast({
+            type: 'info',
+            message: `图片已缩小：${ds.originalWidth}×${ds.originalHeight} → ${ds.finalWidth}×${ds.finalHeight}`,
+          });
+        }
         setAttachments((prev) => [
           ...prev,
           {
             id,
             name: `pasted-image-${Date.now()}.png`,
             type: 'image',
-            mimeType: file.type || 'image/png',
-            previewUrl: reader.result as string,
-            data: reader.result as string,
+            mimeType: ds.mediaType || file.type || 'image/png',
+            previewUrl: ds.dataUrl,
+            data: ds.dataUrl,
           },
         ]);
       };
@@ -546,18 +555,40 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(function
       const id = `att-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const isImage = file.type.startsWith('image/');
       const reader = new FileReader();
-      reader.onload = () => {
-        setAttachments((prev) => [
-          ...prev,
-          {
-            id,
-            name: file.name,
-            type: isImage ? 'image' : 'file',
-            mimeType: file.type || undefined,
-            previewUrl: isImage ? (reader.result as string) : undefined,
-            data: reader.result as string,
-          },
-        ]);
+      reader.onload = async () => {
+        // v2.27.5 方案 A：图片入口统一走 downsample，防 CLI 2000×2000 硬拒
+        if (isImage) {
+          const ds = await downsampleImageIfNeeded(reader.result as string);
+          if (ds.wasResized) {
+            useUIStore.getState().addToast({
+              type: 'info',
+              message: `图片已缩小：${ds.originalWidth}×${ds.originalHeight} → ${ds.finalWidth}×${ds.finalHeight}`,
+            });
+          }
+          setAttachments((prev) => [
+            ...prev,
+            {
+              id,
+              name: file.name,
+              type: 'image',
+              mimeType: ds.mediaType || file.type || undefined,
+              previewUrl: ds.dataUrl,
+              data: ds.dataUrl,
+            },
+          ]);
+        } else {
+          setAttachments((prev) => [
+            ...prev,
+            {
+              id,
+              name: file.name,
+              type: 'file',
+              mimeType: file.type || undefined,
+              previewUrl: undefined,
+              data: reader.result as string,
+            },
+          ]);
+        }
       };
       reader.readAsDataURL(file);
     });

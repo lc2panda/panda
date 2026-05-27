@@ -173,6 +173,9 @@ export class CLISession extends EventEmitter {
   private startupGraceTimer: ReturnType<typeof setTimeout> | null = null;
   private startupStderrChunks: string[] = [];
 
+  // v2.27.5 方案 C：缓存最近一帧 result 消息，供 exit 路径提取真错误文本。
+  private lastStreamResult: import('./types').SDKResultMessage | null = null;
+
   // Comdr 指令: 修复 spawn race condition — sendMessage 在 spawnWithDiskProbe
   //   await 完成前调用时，this.process 还是 null/stdin 不 writable，旧实现直接
   //   console.error + return 静默丢消息（用户感受："发了没响应/必须刷新"）。
@@ -463,13 +466,27 @@ export class CLISession extends EventEmitter {
           return; // 不走既有 exit 路径
         }
         const stderrTail = this.lastStderr();
+        // v2.27.5 方案 C：若最近 result 帧为 error_during_execution，提取真错误文本。
+        const lastResult = this.lastStreamResult;
+        const cliInternalError =
+          lastResult?.subtype === 'error_during_execution' && lastResult.errors?.[0]
+            ? lastResult.errors[0]
+            : null;
+        const friendlyCliError = cliInternalError
+          ? friendifyCliError(cliInternalError)
+          : null;
+        const diagBlock =
+          `(诊断: code=${code ?? 'null'} signal=${signal ?? 'null'} cwd=${this.cwd}` +
+          (stderrTail ? ` stderr=${stderrTail.slice(0, 200)}` : '') +
+          `)`;
         this.emitStreamError({
           reason: 'exit',
           exitCode: code,
           signal,
-          error:
-            `CLI process exited before completing the response (code=${code ?? 'null'} signal=${signal ?? 'null'}).` +
-            (stderrTail ? `\n\nstderr:\n${stderrTail}` : ''),
+          error: friendlyCliError
+            ? `panda-cli 内部错误：${friendlyCliError}\n${diagBlock}`
+            : `CLI process exited before completing the response (code=${code ?? 'null'} signal=${signal ?? 'null'}).` +
+              (stderrTail ? `\n\nstderr:\n${stderrTail}` : ''),
           stderrTail,
         });
         this.state = 'error';
@@ -671,6 +688,8 @@ export class CLISession extends EventEmitter {
   // ── Result handler ───────────────────────────────────────────────────
 
   private handleResult(msg: SDKResultMessage): void {
+    // v2.27.5 方案 C：缓存最近 result 帧，供 exit 路径提取真错误文本。
+    this.lastStreamResult = msg;
     this.state = 'idle';
     this.emit('stream:end', {
       sessionId: this.id,
@@ -1392,3 +1411,24 @@ export class CLIManager {
 // ---------------------------------------------------------------------------
 
 export const cliManager = new CLIManager();
+
+// ---------------------------------------------------------------------------
+// v2.27.5 方案 C：CLI 内部错误文本中文友好化（轻量映射）
+// ---------------------------------------------------------------------------
+
+/**
+ * 把 panda-cli 内部 errors[0] 字符串映射为用户可读的中文提示。
+ * 未匹配的错误原样透传，供高级用户诊断。
+ */
+export function friendifyCliError(raw: string): string {
+  if (raw.includes('dimensions exceed the 2000x2000px limit') ||
+      raw.includes('exceeds the 2000x2000px') ||
+      raw.includes('2000x2000')) {
+    return '图片像素超过 2000×2000 上限，请先缩小图片再发送';
+  }
+  if (raw.includes('File size exceeds') || raw.includes('file size limit')) {
+    return `图片文件过大：${raw}`;
+  }
+  // 其他错误原样透传
+  return raw;
+}
