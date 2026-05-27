@@ -135,8 +135,25 @@ const CH = {
   CLI_TASK_DELETE:  'cli-task:delete',
   // v2.27.1 P3 占位 session 清理
   SESSION_CLEANUP_PLACEHOLDER: 'session:cleanup-placeholder',
+  // v2.27.1 P3 computer-use 审批通道 (4 个 channel)
+  COMPUTER_USE_REQUEST_APPROVAL: 'computer-use:request-approval',
+  COMPUTER_USE_GET_POLICY:       'computer-use:get-policy',
+  COMPUTER_USE_UPDATE_POLICY:    'computer-use:update-policy',
+  COMPUTER_USE_RESPOND:          'computer-use:respond',
   // v2.27.1 外部 webhook 通知（飞书 + Telegram）
   WEBHOOK_NOTIFY:       'webhook:notify',
+  // v2.27.1 agentService CRUD
+  AGENT_LIST:   'agent:list',
+  AGENT_GET:    'agent:get',
+  AGENT_CREATE: 'agent:create',
+  AGENT_UPDATE: 'agent:update',
+  AGENT_DELETE: 'agent:delete',
+  // v2.27.1 teamService CRUD
+  TEAM_LIST:   'team:list',
+  TEAM_GET:    'team:get',
+  TEAM_CREATE: 'team:create',
+  TEAM_UPDATE: 'team:update',
+  TEAM_DELETE: 'team:delete',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -276,6 +293,12 @@ contextBridge.exposeInMainWorld('pandaAPI', {
       ipcRenderer.invoke(CH.PANDA_COMPUTER_USE_SET_AUTHORIZED, input),
     openSettings:        (input: unknown) =>
       ipcRenderer.invoke(CH.PANDA_COMPUTER_USE_OPEN_SETTINGS, input),
+    // v2.27.1 审批通道
+    requestApproval: (input: unknown) =>
+      ipcRenderer.invoke(CH.COMPUTER_USE_REQUEST_APPROVAL, input),
+    getPolicy: () => ipcRenderer.invoke(CH.COMPUTER_USE_GET_POLICY),
+    updatePolicy: (policy: unknown) =>
+      ipcRenderer.invoke(CH.COMPUTER_USE_UPDATE_POLICY, policy),
   },
   // Comdr 指令: IM Wechat / 任务 B — IM Adapter 启停 namespace
   adapter: {
@@ -302,11 +325,17 @@ contextBridge.exposeInMainWorld('pandaAPI', {
     readFlashcards:  (projectSlug: string, topic: string) =>
       ipcRenderer.invoke(CH.LEARNING_READ_FLASHCARDS, { projectSlug, topic }),
   },
-  // Comdr 指令: Agent Teams — panda CLI ~/.pandacc/teams 落盘数据扫描 namespace
+  // Comdr 指令: Agent Teams — 落盘数据扫描（只读）+ CRUD namespace
   teams: {
     list:           () => ipcRenderer.invoke(CH.TEAMS_LIST),
     detail:         (name: string) => ipcRenderer.invoke(CH.TEAMS_DETAIL, { name }),
     enabledStatus:  () => ipcRenderer.invoke(CH.TEAMS_ENABLED_STATUS),
+    // CRUD（v2.27.1 新增）
+    listAll: (dir?: string) => ipcRenderer.invoke(CH.TEAM_LIST, dir),
+    get: (id: string, dir?: string) => ipcRenderer.invoke(CH.TEAM_GET, { id, dir }),
+    create: (input: unknown) => ipcRenderer.invoke(CH.TEAM_CREATE, input),
+    update: (id: string, partial: unknown) => ipcRenderer.invoke(CH.TEAM_UPDATE, { id, partial }),
+    delete: (id: string) => ipcRenderer.invoke(CH.TEAM_DELETE, { id }),
   },
   // Comdr 指令 cc-haha 路线 A: 工具调用调试器 — audit.jsonl 反向读 namespace
   audit: {
@@ -373,5 +402,13 @@ contextBridge.exposeInMainWorld('pandaAPI', {
   // v2.27.1 外部 webhook 通知 namespace
   webhook: {
     notify: (payload: unknown) => ipcRenderer.invoke(CH.WEBHOOK_NOTIFY, payload),
+  },
+  // v2.27.1 agentService CRUD namespace
+  agents: {
+    list: (dir?: string) => ipcRenderer.invoke(CH.AGENT_LIST, dir),
+    get: (id: string, dir?: string) => ipcRenderer.invoke(CH.AGENT_GET, { id, dir }),
+    create: (input: unknown) => ipcRenderer.invoke(CH.AGENT_CREATE, input),
+    update: (id: string, partial: unknown) => ipcRenderer.invoke(CH.AGENT_UPDATE, { id, partial }),
+    delete: (id: string) => ipcRenderer.invoke(CH.AGENT_DELETE, { id }),
   },
 });

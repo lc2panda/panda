@@ -830,6 +830,52 @@ export async function openComputerUseSettings(
   }
 }
 
+// ─── v2.27.1 computer-use 审批通道 (3 个 bridge 函数) ───────────────────────
+
+/** 发起 computer-use 操作审批请求 → 按 policy 返回是否批准。 */
+export async function requestComputerUseApproval(
+  input: import('./types').ApprovalRequest,
+): Promise<import('./types').ApprovalResult> {
+  if (IS_DEV) return { approved: false, reason: 'auto-deny' };
+  try {
+    return await getPandaAPI().computerUse.requestApproval(input);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[bridge] requestComputerUseApproval failed:', msg);
+    return { approved: false, reason: 'auto-deny' };
+  }
+}
+
+/** 读取 ~/.pandacc/computer-use-policy.json。dev 模式返回 deny-by-default policy。 */
+export async function getComputerUsePolicy(): Promise<import('./types').ComputerUsePolicy> {
+  const defaultPolicy: import('./types').ComputerUsePolicy = {
+    defaultAction: 'deny',
+    perActionRules: {},
+    sessionWhitelist: [],
+  };
+  if (IS_DEV) return defaultPolicy;
+  try {
+    return await getPandaAPI().computerUse.getPolicy();
+  } catch (err) {
+    console.warn('[bridge] getComputerUsePolicy failed:', err);
+    return defaultPolicy;
+  }
+}
+
+/** 写入 computer-use-policy.json。 */
+export async function updateComputerUsePolicy(
+  policy: import('./types').ComputerUsePolicy,
+): Promise<{ ok: boolean }> {
+  if (IS_DEV) return { ok: true };
+  try {
+    return await getPandaAPI().computerUse.updatePolicy(policy);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[bridge] updateComputerUsePolicy failed:', msg);
+    return { ok: false };
+  }
+}
+
 // ─── Comdr 指令: 学习助手 — panda CLI /learn 落盘数据 (4 函数) ─────────────
 //
 // 数据来源：

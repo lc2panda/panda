@@ -115,6 +115,32 @@ import {
   type CliTaskUpdateInput,
   type CliBackendTaskStatus,
 } from '../backend/cli-task-service';
+// v2.27.1 computer-use 审批通道
+import {
+  computerUseApprovalService,
+  type ApprovalRequest,
+  type ComputerUsePolicy,
+} from '../backend/computer-use-approval-service';
+// v2.27.1 agentService CRUD
+import {
+  listAgents as agentSvcList,
+  getAgent as agentSvcGet,
+  createAgent as agentSvcCreate,
+  updateAgent as agentSvcUpdate,
+  deleteAgent as agentSvcDelete,
+  type AgentCreateInput,
+  type AgentUpdateInput,
+} from '../backend/agent-service';
+// v2.27.1 teamService CRUD
+import {
+  listTeams as teamSvcList,
+  getTeam as teamSvcGet,
+  createTeam as teamSvcCreate,
+  updateTeam as teamSvcUpdate,
+  deleteTeam as teamSvcDelete,
+  type TeamCreateInput,
+  type TeamUpdateInput,
+} from '../backend/team-service';
 
 // ---------------------------------------------------------------------------
 // IPC channel constants (must match preload/chat.ts)
@@ -227,6 +253,23 @@ const CH = {
   CLI_TASK_DELETE:  'cli-task:delete',
   // v2.27.1 P3 占位 session 清理
   SESSION_CLEANUP_PLACEHOLDER: 'session:cleanup-placeholder',
+  // v2.27.1 P3 computer-use 审批通道 (4 个 channel)
+  COMPUTER_USE_REQUEST_APPROVAL: 'computer-use:request-approval',
+  COMPUTER_USE_GET_POLICY:       'computer-use:get-policy',
+  COMPUTER_USE_UPDATE_POLICY:    'computer-use:update-policy',
+  COMPUTER_USE_RESPOND:          'computer-use:respond',
+  // v2.27.1 agentService CRUD (5 channels)
+  AGENT_LIST:   'agent:list',
+  AGENT_GET:    'agent:get',
+  AGENT_CREATE: 'agent:create',
+  AGENT_UPDATE: 'agent:update',
+  AGENT_DELETE: 'agent:delete',
+  // v2.27.1 teamService CRUD (5 channels)
+  TEAM_LIST:   'team:list',
+  TEAM_GET:    'team:get',
+  TEAM_CREATE: 'team:create',
+  TEAM_UPDATE: 'team:update',
+  TEAM_DELETE: 'team:delete',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -1120,6 +1163,54 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(CH.CLI_TASK_DELETE, async (_event, taskId: string) => {
     return cliTaskService.deleteTask(taskId);
+  });
+
+  // ─── agentService CRUD handlers ──────────────────────────────────────────────
+  ipcMain.handle(CH.AGENT_LIST, async (_event, dir?: string) => {
+    try { return await agentSvcList(dir); }
+    catch (err) { console.error('[IPC] AGENT_LIST failed:', err); return []; }
+  });
+
+  ipcMain.handle(CH.AGENT_GET, async (_event, payload: { id: string; dir?: string }) => {
+    try { return await agentSvcGet(payload.id, payload.dir); }
+    catch (err) { console.error('[IPC] AGENT_GET failed:', err); return null; }
+  });
+
+  ipcMain.handle(CH.AGENT_CREATE, async (_event, input: AgentCreateInput) => {
+    return agentSvcCreate(input);
+  });
+
+  ipcMain.handle(CH.AGENT_UPDATE, async (_event, payload: { id: string; partial: AgentUpdateInput }) => {
+    return agentSvcUpdate(payload.id, payload.partial);
+  });
+
+  ipcMain.handle(CH.AGENT_DELETE, async (_event, payload: { id: string }) => {
+    try { return await agentSvcDelete(payload.id); }
+    catch (err) { console.error('[IPC] AGENT_DELETE failed:', err); return { ok: false }; }
+  });
+
+  // ─── teamService CRUD handlers ───────────────────────────────────────────────
+  ipcMain.handle(CH.TEAM_LIST, async (_event, dir?: string) => {
+    try { return await teamSvcList(dir); }
+    catch (err) { console.error('[IPC] TEAM_LIST failed:', err); return []; }
+  });
+
+  ipcMain.handle(CH.TEAM_GET, async (_event, payload: { id: string; dir?: string }) => {
+    try { return await teamSvcGet(payload.id, payload.dir); }
+    catch (err) { console.error('[IPC] TEAM_GET failed:', err); return null; }
+  });
+
+  ipcMain.handle(CH.TEAM_CREATE, async (_event, input: TeamCreateInput) => {
+    return teamSvcCreate(input);
+  });
+
+  ipcMain.handle(CH.TEAM_UPDATE, async (_event, payload: { id: string; partial: TeamUpdateInput }) => {
+    return teamSvcUpdate(payload.id, payload.partial);
+  });
+
+  ipcMain.handle(CH.TEAM_DELETE, async (_event, payload: { id: string }) => {
+    try { return await teamSvcDelete(payload.id); }
+    catch (err) { console.error('[IPC] TEAM_DELETE failed:', err); return { ok: false }; }
   });
 
   console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning + teams + audit + memdir + connectors + session-control + shell-open-terminal + title-generate + session-rewind + mcp-preflight + cli-task connected)');

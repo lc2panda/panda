@@ -239,6 +239,31 @@ export interface UpdateStatus {
   message?: string;
 }
 
+// ─── v2.27.1 computer-use 审批通道类型 ─────────────────────────────────────
+
+export type ComputerUseAction = 'click' | 'keystroke' | 'screenshot' | 'open-app' | 'execute';
+export type ComputerUseRisk = 'low' | 'medium' | 'high';
+export type ComputerUsePolicyAction = 'allow' | 'deny' | 'prompt';
+export type ApprovalReason = 'auto-allow' | 'auto-deny' | 'user-approved' | 'user-denied' | 'timeout';
+
+export interface ApprovalRequest {
+  action: ComputerUseAction;
+  payload: unknown;
+  sessionId?: string;
+  risk: ComputerUseRisk;
+}
+
+export interface ApprovalResult {
+  approved: boolean;
+  reason: ApprovalReason;
+}
+
+export interface ComputerUsePolicy {
+  defaultAction: ComputerUsePolicyAction;
+  perActionRules: Partial<Record<ComputerUseAction, ComputerUsePolicyAction>>;
+  sessionWhitelist: string[];
+}
+
 // ─── PandaChatAPI: named interface matching preload (C-5 compliant) ─────────
 
 export interface PandaChatAPI {
@@ -338,6 +363,10 @@ export interface PandaChatAPI {
     getAuthorizedApps(): Promise<ComputerUseGrantsFile>;
     setAuthorizedApps(input: SetAuthorizedAppsInput): Promise<ComputerUseOpResult>;
     openSettings(input: { pane: ComputerUsePane }): Promise<ComputerUseOpResult>;
+    // v2.27.1 审批通道
+    requestApproval(input: ApprovalRequest): Promise<ApprovalResult>;
+    getPolicy(): Promise<ComputerUsePolicy>;
+    updatePolicy(policy: ComputerUsePolicy): Promise<{ ok: boolean }>;
   };
   // Comdr 指令: IM Wechat / 任务 B — IM Adapter 启停 namespace
   adapter: {
