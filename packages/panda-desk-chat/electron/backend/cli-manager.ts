@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 import { findSessionFile, getSessionLaunchInfo } from './disk-session-scanner';
 import { findOccupyingInteractiveSession } from './pid-registry';
 import { resolveBunPath } from './binPath';
+import { buildChildEnv, type ProviderConfig } from './provider-env-builder';
+import { clearStaleLocks } from './stale-lock-cleanup';
 import { verifyCliIntegrity, formatVerifyResult } from './cli-integrity';
 import {
   buildStartupError,
@@ -133,6 +135,9 @@ export class CLISession extends EventEmitter {
   name: string;
   state: SessionState = 'idle';
   readonly createdAt: number;
+  // v2.27.1: provider env 隔离。CLISession 持有 providerConfig，start() 调用
+  // buildChildEnv() 替代 { ...process.env } 展开，防止 shell 残留 provider token 污染。
+  providerConfig: ProviderConfig | undefined;
 
   private process: ChildProcess | null = null;
   private rl: ReadlineInterface | null = null;
@@ -169,12 +174,13 @@ export class CLISession extends EventEmitter {
   //   改为：未就绪时 push 到 pendingSends queue，spawn 完成后 flush。
   private pendingSends: Array<{ content: string; attachments?: Array<{ mediaType: string; data: string }> }> = [];
 
-  constructor(id: string, cwd: string, name?: string) {
+  constructor(id: string, cwd: string, name?: string, providerConfig?: ProviderConfig) {
     super();
     this.id = id;
     this.cwd = cwd;
     this.name = name || `Session ${id.slice(0, 8)}`;
     this.createdAt = Date.now();
+    this.providerConfig = providerConfig;
   }
 
   // ── Resolve CLI binary path ──────────────────────────────────────────
@@ -303,19 +309,14 @@ export class CLISession extends EventEmitter {
     );
     console.log(`[CLISession:${this.id}] Spawning${isResume ? ' (resume)' : ''}: bun ${args.join(' ')}`);
 
-    // v2.26.14 Bug B fix (1:1 align cc-haha conversationService.buildChildEnv):
-    // panda-cli (forked from upstream claude-code) reads CALLER_DIR/PWD in its
-    // preload.tsx bootstrap path and may chdir away from the spawn-time cwd.
-    // Force-inject CALLER_DIR + PWD = this.cwd so the child cannot drift to "/"
-    // even if Electron main process was launched from Finder with cwd="/".
+    // v2.27.1: Provider env 隔离。使用 buildChildEnv() 替代 { ...process.env }，
+    // 清除 shell 残留的 ANTHROPIC_*/OPENAI_*/GOOGLE_*/AWS_*/VERTEX_* token，
+    // 按 providerConfig 注入对应 provider env key，避免多 provider 切换时老 token
+    // 污染新 provider 调用。CALLER_DIR/PWD 强制注入（Bug B 规则，v2.26.14 建立）。
     this.process = spawn(bunPath, args, {
       cwd: this.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        CALLER_DIR: this.cwd,
-        PWD: this.cwd,
-      },
+      env: buildChildEnv({ cwd: this.cwd, provider: this.providerConfig, managedOAuth: true }),
     });
 
     // v2.27.0 P0-2：启动期窗口计时与 stderr 收集。spawn 同步返回后立刻启动，
@@ -852,6 +853,9 @@ export class CLIManager {
   // In-memory config (set via IPC, consumed on session start)
   private currentModel: string | undefined;
   private currentPermissionMode: CLIPermissionMode | undefined;
+  // v2.27.1: Provider env 隔离。由 IPC 从 renderer providerStore 传入，
+  // 在 createSessionWithId/ensureSession 创建 CLISession 时注入。
+  private currentProviderConfig: ProviderConfig | undefined;
 
   // v2.27.0 P1: sidecar (panda-cli) sha256 完整性校验。每个 CLIManager 实例只
   // 校验一次（panda-cli/dist/*.js 在 packaged app 中是只读的，校验结果稳定）。
@@ -875,6 +879,12 @@ export class CLIManager {
 
   setPermissionMode(mode: string): void {
     this.currentPermissionMode = normalizePermissionMode(mode);
+  }
+
+  // v2.27.1: 由 IPC handler 在 provider 切换时调用，传入当前选中的 provider 配置。
+  // CLISession.providerConfig 在下次 createSessionWithId / ensureSession 重启时生效。
+  setProviderConfig(config: ProviderConfig | undefined): void {
+    this.currentProviderConfig = config;
   }
 
   // ── CLI integrity (v2.27.0 P1) ───────────────────────────────────────
@@ -952,7 +962,7 @@ export class CLIManager {
         `Invalid desktop session id "${id}". Panda Desk Chat requires a UUID session. Please open a new chat tab.`,
       );
     }
-    const session = new CLISession(id, cwd, name);
+    const session = new CLISession(id, cwd, name, this.currentProviderConfig);
     this.sessions.set(id, session);
 
     this.wireSessionEvents(session);
@@ -980,6 +990,12 @@ export class CLIManager {
     // 完整性校验，抓 DMG 传输错误/磁盘损坏/误改造成的 code=1 静默失败。
     // dev 模式（无 cli-manifest.json）走 missingManifest=true，只 console.warn 不阻塞。
     await this.ensureCliIntegrity();
+    // v2.27.1: clearStaleLocks — 清理 panic crash 遗留的死 PID 文件，
+    // 避免 findOccupyingInteractiveSession 误判 SESSION_OCCUPIED。
+    // catch 错误只打 warn，不阻塞后续流程。
+    await clearStaleLocks().catch((err) =>
+      console.warn('[CLIManager] clearStaleLocks failed (non-blocking):', err),
+    );
     let session = this.sessions.get(sessionId);
     // v2.27.0 Bug C 修复：在 spawn 子进程前检测 panda-cli PID registry，
     // 若同一 sessionId 已被终端 `panda --resume` interactive REPL 持有，
