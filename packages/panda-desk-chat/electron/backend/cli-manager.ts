@@ -962,8 +962,36 @@ export class CLIManager {
   // ── Session lifecycle ────────────────────────────────────────────────
 
   async createSession(cwd: string, name?: string): Promise<SessionInfo> {
+    // v2.27.3 Bug I fix: empty/invalid cwd from EmptySession → fallback HOME,
+    // then validate existence + isDirectory (mirrors ensureSession typed-Error pattern).
+    let resolvedCwd = cwd;
+    if (!resolvedCwd || resolvedCwd.trim() === '') {
+      resolvedCwd = process.env.HOME ?? app.getPath('home');
+      console.log(
+        `[CLIManager] createSession cwd empty, fallback to HOME=${resolvedCwd}`,
+      );
+    }
+    try {
+      const stat = statSync(resolvedCwd);
+      if (!stat.isDirectory()) {
+        const err = new Error(
+          `Workdir is not a directory: ${resolvedCwd}`,
+        ) as NodeJS.ErrnoException;
+        err.code = 'WORKDIR_INVALID';
+        throw err;
+      }
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+        const err = new Error(
+          `Workdir does not exist: ${resolvedCwd}`,
+        ) as NodeJS.ErrnoException;
+        err.code = 'WORKDIR_NOT_FOUND';
+        throw err;
+      }
+      throw e;
+    }
     const id = randomUUID();
-    return this.createSessionWithId(id, cwd, name);
+    return this.createSessionWithId(id, resolvedCwd, name);
   }
 
   /**
