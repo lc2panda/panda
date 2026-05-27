@@ -1,16 +1,24 @@
 // Input: agent definitions from cc-haha userSettings/projectSettings/localSettings/policySettings/plugin/flagSettings/built-in
 //        Comdr 指令: 实接 ~/.pandacc/agents/*.md (frontmatter parser) → AgentDefinition[]
-// Output: agent groups + selected agent detail for PdAgentsSettings
-// Pos: State layer — drives PdAgentsSettings list/detail
+//        v2.27.1: 完整 CRUD via bridge.agents.* IPC
+// Output: agent groups + selected agent detail + create/update/delete actions
+// Pos: State layer — drives PdAgentsSettings list/detail/editor
 //
 // Source 1:1: cc-haha desktop/src/stores/agentStore.ts shape
 //   panda IPC: bridge.listAgentsPandacc() 走 main 进程读 ~/.pandacc/agents/*.md，解析 frontmatter，
 //   全部映射为 source='userSettings' 的 AgentDefinition（panda 当前只支持用户级 agents）。
+//   v2.27.1: create/update/delete 改走 bridge.agents CRUD。
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
 import { create } from 'zustand';
 import type { AgentDefinition } from '../api/agents';
-import { listAgentsPandacc } from '../ipc/bridge';
+import {
+  listAgentsPandacc,
+  createAgentService,
+  updateAgentService,
+  deleteAgentService,
+} from '../ipc/bridge';
+import type { AgentServiceCreateInput, AgentServiceUpdateInput } from '../ipc/types';
 
 export interface AgentStore {
   activeAgents: AgentDefinition[];
@@ -22,9 +30,12 @@ export interface AgentStore {
 
   fetchAgents: (cwd?: string) => Promise<void>;
   selectAgent: (agent: AgentDefinition | null, returnTab?: string) => void;
+  createAgent: (input: AgentServiceCreateInput) => Promise<void>;
+  updateAgent: (id: string, partial: AgentServiceUpdateInput) => Promise<void>;
+  deleteAgent: (id: string) => Promise<void>;
 }
 
-export const useAgentStore = create<AgentStore>()((set) => ({
+export const useAgentStore = create<AgentStore>()((set, _get) => ({
   activeAgents: [],
   allAgents: [],
   selectedAgent: null,
@@ -64,4 +75,37 @@ export const useAgentStore = create<AgentStore>()((set) => ({
       selectedAgent,
       selectedAgentReturnTab: returnTab ?? null,
     }),
+
+  createAgent: async (input) => {
+    set({ isLoading: true, error: null });
+    try {
+      await createAgentService(input);
+      await useAgentStore.getState().fetchAgents();
+    } catch (err) {
+      set({ isLoading: false, error: err instanceof Error ? err.message : 'Failed to create agent' });
+      throw err;
+    }
+  },
+
+  updateAgent: async (id, partial) => {
+    set({ isLoading: true, error: null });
+    try {
+      await updateAgentService(id, partial);
+      await useAgentStore.getState().fetchAgents();
+    } catch (err) {
+      set({ isLoading: false, error: err instanceof Error ? err.message : 'Failed to update agent' });
+      throw err;
+    }
+  },
+
+  deleteAgent: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await deleteAgentService(id);
+      await useAgentStore.getState().fetchAgents();
+    } catch (err) {
+      set({ isLoading: false, error: err instanceof Error ? err.message : 'Failed to delete agent' });
+      throw err;
+    }
+  },
 }));

@@ -1317,6 +1317,157 @@ export async function getOAuthStatus(_configDir?: string): Promise<any> {
   }
 }
 
+// ─── v2.27.1 Plugin/Skill/Adapter/Settings IPC ───────────────────────────────
+
+export async function listPluginsService(): Promise<PluginServiceItem[]> {
+  if (IS_DEV) return [];
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(api as any).plugins?.list) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (api as any).plugins.list();
+  } catch (err) {
+    console.warn('[bridge] listPluginsService failed:', err);
+    return [];
+  }
+}
+
+export async function getPluginService(id: string): Promise<PluginServiceItem | null> {
+  if (IS_DEV) return null;
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(api as any).plugins?.get) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (api as any).plugins.get(id);
+  } catch (err) {
+    console.warn('[bridge] getPluginService failed:', err);
+    return null;
+  }
+}
+
+export async function listSkillsService(): Promise<SkillServiceItem[]> {
+  if (IS_DEV) return [];
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(api as any).skills?.list) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (api as any).skills.list();
+  } catch (err) {
+    console.warn('[bridge] listSkillsService failed:', err);
+    return [];
+  }
+}
+
+export async function getSkillService(name: string): Promise<SkillServiceDetail | null> {
+  if (IS_DEV) return null;
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(api as any).skills?.get) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (api as any).skills.get(name);
+  } catch (err) {
+    console.warn('[bridge] getSkillService failed:', err);
+    return null;
+  }
+}
+
+export async function listAdaptersService(): Promise<AdapterServiceItem[]> {
+  if (IS_DEV) return [];
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(api as any).adapters?.list) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (api as any).adapters.list();
+  } catch (err) {
+    console.warn('[bridge] listAdaptersService failed:', err);
+    return [];
+  }
+}
+
+export async function getAdapterService(id: string): Promise<AdapterServiceItem | null> {
+  if (IS_DEV) return null;
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(api as any).adapters?.get) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (api as any).adapters.get(id);
+  } catch (err) {
+    console.warn('[bridge] getAdapterService failed:', err);
+    return null;
+  }
+}
+
+export async function getSettingsService(): Promise<PandaSettings | null> {
+  if (IS_DEV) return null;
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(api as any).settings?.get) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (api as any).settings.get();
+  } catch (err) {
+    console.warn('[bridge] getSettingsService failed:', err);
+    return null;
+  }
+}
+
+export async function updateSettingsService(
+  patch: PandaSettingsPatch,
+): Promise<PandaSettings | null> {
+  if (IS_DEV) {
+    console.log('[bridge][dev] updateSettingsService', patch);
+    return null;
+  }
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(api as any).settings?.update) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (api as any).settings.update(patch);
+  } catch (err) {
+    console.warn('[bridge] updateSettingsService failed:', err);
+    return null;
+  }
+}
+
+export async function setModelSettings(modelId: string): Promise<void> {
+  if (IS_DEV) {
+    console.log('[bridge][dev] setModelSettings', modelId);
+    return;
+  }
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(api as any).settings?.setModel) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (api as any).settings.setModel(modelId);
+  } catch (err) {
+    console.warn('[bridge] setModelSettings failed:', err);
+  }
+}
+
+export async function setEffortSettings(level: string): Promise<void> {
+  if (IS_DEV) {
+    console.log('[bridge][dev] setEffortSettings', level);
+    return;
+  }
+  try {
+    const api = getPandaAPI();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(api as any).settings?.setEffort) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (api as any).settings.setEffort(level);
+  } catch (err) {
+    console.warn('[bridge] setEffortSettings failed:', err);
+  }
+}
+
 // v2.27.1 外部 webhook 通知（飞书 + Telegram）
 export async function sendWebhookNotification(
   channel: 'feishu' | 'telegram',

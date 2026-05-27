@@ -311,10 +311,12 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
   setModel: async (modelId) => {
     try {
       // panda 现在 setModel 需要 sessionId；这里以全局占位调用，让 chatStore 在切会话时再覆盖。
-      // TODO(IPC): cc-haha 的 modelsApi.setCurrent(modelId) 是全局；panda IPC 需要扩展无 sessionId 的 setModel。
-      await bridge.setModel('', modelId);
+      // 已接通：写入 ~/.pandacc/settings.json（全局默认模型）
+      bridge.setModelSettings(modelId).catch((_e: unknown) => {
+        console.warn('[settingsStore] setModelSettings failed:', _e);
+      });
     } catch (err) {
-      console.warn('[settingsStore] bridge.setModel failed (no session):', err);
+      console.warn('[settingsStore] setModel failed:', err);
     }
     const list = get().availableModels;
     const next = list.find((m) => m.id === modelId) ?? null;
@@ -327,8 +329,8 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
     const prev = get().effortLevel;
     set({ effortLevel: level });
     try {
-      // TODO(IPC): cc-haha 的 modelsApi.setEffort(level) 在 panda IPC 缺失。
-      // 暂存到 localStorage；后续 panda IPC 暴露 effort 持久化端点后接入。
+      // 已接通：写入 ~/.pandacc/settings.json（全局 effort level）
+      await bridge.setEffortSettings(level);
       get().saveSettings();
     } catch {
       set({ effortLevel: prev });
@@ -359,7 +361,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
       useUIStore.getState().setTheme(theme);
     }
     try {
-      // TODO(IPC): cc-haha 的 settingsApi.updateUser({ theme }) 在 panda IPC 缺失。
+      // theme 存 localStorage（与 cc-haha 保持一致，不写 settings.json）
       get().saveSettings();
     } catch {
       set({ theme: prev });
@@ -374,7 +376,8 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
     const prev = get().skipWebFetchPreflight;
     set({ skipWebFetchPreflight: enabled });
     try {
-      // TODO(IPC): cc-haha 的 settingsApi.updateUser({ skipWebFetchPreflight }) 在 panda IPC 缺失。
+      // 已接通：写入 ~/.pandacc/settings.json env 块
+      await bridge.updateSettingsService({ env: { PANDA_SKIP_WEB_FETCH_PREFLIGHT: String(enabled) } });
       get().saveSettings();
     } catch {
       set({ skipWebFetchPreflight: prev });

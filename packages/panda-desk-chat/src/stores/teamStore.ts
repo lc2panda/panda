@@ -17,6 +17,12 @@ import { create } from 'zustand';
 import { useTabStore } from './tabStore';
 import type { TeamDetail, TeamMember, TeamSummary, AgentColor } from '../types/team';
 import { AGENT_COLORS } from '../types/team';
+import {
+  createTeamService,
+  updateTeamService,
+  deleteTeamService,
+} from '../ipc/bridge';
+import type { AgentTeamCreateInput, AgentTeamUpdateInput } from '../ipc/types';
 
 const memberSessionId = (agentId: string) => `team-member:${agentId}`;
 
@@ -47,6 +53,11 @@ type TeamStore = {
     currentTask?: string;
   }>) => void;
   handleTeamDeleted: (teamName: string) => void;
+
+  // v2.27.1 CRUD
+  createTeam: (input: AgentTeamCreateInput) => Promise<void>;
+  updateTeam: (id: string, partial: AgentTeamUpdateInput) => Promise<void>;
+  deleteTeam: (id: string) => Promise<void>;
 };
 
 function normalizeMemberStatus(status: string | undefined): TeamMember['status'] {
@@ -175,5 +186,35 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
       teams: s.teams.filter((t) => t.name !== teamName),
       activeTeam: s.activeTeam?.name === teamName ? null : s.activeTeam,
     }));
+  },
+
+  // v2.27.1 CRUD
+  createTeam: async (input) => {
+    const rec = await createTeamService(input);
+    set((s) => ({
+      teams: [
+        ...s.teams,
+        {
+          name: rec.id,
+          path: rec.path,
+          memberCount: rec.members.length,
+          members: rec.members,
+          activeMembers: 0,
+          lastActivityAt: null,
+        } as unknown as TeamSummary,
+      ],
+    }));
+  },
+
+  updateTeam: async (id, partial) => {
+    await updateTeamService(id, partial);
+    await useTeamStore.getState().fetchTeams();
+  },
+
+  deleteTeam: async (id) => {
+    const result = await deleteTeamService(id);
+    if (result.ok) {
+      get().handleTeamDeleted(id);
+    }
   },
 }));

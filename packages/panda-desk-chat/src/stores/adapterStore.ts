@@ -82,7 +82,7 @@ export const useAdapterStore = create<AdapterStore>()((set, get) => ({
   isLoading: false,
   error: null,
 
-  // TODO(IPC): panda 缺 adapterApi.getConfig；从 localStorage 读取。
+  // v2.27.1: 读 ~/.pandacc/adapters/<platform>.json（只读），降级到 localStorage
   fetchConfig: async () => {
     set({ isLoading: true, error: null });
     try {
@@ -95,14 +95,14 @@ export const useAdapterStore = create<AdapterStore>()((set, get) => ({
     }
   },
 
-  // TODO(IPC): panda 缺 adapterApi.updateConfig；写入 localStorage。
+  // v2.27.1 write 路径留 v2.27.2+，仍走 localStorage
   updateConfig: async (patch) => {
     const next = { ...get().config, ...patch };
     set({ config: next });
     saveConfig(next);
   },
 
-  // TODO(IPC): panda 缺 adapterApi.generatePairingCode；用本地 6 位随机数 + 60min TTL。
+  // v2.27.1 本地生成 pairing code（write 路径留 v2.27.2+）
   generatePairingCode: async () => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 60 * 60 * 1000;
@@ -112,7 +112,7 @@ export const useAdapterStore = create<AdapterStore>()((set, get) => ({
     return code;
   },
 
-  // TODO(IPC): panda 缺 adapterApi.removePairedUser；本地按平台过滤。
+  // v2.27.1 本地过滤（write 路径留 v2.27.2+）
   removePairedUser: async (platform, userId) => {
     const config = get().config;
     if (platform === 'telegram' && config.telegram?.pairedUsers) {
