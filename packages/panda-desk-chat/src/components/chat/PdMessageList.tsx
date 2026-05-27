@@ -32,6 +32,7 @@ import {
   extractText,
   extractThinking,
   type UIMessage,
+  type UIUserMessage,
   type UIToolUseMessage,
   type UIToolResultMessage,
 } from "../../stores/chatStore";
@@ -349,6 +350,7 @@ export const PdMessageList: React.FC<PdMessageListProps> = ({
               content={text}
               timestamp={msg.timestamp}
               transcriptMode={transcriptMode}
+              attachments={(msg as UIUserMessage).attachments}
               onRewind={
                 typeof rewindableUserIndex === "number"
                   ? () =>

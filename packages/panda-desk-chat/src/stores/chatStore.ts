@@ -36,10 +36,19 @@ export interface UIMessageBase {
   timestamp: number;
 }
 
+export interface UIAttachment {
+  type: 'image' | 'file';
+  name?: string;
+  mediaType: string;
+  /** base64 raw bytes（不含 data: 前缀） */
+  data: string;
+}
+
 export interface UIUserMessage extends UIMessageBase {
   type: 'user';
   /** Raw JSONL content — string or Anthropic content blocks array. */
   content: unknown;
+  attachments?: UIAttachment[];
   feedback?: MessageFeedback;
 }
 
@@ -248,7 +257,7 @@ export interface ChatStore {
   setActiveSession: (sessionId: string) => void;
 
   // Message actions
-  addUserMessage: (sessionId: string, content: string) => void;
+  addUserMessage: (sessionId: string, content: string, attachments?: UIAttachment[]) => void;
   startStreaming: (sessionId: string, messageId: string) => void;
   appendStreamDelta: (
     sessionId: string,
@@ -395,7 +404,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
   // -- Message actions -------------------------------------------------------
 
-  addUserMessage: (sessionId, content) =>
+  addUserMessage: (sessionId, content, attachments?) =>
     set((state) => {
       const session = getSession(state.sessions, sessionId);
       if (!session) return state;
@@ -404,6 +413,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         type: 'user',
         content,
         timestamp: Date.now(),
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
       };
       return {
         sessions: putSession(state.sessions, {
@@ -828,7 +838,13 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       return;
     }
     const { addUserMessage } = get();
-    addUserMessage(sessionId, content);
+    // Bug J 修复：normalize attachments → UIAttachment[]，让气泡能渲染缩略图
+    const uiAttachments: UIAttachment[] = (attachments ?? []).map(a => ({
+      type: 'image' as const,
+      mediaType: a.mediaType,
+      data: a.data,
+    }));
+    addUserMessage(sessionId, content, uiAttachments.length > 0 ? uiAttachments : undefined);
     // Bug E 修复（方案 B）：附件作为第三参数原样透传到 bridge → IPC → cli-manager，
     // 不再走 PdComposer 旧的 @path 序列化分支，避免 base64 串被拼进 text 后看不见且不能识别。
     bridge.sendMessage(sessionId, content, attachments).catch(async (err) => {
@@ -1153,13 +1169,38 @@ function messageEntryToUIMessage(entry: MessageEntry): UIMessage {
   const stableTs = Number.isNaN(ts) ? Date.now() : ts;
 
   switch (entry.type) {
-    case 'user':
+    case 'user': {
+      // Bug J 修复：扫 content blocks，提取 image blocks 还原为 UIAttachment
+      const userAttachments: UIAttachment[] = [];
+      const textParts: string[] = [];
+      if (Array.isArray(entry.content)) {
+        for (const block of entry.content as Array<Record<string, unknown>>) {
+          if (block.type === 'text' && typeof block.text === 'string') {
+            textParts.push(block.text);
+          } else if (block.type === 'image') {
+            const source = block.source as Record<string, unknown> | undefined;
+            userAttachments.push({
+              type: 'image',
+              name: 'image',
+              mediaType: (source?.media_type as string) ?? 'image/png',
+              data: (source?.data as string) ?? '',
+            });
+          }
+        }
+      } else if (typeof entry.content === 'string') {
+        textParts.push(entry.content);
+      }
+      const resolvedContent = textParts.length > 0
+        ? textParts.join('\n')
+        : entry.content;
       return {
         id,
         type: 'user',
-        content: entry.content,
+        content: resolvedContent,
         timestamp: stableTs,
+        ...(userAttachments.length > 0 ? { attachments: userAttachments } : {}),
       };
+    }
 
     case 'assistant':
       return {

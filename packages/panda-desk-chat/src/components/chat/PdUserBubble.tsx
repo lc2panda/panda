@@ -10,7 +10,8 @@
 import React, { useState } from "react";
 import { cn } from "../../lib/cn";
 import { PdMessageActionBar } from "./PdMessageActionBar";
-import type { TranscriptMode } from "../../stores/chatStore";
+import { PdAttachmentGallery } from "./PdAttachmentGallery";
+import type { TranscriptMode, UIAttachment } from "../../stores/chatStore";
 import { t } from "../../i18n";
 
 // W23C 任务 #3：truncate 阈值（与 PdMessageBubble 一致；用户消息一般不像 assistant 那么长，
@@ -63,10 +64,12 @@ export interface PdUserBubbleProps {
   rewindLabel?: string;
   /** Transcript mode — verbose 时不 truncate（Ctrl+O 全局展开承载方式）。 */
   transcriptMode?: TranscriptMode;
+  /** Bug J 修复：用户发送的图片附件，用于气泡内缩略图渲染。 */
+  attachments?: UIAttachment[];
 }
 
 export const PdUserBubble: React.FC<PdUserBubbleProps> = React.memo(
-  ({ content, onRewind, rewindLabel, transcriptMode = "normal" }) => {
+  ({ content, onRewind, rewindLabel, transcriptMode = "normal", attachments }) => {
     const hasText = content.trim().length > 0;
 
     // W23C 任务 #3：单条消息级 Expand 状态 + verbose 时跳过 truncate
@@ -83,7 +86,18 @@ export const PdUserBubble: React.FC<PdUserBubbleProps> = React.memo(
           data-message-shell="user"
           className="flex min-w-0 w-full max-w-[82%] flex-col items-end gap-2 sm:max-w-[78%] lg:max-w-[72%]"
         >
-          {/* panda store 暂无 attachments 字段，跳过 AttachmentGallery（cc-haha L21-23 对应位） */}
+          {/* Bug J 修复：渲染图片附件缩略图（cc-haha UserMessage L21-23 对应位） */}
+          {attachments && attachments.length > 0 && (
+            <PdAttachmentGallery
+              attachments={attachments.map(a => ({
+                type: a.type,
+                name: a.name ?? 'image',
+                // PdAttachmentGallery AttachmentPreview.data 期望 dataURL
+                data: `data:${a.mediaType};base64,${a.data}`,
+              }))}
+              variant="message"
+            />
+          )}
 
           {hasText && (
             <div
