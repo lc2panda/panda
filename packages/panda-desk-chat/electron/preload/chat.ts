@@ -117,6 +117,8 @@ const CH = {
   CONNECTORS_TOGGLE:    'panda:connectors:toggle',
   // Comdr 指令 cc-haha 路线 A: 会话控制 fork/branch/resume slash 注入 (1 个 channel)
   SESSION_CONTROL:      'panda:session:control',
+  // Bug F G5: 跳转系统终端
+  SHELL_OPEN_TERMINAL:  'shell:openTerminal',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -308,5 +310,10 @@ contextBridge.exposeInMainWorld('pandaAPI', {
   sessionControl: {
     dispatch: (sessionId: string, action: 'fork' | 'branch' | 'resume', args?: string) =>
       ipcRenderer.invoke(CH.SESSION_CONTROL, { sessionId, action, args }),
+  },
+  // Bug F G5: 跳转系统终端 namespace
+  shell: {
+    openTerminal: (args?: { cwd?: string }) =>
+      ipcRenderer.invoke(CH.SHELL_OPEN_TERMINAL, args ?? {}),
   },
 });

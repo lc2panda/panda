@@ -74,14 +74,15 @@ const en = {
   'settings.terminal.clear': 'Clear',
   'settings.terminal.restart': 'Restart',
   'settings.terminal.windowTitle': 'Host shell',
-  'settings.terminal.unavailableTitle': 'Desktop runtime required',
-  'settings.terminal.unavailableBody': 'Open this page in the packaged desktop app to start an interactive terminal.',
+  'settings.terminal.unavailableTitle': 'Desktop terminal planned',
+  'settings.terminal.unavailableBody': 'Native PTY terminal is on the roadmap. Use the button below to launch your system terminal.',
+  'settings.terminal.openSystemTerminal': 'Open system terminal',
   'settings.terminal.status.idle': 'Idle',
   'settings.terminal.status.starting': 'Starting',
   'settings.terminal.status.running': 'Running',
   'settings.terminal.status.exited': 'Exited',
   'settings.terminal.status.error': 'Error',
-  'settings.terminal.status.unavailable': 'Unavailable',
+  'settings.terminal.status.unavailable': 'Planned',
 
   // Settings > Claude Official Login
   'settings.claudeOfficialLogin.intro': 'Using official Claude models requires signing in to your Claude.ai account. Click the button below to open the official Claude login page in your browser; you\'ll be returned here after authorizing.',

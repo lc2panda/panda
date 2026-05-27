@@ -1023,6 +1023,22 @@ export async function toggleConnector(
   }
 }
 
+// ─── Bug F G5: 跳转系统终端 ──────────────────────────────────────────────────
+
+/** Open the host system terminal at the given cwd (or HOME if omitted). */
+export async function openSystemTerminal(cwd?: string): Promise<{ ok: boolean; error?: string }> {
+  if (IS_DEV) {
+    console.info('[bridge] openSystemTerminal dev no-op', cwd);
+    return { ok: true };
+  }
+  try {
+    return await getPandaAPI().shell.openTerminal({ cwd });
+  } catch (err) {
+    console.warn('[bridge] openSystemTerminal failed:', err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 // ─── Comdr 指令 cc-haha 路线 A: 会话控制 fork/branch/resume slash 注入 ───────
 
 export async function dispatchSessionControl(

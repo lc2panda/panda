@@ -1,14 +1,15 @@
 // Input: terminalApi (panda stub) — isAvailable() === false 走 unavailable 分支
-// Output: terminal status pill + restart/clear buttons + xterm host (panda 暂无 PTY → unavailable card)
+// Output: terminal status pill + 系统终端按钮 + xterm host (panda 暂无 PTY → planned card + openSystemTerminal G5)
 // Pos: Settings tab — fifth entry (icon: terminal)
 //
-// Source 1:1: cc-haha desktop/src/pages/TerminalSettings.tsx (276 行)
-//   panda 无 xterm/sidecar：isAvailable() 返回 false，UI 渲染 unavailableTitle/Body 占位卡。
+// Bug F G2+G5: 文案改为"规划中" + 新增"打开系统终端"按钮 (openSystemTerminal IPC)
+//   完整 PTY 集成 (G3) 留 v2.28+ 独立大版本立项。
 // 一旦我被修改，请更新我的头部注释，以及所属文件夹的 README.md。
 
 import { useState } from 'react';
 import { t } from '../../i18n';
 import { terminalApi } from '../../api/terminal';
+import { openSystemTerminal } from '../../ipc/bridge';
 
 type TerminalStatus =
   | 'idle'
@@ -63,11 +64,11 @@ export function PdTerminalSettings() {
           </button>
           <button
             type="button"
-            onClick={startTerminal}
+            onClick={() => { void openSystemTerminal(); }}
             className="inline-flex h-8 items-center gap-1.5 rounded-[var(--pd-radius-md)] bg-[var(--pd-color-text-primary)] px-2.5 text-xs font-medium text-[var(--pd-color-surface)] transition-colors hover:opacity-90"
           >
-            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">restart_alt</span>
-            {t('settings.terminal.restart')}
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">open_in_new</span>
+            {t('settings.terminal.openSystemTerminal')}
           </button>
         </div>
       </div>
@@ -94,6 +95,14 @@ export function PdTerminalSettings() {
             <p className="mt-1 text-sm text-[var(--pd-color-text-tertiary)]">
               {t('settings.terminal.unavailableBody')}
             </p>
+            <button
+              type="button"
+              onClick={() => { void openSystemTerminal(); }}
+              className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-[var(--pd-radius-md)] bg-[var(--pd-color-text-primary)] px-3 text-xs font-medium text-[var(--pd-color-surface)] transition-colors hover:opacity-90"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[16px]">open_in_new</span>
+              {t('settings.terminal.openSystemTerminal')}
+            </button>
           </div>
         </div>
       ) : (

@@ -175,6 +175,8 @@ const CH = {
   CONNECTORS_TOGGLE:    'panda:connectors:toggle',
   // Comdr 指令 cc-haha 路线 A: 会话控制 fork/branch/resume slash 注入 (1 个 channel)
   SESSION_CONTROL:      'panda:session:control',
+  // Bug F G5: 跳转系统终端
+  SHELL_OPEN_TERMINAL:  'shell:openTerminal',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -945,7 +947,30 @@ export function registerIpcHandlers(): void {
     },
   );
 
-  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning + teams + audit + memdir + connectors + session-control connected)');
+  // Bug F G5: 跳转系统终端 —————————————————————————————————————————
+  ipcMain.handle(CH.SHELL_OPEN_TERMINAL, async (_event, args: { cwd?: string } = {}) => {
+    const cwd = args?.cwd || process.env.HOME || '/';
+    try {
+      if (process.platform === 'darwin') {
+        childSpawn('open', ['-a', 'Terminal', cwd], { detached: true, stdio: 'ignore' }).unref();
+        return { ok: true };
+      }
+      if (process.platform === 'linux') {
+        childSpawn('x-terminal-emulator', [], { detached: true, stdio: 'ignore', cwd }).unref();
+        return { ok: true };
+      }
+      if (process.platform === 'win32') {
+        childSpawn('cmd.exe', ['/c', 'start', 'cmd'], { detached: true, stdio: 'ignore', cwd }).unref();
+        return { ok: true };
+      }
+      return { ok: false, error: 'unsupported-platform' };
+    } catch (err) {
+      console.error('[IPC] SHELL_OPEN_TERMINAL failed:', err);
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  console.log('[IPC] Registered invoke handlers (CLI backend + window manager + schedule + pandacc + adapter + wechat-db + learning + teams + audit + memdir + connectors + session-control + shell-open-terminal connected)');
 }
 
 // ---------------------------------------------------------------------------

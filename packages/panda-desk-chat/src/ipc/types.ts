@@ -385,6 +385,10 @@ export interface PandaChatAPI {
       args?: string,
     ): Promise<SessionControlResult>;
   };
+  // Bug F G5: 跳转系统终端 namespace
+  shell: {
+    openTerminal(args?: { cwd?: string }): Promise<{ ok: boolean; error?: string }>;
+  };
 }
 
 // ─── Window init event payload ────────────────────────────────────────────

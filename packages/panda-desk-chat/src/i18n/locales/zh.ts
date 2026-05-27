@@ -76,14 +76,15 @@ const zh: Record<TranslationKey, string> = {
   'settings.terminal.clear': '清屏',
   'settings.terminal.restart': '重启',
   'settings.terminal.windowTitle': '宿主机 Shell',
-  'settings.terminal.unavailableTitle': '需要桌面端运行时',
-  'settings.terminal.unavailableBody': '请在打包后的桌面端里打开这个页面，才能启动交互式终端。',
+  'settings.terminal.unavailableTitle': '桌面终端规划中',
+  'settings.terminal.unavailableBody': '桌面端 PTY 终端集成已规划，请暂用下方按钮打开系统终端。',
+  'settings.terminal.openSystemTerminal': '打开系统终端',
   'settings.terminal.status.idle': '空闲',
   'settings.terminal.status.starting': '启动中',
   'settings.terminal.status.running': '运行中',
   'settings.terminal.status.exited': '已退出',
   'settings.terminal.status.error': '错误',
-  'settings.terminal.status.unavailable': '不可用',
+  'settings.terminal.status.unavailable': '规划中',
 
   // Settings > Claude Official Login
   'settings.claudeOfficialLogin.intro': '使用官方 Claude 模型需要登录你的 Claude.ai 账号。点击下方按钮,浏览器会打开 Claude 官方登录页面,授权后自动回到这里。',
