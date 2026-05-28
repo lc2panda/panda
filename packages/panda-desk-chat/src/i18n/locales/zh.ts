@@ -1091,6 +1091,9 @@ const zh: Record<TranslationKey, string> = {
   'settings.about.readyToInstall': '更新就绪 — 重启以应用',
   'settings.about.restartNow': '立即重启',
   'settings.about.checkFailed': '更新检查失败',
+  'settings.about.releases': '版本发布',
+  'settings.about.issues': '反馈问题',
+  'update.viewReleasesManually': '手动打开 Releases 页面 →',
 
   // Inspector (panda inspector panels)
   'inspector.context': '上下文',

@@ -1,5 +1,5 @@
 // Input: updateStore (status/availableVersion/progress/installUpdate/checkForUpdates)
-// Output: Logo · version · GitHub · update card · author/social links
+// Output: Logo · version · GitHub (repo/releases/issues) · update card (error fallback → Releases) · author/social links
 // Pos: Settings tab — eleventh entry (icon: info, prefixed with border-t separator)
 //
 // Source 1:1: cc-haha desktop/src/pages/Settings.tsx L1384-L1619 (AboutSettings)
@@ -13,7 +13,9 @@ import { PdButton } from '../../components/shared/PdButton';
 import { useUpdateStore } from '../../stores/updateStore';
 import { formatBytes } from '../../lib/formatBytes';
 
-const PANDA_GITHUB_REPO = 'https://github.com/lc2panda/panda-code';
+const PANDA_GITHUB_REPO = 'https://github.com/lc2panda/panda';
+const PANDA_RELEASES = 'https://github.com/lc2panda/panda/releases';
+const PANDA_ISSUES = 'https://github.com/lc2panda/panda/issues';
 const PANDA_AUTHOR = 'PandaAI';
 const PANDA_AUTHOR_GITHUB = 'https://github.com/lc2panda';
 const PANDA_WECHAT_OFFICIAL = 'PandaAI';
@@ -108,10 +110,52 @@ export function PdAboutSettings() {
           </span>
           <div className="flex-1 text-left">
             <div className="text-sm font-medium text-[var(--pd-color-text-primary)]">
-              lc2panda/panda-code
+              lc2panda/panda
             </div>
             <div className="text-xs text-[var(--pd-color-text-tertiary)]">
               {t('settings.about.starHint')}
+            </div>
+          </div>
+          <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[var(--pd-color-text-tertiary)]">
+            open_in_new
+          </span>
+        </button>
+
+        {/* Releases link */}
+        <button
+          onClick={() => openUrl(PANDA_RELEASES)}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--pd-color-border)] hover:bg-[var(--pd-color-surface-hover)] transition-colors cursor-pointer mt-2"
+        >
+          <span aria-hidden="true" className="material-symbols-outlined text-[20px] opacity-70">
+            new_releases
+          </span>
+          <div className="flex-1 text-left">
+            <div className="text-sm font-medium text-[var(--pd-color-text-primary)]">
+              {t('settings.about.releases')}
+            </div>
+            <div className="text-xs text-[var(--pd-color-text-tertiary)]">
+              github.com/lc2panda/panda/releases
+            </div>
+          </div>
+          <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[var(--pd-color-text-tertiary)]">
+            open_in_new
+          </span>
+        </button>
+
+        {/* Issues / feedback link */}
+        <button
+          onClick={() => openUrl(PANDA_ISSUES)}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--pd-color-border)] hover:bg-[var(--pd-color-surface-hover)] transition-colors cursor-pointer mt-2"
+        >
+          <span aria-hidden="true" className="material-symbols-outlined text-[20px] opacity-70">
+            bug_report
+          </span>
+          <div className="flex-1 text-left">
+            <div className="text-sm font-medium text-[var(--pd-color-text-primary)]">
+              {t('settings.about.issues')}
+            </div>
+            <div className="text-xs text-[var(--pd-color-text-tertiary)]">
+              github.com/lc2panda/panda/issues
             </div>
           </div>
           <span aria-hidden="true" className="material-symbols-outlined text-[16px] text-[var(--pd-color-text-tertiary)]">
@@ -173,6 +217,15 @@ export function PdAboutSettings() {
           >
             {updateDescription}
           </p>
+
+          {error && (
+            <button
+              onClick={() => openUrl(PANDA_RELEASES)}
+              className="mt-2 text-xs text-[var(--pd-color-accent)] hover:underline cursor-pointer"
+            >
+              {t('update.viewReleasesManually')}
+            </button>
+          )}
 
           {checkedAtText && (
             <p className="mt-1 text-xs text-[var(--pd-color-text-tertiary)]">

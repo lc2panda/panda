@@ -1088,6 +1088,9 @@ const en = {
   'settings.about.readyToInstall': 'Update ready — restart to apply',
   'settings.about.restartNow': 'Restart Now',
   'settings.about.checkFailed': 'Update check failed',
+  'settings.about.releases': 'Releases',
+  'settings.about.issues': 'Report an Issue',
+  'update.viewReleasesManually': 'View Releases page manually →',
 
   // Inspector (panda inspector panels)
   'inspector.context': 'Context',

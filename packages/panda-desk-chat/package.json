@@ -1,6 +1,6 @@
 {
-  "name": "@panda/desk-chat",
-  "version": "0.3.4",
+  "name": "panda-desk-chat",
+  "version": "0.3.5",
   "private": true,
   "type": "module",
   "description": "Panda Code desktop chat UI — React + Vite + Tailwind 4",
@@ -88,7 +88,7 @@
     "publish": {
       "provider": "github",
       "owner": "lc2panda",
-      "repo": "panda-code"
+      "repo": "panda"
     }
   },
   "dependencies": {
