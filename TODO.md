@@ -20,8 +20,8 @@
 - [x] /Applications/Panda.app 替换：CFBundleShortVersionString=0.3.5，asar sha256 e6fe1c48...
 - [x] git push main + v2.27.7 tag（`Everything up-to-date`，2026-05-28 10:17 +08:00）
 - [x] npm publish：`@lc2panda/panda-code@2.27.7` 已发布（`npm view` 返回 `2.27.7`，2026-05-28 10:18 +08:00）
-- [x] GitHub Release v2.27.7 创建：`https://github.com/lc2panda/panda/releases/tag/v2.27.7`（draft=false，2026-05-28 10:26 +08:00）
-- [~] gh release 大文件补传（5/9 上传 state=uploaded；4 个大文件 DMG/zip/exe 因 LibreSSL TLS 问题待下波补传）
+- [x] GitHub Release v2.27.7 创建并发布：`https://github.com/lc2panda/panda/releases/tag/v2.27.7`（release id 330635719，draft=false，2026-05-28 11:08 +08:00）
+- [~] gh release 大文件补传（5/9 小文件 state=uploaded digest 完全一致；4 个大文件 DMG/zip/exe 因本机 TLS 与 uploads.github.com 不兼容待补传；推荐在 Linux/Windows/有代理环境执行）
 
 ## 已完成 — v2.27.6 Bug J UI 图片展示真补（2026-05-27 +08:00 闭环）
 
