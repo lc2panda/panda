@@ -551,8 +551,17 @@ export async function getAnthropicClient({
   }
 
   const _hasThirdParty = !!getGlobalConfig().thirdPartyProvider
-  const resolvedApiKey = (_hasThirdParty || !isClaudeAISubscriber()) ? (apiKey || getAnthropicApiKey()) : null
-  const resolvedAuthToken = (!_hasThirdParty && isClaudeAISubscriber())
+  // Wave1-项4 P0 修复: 仅在 first-party 官方端点（api.anthropic.com / staging）时注入 OAuth。
+  // 自定义 ANTHROPIC_BASE_URL（第三方 gateway）时不注入 OAuth，回退到 apiKey/getAnthropicApiKey()，
+  // 防止用户 OAuth accessToken 泄露到第三方服务。
+  // 放行边界:
+  //   staging OAuth (USE_STAGING_OAUTH=true + USER_TYPE=ant): ANTHROPIC_BASE_URL 通常未设，
+  //     isFirstPartyAnthropicBaseUrl() 在无 baseUrl 时返回 true，天然放行；
+  //     且 USER_TYPE=ant 时 api-staging.anthropic.com 已加入白名单。
+  //   ssh unix-socket 代理: 在 auth.ts:111-113 层面已处理，不经过此注入路径。
+  const _isFirstParty = isFirstPartyAnthropicBaseUrl()
+  const resolvedApiKey = (_hasThirdParty || !isClaudeAISubscriber() || !_isFirstParty) ? (apiKey || getAnthropicApiKey()) : null
+  const resolvedAuthToken = (!_hasThirdParty && isClaudeAISubscriber() && _isFirstParty)
     ? getClaudeAIOAuthTokens()?.accessToken
     : undefined
   const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
