@@ -3,7 +3,7 @@
 // Pos: src/daemon/ —— DAEMON feature gate 路由入口；复用 bgSpawn/PID registry/tmux/bridge
 
 import { spawn, type ChildProcess } from 'child_process'
-import { mkdir, writeFile, readFile, unlink, chmod } from 'fs/promises'
+import { mkdir, writeFile, readFile, unlink, chmod, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
 
@@ -45,6 +45,23 @@ const MAX_RESPAWN = 5
 /** respawn 间隔（毫秒），指数退避乘数 */
 const RESPAWN_BASE_DELAY_MS = 1000
 
+/**
+ * D5-1 (v2.1.154-a): 同一 worker 最小重启间隔。
+ * 升级后 pinned bg session 每分钟重生的根因是：binary 替换后旧 daemon
+ * 仍持有 worker state 并在 heartbeat 内不断判断"进程死了→respawn"。
+ * 通过保护最小间隔（30s），防止快速连续 respawn 形成通知风暴。
+ */
+/** @internal 导出供测试验证阈值 */
+export const MIN_RESPAWN_INTERVAL_MS = 30_000
+
+/**
+ * D5-3 (v2.1.154-c): bg session 空闲宽限期。
+ * bg session 卡在 blocked/running/working 且超过此时长无活动上报时，
+ * daemon 将其判定为僵死并发送 SIGTERM 退休。
+ */
+/** @internal 导出供测试验证阈值 */
+export const IDLE_GRACE_MS = 5 * 60 * 1000 // 5 分钟
+
 // ---------------------------------------------------------------------------
 // 类型
 // ---------------------------------------------------------------------------
@@ -60,6 +77,11 @@ interface WorkerState {
   respawnCount: number
   lastRespawnAt: number
   exited: boolean
+  /**
+   * D5-2 (v2.1.154-b): 追踪该 worker spawn 出的 pty-host 子进程 PID 列表。
+   * daemon 退出时统一清理，防止孤儿 pty-host 在 macOS 上 100% CPU 空转。
+   */
+  ptyHostPids: number[]
 }
 
 interface DaemonPidFile {
@@ -278,11 +300,42 @@ function spawnWorkerSubprocess(
 
 /**
  * 调度 worker respawn（仅在 supervisor 未关闭且未超过上限时）。
+ *
+ * D5-1 (v2.1.154-a): 加入最小重启间隔保护 MIN_RESPAWN_INTERVAL_MS。
+ * 上游修复原因：binary 升级后，旧 daemon 仍持有 worker state，每次心跳
+ * 发现进程不在就立即 respawn，造成每分钟重生通知风暴。
+ * 修复：respawn 前检查距上次重启是否超过最小间隔；若 worker 实际仍在运行
+ * 则跳过本次 respawn（防止升级期间的虚假"进程死亡"判断）。
  */
 function scheduleRespawn(state: WorkerState): void {
   if (shuttingDown) return
 
   const workerId = `${state.spec.kind}/${state.spec.id}`
+
+  // D5-1: 若 worker 进程实际仍在运行（e.g. 仅 exit 事件误触发），跳过 respawn
+  if (state.proc?.pid != null && isProcessRunning(state.proc.pid)) {
+    logForDebugging(
+      `[daemon] worker ${workerId} still running (pid=${state.proc.pid}), skipping respawn`,
+    )
+    return
+  }
+
+  // D5-1: 最小重启间隔保护，防止升级后 pinned session 每分钟重生
+  const now = Date.now()
+  if (
+    state.lastRespawnAt > 0 &&
+    now - state.lastRespawnAt < MIN_RESPAWN_INTERVAL_MS
+  ) {
+    const wait = MIN_RESPAWN_INTERVAL_MS - (now - state.lastRespawnAt)
+    logForDebugging(
+      `[daemon] worker ${workerId} respawn throttled, waiting ${wait}ms (min interval=${MIN_RESPAWN_INTERVAL_MS}ms)`,
+    )
+    // 延迟到间隔结束后再重新调度（不计入 respawnCount）
+    setTimeout(() => {
+      if (!shuttingDown) scheduleRespawn(state)
+    }, wait)
+    return
+  }
 
   if (state.respawnCount >= MAX_RESPAWN) {
     logForDebugging(
@@ -346,12 +399,109 @@ async function gracefulShutdown(signal: string): Promise<never> {
         }),
       )
     }
+
+    // D5-2 (v2.1.154-b): 清理孤儿 pty-host 子进程。
+    // bg session 的 pty-host 是 worker spawn 出的孙子进程，daemon 退出后
+    // 其 PPID 变为 1（macOS 上不会随父进程死亡），导致 100% CPU 空转。
+    // 修复：daemon 退出时遍历追踪的 ptyHostPids，逐一 SIGTERM + 超时 SIGKILL。
+    for (const ptyPid of state.ptyHostPids) {
+      if (!isProcessRunning(ptyPid)) continue
+      logForDebugging(
+        `[daemon] terminating orphan pty-host pid=${ptyPid} (worker ${id})`,
+      )
+      try {
+        process.kill(ptyPid, 'SIGTERM')
+      } catch {
+        // already dead
+      }
+      killPromises.push(
+        new Promise<void>(resolve => {
+          const deadline = Date.now() + 3000
+          const check = setInterval(() => {
+            if (!isProcessRunning(ptyPid) || Date.now() > deadline) {
+              clearInterval(check)
+              if (isProcessRunning(ptyPid)) {
+                try {
+                  process.kill(ptyPid, 'SIGKILL')
+                } catch {
+                  // ignore
+                }
+              }
+              resolve()
+            }
+          }, 100)
+        }),
+      )
+    }
   }
+
+  // D5-2 额外保障：扫描 sessions 目录，找所有仍注册为 pty-host kind 的进程并清理
+  await cleanupOrphanPtyHosts()
 
   await Promise.all(killPromises)
   await removeDaemonPidFile()
   logForDebugging('[daemon] shutdown complete')
   process.exit(0)
+}
+
+/**
+ * D5-2 (v2.1.154-b): 扫描 sessions PID 目录，清理孤儿 pty-host 进程。
+ * @internal 导出供测试使用
+ * daemon 直接 spawn 的 worker 可能再 spawn pty-host（其 PPID = worker），
+ * worker 死后 pty-host 的 PPID 变 1，在 macOS 上持续 100% CPU 空转。
+ * 通过扫 sessions dir + kind='bg-pty-host' 识别并 SIGTERM 清理。
+ */
+export async function cleanupOrphanPtyHosts(): Promise<void> {
+  const sessionsDir = join(getClaudeConfigHomeDir(), 'sessions')
+  let files: string[]
+  try {
+    files = await readdir(sessionsDir)
+  } catch {
+    return
+  }
+  const termPromises: Promise<void>[] = []
+  for (const f of files) {
+    if (!f.endsWith('.json')) continue
+    try {
+      const raw = await readFile(join(sessionsDir, f), 'utf8')
+      const entry = JSON.parse(raw) as {
+        pid?: number
+        kind?: string
+      }
+      if (
+        typeof entry.pid === 'number' &&
+        entry.kind === 'bg-pty-host' &&
+        isProcessRunning(entry.pid)
+      ) {
+        logForDebugging(
+          `[daemon] cleanupOrphanPtyHosts: terminating pid=${entry.pid}`,
+        )
+        try {
+          process.kill(entry.pid, 'SIGTERM')
+        } catch {
+          // already dead
+        }
+        const pid = entry.pid
+        termPromises.push(
+          new Promise<void>(resolve => {
+            setTimeout(() => {
+              if (isProcessRunning(pid)) {
+                try {
+                  process.kill(pid, 'SIGKILL')
+                } catch {
+                  // ignore
+                }
+              }
+              resolve()
+            }, 2000)
+          }),
+        )
+      }
+    } catch {
+      // parse error → skip
+    }
+  }
+  await Promise.all(termPromises)
 }
 
 // ---------------------------------------------------------------------------
@@ -405,6 +555,7 @@ async function runSupervisor(workerSpecs: WorkerSpec[]): Promise<void> {
       respawnCount: 0,
       lastRespawnAt: 0,
       exited: false,
+      ptyHostPids: [],
     }
     workers.set(workerId, state)
     await spawnWorker(state, useTmux)
@@ -425,11 +576,89 @@ async function runSupervisor(workerSpecs: WorkerSpec[]): Promise<void> {
       logForDebugging(
         `[daemon] heartbeat workers=${workers.size} pid=${process.pid}`,
       )
+      // D5-3 (v2.1.154-c): 每轮心跳检查 bg session 空闲宽限期
+      void reapIdleBgSessions()
     }, 30_000)
 
     // unref 以防止 heartbeat 阻止 Node/Bun 自然退出
     heartbeat.unref()
   })
+}
+
+/**
+ * D5-3 (v2.1.154-c): 扫描 sessions 目录，对空闲时长超过 IDLE_GRACE_MS 的
+ * bg session 进程发送 SIGTERM 使其退休，并删除对应 PID 文件。
+ *
+ * 上游修复原因：bg session 在执行完任务后卡在 blocked/running/working 状态
+ * 无法自行退出，导致进程积累消耗资源。通过 updatedAt 时间戳检测最近活动。
+ */
+export async function reapIdleBgSessions(): Promise<void> {
+  const sessionsDir = join(getClaudeConfigHomeDir(), 'sessions')
+  let files: string[]
+  try {
+    files = await readdir(sessionsDir)
+  } catch {
+    return
+  }
+
+  const now = Date.now()
+  for (const f of files) {
+    if (!f.endsWith('.json')) continue
+    const filePath = join(sessionsDir, f)
+    try {
+      const raw = await readFile(filePath, 'utf8')
+      const entry = JSON.parse(raw) as {
+        pid?: number
+        kind?: string
+        status?: string
+        updatedAt?: number
+        startedAt?: number
+      }
+
+      // 只处理 bg kind
+      if (entry.kind !== 'bg') continue
+
+      const pid = entry.pid
+      if (typeof pid !== 'number') continue
+
+      // 进程已死 → 清理 stale PID 文件
+      if (!isProcessRunning(pid)) {
+        logForDebugging(
+          `[daemon] reapIdle: removing stale PID file for dead bg session pid=${pid}`,
+        )
+        try {
+          await unlink(filePath)
+        } catch {
+          // ENOENT is fine
+        }
+        continue
+      }
+
+      // 获取最近活动时间（updatedAt 优先，fallback 到 startedAt）
+      const lastActivity = entry.updatedAt ?? entry.startedAt ?? 0
+      if (lastActivity === 0) continue
+
+      const idleMs = now - lastActivity
+      if (idleMs < IDLE_GRACE_MS) continue
+
+      logForDebugging(
+        `[daemon] reapIdle: bg session pid=${pid} idle ${idleMs}ms > grace ${IDLE_GRACE_MS}ms, sending SIGTERM`,
+      )
+      try {
+        process.kill(pid, 'SIGTERM')
+      } catch {
+        // already dead between check and kill
+      }
+      // 删除 PID 文件（进程收到 SIGTERM 后会自行清理，但提前删除防止 ps 列出）
+      try {
+        await unlink(filePath)
+      } catch {
+        // ENOENT is fine
+      }
+    } catch {
+      // parse error or ENOENT → skip
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

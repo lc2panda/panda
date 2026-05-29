@@ -22,6 +22,11 @@ let mkdirCalled = false
 let writtenPidPath: string | null = null
 let unlinkCalled = false
 
+// D5 mock helpers: readdir / per-file readFile overrides
+let mockReaddirFiles: string[] = []
+const mockFileContents = new Map<string, string>()
+let unlinkPaths: string[] = []
+
 mock.module('fs/promises', () => ({
   mkdir: async () => { mkdirCalled = true },
   writeFile: async (_path: string, data: string) => {
@@ -29,11 +34,17 @@ mock.module('fs/promises', () => ({
     mockPidFileData = data
   },
   readFile: async (_path: string) => {
+    // Per-file override (used by D5 tests)
+    if (mockFileContents.has(_path)) return mockFileContents.get(_path)!
     if (mockPidFileData === null) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
     return mockPidFileData
   },
-  unlink: async () => { unlinkCalled = true },
+  unlink: async (_path: string) => {
+    unlinkCalled = true
+    unlinkPaths.push(_path)
+  },
   chmod: async () => {},
+  readdir: async () => mockReaddirFiles,
 }))
 
 // ---------------------------------------------------------------------------
@@ -134,7 +145,14 @@ mock.module('../../../src/utils/swarm/constants.js', () => ({
 // ---------------------------------------------------------------------------
 
 import { runDaemonWorker } from '../workerRegistry.js'
-import { daemonMain, DAEMON_TMUX_SESSION } from '../main.js'
+import {
+  daemonMain,
+  DAEMON_TMUX_SESSION,
+  cleanupOrphanPtyHosts,
+  reapIdleBgSessions,
+  MIN_RESPAWN_INTERVAL_MS,
+  IDLE_GRACE_MS,
+} from '../main.js'
 
 // ---------------------------------------------------------------------------
 // Tests: workerRegistry
@@ -346,5 +364,187 @@ describe('daemonMain — unknown 子命令', () => {
 describe('DAEMON_TMUX_SESSION 常量', () => {
   test('应为 panda-daemon', () => {
     expect(DAEMON_TMUX_SESSION).toBe('panda-daemon')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// D5-1 (v2.1.154-a): MIN_RESPAWN_INTERVAL_MS 常量验证
+// ---------------------------------------------------------------------------
+
+describe('D5-1 MIN_RESPAWN_INTERVAL_MS', () => {
+  test('应 ≥ 30 秒，防止升级后 pinned session 每分钟重生', () => {
+    expect(MIN_RESPAWN_INTERVAL_MS).toBeGreaterThanOrEqual(30_000)
+  })
+
+  test('应 < 120 秒，避免 worker 崩溃后恢复过慢', () => {
+    expect(MIN_RESPAWN_INTERVAL_MS).toBeLessThan(120_000)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// D5-2 (v2.1.154-b): cleanupOrphanPtyHosts
+// ---------------------------------------------------------------------------
+
+describe('D5-2 cleanupOrphanPtyHosts', () => {
+  beforeEach(() => {
+    mockReaddirFiles = []
+    mockFileContents.clear()
+    unlinkPaths = []
+    unlinkCalled = false
+  })
+
+  test('sessions 目录不存在时不抛出', async () => {
+    // readdir 已 mock 为 throw ENOENT
+    mockReaddirFiles = [] // readdir mock 正常返回空
+    await expect(cleanupOrphanPtyHosts()).resolves.toBeUndefined()
+  })
+
+  test('无 bg-pty-host 条目时不发 kill', async () => {
+    mockReaddirFiles = ['1234.json']
+    mockFileContents.set(
+      '/tmp/panda-daemon-test/sessions/1234.json',
+      JSON.stringify({ pid: 1234, kind: 'bg', status: 'idle' }),
+    )
+    mockProcessRunning = false
+
+    const killCalls: Array<[number, string]> = []
+    const origKill = process.kill.bind(process)
+    // @ts-ignore
+    process.kill = (pid: number, sig: string) => { killCalls.push([pid, sig]) }
+    try {
+      await cleanupOrphanPtyHosts()
+    } finally {
+      // @ts-ignore
+      process.kill = origKill
+    }
+    expect(killCalls).toHaveLength(0)
+  })
+
+  test('发现存活 bg-pty-host 进程应发 SIGTERM', async () => {
+    mockReaddirFiles = ['9876.json']
+    mockFileContents.set(
+      '/tmp/panda-daemon-test/sessions/9876.json',
+      JSON.stringify({ pid: 9876, kind: 'bg-pty-host' }),
+    )
+    mockProcessRunning = true
+
+    const killCalls: Array<[number, string]> = []
+    const origKill = process.kill.bind(process)
+    // @ts-ignore
+    process.kill = (pid: number, sig: string) => {
+      killCalls.push([pid, sig])
+      // 模拟进程收到信号后即死（让 Promise 及时 resolve）
+      mockProcessRunning = false
+    }
+    try {
+      await cleanupOrphanPtyHosts()
+    } finally {
+      // @ts-ignore
+      process.kill = origKill
+    }
+    expect(killCalls.some(([pid, sig]) => pid === 9876 && sig === 'SIGTERM')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// D5-3 (v2.1.154-c): reapIdleBgSessions + IDLE_GRACE_MS
+// ---------------------------------------------------------------------------
+
+describe('D5-3 IDLE_GRACE_MS', () => {
+  test('应 ≥ 3 分钟', () => {
+    expect(IDLE_GRACE_MS).toBeGreaterThanOrEqual(3 * 60 * 1000)
+  })
+
+  test('应 ≤ 15 分钟，避免僵死进程积累过久', () => {
+    expect(IDLE_GRACE_MS).toBeLessThanOrEqual(15 * 60 * 1000)
+  })
+})
+
+describe('D5-3 reapIdleBgSessions', () => {
+  beforeEach(() => {
+    mockReaddirFiles = []
+    mockFileContents.clear()
+    unlinkPaths = []
+    unlinkCalled = false
+    mockProcessRunning = false
+  })
+
+  test('sessions 目录为空时不抛出', async () => {
+    mockReaddirFiles = []
+    await expect(reapIdleBgSessions()).resolves.toBeUndefined()
+  })
+
+  test('bg session updatedAt 未超过 grace 时不 kill', async () => {
+    const recentMs = Date.now() - 60_000 // 1 分钟前，未超过 5 分钟
+    mockReaddirFiles = ['5555.json']
+    mockFileContents.set(
+      '/tmp/panda-daemon-test/sessions/5555.json',
+      JSON.stringify({ pid: 5555, kind: 'bg', updatedAt: recentMs }),
+    )
+    mockProcessRunning = true
+
+    const killCalls: Array<[number, string]> = []
+    const origKill = process.kill.bind(process)
+    // @ts-ignore
+    process.kill = (pid: number, sig: string) => { killCalls.push([pid, sig]) }
+    try {
+      await reapIdleBgSessions()
+    } finally {
+      // @ts-ignore
+      process.kill = origKill
+    }
+    expect(killCalls).toHaveLength(0)
+  })
+
+  test('bg session updatedAt 超过 IDLE_GRACE_MS 时发 SIGTERM 并删 PID 文件', async () => {
+    const staleMs = Date.now() - IDLE_GRACE_MS - 10_000 // 超出宽限期
+    mockReaddirFiles = ['7777.json']
+    mockFileContents.set(
+      '/tmp/panda-daemon-test/sessions/7777.json',
+      JSON.stringify({ pid: 7777, kind: 'bg', updatedAt: staleMs }),
+    )
+    mockProcessRunning = true
+
+    const killCalls: Array<[number, string]> = []
+    const origKill = process.kill.bind(process)
+    // @ts-ignore
+    process.kill = (pid: number, sig: string) => {
+      killCalls.push([pid, sig])
+      mockProcessRunning = false
+    }
+    try {
+      await reapIdleBgSessions()
+    } finally {
+      // @ts-ignore
+      process.kill = origKill
+    }
+    expect(killCalls.some(([pid, sig]) => pid === 7777 && sig === 'SIGTERM')).toBe(true)
+    // PID 文件应被删除
+    expect(unlinkCalled).toBe(true)
+  })
+
+  test('dead bg session（进程已死）清理 stale PID 文件，不发 kill', async () => {
+    const staleMs = Date.now() - IDLE_GRACE_MS - 30_000
+    mockReaddirFiles = ['8888.json']
+    mockFileContents.set(
+      '/tmp/panda-daemon-test/sessions/8888.json',
+      JSON.stringify({ pid: 8888, kind: 'bg', updatedAt: staleMs }),
+    )
+    mockProcessRunning = false // 进程已死
+
+    const killCalls: Array<[number, string]> = []
+    const origKill = process.kill.bind(process)
+    // @ts-ignore
+    process.kill = (pid: number, sig: string) => { killCalls.push([pid, sig]) }
+    try {
+      await reapIdleBgSessions()
+    } finally {
+      // @ts-ignore
+      process.kill = origKill
+    }
+    // 不应发 kill（进程已死）
+    expect(killCalls.filter(([pid]) => pid === 8888)).toHaveLength(0)
+    // 但应清理 stale PID 文件
+    expect(unlinkCalled).toBe(true)
   })
 })
