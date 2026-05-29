@@ -1,9 +1,17 @@
-import { z } from 'zod/v4'
+// Input:  tool_use call {workflow, args} from model + ToolUseContext (setAppState, AgentTool registry)
+// Output: WorkflowRunResult (static) or runWorkflowSteps result (dynamic, multi-step)
+// Pos:    src/tools/WorkflowTool/WorkflowTool.ts — main entry point for /Workflow tool calls;
+//         delegates multi-step runs to WorkflowOrchestrator which is built on D7 coordinator/swarm.
+// "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
+
+import { generateTaskId } from '../../Task.js'
 import { buildTool, type ToolDef } from '../../Tool.js'
 import { lazySchema } from '../../utils/lazySchema.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
+import { z } from 'zod/v4'
 import { WORKFLOW_TOOL_NAME } from './constants.js'
 import { getWorkflow, listWorkflows } from './createWorkflowCommand.js'
+import { runWorkflowSteps } from './WorkflowOrchestrator.js'
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
@@ -48,7 +56,9 @@ export const WorkflowTool = buildTool({
 
 Pass the workflow name and any required arguments. Use this for repeatable, structured operations that go beyond single tool calls.
 
-Available workflows are registered at startup. If no workflows are registered, this tool will report an empty list.`
+Workflows with a \`steps\` array run as dynamic multi-agent orchestrations in the background — each step spawns a sub-agent via the swarm. Kill, skip, and retry individual steps via the background tasks UI.
+
+Available workflows are registered at startup or discovered from ~/.pandacc/workflows/ and <project>/.pandacc/workflows/ (JSON files).`
   },
 
   mapToolResultToToolResultBlockParam(output, toolUseID) {
@@ -63,29 +73,65 @@ Available workflows are registered at startup. If no workflows are registered, t
     return null
   },
 
-  async call(input) {
+  async call(input, context) {
     const { workflow, args } = input
 
     const definition = getWorkflow(workflow)
     if (definition) {
-      try {
-        const result = await definition.execute(args ?? {})
-        return {
-          data: {
-            workflow,
-            status: 'success',
-            result,
-            message: `Workflow "${workflow}" executed successfully.`,
-          },
+      // --- Dynamic multi-step path (new: orchestrated via D7 swarm) ---
+      if (definition.steps && definition.steps.length > 0) {
+        const workflowId = generateTaskId('local_workflow')
+        try {
+          const result = await runWorkflowSteps(workflowId, definition, args ?? {}, context)
+          return {
+            data: {
+              workflow,
+              status: result.status,
+              result,
+              message: result.summary,
+            },
+          }
+        } catch (err) {
+          return {
+            data: {
+              workflow,
+              status: 'error',
+              message: `Workflow "${workflow}" orchestration failed: ${err instanceof Error ? err.message : String(err)}`,
+            },
+          }
         }
-      } catch (err) {
-        return {
-          data: {
-            workflow,
-            status: 'error',
-            message: `Workflow "${workflow}" failed: ${err instanceof Error ? err.message : String(err)}`,
-          },
+      }
+
+      // --- Legacy / bundled single-function path ---
+      if (typeof definition.execute === 'function') {
+        try {
+          const result = await definition.execute(args ?? {})
+          return {
+            data: {
+              workflow,
+              status: 'success',
+              result,
+              message: `Workflow "${workflow}" executed successfully.`,
+            },
+          }
+        } catch (err) {
+          return {
+            data: {
+              workflow,
+              status: 'error',
+              message: `Workflow "${workflow}" failed: ${err instanceof Error ? err.message : String(err)}`,
+            },
+          }
         }
+      }
+
+      // Definition has neither steps nor execute
+      return {
+        data: {
+          workflow,
+          status: 'error',
+          message: `Workflow "${workflow}" has no steps or execute function defined.`,
+        },
       }
     }
 
