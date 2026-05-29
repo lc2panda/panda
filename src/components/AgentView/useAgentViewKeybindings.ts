@@ -24,6 +24,12 @@ export type AgentViewCallbacks = {
   onStop: (entry: SessionEntry) => void
   /** ← 在空 prompt 上 = 退出 dashboard 回 shell。 */
   onExit: () => void
+  /**
+   * Enter 在 dispatch prompt 以 `! <command>` 开头时触发。
+   * 将命令分流到 LocalShellTask 作为后台 shell session 执行，不进入 agent REPL。
+   * 上游 2.1.154: "type `! <command>` to run a shell command as a background session".
+   */
+  onSpawnShell: (command: string) => void
 }
 
 type Handler = (input: string, key: Key) => boolean
@@ -109,6 +115,18 @@ export function createKeyHandler(
     // 必须先于普通 Enter/→ Attach 分支判定，否则 Ctrl+Enter 会先匹配 Attach。
     // dispatchPrompt 作为 draft 透传，handler 通过 --prefill 注入到新 panda 子进程。
     if (key.return && (key.shift || key.ctrl)) {
+      // ---- `! <command>` 前缀：分流到 LocalShellTask 后台 shell session ----
+      // 上游 2.1.154: "type `! <command>` to run a shell command as a background session"
+      // 若 dispatch prompt 以 `!` 开头，提取命令后半段，调用 onSpawnShell，
+      // 不进入 agent REPL（不调用 onDispatchAndAttach）。
+      const shellMatch = state.dispatchPrompt.match(/^!\s*(.+)/)
+      if (shellMatch) {
+        const shellCmd = shellMatch[1].trim()
+        if (shellCmd.length > 0) {
+          callbacks.onSpawnShell(shellCmd)
+          return true
+        }
+      }
       callbacks.onDispatchAndAttach(selected ?? null, state.dispatchPrompt)
       return true
     }

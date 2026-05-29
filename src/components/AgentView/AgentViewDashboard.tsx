@@ -29,7 +29,8 @@ const ANIMATION_MS = 500;
 export type AgentViewExitAction =
   | { kind: 'quit' }
   | { kind: 'attach'; sessionId: string; cwd: string }
-  | { kind: 'dispatch'; cwd: string; draft: string };
+  | { kind: 'dispatch'; cwd: string; draft: string }
+  | { kind: 'shell'; command: string; cwd: string };
 
 let lastExitAction: AgentViewExitAction = { kind: 'quit' };
 
@@ -83,6 +84,14 @@ export function AgentViewDashboard(): React.ReactElement {
           kind: 'dispatch',
           cwd: entry?.cwd ?? process.cwd(),
           draft,
+        };
+        exit();
+      },
+      onSpawnShell: (command) => {
+        lastExitAction = {
+          kind: 'shell',
+          command,
+          cwd: process.cwd(),
         };
         exit();
       },

@@ -179,6 +179,7 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
     movePeekPage: number[]
     editPrompt: number
     setDispatchPrompt: string[]
+    spawnShell: string[]
   }
   const fakeKey = (
     over: Partial<Record<string, boolean>>,
@@ -248,6 +249,7 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
       movePeekPage: [],
       editPrompt: 0,
       setDispatchPrompt: [],
+      spawnShell: [],
     }
     const actions: AgentViewActions = {
       refresh: async () => {},
@@ -295,6 +297,9 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
       onStop: () => {},
       onExit: () => {
         calls.exit++
+      },
+      onSpawnShell: (cmd: string) => {
+        calls.spawnShell.push(cmd)
       },
     }
     return { calls, actions, cb }
@@ -479,6 +484,69 @@ describe('useAgentViewKeybindings.createKeyHandler', () => {
     handler2('', fakeKey({ return: true }))
     expect(calls.beginRename).toContain('END')
   })
+
+  describe('! prefix: shell command dispatch', () => {
+    test('`! ls` → calls onSpawnShell("ls"), does NOT call onDispatchAndAttach', () => {
+      const { calls, actions, cb } = makeCallbacks()
+      const handler = createKeyHandler(
+        baseState({ dispatchPrompt: '! ls' }),
+        actions,
+        cb,
+      )
+      handler('', fakeKey({ return: true, shift: true }))
+      expect(calls.spawnShell).toEqual(['ls'])
+      expect(calls.dispatch).toBe(0)
+    })
+
+    test('`!   ls -la  ` trims extra whitespace → onSpawnShell("ls -la")', () => {
+      const { calls, actions, cb } = makeCallbacks()
+      const handler = createKeyHandler(
+        baseState({ dispatchPrompt: '!   ls -la  ' }),
+        actions,
+        cb,
+      )
+      handler('', fakeKey({ return: true, shift: true }))
+      expect(calls.spawnShell).toEqual(['ls -la'])
+      expect(calls.dispatch).toBe(0)
+    })
+
+    test('`! ` (only spaces after !) → falls through to onDispatchAndAttach, not shell', () => {
+      // /^!\s*(.+)/ does not match when nothing follows `!` + spaces
+      const { calls, actions, cb } = makeCallbacks()
+      const handler = createKeyHandler(
+        baseState({ dispatchPrompt: '! ' }),
+        actions,
+        cb,
+      )
+      handler('', fakeKey({ return: true, shift: true }))
+      expect(calls.spawnShell).toEqual([])
+      expect(calls.dispatch).toBe(1)
+    })
+
+    test('ordinary text (no ! prefix) → onDispatchAndAttach, NOT onSpawnShell', () => {
+      const { calls, actions, cb } = makeCallbacks()
+      const handler = createKeyHandler(
+        baseState({ dispatchPrompt: 'hello world' }),
+        actions,
+        cb,
+      )
+      handler('', fakeKey({ return: true, shift: true }))
+      expect(calls.spawnShell).toEqual([])
+      expect(calls.dispatch).toBe(1)
+    })
+
+    test('Ctrl+Enter with `! echo hi` → also routes to shell', () => {
+      const { calls, actions, cb } = makeCallbacks()
+      const handler = createKeyHandler(
+        baseState({ dispatchPrompt: '! echo hi' }),
+        actions,
+        cb,
+      )
+      handler('', fakeKey({ return: true, ctrl: true }))
+      expect(calls.spawnShell).toEqual(['echo hi'])
+      expect(calls.dispatch).toBe(0)
+    })
+  })
 })
 
 describe('PeekPanel.computePeekWindow (Tier 2 paging)', () => {
@@ -541,3 +609,4 @@ describe('roster: file path helpers', () => {
     process.env.PANDA_CONFIG_DIR = FAKE_HOME
   })
 })
+
