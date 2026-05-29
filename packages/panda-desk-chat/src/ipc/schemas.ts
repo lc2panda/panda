@@ -54,9 +54,13 @@ export const IPC_CHANNELS = {
 // 与 electron/ipc/handlers.ts CHAT_SEND handler 期望（Array<{ mediaType: string; data: string }>）
 // 以及 cli-manager.sendMessage / interactive REPL 控制协议保持一致。
 // 旧 { type, path } 形态已废弃 — Desk Chat 不依赖外置文件路径，全程 dataURL → base64。
+//
+// WO-H9：IPC 双层防御 — data 字段最大字符数对应 ~4.7MB base64 + buffer
+// 4_700_000 bytes ÷ 0.75（base64 ratio）× 1 = ~6_267_000 chars；取 6_500_000 留余量。
+const MAX_ATTACHMENT_DATA_CHARS = 6_500_000;
 const attachmentSchema = z.object({
   mediaType: z.string(),
-  data: z.string(),
+  data: z.string().max(MAX_ATTACHMENT_DATA_CHARS, '单张图片超过 IPC 传输大小上限（~4.7MB）'),
 });
 
 const tokenUsageSchema = z.object({

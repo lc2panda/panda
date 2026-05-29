@@ -36,6 +36,12 @@ import type {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// WO-H9：后端附件 size guard 阈值
+// panda-cli 限制：单张 base64 字节数 ≤ 5MB（含协议开销取 4.7MB buffer）。
+// 累计 payload 阈值：30MB，防止 stdin 超载。
+const MAX_IMAGE_BASE64_BYTES = 4_700_000;
+const MAX_TOTAL_PAYLOAD_BYTES = 30 * 1024 * 1024; // 30 MB
+
 type CLIPermissionMode =
   | 'acceptEdits'
   | 'bypassPermissions'
@@ -760,6 +766,28 @@ export class CLISession extends EventEmitter {
       console.error(`[CLISession:${this.id}] writeUserInput: stdin gone, dropping`);
       return;
     }
+
+    // WO-H9：size guard — 单图 / 累计 payload 超限时拒绝，避免 panda-cli 硬崩
+    if (attachments && attachments.length > 0) {
+      let totalBytes = 0;
+      for (const a of attachments) {
+        const imgBytes = a.data.length; // base64 字符数 ≈ 字节数（ASCII-safe）
+        if (imgBytes > MAX_IMAGE_BASE64_BYTES) {
+          this.emitStreamError(
+            `图片过大（超过 4.7MB），请压缩后重发（当前 ${(imgBytes / 1_000_000).toFixed(1)} MB）`,
+          );
+          return;
+        }
+        totalBytes += imgBytes;
+      }
+      if (totalBytes > MAX_TOTAL_PAYLOAD_BYTES) {
+        this.emitStreamError(
+          `附件总大小超过 30MB（当前 ${(totalBytes / 1_000_000).toFixed(1)} MB），请减少图片数量后重发`,
+        );
+        return;
+      }
+    }
+
     const userInput: UserInput = {
       type: 'user',
       message: {
