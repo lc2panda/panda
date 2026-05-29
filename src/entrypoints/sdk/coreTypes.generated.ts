@@ -96,6 +96,13 @@ export type ConfigChangeHookInput = HookInput
 export type InstructionsLoadedHookInput = HookInput
 export type CwdChangedHookInput = HookInput & { cwd: string }
 export type FileChangedHookInput = HookInput & { path: string }
+/** [v2.1.154] Input for MessageDisplay hooks; fired before a message is rendered. */
+export type MessageDisplayHookInput = HookInput & {
+  /** Role of the message being displayed ('assistant' or 'user'). */
+  message_role: 'assistant' | 'user'
+  /** Abbreviated text content (first 500 chars) of the message. */
+  message_content: string
+}
 
 // SDK Message types
 export type SDKMessage = { type: string; [key: string]: unknown }

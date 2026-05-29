@@ -9,6 +9,7 @@ import { shouldAllowManagedHooksOnly } from './hooks/hooksConfigSnapshot.js'
 import { executeSessionStartHooks, executeSetupHooks } from './hooks.js'
 import { logError } from './log.js'
 import { loadPluginHooks } from './plugins/loadPluginHooks.js'
+import { saveCustomTitle } from './sessionStorage.js'
 
 type SessionStartHooksOptions = {
   sessionId?: string
@@ -152,6 +153,13 @@ export async function processSessionStartHooks(
     }
     if (hookResult.watchPaths && hookResult.watchPaths.length > 0) {
       allWatchPaths.push(...hookResult.watchPaths)
+    }
+    // [v2.1.154] If a hook set a sessionTitle, persist it as a custom title
+    if (hookResult.sessionTitle && sessionId) {
+      logForDebugging(
+        `SessionStart hook set sessionTitle: "${hookResult.sessionTitle}"`,
+      )
+      await saveCustomTitle(sessionId, hookResult.sessionTitle, undefined, 'auto')
     }
   }
 

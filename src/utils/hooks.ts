@@ -101,6 +101,7 @@ import type {
   ConfigChangeHookInput,
   CwdChangedHookInput,
   FileChangedHookInput,
+  MessageDisplayHookInput,
   InstructionsLoadedHookInput,
   UserPromptSubmitHookInput,
   PermissionRequestHookInput,
@@ -376,6 +377,8 @@ export type AggregatedHookResult = {
   permissionBehavior?: PermissionResult['behavior']
   additionalContexts?: string[]
   initialUserMessage?: string
+  /** [v2.1.154] Session title set by a SessionStart hook (last hook wins). */
+  sessionTitle?: string
   updatedInput?: Record<string, unknown>
   updatedMCPToolOutput?: unknown
   permissionRequestResult?: PermissionRequestResult
@@ -383,6 +386,10 @@ export type AggregatedHookResult = {
   elicitationResponse?: ElicitationResponse
   elicitationResultResponse?: ElicitationResponse
   retry?: boolean
+  /** [v2.1.154] MessageDisplay hook: suppress rendering this message. */
+  suppressMessage?: boolean
+  /** [v2.1.154] MessageDisplay hook: replacement text content for first text block. */
+  replacementContent?: string
 }
 
 /**
@@ -579,6 +586,12 @@ interface TypedSyncHookOutput {
         hookEventName: 'WorktreeCreate'
         worktreePath: string
       }
+    | {
+        /** [v2.1.154] MessageDisplay hook output. */
+        hookEventName: 'MessageDisplay'
+        suppress?: boolean
+        replacementContent?: string
+      }
 }
 
 function processHookJSONOutput({
@@ -763,6 +776,13 @@ function processHookJSONOutput({
         ) {
           result.watchPaths = json.hookSpecificOutput.watchPaths
         }
+        // [v2.1.154] Extract sessionTitle if provided
+        if (
+          'sessionTitle' in json.hookSpecificOutput &&
+          json.hookSpecificOutput.sessionTitle
+        ) {
+          result.sessionTitle = json.hookSpecificOutput.sessionTitle
+        }
         break
       case 'Setup':
         result.additionalContext = json.hookSpecificOutput.additionalContext
@@ -838,6 +858,21 @@ function processHookJSONOutput({
               command,
             }
           }
+        }
+        break
+      // [v2.1.154] MessageDisplay hook output handling
+      case 'MessageDisplay':
+        if (
+          'suppress' in json.hookSpecificOutput &&
+          json.hookSpecificOutput.suppress === true
+        ) {
+          result.suppressMessage = true
+        }
+        if (
+          'replacementContent' in json.hookSpecificOutput &&
+          typeof json.hookSpecificOutput.replacementContent === 'string'
+        ) {
+          result.replacementContent = json.hookSpecificOutput.replacementContent
         }
         break
     }
@@ -3116,6 +3151,29 @@ async function* executeHooks({
       }
     }
 
+    // [v2.1.154] Yield sessionTitle from SessionStart hooks
+    if (result.sessionTitle) {
+      logForDebugging(
+        `Hook ${hookEvent} (${getHookDisplayText(result.hook)}) provided sessionTitle: "${result.sessionTitle}"`,
+      )
+      yield {
+        sessionTitle: result.sessionTitle,
+      }
+    }
+
+    // [v2.1.154] Yield MessageDisplay suppress/replacementContent
+    if (result.suppressMessage) {
+      yield {
+        suppressMessage: true,
+      }
+    }
+
+    if (result.replacementContent !== undefined) {
+      yield {
+        replacementContent: result.replacementContent,
+      }
+    }
+
     // Yield updatedMCPToolOutput if provided (from PostToolUse hooks)
     if (result.updatedMCPToolOutput) {
       logForDebugging(
@@ -4331,6 +4389,41 @@ export async function* executeSetupHooks(
     signal,
     timeoutMs,
     forceSyncExecution,
+  })
+}
+
+/**
+ * [v2.1.154] Execute MessageDisplay hooks before a message is rendered.
+ *
+ * Hooks may return `suppress: true` to skip rendering, or `replacementContent`
+ * to override the first text block of the message.
+ *
+ * @param messageRole  Role of the message ('assistant' | 'user')
+ * @param messageContent  Abbreviated message text (first 500 chars)
+ * @param signal Optional AbortSignal to cancel hook execution
+ * @param timeoutMs Optional timeout in milliseconds for hook execution
+ * @returns Async generator that yields AggregatedHookResult items
+ */
+export async function* executeMessageDisplayHooks(
+  messageRole: 'assistant' | 'user',
+  messageContent: string,
+  signal?: AbortSignal,
+  timeoutMs: number = TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+): AsyncGenerator<AggregatedHookResult> {
+  const hookInput: MessageDisplayHookInput = {
+    ...createBaseHookInput(undefined),
+    hook_event_name: 'MessageDisplay',
+    message_role: messageRole,
+    message_content: messageContent.slice(0, 500),
+  }
+
+  yield* executeHooks({
+    hookInput,
+    toolUseID: randomUUID(),
+    matchQuery: messageRole,
+    signal,
+    timeoutMs,
+    forceSyncExecution: true,
   })
 }
 

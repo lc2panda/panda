@@ -173,7 +173,7 @@ import type { MCPServerConnection } from '../services/mcp/types.js';
 import type { ScopedMcpServerConfig } from '../services/mcp/types.js';
 import { randomUUID, type UUID } from 'crypto';
 import { processSessionStartHooks } from '../utils/sessionStart.js';
-import { executeSessionEndHooks, getSessionEndHookTimeoutMs } from '../utils/hooks.js';
+import { executeSessionEndHooks, getSessionEndHookTimeoutMs, executeMessageDisplayHooks } from '../utils/hooks.js';
 import { type IDESelection, useIdeSelection } from '../hooks/useIdeSelection.js';
 import { getTools, assembleToolPool } from '../tools.js';
 import type { AgentDefinition } from '../tools/AgentTool/loadAgentsDir.js';
@@ -1190,6 +1190,11 @@ export function REPL({
   // on resume (initialMessages present) so we don't re-title a resumed
   // session from mid-conversation context.
   const haikuTitleAttemptedRef = useRef((initialMessages?.length ?? 0) > 0);
+  // [v2.1.154] MessageDisplay hook state: suppressed message IDs + replacement text
+  const [messageDisplaySuppressedIds, setMessageDisplaySuppressedIds] = useState<Set<string>>(new Set());
+  const [messageDisplayReplacements, setMessageDisplayReplacements] = useState<Map<string, string>>(new Map());
+  // Track the count of messages we've already processed for MessageDisplay hooks
+  const messageDisplayProcessedCountRef = useRef(0);
   const agentTitle = mainThreadAgentDefinition?.agentType;
   const terminalTitle = sessionTitle ?? agentTitle ?? haikuTitle ?? 'Panda';
   const isWaitingForApproval = toolUseConfirmQueue.length > 0 || promptQueue.length > 0 || pendingWorkerRequest || pendingSandboxRequest;
@@ -4719,6 +4724,55 @@ export function REPL({
   // When viewing an agent, never fall through to leader — empty until
   // bootstrap/stream fills. Closes the see-leader-type-agent footgun.
   const displayedMessages = viewedAgentTask ? viewedAgentTask.messages ?? [] : usesSyncMessages ? messages : deferredMessages;
+
+  // [v2.1.154] Fire MessageDisplay hooks for newly arriving assistant messages.
+  // Uses a fire-and-forget useEffect so rendering is never blocked.
+  useEffect(() => {
+    const processed = messageDisplayProcessedCountRef.current;
+    const currentCount = displayedMessages.length;
+    if (currentCount <= processed) return;
+    const newMessages = displayedMessages.slice(processed);
+    messageDisplayProcessedCountRef.current = currentCount;
+
+    for (const msg of newMessages) {
+      if (msg.type !== 'assistant') continue;
+      const msgId = (msg as {uuid?: string}).uuid;
+      if (!msgId) continue;
+      // Extract text content from the message for hook input
+      const textContent = (() => {
+        try {
+          const content = (msg as {message?: {content?: unknown}}).message?.content;
+          if (typeof content === 'string') return content;
+          if (Array.isArray(content)) {
+            const textBlock = content.find((b: unknown) => typeof b === 'object' && b !== null && (b as {type?: string}).type === 'text');
+            return textBlock ? String((textBlock as {text?: string}).text ?? '') : '';
+          }
+          return '';
+        } catch { return ''; }
+      })();
+      ;(async () => {
+        try {
+          for await (const result of executeMessageDisplayHooks('assistant', textContent)) {
+            if (result.suppressMessage) {
+              setMessageDisplaySuppressedIds(prev => new Set([...prev, msgId]));
+            }
+            if (typeof result.replacementContent === 'string') {
+              setMessageDisplayReplacements(prev => new Map([...prev, [msgId, result.replacementContent!]]));
+            }
+          }
+        } catch { /* hook errors are non-fatal */ }
+      })();
+    }
+  }, [displayedMessages]);
+
+  // [v2.1.154] Apply MessageDisplay hook results: filter suppressed + apply replacements
+  const filteredDisplayedMessages = messageDisplaySuppressedIds.size === 0 && messageDisplayReplacements.size === 0
+    ? displayedMessages
+    : displayedMessages.filter(msg => {
+        const uuid = (msg as {uuid?: string}).uuid;
+        return !uuid || !messageDisplaySuppressedIds.has(uuid);
+      });
+
   // Show the placeholder until the real user message appears in
   // displayedMessages. userInputOnProcessing stays set for the whole turn
   // (cleared in resetLoadingState); this length check hides it once
@@ -4781,7 +4835,7 @@ export function REPL({
               <TeammateViewHeader />
               {/* v3.8 简化：移除顶 ScreenFrame + StaticCharRain（过度装饰）；保留 MatrixBanner */}
               {isMatrixTheme() && <MatrixBanner cols={transcriptCols} height={2} />}
-              <Messages messages={displayedMessages} tools={tools} commands={commands} verbose={verbose} toolJSX={toolJSX} toolUseConfirmQueue={toolUseConfirmQueue} inProgressToolUseIDs={viewedTeammateTask ? viewedTeammateTask.inProgressToolUseIDs ?? new Set() : inProgressToolUseIDs} isMessageSelectorVisible={isMessageSelectorVisible} conversationId={conversationId} screen={screen} streamingToolUses={streamingToolUses} showAllInTranscript={showAllInTranscript} agentDefinitions={agentDefinitions} onOpenRateLimitOptions={handleOpenRateLimitOptions} isLoading={isLoading} streamingText={isLoading && !viewedAgentTask ? visibleStreamingText : null} isBriefOnly={viewedAgentTask ? false : isBriefOnly} unseenDivider={viewedAgentTask ? undefined : unseenDivider} scrollRef={isFullscreenEnvEnabled() ? scrollRef : undefined} trackStickyPrompt={isFullscreenEnvEnabled() ? true : undefined} cursor={cursor} setCursor={setCursor} cursorNavRef={cursorNavRef} />
+              <Messages messages={filteredDisplayedMessages} tools={tools} commands={commands} verbose={verbose} toolJSX={toolJSX} toolUseConfirmQueue={toolUseConfirmQueue} inProgressToolUseIDs={viewedTeammateTask ? viewedTeammateTask.inProgressToolUseIDs ?? new Set() : inProgressToolUseIDs} isMessageSelectorVisible={isMessageSelectorVisible} conversationId={conversationId} screen={screen} streamingToolUses={streamingToolUses} showAllInTranscript={showAllInTranscript} agentDefinitions={agentDefinitions} onOpenRateLimitOptions={handleOpenRateLimitOptions} isLoading={isLoading} streamingText={isLoading && !viewedAgentTask ? visibleStreamingText : null} isBriefOnly={viewedAgentTask ? false : isBriefOnly} unseenDivider={viewedAgentTask ? undefined : unseenDivider} scrollRef={isFullscreenEnvEnabled() ? scrollRef : undefined} trackStickyPrompt={isFullscreenEnvEnabled() ? true : undefined} cursor={cursor} setCursor={setCursor} cursorNavRef={cursorNavRef} />
               <AwsAuthStatusBox />
               {/* Hide the processing placeholder while a modal is showing —
                   it would sit at the last visible transcript row right above

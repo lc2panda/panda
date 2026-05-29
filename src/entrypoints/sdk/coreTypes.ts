@@ -50,6 +50,8 @@ export const HOOK_EVENTS = [
   'InstructionsLoaded',
   'CwdChanged',
   'FileChanged',
+  /** [v2.1.154] Fired before a message is rendered; hook may suppress or replace content. */
+  'MessageDisplay',
 ] as const
 
 export const EXIT_REASONS = [

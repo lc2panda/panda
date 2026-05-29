@@ -107,6 +107,8 @@ export const syncHookResponseSchema = lazySchema(() =>
             .array(z.string())
             .describe('Absolute paths to watch for FileChanged hooks')
             .optional(),
+          /** [v2.1.154] Optional title to set for the session on startup. */
+          sessionTitle: z.string().optional(),
         }),
         z.object({
           hookEventName: z.literal('Setup'),
@@ -188,6 +190,14 @@ export const syncHookResponseSchema = lazySchema(() =>
         z.object({
           hookEventName: z.literal('WorktreeCreate'),
           worktreePath: z.string(),
+        }),
+        /** [v2.1.154] MessageDisplay hook output — hook may suppress or alter a message. */
+        z.object({
+          hookEventName: z.literal('MessageDisplay'),
+          /** When true, suppress rendering this message entirely. */
+          suppress: z.boolean().optional(),
+          /** Replacement text content for the message (first text block). */
+          replacementContent: z.string().optional(),
         }),
       ])
       .optional(),
@@ -317,6 +327,8 @@ export type AggregatedHookResult = {
   permissionBehavior?: PermissionResult['behavior']
   additionalContexts?: string[]
   initialUserMessage?: string
+  /** [v2.1.154] Session title set by a SessionStart hook (last hook wins). */
+  sessionTitle?: string
   updatedInput?: Record<string, unknown>
   updatedMCPToolOutput?: unknown
   /** [v2.1.121] Aggregated PostToolUse output override (last hook wins). */
@@ -327,4 +339,7 @@ export type AggregatedHookResult = {
   terminalSequence?: string
   permissionRequestResult?: PermissionRequestResult
   retry?: boolean
+  /** [v2.1.154] MessageDisplay hook output to suppress or replace a message. */
+  suppressMessage?: boolean
+  replacementContent?: string
 }

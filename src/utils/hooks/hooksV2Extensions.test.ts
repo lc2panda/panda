@@ -217,3 +217,103 @@ describe('v2.1.142: 配置错误提示明确化', () => {
     }
   })
 })
+
+// -----------------------------------------------------------------------
+// Wave3-E3 块 A — SessionStart sessionTitle
+// -----------------------------------------------------------------------
+describe('Wave3-E3 块 A: SessionStart sessionTitle schema', () => {
+  test('SessionStart output schema 接受 sessionTitle 字段', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+        sessionTitle: 'My project session',
+      },
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.data.hookSpecificOutput?.hookEventName).toBe('SessionStart')
+      expect((parsed.data.hookSpecificOutput as {sessionTitle?: string}).sessionTitle).toBe('My project session')
+    }
+  })
+
+  test('SessionStart output schema sessionTitle 缺省时不影响解析（可选字段）', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+        additionalContext: 'some context',
+      },
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect((parsed.data.hookSpecificOutput as {sessionTitle?: string}).sessionTitle).toBeUndefined()
+    }
+  })
+
+  test('SessionStart sessionTitle 为数字时 schema 拒绝', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+        sessionTitle: 42,
+      },
+    })
+    expect(parsed.success).toBe(false)
+  })
+})
+
+// -----------------------------------------------------------------------
+// Wave3-E3 块 B — MessageDisplay hook schema
+// -----------------------------------------------------------------------
+describe('Wave3-E3 块 B: MessageDisplay hook schema', () => {
+  test('MessageDisplay output schema 接受 suppress=true', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'MessageDisplay',
+        suppress: true,
+      },
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      const out = parsed.data.hookSpecificOutput as {hookEventName: string; suppress?: boolean}
+      expect(out.hookEventName).toBe('MessageDisplay')
+      expect(out.suppress).toBe(true)
+    }
+  })
+
+  test('MessageDisplay output schema 接受 replacementContent 字符串', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'MessageDisplay',
+        replacementContent: '**替换后的内容**',
+      },
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      const out = parsed.data.hookSpecificOutput as {hookEventName: string; replacementContent?: string}
+      expect(out.replacementContent).toBe('**替换后的内容**')
+    }
+  })
+
+  test('MessageDisplay 字段全部缺省时解析成功（所有字段均可选）', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'MessageDisplay',
+      },
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  test('MessageDisplay suppress 为字符串时 schema 拒绝', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'MessageDisplay',
+        suppress: 'yes',
+      },
+    })
+    expect(parsed.success).toBe(false)
+  })
+
+  test('HOOK_EVENTS 包含 MessageDisplay', () => {
+    const { HOOK_EVENTS } = require('../../entrypoints/sdk/coreTypes.js')
+    expect(HOOK_EVENTS).toContain('MessageDisplay')
+  })
+})
