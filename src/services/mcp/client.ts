@@ -967,6 +967,15 @@ export const connectToServer = memoize(
             // off chance a user wants to override (rare, but consistent with
             // how stdioRef.env shadows subprocessEnv).
             CLAUDE_PROJECT_DIR: getOriginalCwd(),
+            // v2.1.154: stdio MCP servers receive CLAUDECODE=1 (ecosystem
+            // standard — third-party MCP servers detect they are running
+            // inside Claude Code / panda) and CLAUDE_CODE_SESSION_ID (current
+            // session UUID, lets MCP servers correlate requests to a session).
+            // These are MCP ecosystem standard variable names and must be kept
+            // as-is for third-party compatibility; panda brand aliases are not
+            // added here because server-supplied env already wins below.
+            CLAUDECODE: '1',
+            CLAUDE_CODE_SESSION_ID: getSessionId(),
             ...stdioRef.env,
           } as Record<string, string>,
           stderr: 'pipe', // prevents error output from the MCP server from printing to the UI
