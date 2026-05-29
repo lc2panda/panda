@@ -37,6 +37,10 @@ type AnthropicUsage = {
   output_tokens?: number | null
   cache_creation_input_tokens?: number | null
   cache_read_input_tokens?: number | null
+  cache_creation?: {
+    ephemeral_1h_input_tokens?: number | null
+    ephemeral_5m_input_tokens?: number | null
+  } | null
 }
 
 type DeepSeekUsage = {
@@ -75,9 +79,17 @@ export function extractUnifiedCacheUsage(
     u.cache_read_input_tokens !== undefined ||
     u.cache_creation_input_tokens !== undefined
   ) {
+    // 顶层 cache_creation_input_tokens 为 0/null 时，从 nested breakdown 求和回填
+    // 对齐上游 2.1.150：API 仅经 nested breakdown 报 cache writes 时避免漏报
+    const topLevelWrite = u.cache_creation_input_tokens ?? 0
+    const nestedWrite =
+      topLevelWrite === 0 && u.cache_creation != null
+        ? ((u.cache_creation.ephemeral_1h_input_tokens ?? 0) +
+            (u.cache_creation.ephemeral_5m_input_tokens ?? 0))
+        : 0
     return {
       cacheReadTokens: u.cache_read_input_tokens ?? 0,
-      cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
+      cacheWriteTokens: nestedWrite > 0 ? nestedWrite : topLevelWrite,
       cacheMissTokens: 0, // Anthropic 不显式报告 miss
       freshInputTokens: u.input_tokens ?? 0,
     }

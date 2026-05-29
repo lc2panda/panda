@@ -3207,7 +3207,17 @@ export function updateUsage(
         ? partUsage.cache_creation_input_tokens
         : thirdPartyCacheWriteTokens > 0
           ? thirdPartyCacheWriteTokens
-          : usage.cache_creation_input_tokens,
+          : (() => {
+              // 顶层为 0 且第三方也无值时，从 nested cache_creation breakdown 求和回填
+              // 对齐上游 2.1.150：API 仅经 nested breakdown 报 cache writes 时避免报 0
+              const nested = partUsage.cache_creation
+              const nestedSum =
+                nested != null
+                  ? ((nested.ephemeral_1h_input_tokens ?? 0) +
+                      (nested.ephemeral_5m_input_tokens ?? 0))
+                  : 0
+              return nestedSum > 0 ? nestedSum : usage.cache_creation_input_tokens
+            })(),
     cache_read_input_tokens: cacheRead,
     output_tokens: partUsage.output_tokens ?? usage.output_tokens,
     server_tool_use: {
