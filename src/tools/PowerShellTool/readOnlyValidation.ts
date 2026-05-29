@@ -1014,7 +1014,28 @@ export function resolveToCanonical(name: string): string {
  * Name kept for BashTool parity (isCwdChangingCmdlet ↔ compoundCommandHasCd);
  * semantically this is "alters path-resolution namespace".
  */
+/**
+ * No-space cd variants that PowerShell's tokenizer emits as a single command
+ * token rather than `cd` + argument.  Must be checked before alias resolution
+ * because COMMON_ALIASES has no entry for these forms.
+ * (upstream 2.1.149 / Wave1-項1)
+ */
+const CD_NOSPACE_VARIANTS = new Set(['cd..', 'cd\\', 'cd~', 'cd/'])
+
+/**
+ * Bare Windows drive-letter jump — `C:` issued as a standalone command
+ * changes the working directory to that drive's current directory.
+ * Only `<letter>:` (no trailing path) is a drive jump; `C:\foo` is a path.
+ * (upstream 2.1.149 / Wave1-項1)
+ */
+const DRIVE_JUMP_RE = /^[a-z]:$/
+
 export function isCwdChangingCmdlet(name: string): boolean {
+  const lower = name.toLowerCase()
+  // No-space cd variants bypass alias resolution — handle them first.
+  if (CD_NOSPACE_VARIANTS.has(lower)) return true
+  // Bare drive-letter jump (C:, X: …) changes cwd to the drive's directory.
+  if (DRIVE_JUMP_RE.test(lower)) return true
   const canonical = resolveToCanonical(name)
   return (
     canonical === 'set-location' ||

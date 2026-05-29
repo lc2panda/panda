@@ -1457,7 +1457,21 @@ const DIRECTORY_CHANGE_CMDLETS = new Set([
   'pop-location',
 ])
 
-const DIRECTORY_CHANGE_ALIASES = new Set(['cd', 'sl', 'chdir', 'pushd', 'popd'])
+const DIRECTORY_CHANGE_ALIASES = new Set([
+  'cd',
+  'sl',
+  'chdir',
+  'pushd',
+  'popd',
+  // No-space cd variants: PowerShell accepts `cd..` `cd\` `cd~` `cd/` as
+  // a single token — the tokenizer treats the entire string as the command
+  // name, so the parser never sees a bare `cd`.  We must list each variant
+  // explicitly. (upstream 2.1.149 / Wave1-項1)
+  'cd..',
+  'cd\\',
+  'cd~',
+  'cd/',
+])
 
 /**
  * Get all command names across all statements, pipeline segments, and nested commands.
@@ -1571,15 +1585,27 @@ export function hasCommandNamed(
 }
 
 /**
+ * Matches bare Windows drive-letter jumps such as `C:` or `X:` used standalone
+ * as a command in PowerShell to change to a drive's current directory.
+ * Only single ASCII letter + colon, no trailing path component — `C:\foo`
+ * is a path argument, not a cwd-change command.
+ * (upstream 2.1.149 / Wave1-項1)
+ */
+const DRIVE_LETTER_JUMP_RE = /^[a-z]:$/
+
+/**
  * Check if the command contains any directory-changing commands.
- * (Set-Location, cd, sl, chdir, Push-Location, pushd, Pop-Location, popd)
+ * (Set-Location, cd, sl, chdir, Push-Location, pushd, Pop-Location, popd,
+ *  no-space cd variants cd.. cd\ cd~ cd/, and bare drive-letter jumps C: X:)
  */
 // exported for testing
 export function hasDirectoryChange(parsed: ParsedPowerShellCommand): boolean {
   for (const cmdName of getAllCommandNames(parsed)) {
     if (
       DIRECTORY_CHANGE_CMDLETS.has(cmdName) ||
-      DIRECTORY_CHANGE_ALIASES.has(cmdName)
+      DIRECTORY_CHANGE_ALIASES.has(cmdName) ||
+      // Bare drive-letter jump: `C:` changes to the drive's current directory.
+      DRIVE_LETTER_JUMP_RE.test(cmdName)
     ) {
       return true
     }
