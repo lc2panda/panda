@@ -33,3 +33,4 @@ monitor/tmp/
 
 # Stray Electron main bundle dropped to repo root by build:electron in some configs
 /main.js
+package-v2.1.156/
