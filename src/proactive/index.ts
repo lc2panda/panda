@@ -7,6 +7,8 @@ import { registerTask, getEnabledTasks } from './taskRegistry.js'
 import { BUILTIN_TASKS } from './builtinTasks.js'
 import { getNextNightTickAt } from './nightMode.js'
 import { parseCronExpression, computeNextCronRun } from '../utils/cron.js'
+import { logForDebugging } from '../utils/debug.js'
+import { errorMessage } from '../utils/errors.js'
 
 let _active = false
 let _paused = false
@@ -15,7 +17,7 @@ const _subscribers = new Set<() => void>()
 
 function _notifySubscribers(): void {
   for (const cb of _subscribers) {
-    try { cb() } catch {}
+    try { cb() } catch (e) { logForDebugging(`[proactive] subscriber callback error: ${errorMessage(e)}`) }
   }
 }
 
@@ -34,14 +36,14 @@ export function activateProactive(_source?: string): void {
   try {
     void import('./platform.js')
       .then(({ ensurePandaccDirs }) => ensurePandaccDirs())
-      .catch(() => {})
-  } catch {}
+      .catch((e) => { logForDebugging(`[proactive] ensurePandaccDirs error: ${errorMessage(e)}`) })
+  } catch (e) { logForDebugging(`[proactive] import platform.js error: ${errorMessage(e)}`) }
   // why: 注册 6 个内置 IM connector factory，否则 registry 永远为空导致 IM 子系统死代码
   try {
     void import('../connectors/boot.js')
       .then(({ bootConnectors }) => bootConnectors())
-      .catch(() => {})
-  } catch {}
+      .catch((e) => { logForDebugging(`[proactive] bootConnectors error: ${errorMessage(e)}`) })
+  } catch (e) { logForDebugging(`[proactive] import connectors/boot.js error: ${errorMessage(e)}`) }
   for (const task of BUILTIN_TASKS) {
     registerTask(task)
   }
@@ -50,9 +52,9 @@ export function activateProactive(_source?: string): void {
   // 立即补跑一次。fire-and-forget，不 await，不影响 activateProactive 同步签名。
   try {
     void import('./catchupRunner.js')
-      .then(({ runCatchup }) => runCatchup(BUILTIN_TASKS).catch(() => {}))
-      .catch(() => {})
-  } catch {}
+      .then(({ runCatchup }) => runCatchup(BUILTIN_TASKS).catch((e) => { logForDebugging(`[proactive] runCatchup error: ${errorMessage(e)}`) }))
+      .catch((e) => { logForDebugging(`[proactive] import catchupRunner.js error: ${errorMessage(e)}`) })
+  } catch (e) { logForDebugging(`[proactive] catchupRunner outer error: ${errorMessage(e)}`) }
 }
 
 export function deactivateProactive(): void {
@@ -63,7 +65,7 @@ export function deactivateProactive(): void {
   try {
     const { clearProactiveOwnership } = require('../assistant/index.js') as typeof import('../assistant/index.js')
     clearProactiveOwnership()
-  } catch {}
+  } catch (e) { logForDebugging(`[proactive] clearProactiveOwnership error: ${errorMessage(e)}`) }
   _notifySubscribers()
 }
 
