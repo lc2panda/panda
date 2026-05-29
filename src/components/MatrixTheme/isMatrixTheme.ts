@@ -38,38 +38,6 @@ function getConfigPath(): string {
 
 let cachedTheme: string | undefined // undefined = 尚未成功读到
 
-import { appendFileSync } from 'node:fs'
-
-let _callCount = 0
-let _trueCount = 0
-const DEBUG_LOG = join(homedir(), '.pandacc', 'isMatrixTheme-debug.log')
-
-function dbg(label: string, result: boolean): void {
-  _callCount++
-  if (result) _trueCount++
-  // 记录前 50 次详细 + 每条 stack 的第 3-5 行（caller 路径）
-  if (_callCount > 50) return
-  let caller = ''
-  try {
-    const stack = new Error().stack || ''
-    caller = stack
-      .split('\n')
-      .slice(3, 6)
-      .map(l => l.trim().replace(/^at\s+/, ''))
-      .join(' | ')
-  } catch {
-    caller = '?'
-  }
-  try {
-    appendFileSync(
-      DEBUG_LOG,
-      `[${new Date().toISOString()}] #${_callCount} (T=${_trueCount}) ${label} ← ${caller}\n`,
-    )
-  } catch {
-    // ignore
-  }
-}
-
 // 通过 globalThis 间接读 env，绕过 bun bundler 的 process.env.PANDA_THEME
 // 静态 inline + DCE（直接 process.env.X 在 build time 被 inline 成 undefined，
 // 整个 isMatrixTheme() 三元被 dead-code-eliminate 成 false 分支）。
@@ -115,9 +83,7 @@ export function isMatrixTheme(): boolean {
   }
   // 优先从 module load 时 prefetch 的 globalThis 缓存读取（最快 + 100% 准确）
   if (_gt.__PANDA_IS_MATRIX_PREFETCH !== undefined) {
-    const v = _gt.__PANDA_IS_MATRIX_PREFETCH
-    dbg(`prefetch hit → ${v}`, v)
-    return v
+    return _gt.__PANDA_IS_MATRIX_PREFETCH
   }
   // 兜底（理论上 prefetch 一定会 run，永远不会到此）
   if (cachedTheme !== undefined) return MATRIX_THEMES.has(cachedTheme)
