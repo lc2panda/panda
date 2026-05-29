@@ -941,6 +941,23 @@ class Project {
             return true // Keep malformed lines
           }
         })
+        // External-writer check: if the file grew since we read it, an
+        // external process appended new entries. Log a warning so the
+        // data-loss event is traceable; continue with the rewrite because
+        // this tombstone path is the authoritative rewrite for this session.
+        try {
+          const currentSize = (await stat(this.sessionFile)).size
+          if (currentSize > fileSize) {
+            logForDebugging(
+              `[sessionStorage] external-writer detected before tombstone rewrite: ` +
+                `file grew from ${fileSize} to ${currentSize} bytes ` +
+                `(session: ${getSessionId()}, file: ${this.sessionFile})`,
+              { level: 'warn' },
+            )
+          }
+        } catch {
+          // stat failure is non-fatal — proceed with rewrite
+        }
         await writeFile(this.sessionFile, lines.join('\n'), {
           encoding: 'utf8',
         })
@@ -1631,6 +1648,20 @@ export async function hydrateRemoteSession(
 
     // Replace local logs with remote logs. writeFile truncates, so no
     // unlink is needed; an empty remoteLogs array produces an empty file.
+    // External-writer check: if the local file already has content that we
+    // are about to overwrite, log a warning for traceability.
+    try {
+      const localSize = (await stat(sessionFile)).size
+      if (localSize > 0) {
+        logForDebugging(
+          `[sessionStorage] overwriting non-empty local transcript during remote hydrate: ` +
+            `local file is ${localSize} bytes (session: ${sessionId}, file: ${sessionFile})`,
+          { level: 'warn' },
+        )
+      }
+    } catch {
+      // File may not exist yet — that is the normal case, no warning needed
+    }
     const content = remoteLogs.map(e => jsonStringify(e) + '\n').join('')
     await writeFile(sessionFile, content, { encoding: 'utf8', mode: 0o600 })
 
@@ -1684,6 +1715,19 @@ export async function hydrateFromCCRv2InternalEvents(
     // Write foreground transcript
     const sessionFile = getTranscriptPathForSession(sessionId)
     const fgContent = events.map(e => jsonStringify(e.payload) + '\n').join('')
+    // External-writer check before overwriting the foreground transcript.
+    try {
+      const localSize = (await stat(sessionFile)).size
+      if (localSize > 0) {
+        logForDebugging(
+          `[sessionStorage] overwriting non-empty local transcript during CCRv2 hydrate: ` +
+            `local file is ${localSize} bytes (session: ${sessionId}, file: ${sessionFile})`,
+          { level: 'warn' },
+        )
+      }
+    } catch {
+      // File may not exist yet — normal case
+    }
     await writeFile(sessionFile, fgContent, { encoding: 'utf8', mode: 0o600 })
 
     logForDebugging(
@@ -1717,6 +1761,19 @@ export async function hydrateFromCCRv2InternalEvents(
           const agentContent = entries
             .map(p => jsonStringify(p) + '\n')
             .join('')
+          // External-writer check before overwriting each subagent transcript.
+          try {
+            const localSize = (await stat(agentFile)).size
+            if (localSize > 0) {
+              logForDebugging(
+                `[sessionStorage] overwriting non-empty subagent transcript during CCRv2 hydrate: ` +
+                  `local file is ${localSize} bytes (agent: ${agentId}, file: ${agentFile})`,
+                { level: 'warn' },
+              )
+            }
+          } catch {
+            // File may not exist yet — normal case
+          }
           await writeFile(agentFile, agentContent, {
             encoding: 'utf8',
             mode: 0o600,
