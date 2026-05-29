@@ -63,8 +63,10 @@ const URL_REACH_TIMEOUT_MS = 5_000;
 async function checkCommandInPath(
   command: string,
 ): Promise<PreflightCheck> {
+  // Windows uses `where`, macOS/Linux use `which`
+  const finder = process.platform === 'win32' ? 'where' : 'which';
   try {
-    const { stdout } = await execFileAsync('which', [command], {
+    const { stdout } = await execFileAsync(finder, [command], {
       timeout: WHICH_TIMEOUT_MS,
     });
     return {
