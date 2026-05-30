@@ -25,13 +25,13 @@
 | 2.26.10 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 历史对话只读加载 · 续聊修复 · 权限模式清洗 |
 | 2.26.7 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 发布入口 · provider snapshot · stream error 兜底 · model IPC 修复 · 顶部拖动修复 |
 
-## 当前进度 · v2.26.11
+## 当前进度 · v2.27.8
 
 | 维度 | 状态 |
 |------|------|
-| 主线提交 | v2.26.11 截图复核热修提交；详见 `git log` |
-| 本地/远端 | 本地 `main` 已包含 v2.26.11；远端推送以后以 `panda/main` 为准 |
-| 包版本 | `@lc2panda/panda-code@2.26.11`；`@panda/desk-chat@0.2.6`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
+| 主线提交 | v2.27.8（对齐上游 142→156 高价值能力 + daemon/workflows 100% 吸收）；详见 `git log` |
+| 本地/远端 | 本地 `main` 已包含 v2.27.8；远端推送以后以 `panda/main` 为准 |
+| 包版本 | `@lc2panda/panda-code@2.27.8`；`@panda/desk-chat@0.3.x`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
 | 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.142；npm 上游已继续到 v2.1.150，v2.1.143+ 作为后续评估范围，不在本 README 虚报为已吸收 |
 | v2.26.11 修复 | Desk Chat restoreTabs 改读 `~/.pandacc/projects` 磁盘历史；tab 切换保持 UI-only，不触发 CLI focus；CLI code=1 不再自动 5 次重启刷屏，并在 UI/日志中带 stderr、cwd、cliPath、bunPath、configDir、logPath 诊断 |
 | 验证证据 | `cd packages/panda-desk-chat && bun run test src/__tests__/stores/tabStore.test.ts src/__tests__/stores/chatStore.test.ts src/__tests__/stores/sessionStore.test.ts` 51/51 通过；`npx tsc -b --pretty false --incremental false` 通过；`bun run build:electron` 通过；packaged CLI 历史 UUID resume 可启动，当前实测受 API `429 rate_limit` 限制未完成 result |
@@ -143,6 +143,11 @@ panda auth login
 ### 1.4 配置参考
 
 所有配置文件位于 `~/.pandacc/config/` 目录，JSON 格式，不存在时使用默认值。
+
+#### 工作流与 daemon 目录（v2.27.8）
+
+- **工作流定义**：放在 `~/.pandacc/workflows/`（用户级）或 `<project>/.pandacc/workflows/`（项目级），仅识别 `.json` 文件。详见命令手册「v2.27.8 新能力 · 工作流引擎」。
+- **daemon**：无 settings.json 配置项，不随 REPL 自动拉起；需显式 `panda daemon start` 启动，PID 文件位于 `~/.pandacc/daemon.pid`、工作目录 `~/.pandacc/daemon/`。
 
 #### settings.json — 全局设置
 
@@ -1922,7 +1927,95 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 #### `/workflows`
 - **用法**: `/workflows`
-- **说明**: 列出和管理工作流脚本
+- **说明**: 列出和管理工作流脚本（详见下方「v2.27.8 新能力 · 工作流引擎」）
+
+### v2.27.8 新能力（Workflow 引擎 + daemon + 后台任务面板）
+
+#### 2.1 工作流引擎（Workflow Scripts）
+
+通过 slash 命令运行多步工作流，每个步骤派生一个后台子 Agent 执行。
+
+- **列出全部**: `/workflows`
+- **运行指定**: `/workflows <name>`（解析后自动以 `/<name>` 提交执行）
+
+**定义目录**（两处都会被扫描）：
+
+| 范围 | 路径 |
+|------|------|
+| 用户级 | `~/.pandacc/workflows/` |
+| 项目级 | `<project>/.pandacc/workflows/` |
+
+- 仅支持 **`.json`** 文件（YAML 不会被加载）。
+- 会话内修改定义文件即时**热重载**，无需重启。
+- 无内置示例，需自行创建定义文件。
+
+**完整 JSON 示例**（保存为 `~/.pandacc/workflows/ship.json` 或 `<project>/.pandacc/workflows/ship.json`）：
+
+```json
+{
+  "name": "ship",
+  "description": "Lint, test, then build",
+  "steps": [
+    { "id": "lint",  "label": "Lint",  "prompt": "Run the linter and fix issues", "timeoutSeconds": 120 },
+    { "id": "test",  "label": "Test",  "prompt": "Run the test suite", "dependsOn": ["lint"], "runCondition": { "type": "on_success" } },
+    { "id": "build", "label": "Build", "prompt": "Build for {{target}}", "runCondition": { "type": "always" } }
+  ]
+}
+```
+
+**WorkflowStep 字段**：
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `id` | 是 | 步骤唯一 id，kill/skip/retry 的定位键 |
+| `label` | 是 | UI 与通知中显示的步骤名 |
+| `prompt` | 是 | 派给子 Agent 的自然语言提示，支持 `{{arg}}` 占位符引用工作流参数 |
+| `timeoutSeconds?` | 否 | 步骤墙钟超时秒数，默认 `300` |
+| `runCondition?` | 否 | 相对前驱的运行条件，默认 `on_success` |
+| `dependsOn?` | 否 | 前置 step id 数组；省略则在紧邻前一步后运行 |
+
+**`runCondition` 取值**：
+
+| 取值 | 说明 |
+|------|------|
+| `{ "type": "on_success" }` | 前驱步骤成功才运行（默认） |
+| `{ "type": "on_failure" }` | 前驱步骤失败才运行 |
+| `{ "type": "always" }` | 无论前驱成功/失败/跳过都运行 |
+| `{ "type": "on_output_contains", "value": "<str>" }` | 前驱输出包含 `value` 才运行 |
+
+> **执行模型**：每个 step 派生一个后台子 Agent，按 `dependsOn` 依赖关系 + `runCondition` 条件门控顺序执行。
+
+#### 2.2 daemon 后台守护进程
+
+长驻 supervisor 进程，管理后台 worker fleet，独立于交互式 REPL。
+
+| 命令 | 说明 |
+|------|------|
+| `panda daemon start` | 启动 supervisor（单例，已运行会报错） |
+| `panda daemon stop` | 停止（先 SIGTERM，超时后 SIGKILL） |
+| `panda daemon status` | 打印 PID 与运行状态 |
+| `panda daemon restart` | 先 stop 再 start |
+
+- **PID 文件**: `~/.pandacc/daemon.pid`
+- **工作目录**: `~/.pandacc/daemon/`
+- **单例锁**：已运行时再 `start` 会报 `Daemon already running (pid=...). Use "panda daemon stop" first.`。
+- **无 settings.json 配置项**，不随 REPL 自动拉起，需显式 `panda daemon start`。
+- **稳定性**：陈旧锁自动清理、孤儿 pty-host 清理、worker 崩溃自动 respawn。
+
+#### 2.3 后台任务面板（`/tasks`）
+
+- **打开方式**: `/tasks`（别名 `/bashes`），或在 REPL footer 的 "tasks" pill 上选中后回车。
+- **可查看**：shells / agent / 工作流（workflow）等多类后台任务。
+- **工作流任务**进入详情面板后的键位：
+
+| 键 | 动作 |
+|----|------|
+| `↑` / `k` | 上移选中步骤 |
+| `↓` / `j` | 下移选中步骤 |
+| `x` | kill 整个 workflow |
+| `s` | skip 选中步骤 |
+| `r` | retry 选中步骤（仅 `failed` / `skipped` 状态可重试） |
+| `Esc` | 返回列表 / 关闭 |
 
 #### `/skills`
 - **用法**: `/skills`
