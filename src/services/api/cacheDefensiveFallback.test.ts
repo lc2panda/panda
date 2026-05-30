@@ -10,7 +10,7 @@
 import { describe, expect, test } from 'bun:test'
 import { APIError } from '@anthropic-ai/sdk'
 import { stripCacheControlFromRequestParams } from './promptCacheBreakDetection.js'
-import { withRetry } from './withRetry.js'
+import { isCacheControlRejection400, withRetry } from './withRetry.js'
 
 // Build a minimal APIError. The SDK's APIError constructor signature is
 // (status, error, message, headers) — error is the response body.
@@ -171,6 +171,79 @@ describe('Wave 7 P1-2 — withRetry defensive cache_control fallback', () => {
         process.env.DISABLE_CACHE_DEFENSIVE_FALLBACK = prev
       }
     }
+  })
+})
+
+describe('B-1 — isCacheControlRejection400 (clean 400 + third-party relay wrapping)', () => {
+  // The real upstream TTL-ordering error text Anthropic returns.
+  const ttlOrderingMsg =
+    "messages.2.content.7.cache_control.ttl: a ttl='1h' cache_control block " +
+    "must not come after a ttl='5m' cache_control block. Note that blocks are " +
+    'processed in the following order: tools, system, messages.'
+
+  test('clean APIError 400 with cache_control keyword → true', () => {
+    const err = makeAPIError(
+      400,
+      { type: 'error', error: { type: 'invalid_request_error', message: ttlOrderingMsg } },
+      ttlOrderingMsg,
+    )
+    expect(isCacheControlRejection400(err)).toBe(true)
+  })
+
+  test('clean APIError 400 scope + unsupported parameter → true', () => {
+    const msg = 'unsupported parameter: scope'
+    const err = makeAPIError(
+      400,
+      { type: 'error', error: { type: 'invalid_request_error', message: msg } },
+      msg,
+    )
+    expect(isCacheControlRejection400(err)).toBe(true)
+  })
+
+  test('clean APIError 400 unrelated (max_tokens) → false', () => {
+    const msg = 'max_tokens: must be at least 1'
+    const err = makeAPIError(
+      400,
+      { type: 'error', error: { type: 'invalid_request_error', message: msg } },
+      msg,
+    )
+    expect(isCacheControlRejection400(err)).toBe(false)
+  })
+
+  test('B-1: third-party relay upstream_error wrapping cache_control TTL ordering (plain Error, not APIError 400) → true', () => {
+    // Relay forwards to Anthropic, gets the cache_control TTL 400, re-wraps it
+    // as a streaming upstream_error event. Surfaces as a plain Error whose
+    // message carries the original cache_control TTL-ordering text.
+    const err = new Error(
+      `${ttlOrderingMsg}\ndata: {"type":"error","error":{"type":"upstream_error","message":"Upstream request failed"}}`,
+    )
+    expect(isCacheControlRejection400(err)).toBe(true)
+  })
+
+  test('B-1: relay error with cache_control text in .error body (object) → true', () => {
+    const err = {
+      message: 'Upstream request failed',
+      error: {
+        type: 'upstream_error',
+        upstream: {
+          message:
+            "cache_control.ttl: a ttl='1h' cache_control block must not come after a ttl='5m' cache_control block",
+        },
+      },
+    }
+    expect(isCacheControlRejection400(err)).toBe(true)
+  })
+
+  test('B-1 negative: generic upstream_error WITHOUT cache_control signature → false (no over-match)', () => {
+    const err = new Error(
+      'data: {"type":"error","error":{"type":"upstream_error","message":"Upstream request failed"}}',
+    )
+    expect(isCacheControlRejection400(err)).toBe(false)
+  })
+
+  test('B-1 negative: network error mentioning cache but no TTL ordering → false', () => {
+    const err = new Error('failed to read cache from disk: ENOENT')
+    expect(isCacheControlRejection400(err)).toBe(false)
   })
 })
 

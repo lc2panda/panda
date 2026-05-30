@@ -28,7 +28,11 @@ import { has1mContext } from './context.js'
 import { isEnvDefinedFalsy, isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
-import { getAPIProvider, isThirdPartyProvider } from './model/providers.js'
+import {
+  getAPIProvider,
+  isFirstPartyAnthropicBaseUrl,
+  isThirdPartyProvider,
+} from './model/providers.js'
 import { getInitialSettings } from './settings/settings.js'
 
 /**
@@ -212,10 +216,23 @@ export function getToolSearchBetaHeader(): string {
  * Check if experimental betas should be included.
  * These are betas that are only available on firstParty provider
  * and may not be supported by proxies or other providers.
+ *
+ * Third-party relay guard (B-2): getAPIProvider() only inspects env
+ * (BEDROCK/VERTEX/FOUNDRY/PANDA_PROVIDER) and therefore misclassifies a
+ * third-party relay reached via ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN as
+ * 'firstParty'. Such relays often do NOT support the experimental
+ * first-party-only betas (notably extended-cache-ttl which enables the 1h
+ * cache_control TTL) and forwarding them produces upstream
+ * cache_control 1h-after-5m 400s. Require isFirstPartyAnthropicBaseUrl() so a
+ * non-official ANTHROPIC_BASE_URL host suppresses these betas. Bedrock/Vertex
+ * (provider !== 'firstParty' && !== 'foundry') were already excluded; foundry
+ * without a custom base_url keeps its prior behavior (isFirstPartyAnthropicBaseUrl
+ * returns true when ANTHROPIC_BASE_URL is unset).
  */
 export function shouldIncludeFirstPartyOnlyBetas(): boolean {
   return (
     (getAPIProvider() === 'firstParty' || getAPIProvider() === 'foundry') &&
+    isFirstPartyAnthropicBaseUrl() &&
     !isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS)
   )
 }

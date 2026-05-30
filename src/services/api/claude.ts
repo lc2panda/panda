@@ -457,6 +457,24 @@ const BACKGROUND_LONG_TTL_QUERY_SOURCES: ReadonlySet<string> = new Set([
 ])
 
 function should1hCacheTTL(querySource?: QuerySource, isSystemLevel?: boolean): boolean {
+  // Third-party relay guard (B-2): getAPIProvider() inspects env only and
+  // misclassifies a relay reached via ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN
+  // as 'firstParty'. Such relays frequently re-serialize the request and inject
+  // their own 5m cache_control blocks; combining those with a panda-emitted 1h
+  // block triggers the upstream "ttl='1h' must not come after ttl='5m'" 400.
+  // Force 5m (return false) for any non-official ANTHROPIC_BASE_URL host so
+  // panda never emits a 1h cache_control block on a third-party relay. This
+  // runs before the background early-return on purpose: third-party relays must
+  // never receive 1h even for background fork query sources. Official direct
+  // (no base_url / api.anthropic.com) and Bedrock/Vertex/Foundry (provider !==
+  // 'firstParty') are unaffected — they keep their prior 1h behavior below.
+  if (
+    getAPIProvider() === 'firstParty' &&
+    !isFirstPartyAnthropicBaseUrl()
+  ) {
+    return false
+  }
+
   // Background forks: always 1h TTL regardless of allowlist / user eligibility,
   // since their invocation interval often exceeds the 5m ephemeral window.
   if (querySource && BACKGROUND_LONG_TTL_QUERY_SOURCES.has(querySource)) {

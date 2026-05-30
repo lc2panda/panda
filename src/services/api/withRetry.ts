@@ -675,13 +675,21 @@ const CACHE_CONTROL_400_KEYWORDS = [
   'scope',
 ]
 
-function isCacheControlRejection400(error: unknown): boolean {
-  if (!(error instanceof APIError)) return false
-  if (error.status !== 400) return false
-  // Pull from both .message (normalized by SDK) and raw error body if present.
-  const msg = (error.message ?? '').toLowerCase()
+/**
+ * Collect the lowercased text we can scan for cache-control rejection
+ * keywords. Pulls from `.message` (SDK-normalized) plus a raw `.error` body if
+ * present (object or string). Works for any error shape, not just APIError, so
+ * the same scanner serves both the clean-400 path and the third-party relay
+ * fallback below.
+ */
+function collectErrorText(error: unknown): string {
+  const msg = (
+    (error as { message?: unknown } | null | undefined)?.message ?? ''
+  )
+    .toString()
+    .toLowerCase()
   let bodyStr = ''
-  const body = (error as { error?: unknown }).error
+  const body = (error as { error?: unknown } | null | undefined)?.error
   if (body) {
     try {
       bodyStr = (
@@ -691,24 +699,49 @@ function isCacheControlRejection400(error: unknown): boolean {
       bodyStr = ''
     }
   }
-  // Require at least one cache-specific keyword (cache_control / cache control /
-  // invalid cache). `scope` / `unsupported parameter` / `unknown parameter`
-  // alone would over-match unrelated 400s, so they must co-occur with a cache
-  // keyword in the combined text.
-  const combined = `${msg}\n${bodyStr}`
-  const hasCacheKeyword =
-    combined.includes('cache_control') ||
-    combined.includes('cache control') ||
-    combined.includes('invalid cache')
-  if (hasCacheKeyword) return true
-  // Edge case: some providers say "unsupported parameter: scope" without
-  // mentioning cache_control. Catch that too.
-  const hasScopeAndUnsupported =
-    combined.includes('scope') &&
-    (combined.includes('unsupported parameter') ||
-      combined.includes('unknown parameter') ||
-      combined.includes('unsupported field'))
-  return hasScopeAndUnsupported
+  return `${msg}\n${bodyStr}`
+}
+
+export function isCacheControlRejection400(error: unknown): boolean {
+  // Clean path: SDK surfaced a real APIError with HTTP 400. Require at least one
+  // cache-specific keyword (cache_control / cache control / invalid cache).
+  // `scope` / `unsupported parameter` / `unknown parameter` alone would
+  // over-match unrelated 400s, so they must co-occur with a cache keyword in
+  // the combined text.
+  if (error instanceof APIError && error.status === 400) {
+    const combined = collectErrorText(error)
+    const hasCacheKeyword =
+      combined.includes('cache_control') ||
+      combined.includes('cache control') ||
+      combined.includes('invalid cache')
+    if (hasCacheKeyword) return true
+    // Edge case: some providers say "unsupported parameter: scope" without
+    // mentioning cache_control. Catch that too.
+    const hasScopeAndUnsupported =
+      combined.includes('scope') &&
+      (combined.includes('unsupported parameter') ||
+        combined.includes('unknown parameter') ||
+        combined.includes('unsupported field'))
+    return hasScopeAndUnsupported
+  }
+
+  // B-1 third-party relay fallback: a relay reached via ANTHROPIC_BASE_URL may
+  // re-wrap the upstream cache_control 400 as a streaming `upstream_error`
+  // event ("Upstream request failed"), which does NOT surface as an
+  // APIError(status=400). To avoid over-matching genuine network/upstream
+  // failures we require the *precise* cache_control TTL-ordering signature
+  // (the actual text Anthropic returns) before reusing the strip-and-retry
+  // self-heal. Match either the explicit cache_control TTL-ordering phrase or
+  // a cache_control mention co-occurring with the "must not come after"
+  // ordering phrase.
+  const combined = collectErrorText(error)
+  const mentionsCacheControl =
+    combined.includes('cache_control') || combined.includes('cache control')
+  const mentionsTtlOrdering =
+    combined.includes('must not come after') ||
+    (combined.includes("ttl='1h'") && combined.includes("ttl='5m'")) ||
+    (combined.includes('ttl=1h') && combined.includes('ttl=5m'))
+  return mentionsCacheControl && mentionsTtlOrdering
 }
 
 function isDefensiveCacheFallbackDisabled(): boolean {
