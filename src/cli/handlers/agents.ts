@@ -16,6 +16,66 @@ import {
   getAgentDefinitionsWithOverrides,
 } from '../../tools/AgentTool/loadAgentsDir.js'
 import { getCwd } from '../../utils/cwd.js'
+import { enumerateSessions } from '../../components/AgentView/sessionEnumerator.js'
+import type { SessionEntry } from '../../components/AgentView/types.js'
+
+/**
+ * JSON shape emitted by `claude agents --json`.
+ * Mirrors upstream "active session" semantics: only live (process-backed)
+ * sessions are reported, with stable script-consumable fields.
+ */
+type ActiveAgentSessionJson = {
+  id: string
+  name: string
+  sessionId: string | null
+  pid: number | null
+  status: SessionEntry['status']
+  cwd: string
+  startedAt: number
+  pinned: boolean
+  prStatus: SessionEntry['prStatus']
+  waitingFor?: string
+}
+
+function toActiveSessionJson(entry: SessionEntry): ActiveAgentSessionJson {
+  const json: ActiveAgentSessionJson = {
+    id: entry.id,
+    name: entry.displayName,
+    sessionId: entry.sessionId,
+    pid: entry.pid,
+    status: entry.status,
+    cwd: entry.cwd,
+    startedAt: entry.startedAt,
+    pinned: entry.pinned,
+    prStatus: entry.prStatus,
+  }
+  if (entry.waitingFor !== undefined) {
+    json.waitingFor = entry.waitingFor
+  }
+  return json
+}
+
+/**
+ * Pure transform: filter merged session entries down to active (alive)
+ * sessions and map them to the stable JSON shape. Exported for tests.
+ */
+export function buildActiveSessionsJson(
+  entries: SessionEntry[],
+): ActiveAgentSessionJson[] {
+  return entries.filter(e => e.shape === 'alive').map(toActiveSessionJson)
+}
+
+/**
+ * `claude agents --json` — emit active sessions as JSON to stdout.
+ * "Active" = live PID-file-backed sessions (shape === 'alive'); roster-only
+ * (exited) entries are excluded. Always prints a valid JSON array; an empty
+ * list serializes to `[]`.
+ */
+export async function agentsJsonHandler(): Promise<void> {
+  const entries = await enumerateSessions()
+  const active = buildActiveSessionsJson(entries)
+  console.log(JSON.stringify(active, null, 2))
+}
 
 function formatAgent(agent: ResolvedAgent): string {
   const model = resolveAgentModelDisplay(agent)

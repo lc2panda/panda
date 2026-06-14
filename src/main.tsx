@@ -4394,7 +4394,14 @@ async function run(): Promise<CommanderCommand> {
     await agentsHandler();
     process.exit(0);
   });
-  agentsCmd.action(async () => {
+  agentsCmd.option('--json', 'Output active agent sessions as JSON to stdout (no TUI) · 以 JSON 输出活跃 Agent session（不进 TUI）').action(async (opts: { json?: boolean }) => {
+    if (opts.json) {
+      const {
+        agentsJsonHandler
+      } = await import('./cli/handlers/agents.js');
+      await agentsJsonHandler();
+      process.exit(0);
+    }
     const {
       agentViewHandler
     } = await import('./cli/handlers/agentView.js');
