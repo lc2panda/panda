@@ -21,7 +21,7 @@ import { effortLevelToSymbol } from './EffortIndicator.js';
 export type Props = {
   initial: string | null;
   sessionModel?: ModelSetting;
-  onSelect: (model: string | null, effort: EffortLevel | undefined) => void;
+  onSelect: (model: string | null, effort: EffortLevel | undefined, setAsDefault?: boolean) => void;
   onCancel?: () => void;
   isStandaloneCommand?: boolean;
   showFastModeNotice?: boolean;
@@ -37,7 +37,7 @@ export type Props = {
 };
 const NO_PREFERENCE = '__NO_PREFERENCE__';
 export function ModelPicker(t0) {
-  const $ = _c(82);
+  const $ = _c(83);
   const {
     initial,
     sessionModel,
@@ -223,7 +223,7 @@ export function ModelPicker(t0) {
   useKeybindings(t12, t13);
   let t14;
   if ($[35] !== effort || $[36] !== hasToggledEffort || $[37] !== onSelect || $[38] !== setAppState || $[39] !== skipSettingsWrite) {
-    t14 = function handleSelect(value_0) {
+    t14 = function handleSelect(value_0, setAsDefault) {
       logEvent("tengu_model_command_menu_effort", {
         effort: effort as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
       });
@@ -243,10 +243,10 @@ export function ModelPicker(t0) {
       const selectedModel = resolveOptionModel(value_0);
       const selectedEffort = hasToggledEffort && selectedModel && modelSupportsEffort(selectedModel) ? effort : undefined;
       if (value_0 === NO_PREFERENCE) {
-        onSelect(null, selectedEffort);
+        onSelect(null, selectedEffort, setAsDefault);
         return;
       }
-      onSelect(value_0, selectedEffort);
+      onSelect(value_0, selectedEffort, setAsDefault);
     };
     $[35] = effort;
     $[36] = hasToggledEffort;
@@ -258,6 +258,11 @@ export function ModelPicker(t0) {
     t14 = $[40];
   }
   const handleSelect = t14;
+  useKeybindings({
+    "modelPicker:setDefault": () => handleSelect(focusedValue, true)
+  }, {
+    context: "ModelPicker"
+  });
   let t15;
   if ($[41] === Symbol.for("react.memo_cache_sentinel")) {
     t15 = <Text color="remember" bold={true}>Select model</Text>;
@@ -265,7 +270,7 @@ export function ModelPicker(t0) {
   } else {
     t15 = $[41];
   }
-  const t16 = headerText ?? "Switch between Claude models. Applies to this session and future Panda sessions. For other/previous model names, specify with --model.";
+  const t16 = headerText ?? "Switch between Claude models. Enter applies to this session only; press d to set the highlighted model as the default for future Panda sessions. For other/previous model names, specify with --model.";
   let t17;
   if ($[42] !== t16) {
     t17 = <Text dimColor={true}>{t16}</Text>;
@@ -342,9 +347,16 @@ export function ModelPicker(t0) {
   } else {
     t25 = $[68];
   }
+  let t25b;
+  if ($[82] === Symbol.for("react.memo_cache_sentinel")) {
+    t25b = <Box><Text color="subtle"><Text bold={true}>Enter</Text> use for this session · <Text bold={true}>d</Text> set as default for new sessions</Text></Box>;
+    $[82] = t25b;
+  } else {
+    t25b = $[82];
+  }
   let t26;
   if ($[69] !== t19 || $[70] !== t23 || $[71] !== t24 || $[72] !== t25) {
-    t26 = <Box flexDirection="column">{t19}{t23}{t24}{t25}</Box>;
+    t26 = <Box flexDirection="column">{t19}{t23}{t24}{t25}{t25b}</Box>;
     $[69] = t19;
     $[70] = t23;
     $[71] = t24;

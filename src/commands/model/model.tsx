@@ -49,18 +49,27 @@ function ModelPickerWrapper(t0) {
   const handleCancel = t1;
   let t2;
   if ($[3] !== isFastMode || $[4] !== mainLoopModel || $[5] !== onDone || $[6] !== setAppState) {
-    t2 = function handleSelect(model, effort) {
+    t2 = function handleSelect(model, effort, setAsDefault) {
       logEvent("tengu_model_command_menu", {
         action: model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         from_model: mainLoopModel as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
         to_model: model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
       });
-      setAppState(prev => ({
-        ...prev,
-        mainLoopModel: model,
-        mainLoopModelForSession: null
-      }));
-      let message = `Set model to ${chalk.bold(renderModelLabel(model))}`;
+      if (setAsDefault) {
+        // `d` key: set as the default for new sessions (persisted) and clear any session override.
+        setAppState(prev => ({
+          ...prev,
+          mainLoopModel: model,
+          mainLoopModelForSession: null
+        }));
+      } else {
+        // Enter: apply to the current session only. Do not touch the persisted default.
+        setAppState(prev => ({
+          ...prev,
+          mainLoopModelForSession: model
+        }));
+      }
+      let message = setAsDefault ? `Set default model to ${chalk.bold(renderModelLabel(model))}` : `Set model to ${chalk.bold(renderModelLabel(model))} for this session`;
       if (effort !== undefined) {
         message = message + ` with ${chalk.bold(effort)} effort`;
       }

@@ -312,6 +312,7 @@ export const DEFAULT_BINDINGS: KeybindingBlock[] = [
     bindings: {
       left: 'modelPicker:decreaseEffort',
       right: 'modelPicker:increaseEffort',
+      d: 'modelPicker:setDefault',
     },
   },
   // Select component navigation (used by /model, /resume, permission prompts, etc.)

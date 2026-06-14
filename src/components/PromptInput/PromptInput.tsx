@@ -2055,14 +2055,17 @@ function PromptInput({
   // Memoized callbacks for model picker to prevent re-renders when unrelated
   // state (like notifications) changes. This prevents the inline model picker
   // from visually "jumping" when notifications arrive.
-  const handleModelSelect = useCallback((model: string | null, _effort: EffortLevel | undefined) => {
+  const handleModelSelect = useCallback((model: string | null, _effort: EffortLevel | undefined, setAsDefault?: boolean) => {
     let wasFastModeDisabled = false;
     setAppState(prev => {
       wasFastModeDisabled = isFastModeEnabled() && !isFastModeSupportedByModel(model) && !!prev.fastMode;
       return {
         ...prev,
-        mainLoopModel: model,
-        mainLoopModelForSession: null,
+        // `d` key sets the persisted default (and clears the session override);
+        // Enter applies to the current session only.
+        ...(setAsDefault
+          ? { mainLoopModel: model, mainLoopModelForSession: null }
+          : { mainLoopModelForSession: model }),
         // Turn off fast mode if switching to a model that doesn't support it
         ...(wasFastModeDisabled && {
           fastMode: false
@@ -2071,7 +2074,7 @@ function PromptInput({
     });
     setShowModelPicker(false);
     const effectiveFastMode = (isFastMode ?? false) && !wasFastModeDisabled;
-    let message = `Model set to ${modelDisplayString(model)}`;
+    let message = setAsDefault ? `Default model set to ${modelDisplayString(model)}` : `Model set to ${modelDisplayString(model)} for this session`;
     if (isBilledAsExtraUsage(model, effectiveFastMode, isOpus1mMergeEnabled())) {
       message += ' · Billed as extra usage';
     }
