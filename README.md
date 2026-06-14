@@ -8,8 +8,6 @@
 
 > 🖥️ **桌面端主线：Panda Desk Chat** — 当前 UI 桌面端为 `@panda/desk-chat@0.3.7`，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。`panda-on-desk` 桌面宠物线降级为 v2.25.x 历史归档，暂不作为用户下载/安装入口。
 
-> 此项目的任何功能、架构更新，必须在结束后同步更新相关文档。这是我们契约的一部分。
-
 ```
  ██████╗   █████╗  ███╗   ██╗ ██████╗   █████╗
  ██╔══██╗ ██╔══██╗ ████╗  ██║ ██╔══██╗ ██╔══██╗
@@ -19,36 +17,7 @@
  ╚═╝      ╚═╝  ╚═╝ ╚═╝  ╚═══╝ ╚═════╝  ╚═╝  ╚═╝
 ```
 
-| 版本 | 运行时 | 亮点 |
-|------|--------|-----|
-| 2.28.0 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 6 项上游能力同步（markdown checkbox · /diff 行级滚动 · /model 会话级切换 · Read PARTIAL · agents --json · /code-review）· 一行零门槛安装 |
-| 2.27.9 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 第三方中转 cache_control TTL 修复 · workflow 引擎 · daemon · 后台任务面板 |
-| 2.26.11 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 历史 tab 恢复 · CLI 错误诊断 · 退出刷屏修复 |
-
-## 当前进度 · v2.28.0
-
-| 维度 | 状态 |
-|------|------|
-| 主线提交 | v2.28.0（6 项上游 Claude Code 能力同步 + 一行零门槛安装）；详见 `git log` |
-| 本地/远端 | 本地 `main` 已包含 v2.28.0；远端推送以后以 `panda/main` 为准 |
-| 包版本 | `@lc2panda/panda-code@2.28.0`；`@panda/desk-chat@0.3.7`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
-| 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.156 的高价值能力；本次补齐 v2.1.144–149 区间 6 项缺口；v2.1.157+ 作为后续评估范围，不在本 README 虚报为已吸收 |
-| v2.28.0 上游同步 | 见下方「本次新能力」6 项清单（markdown checkbox 渲染 · `/diff` 行级滚动 · `/model` 会话级切换 · Read PARTIAL 截断 · `agents --json` · `/code-review`） |
-| 新安装方式 | 一行 `curl -fsSL .../install.sh \| bash` 零门槛安装（自动装 bun + 拉 latest Release .tgz + 全局安装），无需 GitHub token / `.npmrc` |
-| 发布状态 | v2.28.0 计划发布到 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest)；Desk Chat 0.3.7 安装资产随 Release 上传，`panda-on-desk-v1.0.4` 仅作历史归档 |
-
-### 本次新能力（v2.28.0 上游同步）
-
-| # | 能力 | 上游版本 |
-|---|------|---------|
-| ① | CLI markdown 任务列表 checkbox（`- [ ]` / `- [x]`）渲染 | 2.1.149 |
-| ② | `/simplify` 重命名为 `/code-review`，新增 `--comment` 发 PR 内联评论（`/simplify` 作为 alias 仍兼容） | 2.1.147 |
-| ④ | `/diff` 详情支持键盘行级滚动 | 2.1.149 |
-| ⑤ | `claude agents --json` 输出当前活跃 session | 2.1.145 |
-| ⑥ | Read 工具超出限制时返回 PARTIAL view 截断视图（而非直接报错） | 2.1.145 |
-| ⑧ | `/model` 选择只改当前会话，按 `d` 键将所选模型设为默认 | 2.1.144 |
-
----
+> Panda 是一个本地优先、隐私安全的 AI 伙伴 CLI：编码助手 + 智能助理 + 系统感知 + 生活管理一体。支持 Anthropic / DeepSeek / Kimi / Qwen / MiniMax / GLM / 火山引擎 / OpenAI 多 Provider，内置五层记忆系统、103 个主动推送场景、工作流引擎与桌面端 Panda Desk Chat。完整版本演进见文末「[更新历史](#更新历史)」。
 
 ## 1. 安装与配置
 
@@ -2311,7 +2280,43 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 ---
 
-> **此项目的任何功能、架构更新，必须在结束后同步更新相关文档。这是我们契约的一部分。**
+## 更新历史
+
+<details>
+<summary>点击展开版本更新记录</summary>
+
+### 当前进度 · v2.28.0
+
+| 维度 | 状态 |
+|------|------|
+| 主线提交 | v2.28.0（6 项上游 Claude Code 能力同步 + 一行零门槛安装）；详见 `git log` |
+| 本地/远端 | 本地 `main` 已包含 v2.28.0；远端推送以后以 `panda/main` 为准 |
+| 包版本 | `@lc2panda/panda-code@2.28.0`；`@panda/desk-chat@0.3.7`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
+| 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.156 的高价值能力；本次补齐 v2.1.144–149 区间 6 项缺口；v2.1.157+ 作为后续评估范围，不在本 README 虚报为已吸收 |
+| v2.28.0 上游同步 | 见下方「v2.28.0 新能力」6 项清单（markdown checkbox 渲染 · `/diff` 行级滚动 · `/model` 会话级切换 · Read PARTIAL 截断 · `agents --json` · `/code-review`） |
+| 新安装方式 | 一行 `curl -fsSL .../install.sh \| bash` 零门槛安装（自动装 bun + 拉 latest Release .tgz + 全局安装），无需 GitHub token / `.npmrc` |
+| 发布状态 | v2.28.0 计划发布到 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest)；Desk Chat 0.3.7 安装资产随 Release 上传，`panda-on-desk-v1.0.4` 仅作历史归档 |
+
+### v2.28.0 新能力（上游同步）
+
+| # | 能力 | 上游版本 |
+|---|------|---------|
+| ① | CLI markdown 任务列表 checkbox（`- [ ]` / `- [x]`）渲染 | 2.1.149 |
+| ② | `/simplify` 重命名为 `/code-review`，新增 `--comment` 发 PR 内联评论（`/simplify` 作为 alias 仍兼容） | 2.1.147 |
+| ④ | `/diff` 详情支持键盘行级滚动 | 2.1.149 |
+| ⑤ | `claude agents --json` 输出当前活跃 session | 2.1.145 |
+| ⑥ | Read 工具超出限制时返回 PARTIAL view 截断视图（而非直接报错） | 2.1.145 |
+| ⑧ | `/model` 选择只改当前会话，按 `d` 键将所选模型设为默认 | 2.1.144 |
+
+### 版本对照
+
+| 版本 | 运行时 | 亮点 |
+|------|--------|-----|
+| 2.28.0 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 6 项上游能力同步（markdown checkbox · /diff 行级滚动 · /model 会话级切换 · Read PARTIAL · agents --json · /code-review）· 一行零门槛安装 |
+| 2.27.9 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 第三方中转 cache_control TTL 修复 · workflow 引擎 · daemon · 后台任务面板 |
+| 2.26.11 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 历史 tab 恢复 · CLI 错误诊断 · 退出刷屏修复 |
+
+</details>
 
 ---
 
