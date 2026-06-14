@@ -265,6 +265,12 @@ const outputSchema = lazySchema(() => {
           .describe('Number of lines in the returned content'),
         startLine: z.number().describe('The starting line number'),
         totalLines: z.number().describe('Total number of lines in the file'),
+        partialView: z
+          .boolean()
+          .optional()
+          .describe(
+            'True when content was truncated to fit the per-read token budget (PARTIAL view)',
+          ),
       }),
     }),
     z.object({
@@ -693,9 +699,13 @@ export const FileReadTool = buildTool({
         let content: string
 
         if (data.file.content) {
+          const partialViewNotice = data.file.partialView
+            ? buildPartialViewNotice(data.file)
+            : ''
           content =
             memoryFileFreshnessPrefix(data) +
             formatFileLines(data.file) +
+            partialViewNotice +
             (shouldIncludeFileReadMitigation()
               ? CYBER_RISK_MITIGATION_REMINDER
               : '')
@@ -724,6 +734,29 @@ function pickLineFormatInstruction(): string {
 /** Format file content with line numbers. */
 function formatFileLines(file: { content: string; startLine: number }): string {
   return addLineNumbers(file)
+}
+
+/**
+ * PARTIAL view notice appended to the model-facing tool result when a text read
+ * was truncated to fit the per-read token budget (upstream v2.1.145 parity).
+ * `startLine` is 1-based for offset>0 reads and 0 when reading from the top.
+ */
+export function buildPartialViewNotice(file: {
+  numLines: number
+  startLine: number
+  totalLines: number
+}): string {
+  const firstLine = file.startLine > 0 ? file.startLine : 1
+  const lastLine = firstLine + file.numLines - 1
+  return (
+    '\n\n<system-reminder>\n' +
+    'PARTIAL view: this file exceeds the maximum tokens allowed in a single ' +
+    `read, so only lines ${firstLine}-${lastLine} of ${file.totalLines} are ` +
+    'shown above. To read the rest of the file, call Read again with ' +
+    `\`offset\` set to ${lastLine + 1} (optionally with \`limit\`) to ` +
+    'continue from where this view stopped.\n' +
+    '</system-reminder>\n'
+  )
 }
 
 export const CYBER_RISK_MITIGATION_REMINDER = isEnvTruthy(process.env.PANDA_SECURITY_RESEARCH)
@@ -769,6 +802,115 @@ async function validateContentTokens(
 
   if (effectiveCount > effectiveMaxTokens) {
     throw new MaxFileReadTokenExceededError(effectiveCount, effectiveMaxTokens)
+  }
+}
+
+export type TokenBudgetResult = {
+  /** Content that fits under the token budget (truncated at a line boundary). */
+  content: string
+  /** True when content was truncated because the full slice exceeded the cap. */
+  truncated: boolean
+  /** Number of lines retained in `content` when truncated; undefined otherwise. */
+  truncatedLineCount?: number
+}
+
+/**
+ * Enforces the per-read output token budget for text files.
+ *
+ * Upstream parity (claude-code v2.1.145): instead of hard-throwing
+ * `MaxFileReadTokenExceededError` when a slice exceeds the token cap, return a
+ * truncated "PARTIAL view" of the leading lines that fit under the budget so
+ * the model gets immediately useful content and a clear nudge to continue with
+ * offset/limit.
+ *
+ * Why this is safe vs. the reverted byte-cap truncation (#21841): the byte-cap
+ * revert was driven by mean-token regression (a ~100-byte error tool-result vs
+ * ~25K tokens of truncated content). The token-cap path is different — when it
+ * throws, the model must re-issue a Read of the same leading region anyway,
+ * which yields the same ~25K tokens. Truncating here does not increase mean
+ * tokens versus that unavoidable re-read; it just removes a round trip.
+ *
+ * Truncation always lands on a line boundary (never mid-line).
+ */
+async function enforceContentTokenBudget(
+  content: string,
+  ext: string,
+  maxTokens?: number,
+): Promise<TokenBudgetResult> {
+  const effectiveMaxTokens =
+    maxTokens ?? getDefaultFileReadingLimits().maxTokens
+
+  const tokenEstimate = roughTokenCountEstimationForFileType(content, ext)
+  if (!tokenEstimate || tokenEstimate <= effectiveMaxTokens / 4) {
+    return { content, truncated: false }
+  }
+
+  const tokenCount = await countTokensWithAPI(content)
+  const effectiveCount = tokenCount ?? tokenEstimate
+
+  if (effectiveCount <= effectiveMaxTokens) {
+    return { content, truncated: false }
+  }
+
+  return truncateLinesToTokenBudget(
+    content,
+    ext,
+    effectiveCount,
+    effectiveMaxTokens,
+  )
+}
+
+/**
+ * Pure line-boundary truncation: given content known to exceed the token
+ * budget (effectiveCount > effectiveMaxTokens), keep the largest prefix of
+ * whole lines that fits under the budget. Network-free — uses the cheap
+ * per-file-type estimator to converge, so it is safe to unit test offline.
+ */
+export function truncateLinesToTokenBudget(
+  content: string,
+  ext: string,
+  effectiveCount: number,
+  effectiveMaxTokens: number,
+): TokenBudgetResult {
+  // Split on line boundaries so we never truncate mid-line. A trailing newline
+  // yields a trailing '' element; we keep the slice/join symmetric so the
+  // retained line count matches the visible lines.
+  const lines = content.split('\n')
+  // Proportional first guess from the known counts, then converge.
+  let keep = Math.max(
+    1,
+    Math.min(
+      lines.length,
+      Math.floor((lines.length * effectiveMaxTokens) / effectiveCount),
+    ),
+  )
+
+  const fitsEstimate = (n: number): boolean => {
+    const slice = lines.slice(0, n).join('\n')
+    const est = roughTokenCountEstimationForFileType(slice, ext)
+    return !est || est <= effectiveMaxTokens
+  }
+
+  // Shrink to a prefix that fits.
+  while (keep > 1 && !fitsEstimate(keep)) {
+    keep = Math.floor(keep / 2) || 1
+  }
+  // Grow back toward the cap in coarse halving steps so the partial view is as
+  // complete as possible without exceeding the budget.
+  let step = Math.max(1, Math.floor(keep / 2))
+  while (step >= 1 && keep < lines.length) {
+    if (fitsEstimate(Math.min(lines.length, keep + step))) {
+      keep = Math.min(lines.length, keep + step)
+    } else {
+      step = Math.floor(step / 2)
+    }
+  }
+
+  const truncatedContent = lines.slice(0, keep).join('\n')
+  return {
+    content: truncatedContent,
+    truncated: true,
+    truncatedLineCount: keep,
   }
 }
 
@@ -1028,30 +1170,42 @@ async function callInner(
       context.abortController.signal,
     )
 
-  await validateContentTokens(content, ext, maxTokens)
+  // Upstream parity (v2.1.145): when the slice exceeds the per-read token
+  // budget, return a truncated PARTIAL view of the leading lines instead of
+  // hard-throwing MaxFileReadTokenExceededError. The model gets immediately
+  // useful content plus a nudge to continue with offset/limit.
+  const budget = await enforceContentTokenBudget(content, ext, maxTokens)
+  const effectiveContent = budget.content
+  const effectiveLineCount = budget.truncated
+    ? (budget.truncatedLineCount ?? lineCount)
+    : lineCount
 
   readFileState.set(fullFilePath, {
-    content,
+    content: effectiveContent,
     timestamp: Math.floor(mtimeMs),
     offset,
     limit,
+    // A PARTIAL view is not the full slice — flag it so Edit/Write require a
+    // real (complete) Read of the region before mutating.
+    ...(budget.truncated ? { isPartialView: true } : {}),
   })
   context.nestedMemoryAttachmentTriggers?.add(fullFilePath)
 
   // Snapshot before iterating — a listener that unsubscribes mid-callback
   // would splice the live array and skip the next listener.
   for (const listener of fileReadListeners.slice()) {
-    listener(resolvedFilePath, content)
+    listener(resolvedFilePath, effectiveContent)
   }
 
   const data = {
     type: 'text' as const,
     file: {
       filePath: file_path,
-      content,
-      numLines: lineCount,
+      content: effectiveContent,
+      numLines: effectiveLineCount,
       startLine: offset,
       totalLines,
+      ...(budget.truncated ? { partialView: true } : {}),
     },
   }
   if (isAutoMemFile(fullFilePath)) {
@@ -1062,14 +1216,14 @@ async function callInner(
     operation: 'read',
     tool: 'FileReadTool',
     filePath: fullFilePath,
-    content,
+    content: effectiveContent,
   })
 
   const sessionFileType = detectSessionFileType(fullFilePath)
   const analyticsExt = getFileExtensionForAnalytics(fullFilePath)
   logEvent('tengu_session_file_read', {
     totalLines,
-    readLines: lineCount,
+    readLines: effectiveLineCount,
     totalBytes,
     readBytes,
     offset,

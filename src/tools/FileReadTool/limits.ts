@@ -1,16 +1,24 @@
 /**
  * Read tool output limits.  Two caps apply to text reads:
  *
- *   | limit         | default | checks                    | cost          | on overflow     |
- *   |---------------|---------|---------------------------|---------------|-----------------|
- *   | maxSizeBytes  | 256 KB  | TOTAL FILE SIZE (not out) | 1 stat        | throws pre-read |
- *   | maxTokens     | 25000   | actual output tokens      | API roundtrip | throws post-read|
+ *   | limit         | default | checks                    | cost          | on overflow      |
+ *   |---------------|---------|---------------------------|---------------|------------------|
+ *   | maxSizeBytes  | 256 KB  | TOTAL FILE SIZE (not out) | 1 stat        | throws pre-read  |
+ *   | maxTokens     | 25000   | actual output tokens      | API roundtrip | PARTIAL truncate |
  *
  * Known mismatch: maxSizeBytes gates on total file size, not the slice.
  * Tested truncating instead of throwing for explicit-limit reads that
- * exceed the byte cap (#21841, Mar 2026).  Reverted: tool error rate
+ * exceed the BYTE cap (#21841, Mar 2026).  Reverted: tool error rate
  * dropped but mean tokens rose — the throw path yields a ~100-byte error
  * tool-result while truncation yields ~25K tokens of content at the cap.
+ *
+ * Note: the TOKEN cap is a *different* path. As of v2.1.145 it no longer
+ * hard-throws — it returns a line-boundary truncated PARTIAL view of the
+ * leading lines plus a nudge to continue with offset/limit (see
+ * enforceContentTokenBudget in FileReadTool.ts). This does not regress mean
+ * tokens like the byte-cap revert did: when the token cap threw, the model
+ * had to re-read the same leading region anyway (~25K tokens), so truncating
+ * here only removes a round trip rather than adding content.
  */
 import memoize from 'lodash-es/memoize.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
