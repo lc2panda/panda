@@ -61,7 +61,7 @@ function getCommitAndPRInstructions(): string {
 
 These skills handle git safety protocols, proper commit message formatting, and PR creation.
 
-Before creating a pull request, run \`/simplify\` to review your changes, then test end-to-end (e.g. via \`/tmux\` for interactive features).
+Before creating a pull request, run \`/code-review\` to review your changes, then test end-to-end (e.g. via \`/tmux\` for interactive features).
 
 `
       : ''

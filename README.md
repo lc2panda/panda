@@ -2,11 +2,11 @@
 
 > 懂你所有数据的 AI 伙伴 | 编码 · 助理 · 感知 · 生活
 
-[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![desktop](https://img.shields.io/badge/desktop-panda--desk--chat%400.2.6-blue)](https://github.com/lc2panda/panda/releases/latest) [![version](https://img.shields.io/badge/version-v2.26.11-blue)](./TODO.md#进行中--v22611-desk-chat-历史会话错误诊断与恢复修补2026-05-25-173041-0800) [![checks](https://img.shields.io/badge/v2.26.11%20desk--chat-build-pass-brightgreen)](#当前进度--v22611) [![upstream](https://img.shields.io/badge/upstream%20absorbed-v2.1.142-success)](#当前进度--v22611)
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![desktop](https://img.shields.io/badge/desktop-panda--desk--chat%400.3.7-blue)](https://github.com/lc2panda/panda/releases/latest) [![version](https://img.shields.io/badge/version-v2.28.0-blue)](#当前进度--v2280) [![checks](https://img.shields.io/badge/v2.28.0-build-pass-brightgreen)](#当前进度--v2280) [![upstream](https://img.shields.io/badge/upstream%20absorbed-v2.1.156-success)](#当前进度--v2280)
 
-> 🤖 **当前主线：v2.26.11** — `main` 已包含 v2.26.7 Desk Chat 修补与 v2.26.11 截图复核热修，主包版本为 `@lc2panda/panda-code@2.26.11`。v2.26 线已完成上游 `@anthropic-ai/claude-code` v2.1.120→v2.1.142 的 14 项能力吸收，并在 v2.26.11 修复 Panda Desk Chat 历史 tab 恢复依赖 live session list、CLI 异常退出重复刷屏，以及错误信息缺少 stderr/cwd/cliPath 诊断的问题。
+> 🤖 **当前主线：v2.28.0** — `main` 已同步上游 `@anthropic-ai/claude-code` 的 6 项高价值能力（CLI markdown 任务列表 checkbox 渲染、`/diff` 详情键盘行级滚动、`/model` 选择只改当前会话 + `d` 键设默认、Read 工具超限返回 PARTIAL 截断视图、`claude agents --json` 输出活跃 session、`/simplify` 重命名为 `/code-review` + `--comment` 发 PR 内联评论），主包版本为 `@lc2panda/panda-code@2.28.0`。本版本新增**一行命令零门槛安装**（`curl | bash`），无需 GitHub token。
 
-> 🖥️ **桌面端主线：Panda Desk Chat** — 当前 UI 桌面端为 `@panda/desk-chat@0.2.6`，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。`panda-on-desk` 桌面宠物线降级为 v2.25.x 历史归档，暂不作为用户下载/安装入口。
+> 🖥️ **桌面端主线：Panda Desk Chat** — 当前 UI 桌面端为 `@panda/desk-chat@0.3.7`，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。`panda-on-desk` 桌面宠物线降级为 v2.25.x 历史归档，暂不作为用户下载/安装入口。
 
 > 此项目的任何功能、架构更新，必须在结束后同步更新相关文档。这是我们契约的一部分。
 
@@ -21,27 +21,72 @@
 
 | 版本 | 运行时 | 亮点 |
 |------|--------|-----|
+| 2.28.0 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 6 项上游能力同步（markdown checkbox · /diff 行级滚动 · /model 会话级切换 · Read PARTIAL · agents --json · /code-review）· 一行零门槛安装 |
+| 2.27.9 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 第三方中转 cache_control TTL 修复 · workflow 引擎 · daemon · 后台任务面板 |
 | 2.26.11 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 历史 tab 恢复 · CLI 错误诊断 · 退出刷屏修复 |
-| 2.26.10 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 历史对话只读加载 · 续聊修复 · 权限模式清洗 |
-| 2.26.7 | Bun >= 1.2.0 / Node.js >= 18.0.0 | Panda Desk Chat 发布入口 · provider snapshot · stream error 兜底 · model IPC 修复 · 顶部拖动修复 |
 
-## 当前进度 · v2.27.8
+## 当前进度 · v2.28.0
 
 | 维度 | 状态 |
 |------|------|
-| 主线提交 | v2.27.8（对齐上游 142→156 高价值能力 + daemon/workflows 100% 吸收）；详见 `git log` |
-| 本地/远端 | 本地 `main` 已包含 v2.27.8；远端推送以后以 `panda/main` 为准 |
-| 包版本 | `@lc2panda/panda-code@2.27.8`；`@panda/desk-chat@0.3.x`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
-| 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.142；npm 上游已继续到 v2.1.150，v2.1.143+ 作为后续评估范围，不在本 README 虚报为已吸收 |
-| v2.26.11 修复 | Desk Chat restoreTabs 改读 `~/.pandacc/projects` 磁盘历史；tab 切换保持 UI-only，不触发 CLI focus；CLI code=1 不再自动 5 次重启刷屏，并在 UI/日志中带 stderr、cwd、cliPath、bunPath、configDir、logPath 诊断 |
-| 验证证据 | `cd packages/panda-desk-chat && bun run test src/__tests__/stores/tabStore.test.ts src/__tests__/stores/chatStore.test.ts src/__tests__/stores/sessionStore.test.ts` 51/51 通过；`npx tsc -b --pretty false --incremental false` 通过；`bun run build:electron` 通过；packaged CLI 历史 UUID resume 可启动，当前实测受 API `429 rate_limit` 限制未完成 result |
-| 发布状态 | v2.26.11 已发布到 [GitHub Releases](https://github.com/lc2panda/panda/releases/tag/v2.26.11)；Desk Chat 0.2.6 安装资产已上传，`panda-on-desk-v1.0.4` 仅作历史归档 |
+| 主线提交 | v2.28.0（6 项上游 Claude Code 能力同步 + 一行零门槛安装）；详见 `git log` |
+| 本地/远端 | 本地 `main` 已包含 v2.28.0；远端推送以后以 `panda/main` 为准 |
+| 包版本 | `@lc2panda/panda-code@2.28.0`；`@panda/desk-chat@0.3.7`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
+| 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.156 的高价值能力；本次补齐 v2.1.144–149 区间 6 项缺口；v2.1.157+ 作为后续评估范围，不在本 README 虚报为已吸收 |
+| v2.28.0 上游同步 | 见下方「本次新能力」6 项清单（markdown checkbox 渲染 · `/diff` 行级滚动 · `/model` 会话级切换 · Read PARTIAL 截断 · `agents --json` · `/code-review`） |
+| 新安装方式 | 一行 `curl -fsSL .../install.sh \| bash` 零门槛安装（自动装 bun + 拉 latest Release .tgz + 全局安装），无需 GitHub token / `.npmrc` |
+| 发布状态 | v2.28.0 计划发布到 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest)；Desk Chat 0.3.7 安装资产随 Release 上传，`panda-on-desk-v1.0.4` 仅作历史归档 |
+
+### 本次新能力（v2.28.0 上游同步）
+
+| # | 能力 | 上游版本 |
+|---|------|---------|
+| ① | CLI markdown 任务列表 checkbox（`- [ ]` / `- [x]`）渲染 | 2.1.149 |
+| ② | `/simplify` 重命名为 `/code-review`，新增 `--comment` 发 PR 内联评论（`/simplify` 作为 alias 仍兼容） | 2.1.147 |
+| ④ | `/diff` 详情支持键盘行级滚动 | 2.1.149 |
+| ⑤ | `claude agents --json` 输出当前活跃 session | 2.1.145 |
+| ⑥ | Read 工具超出限制时返回 PARTIAL view 截断视图（而非直接报错） | 2.1.145 |
+| ⑧ | `/model` 选择只改当前会话，按 `d` 键将所选模型设为默认 | 2.1.144 |
 
 ---
 
 ## 1. 安装与配置
 
 ### 1.1 安装
+
+#### 方式一（推荐）· 一行零门槛安装
+
+无需 GitHub token，无需配置 `.npmrc`。脚本会自动安装 bun、从 latest Release 拉取 `.tgz` 并全局安装：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lc2panda/panda/main/install.sh | bash
+```
+
+安装完成后直接运行：
+
+```bash
+panda
+```
+
+**更新**：重新执行上面的一行命令即可拉取最新 Release 覆盖安装。
+
+---
+
+#### 方式二（备选）· 显式 tarball URL 安装
+
+如果只想安装某个固定版本，可直接用 Release 资产的 tarball URL：
+
+```bash
+npm install -g https://github.com/lc2panda/panda/releases/latest/download/lc2panda-panda-code.tgz
+```
+
+> 将 `latest` 替换为具体 tag（如 `download/v2.28.0/...`）即可锁定版本。
+
+---
+
+#### 方式三（备选）· GitHub Packages 安装
+
+适合已有 GitHub Packages 认证、希望走 `npm install -g @lc2panda/panda-code` 的用户。
 
 **第一步：配置认证（只需一次）**
 
