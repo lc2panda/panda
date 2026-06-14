@@ -21,7 +21,8 @@
 
 ### 1.1 安装
 
-#### 方式一（推荐）· 一行零门槛安装
+<details>
+<summary><strong>方式一：一键安装（macOS / Linux，推荐）</strong></summary>
 
 无需 GitHub token，无需配置 `.npmrc`。脚本会自动安装 bun、从 latest Release 拉取 `.tgz` 并全局安装：
 
@@ -36,10 +37,41 @@ panda
 ```
 
 > **升级**：重新执行上面这一行命令即可覆盖安装到最新版（详见 [1.1.4 升级与更新](#114-升级与更新)）。
+> `curl ... | bash` 仅适用 macOS / Linux；Windows 请用「方式二」的 `install.ps1`。
 
----
+</details>
 
-#### 方式二（备选）· 显式 tarball URL 安装
+<details>
+<summary><strong>方式二：Windows PowerShell 一键安装</strong></summary>
+
+Windows 用 PowerShell 一行安装（自动装 bun、拉 latest Release `.tgz` 并全局安装，无需 GitHub token）：
+
+```powershell
+irm https://raw.githubusercontent.com/lc2panda/panda/main/install.ps1 | iex
+```
+
+安装完成后直接运行：
+
+```powershell
+panda
+```
+
+手动安装（不走脚本时）：
+
+```powershell
+# 1) 先装 bun
+irm bun.sh/install.ps1 | iex
+# 2) 再用显式 tarball URL 全局安装（替换为实际版本）
+npm i -g https://github.com/lc2panda/panda/releases/download/v2.28.0/lc2panda-panda-code-2.28.0.tgz
+```
+
+> `.tgz` 跨平台，已捆绑 win32 ripgrep，Windows 直接可用。
+> **升级**：重跑 `install.ps1` 覆盖安装即可（详见 [1.1.4 升级与更新](#114-升级与更新)）。
+
+</details>
+
+<details>
+<summary><strong>方式三：显式 tarball URL 安装</strong></summary>
 
 如果只想安装某个固定版本，可直接用 Release 资产的 tarball URL：
 
@@ -47,11 +79,12 @@ panda
 npm install -g https://github.com/lc2panda/panda/releases/latest/download/lc2panda-panda-code.tgz
 ```
 
-> 将 `latest` 替换为具体 tag（如 `download/v2.28.0/...`）即可锁定版本。
+> 将 `latest` 替换为具体 tag（如 `download/v2.28.0/...`）即可锁定版本。Windows PowerShell 同样可用此命令。
 
----
+</details>
 
-#### 方式三（备选）· GitHub Packages 安装
+<details>
+<summary><strong>方式四：GitHub Packages 安装</strong></summary>
 
 适合已有 GitHub Packages 认证、希望走 `npm install -g @lc2panda/panda-code` 的用户。
 
@@ -88,13 +121,14 @@ panda
 
 **更新**：`npm install -g @lc2panda/panda-code@latest --registry=https://npm.pkg.github.com`（详见下方升级章节）。
 
----
+</details>
 
-### 1.1.4 升级与更新
+<details>
+<summary><strong>1.1.4 升级与更新</strong></summary>
 
 > **一句话**：安装和升级用的是**同样的命令 / 同一个入口，无需先卸载** —— 直接覆盖即可完成升级。
 
-#### CLI 升级
+#### CLI 升级（macOS / Linux）
 
 | 你的安装方式 | 升级命令 |
 |------|------|
@@ -102,7 +136,14 @@ panda
 | 锁定到指定版本 | `npm install -g https://github.com/lc2panda/panda/releases/download/v<新版本>/lc2panda-panda-code-<新版本>.tgz` |
 | GitHub Packages 用户 | `npm install -g @lc2panda/panda-code@latest --registry=https://npm.pkg.github.com` |
 
-升级后验证：
+#### CLI 升级（Windows）
+
+| 你的安装方式 | 升级命令 |
+|------|------|
+| PowerShell 脚本安装（推荐） | 重跑 `irm https://raw.githubusercontent.com/lc2panda/panda/main/install.ps1 \| iex` —— **覆盖升级，无需先卸载**。 |
+| GitHub Packages 用户 | `npm i -g @lc2panda/panda-code@latest --registry=https://npm.pkg.github.com` |
+
+升级后验证（全平台）：
 
 ```bash
 panda --version
@@ -111,18 +152,29 @@ panda --version
 #### 桌面端（Panda Desk Chat）升级
 
 - **应用内自动更新（推荐）**：打开 **关于页 → 检查更新**。Panda Desk Chat 内置 electron-updater，对接 GitHub Releases 自动检测新版本，发现后引导下载安装。
-- **手动覆盖**：从 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest) 重新下载最新 `Panda-<版本>-arm64.dmg`，覆盖安装即可（无需先删除旧版）。
+- **手动覆盖（macOS）**：从 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest) 重新下载最新 `Panda-<版本>-arm64.dmg`，覆盖安装即可（无需先删除旧版）。
+- **手动覆盖（Windows）**：重新下载最新 `Panda Setup 0.3.7.exe` 运行安装即可覆盖升级。
 
----
+</details>
 
-### 1.1.1 Panda Desk Chat（UI 桌面端）— 下载、安装与升级
+<details>
+<summary><strong>1.1.1 Panda Desk Chat（UI 桌面端）— 下载、安装与升级</strong></summary>
 
 Panda 当前推荐的 UI 桌面端是 **Panda Desk Chat**，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。
 
 - **下载安装**：从 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest) 下载最新桌面安装包；安装后直接启动 `Panda`，服务商、认证与模型配置会自动读取本机 `panda` CLI 的现有配置。
-- **升级**：应用内 **关于页 → 检查更新** 自动检测并更新；或从 Releases 页重新下载最新 `Panda-<版本>-arm64.dmg` 覆盖安装。**升级入口与安装入口相同，无需先卸载。**
+  - macOS（Apple Silicon）：`Panda-<版本>-arm64.dmg`
+  - Windows（x64）：`Panda Setup 0.3.7.exe`
+- **升级**：应用内 **关于页 → 检查更新** 自动检测并更新；或从 Releases 页重新下载最新安装包覆盖安装。**升级入口与安装入口相同，无需先卸载。**
+
+> ⚠️ **Windows 端诚实标注**：Windows 安装包（CLI 的 win32 ripgrep 与桌面端 `Panda Setup 0.3.7.exe`）为 wine 跨编产物，**尚未在 Windows 实机充分验证**。已知注意点：(a) 首次启动 CLI 需要本机 bun（脚本会自动装）；(b) 未签名 exe 可能触发 SmartScreen「Windows 已保护你的电脑」提示，点「更多信息 → 仍要运行」即可。
 
 > `panda-on-desk` 桌面宠物线已降级为 v2.25.x 历史归档，本 README 不再把它作为下载或安装入口。源码仍保留在 [`packages/panda-on-desk/`](./packages/panda-on-desk/)，最终历史 tag 为 [`panda-on-desk-v1.0.4`](https://github.com/lc2panda/panda/releases/tag/panda-on-desk-v1.0.4)，详见 [`packages/panda-on-desk/STATUS.md`](./packages/panda-on-desk/STATUS.md)。
+
+</details>
+
+<details>
+<summary><strong>1.2 ~ 1.5 首次使用 / 多 Provider / 配置参考 / 常见问题</strong></summary>
 
 ### 1.2 首次使用
 
@@ -610,6 +662,8 @@ panda
 | 选择器卡住、终端不响应 ↑↓ | 非 TTY 环境（CI / pipe）但 panda 仍尝试交互 prompt | v2.21.24 已加 TTY 兜底；非交互终端自动跳过 prompt 用 `pickDefaultCodexModel(planType)` 默认值 |
 | `panda auth login` 后 access_token 过期就报错 | refresh_token 续期失败（网络瞬断 / 代理 race） | v2.21.24 用 module-level Promise 锁单飞 refresh，再次执行 `panda` 即可触发自动续期；持续失败则重新 `panda auth login` |
 | Agent 长任务中途无任何输出后静默退出 | 上游 SSE 连接断开但 client 未察觉（v2.21.20 之前） | v2.21.20 默认启用 stream watchdog 兜底；如需 opt-out，设 `CLAUDE_DISABLE_STREAM_WATCHDOG=1` |
+
+</details>
 
 </details>
 
@@ -1196,6 +1250,9 @@ v2.21.8（commit 281293a）修了 5 个导致缓存命中率长期 <5% 的前缀
 
 ## 6. 隐私与安全
 
+<details>
+<summary><strong>展开第 6 章 · 隐私与安全</strong></summary>
+
 ### 6.1 隐私保护
 
 <details>
@@ -1459,16 +1516,54 @@ Panda 会自动从 macOS Keychain / Windows Credential Manager / Linux Secret Se
 
 </details>
 
+</details>
+
 ---
 
 ## 7. 跨平台支持
 
+<details>
+<summary><strong>展开第 7 章 · 跨平台支持</strong></summary>
+
 | 平台      | 状态   | 说明                                  |
 | ------- | ---- | ----------------------------------- |
 | macOS   | 完整支持 | Keychain 存储、osascript 集成            |
-| Windows | 完整支持 | PowerShell 自动检测、git-bash Shell、路径转换 |
+| Windows | 跨编支持 | PowerShell 自动检测、git-bash Shell、路径转换；CLI 用 `install.ps1` 安装，桌面端用 `Panda Setup 0.3.7.exe`。详见下方 Windows 说明 |
 | Linux   | 完整支持 | 标准 POSIX 环境                         |
 | WSL     | 完整支持 | 自动检测 WSL 环境                         |
+
+#### Windows 安装与升级
+
+**CLI 安装**（PowerShell 一行，自动装 bun + 拉 latest Release `.tgz`）：
+
+```powershell
+irm https://raw.githubusercontent.com/lc2panda/panda/main/install.ps1 | iex
+```
+
+> `curl ... | bash` 仅适用 macOS / Linux；Windows 请用 `install.ps1`。
+
+**CLI 手动安装**：
+
+```powershell
+irm bun.sh/install.ps1 | iex
+npm i -g https://github.com/lc2panda/panda/releases/download/v2.28.0/lc2panda-panda-code-2.28.0.tgz
+```
+
+> `.tgz` 跨平台，已捆绑 win32 ripgrep，Windows 直接可用。
+
+**CLI 升级**：重跑 `install.ps1` 覆盖安装（**无需先卸载**）；或
+
+```powershell
+npm i -g @lc2panda/panda-code@latest --registry=https://npm.pkg.github.com
+```
+
+升级后验证：`panda --version`。
+
+**桌面端安装 / 升级**：从 [Releases](https://github.com/lc2panda/panda/releases/latest) 下载 `Panda Setup 0.3.7.exe` 安装；升级用应用内 **关于页 → 检查更新**，或重下新版 Setup.exe 覆盖安装。
+
+> ⚠️ **诚实标注**：Windows 端（CLI 的 win32 ripgrep 与桌面 `Panda Setup 0.3.7.exe`）为 **wine 跨编产物，尚未在 Windows 实机充分验证**。已知注意点：(a) 未签名 exe 可能触发 SmartScreen「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」即可；(b) 首次启动 CLI 需要本机 bun（`install.ps1` 会自动安装）。与 v2.27.7 声明一致。
+
+</details>
 
 ---
 
