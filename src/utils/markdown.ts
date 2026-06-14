@@ -199,7 +199,18 @@ export function formatToken(
         return token.text
       }
       if (parent?.type === 'list_item') {
-        return `${orderedListNumber === null ? '-' : getListNumber(listDepth, orderedListNumber) + '.'} ${token.tokens ? token.tokens.map(_ => formatToken(_, theme, listDepth, orderedListNumber, token, highlight)).join('') : linkifyIssueReferences(token.text)}${EOL}`
+        // GitHub-flavored task list items carry `task`/`checked` on the
+        // list_item token. Render an unchecked/checked checkbox glyph in place
+        // of the regular bullet. Non-task items keep their `-`/`N.` prefix.
+        const listItem = parent as Tokens.ListItem
+        const prefix = listItem.task
+          ? listItem.checked
+            ? '☑'
+            : '☐'
+          : orderedListNumber === null
+            ? '-'
+            : getListNumber(listDepth, orderedListNumber) + '.'
+        return `${prefix} ${token.tokens ? token.tokens.map(_ => formatToken(_, theme, listDepth, orderedListNumber, token, highlight)).join('') : linkifyIssueReferences(token.text)}${EOL}`
       }
       return linkifyIssueReferences(token.text)
     case 'table': {
