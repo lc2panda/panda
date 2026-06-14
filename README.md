@@ -2,11 +2,7 @@
 
 > 懂你所有数据的 AI 伙伴 | 编码 · 助理 · 感知 · 生活
 
-[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://lc2panda.github.io/panda/) [![desktop](https://img.shields.io/badge/desktop-panda--desk--chat%400.3.7-blue)](https://github.com/lc2panda/panda/releases/latest) [![version](https://img.shields.io/badge/version-v2.28.0-blue)](#当前进度--v2280) [![checks](https://img.shields.io/badge/v2.28.0-build-pass-brightgreen)](#当前进度--v2280) [![upstream](https://img.shields.io/badge/upstream%20absorbed-v2.1.156-success)](#当前进度--v2280)
-
-> 🤖 **当前主线：v2.28.0** — `main` 已同步上游 `@anthropic-ai/claude-code` 的 6 项高价值能力（CLI markdown 任务列表 checkbox 渲染、`/diff` 详情键盘行级滚动、`/model` 选择只改当前会话 + `d` 键设默认、Read 工具超限返回 PARTIAL 截断视图、`claude agents --json` 输出活跃 session、`/simplify` 重命名为 `/code-review` + `--comment` 发 PR 内联评论），主包版本为 `@lc2panda/panda-code@2.28.0`。本版本新增**一行命令零门槛安装**（`curl | bash`），无需 GitHub token。
-
-> 🖥️ **桌面端主线：Panda Desk Chat** — 当前 UI 桌面端为 `@panda/desk-chat@0.3.7`，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。`panda-on-desk` 桌面宠物线降级为 v2.25.x 历史归档，暂不作为用户下载/安装入口。
+[![version](https://img.shields.io/badge/version-v2.28.0-blue)](#更新历史) [![desktop](https://img.shields.io/badge/desktop-Panda%20Desk%20Chat-blue)](https://github.com/lc2panda/panda/releases/latest) [![runtime](https://img.shields.io/badge/runtime-Bun-black)](https://bun.sh) [![platform](https://img.shields.io/badge/platform-mac%20%7C%20win%20%7C%20linux-lightgrey)](#7-跨平台支持) [![license](https://img.shields.io/badge/license-MIT-green)](#)
 
 ```
  ██████╗   █████╗  ███╗   ██╗ ██████╗   █████╗
@@ -17,7 +13,9 @@
  ╚═╝      ╚═╝  ╚═╝ ╚═╝  ╚═══╝ ╚═════╝  ╚═╝  ╚═╝
 ```
 
-> Panda 是一个本地优先、隐私安全的 AI 伙伴 CLI：编码助手 + 智能助理 + 系统感知 + 生活管理一体。支持 Anthropic / DeepSeek / Kimi / Qwen / MiniMax / GLM / 火山引擎 / OpenAI 多 Provider，内置五层记忆系统、103 个主动推送场景、工作流引擎与桌面端 Panda Desk Chat。完整版本演进见文末「[更新历史](#更新历史)」。
+**Panda** 是一个本地优先、隐私安全的 AI 伙伴 CLI：编码助手 + 智能助理 + 系统感知 + 生活管理一体。支持 Anthropic / DeepSeek / Kimi / Qwen / MiniMax / GLM / 火山引擎 / OpenAI 多 Provider，并提供图形化桌面端 **Panda Desk Chat**。
+
+🚀 **快速上手**：[一行命令安装](#方式一推荐--一行零门槛安装) → [升级](#114-升级与更新) → [桌面端 Panda Desk Chat](#111-panda-desk-chat-ui-桌面端--下载安装与升级)。完整能力清单与版本演进见文末「[更新历史](#更新历史)」。
 
 ## 1. 安装与配置
 
@@ -37,7 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/lc2panda/panda/main/install.sh | ba
 panda
 ```
 
-**更新**：重新执行上面的一行命令即可拉取最新 Release 覆盖安装。
+> **升级**：重新执行上面这一行命令即可覆盖安装到最新版（详见 [1.1.4 升级与更新](#114-升级与更新)）。
 
 ---
 
@@ -88,17 +86,43 @@ npm install -g @lc2panda/panda-code
 panda
 ```
 
-**更新**：`npm update -g @lc2panda/panda-code`
+**更新**：`npm install -g @lc2panda/panda-code@latest --registry=https://npm.pkg.github.com`（详见下方升级章节）。
 
 ---
 
-### 1.1.1 Panda Desk Chat（UI 桌面端）— 下载、安装与使用
+### 1.1.4 升级与更新
 
-Panda 当前推荐的 UI 桌面端是 `Panda Desk Chat`。请从 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest) 下载最新桌面安装包；安装后直接启动 `Panda`，服务商、认证与模型配置会读取本机 `panda` CLI 的现有配置。
+> **一句话**：安装和升级用的是**同样的命令 / 同一个入口，无需先卸载** —— 直接覆盖即可完成升级。
 
-`panda-on-desk` 桌面宠物线暂不成熟，本 README 不再把它作为下载或安装入口。`panda-desk-chat` 暂不提供源码安装说明。
+#### CLI 升级
 
-> 历史归档：`panda-on-desk` 是 v2.25.x 的桌面宠物实验线，源码仍保留在 [`packages/panda-on-desk/`](./packages/panda-on-desk/)，最终历史 tag 为 [`panda-on-desk-v1.0.4`](https://github.com/lc2panda/panda/releases/tag/panda-on-desk-v1.0.4)。详见 [`packages/panda-on-desk/STATUS.md`](./packages/panda-on-desk/STATUS.md) 与 [`packages/panda-on-desk/RELEASE_NOTES_v2.25.md`](./packages/panda-on-desk/RELEASE_NOTES_v2.25.md)。
+| 你的安装方式 | 升级命令 |
+|------|------|
+| 一行脚本安装（推荐） | 重新执行 `curl -fsSL https://raw.githubusercontent.com/lc2panda/panda/main/install.sh \| bash` —— 它**总是拉取最新 Release 覆盖安装**（不是卸载重装，直接覆盖）。 |
+| 锁定到指定版本 | `npm install -g https://github.com/lc2panda/panda/releases/download/v<新版本>/lc2panda-panda-code-<新版本>.tgz` |
+| GitHub Packages 用户 | `npm install -g @lc2panda/panda-code@latest --registry=https://npm.pkg.github.com` |
+
+升级后验证：
+
+```bash
+panda --version
+```
+
+#### 桌面端（Panda Desk Chat）升级
+
+- **应用内自动更新（推荐）**：打开 **关于页 → 检查更新**。Panda Desk Chat 内置 electron-updater，对接 GitHub Releases 自动检测新版本，发现后引导下载安装。
+- **手动覆盖**：从 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest) 重新下载最新 `Panda-<版本>-arm64.dmg`，覆盖安装即可（无需先删除旧版）。
+
+---
+
+### 1.1.1 Panda Desk Chat（UI 桌面端）— 下载、安装与升级
+
+Panda 当前推荐的 UI 桌面端是 **Panda Desk Chat**，提供图形化对话、多会话管理、设置页、定时任务、连接器与更新检查。
+
+- **下载安装**：从 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest) 下载最新桌面安装包；安装后直接启动 `Panda`，服务商、认证与模型配置会自动读取本机 `panda` CLI 的现有配置。
+- **升级**：应用内 **关于页 → 检查更新** 自动检测并更新；或从 Releases 页重新下载最新 `Panda-<版本>-arm64.dmg` 覆盖安装。**升级入口与安装入口相同，无需先卸载。**
+
+> `panda-on-desk` 桌面宠物线已降级为 v2.25.x 历史归档，本 README 不再把它作为下载或安装入口。源码仍保留在 [`packages/panda-on-desk/`](./packages/panda-on-desk/)，最终历史 tag 为 [`panda-on-desk-v1.0.4`](https://github.com/lc2panda/panda/releases/tag/panda-on-desk-v1.0.4)，详见 [`packages/panda-on-desk/STATUS.md`](./packages/panda-on-desk/STATUS.md)。
 
 ### 1.2 首次使用
 
