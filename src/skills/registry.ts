@@ -171,13 +171,13 @@ export const BUNDLED_SKILL_INDEX: readonly BundledSkillMeta[] = [
     ),
   },
   {
-    name: 'simplify',
+    name: 'code-review',
     description:
-      'Review changed code for reuse, quality, and efficiency, then fix any issues found · 审查变更代码的复用性、质量和效率，修复发现的问题',
+      'Review changed code by effort level and report correctness bugs; pass --comment to post findings as GitHub PR inline comments · 按 effort 等级审查变更代码并报告正确性 bug，--comment 发为 GitHub PR 内联评论',
     load: makeLoader(
-      'simplify',
-      './bundled/simplify.js',
-      'registerSimplifySkill',
+      'code-review',
+      './bundled/code-review.js',
+      'registerCodeReviewSkill',
     ),
   },
   {

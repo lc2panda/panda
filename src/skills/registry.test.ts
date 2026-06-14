@@ -121,3 +121,47 @@ test('loadSkillFile — 不存在的 skill 返回 null', async () => {
   )
   expect(result).toBeNull()
 })
+
+// ── v2.1.147 同步: /simplify → /code-review 重命名 + alias 重定向 ──
+
+test('code-review skill 已注册到 BUNDLED_SKILL_INDEX', () => {
+  const meta = findSkillMeta('code-review')
+  expect(meta).not.toBeNull()
+  expect(meta!.name).toBe('code-review')
+})
+
+test('旧 simplify 已从索引移除（改由 alias 提供）', () => {
+  expect(findSkillMeta('simplify')).toBeNull()
+})
+
+test('code-review.load() 注册 Command 且保留 simplify alias', async () => {
+  const meta = findSkillMeta('code-review')
+  expect(meta).not.toBeNull()
+  const cmd = await meta!.load()
+  expect(cmd).not.toBeNull()
+  expect(cmd!.name).toBe('code-review')
+  // /simplify 老用户命令不失效：alias 重定向到 code-review
+  expect(cmd!.aliases).toContain('simplify')
+})
+
+test('code-review prompt 默认 effort=medium，--comment 注入 PR 评论指引', async () => {
+  const meta = findSkillMeta('code-review')
+  const cmd = await meta!.load()
+  expect(cmd).not.toBeNull()
+  // 默认（无 args）走 medium，且不含 inline comment 段落
+  const def = await cmd!.getPromptForCommand!('', {} as never)
+  const defText = def.map(b => (b.type === 'text' ? b.text : '')).join('')
+  expect(defText).toContain('Effort: medium')
+  expect(defText).not.toContain('Post Inline PR Comments')
+  // --comment 注入 gh PR review comments 指引
+  const withComment = await cmd!.getPromptForCommand!(
+    'high --comment',
+    {} as never,
+  )
+  const cText = withComment
+    .map(b => (b.type === 'text' ? b.text : ''))
+    .join('')
+  expect(cText).toContain('Effort: high')
+  expect(cText).toContain('Post Inline PR Comments')
+  expect(cText).toContain('/pulls/{number}/comments')
+})

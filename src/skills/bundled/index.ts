@@ -11,7 +11,7 @@ import { registerMorningSkill } from './morning.js'
 import { registerOrganizeSkill } from './organize.js'
 import { registerRememberSkill } from './remember.js'
 import { registerRemindSkill } from './remind.js'
-import { registerSimplifySkill } from './simplify.js'
+import { registerCodeReviewSkill } from './code-review.js'
 import { registerSkillifySkill } from './skillify.js'
 import { registerStuckSkill } from './stuck.js'
 import { registerUpdateConfigSkill } from './updateConfig.js'
@@ -38,7 +38,7 @@ export function initBundledSkills(): void {
   registerLoremIpsumSkill()
   registerSkillifySkill()
   registerRememberSkill()
-  registerSimplifySkill()
+  registerCodeReviewSkill()
   registerBatchSkill()
   registerStuckSkill()
   registerMorningSkill()
