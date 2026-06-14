@@ -93,6 +93,43 @@ function renderColorDiff(patch: StructuredPatchHunk, firstLine: string | null, f
   perHunk.set(key, entry);
   return entry;
 }
+
+/**
+ * Renders a single hunk to a flat array of fully-styled ANSI strings (one
+ * entry per visual line). Used by scrollable detail views (e.g. /diff) that
+ * need line-level viewport slicing rather than per-hunk Box layout.
+ *
+ * Always returns complete single-column lines (splitGutter=false). When the
+ * NAPI color-diff backend is unavailable (matrix theme, highlighting disabled,
+ * or missing native module), falls back to plain `+`/`-`/` ` prefixed lines so
+ * scrolling still works.
+ */
+export function renderHunkLines(
+  patch: StructuredPatchHunk,
+  firstLine: string | null,
+  filePath: string,
+  fileContent: string | null,
+  theme: string,
+  width: number,
+  dim: boolean,
+  skipHighlighting = false,
+): string[] {
+  const safeWidth = Math.max(1, width)
+  const useFallback = skipHighlighting || isMatrixTheme()
+  const cached = useFallback
+    ? null
+    : renderColorDiff(patch, firstLine, filePath, fileContent, theme, safeWidth, dim, false)
+  if (cached && cached.lines.length > 0) {
+    return cached.lines
+  }
+  // Plain-text fallback: prefix each patch line with its diff marker.
+  return patch.lines.map(line => {
+    const marker = line[0]
+    if (marker === '+' || marker === '-' || marker === ' ') return line
+    return ` ${line}`
+  })
+}
+
 export const StructuredDiff = memo(function StructuredDiff(t0: Props) {
   const $ = _c(26);
   const {
