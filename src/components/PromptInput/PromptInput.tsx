@@ -116,7 +116,7 @@ import { getModeFromInput, getValueFromInput } from './inputModes.js';
 import { FOOTER_TEMPORARY_STATUS_TIMEOUT, Notifications } from './Notifications.js';
 import PromptInputFooter from './PromptInputFooter.js';
 import type { SuggestionItem } from './PromptInputFooterSuggestions.js';
-import { PromptInputModeIndicator } from './PromptInputModeIndicator.js';
+import { PromptInputModeIndicator, promptPrefixWidth } from './PromptInputModeIndicator.js';
 import { PromptInputQueuedCommands } from './PromptInputQueuedCommands.js';
 import { PromptInputStashNotice } from './PromptInputStashNotice.js';
 import { useMaybeTruncateInput } from './useMaybeTruncateInput.js';
@@ -378,6 +378,22 @@ function PromptInput({
   // printable, inputFilter prepends a space before it. Any other input
   // (arrow, escape, backspace, paste, space) disarms without inserting.
   const pendingSpaceAfterPillRef = useRef(false);
+  // Image ids that were just pasted (async) but whose [Image #N] placeholder may
+  // not have committed into `input` yet. The prune effect exempts these so an
+  // async clipboard paste isn't clobbered before its placeholder lands.
+  const recentlyPastedImageIdsRef = useRef<Set<number>>(new Set());
+  // Number of async clipboard image pastes currently in flight (between the
+  // getImageFromClipboard() call and its resolution). Enter is deferred while
+  // > 0 so a paste-then-immediate-Enter doesn't submit before the image lands.
+  // Defaults to 0, so plain-text Enter (no image paste) is never affected.
+  const imagePasteInFlightRef = useRef(0);
+  // A submit deferred because an image paste was in flight. Replayed once the
+  // paste settles.
+  const deferredSubmitRef = useRef<null | (() => void)>(null);
+  // Mirrors the latest `input` so a deferred submit replays with the freshest
+  // text (including a placeholder inserted after the original Enter).
+  const latestInputForReplayRef = useRef(input);
+  latestInputForReplayRef.current = input;
   const [showTeamsDialog, setShowTeamsDialog] = useState(false);
   const [showBridgeDialog, setShowBridgeDialog] = useState(false);
   const [teammateFooterIndex, setTeammateFooterIndex] = useState(0);
@@ -989,14 +1005,24 @@ function PromptInput({
     setSuggestionsStateRaw(prev => typeof updater === 'function' ? updater(prev) : updater);
   }, []);
   const onSubmit = useCallback(async (inputParam: string, isSubmittingSlashCommand = false) => {
-    // Worker Y P0: trace stale-closure submissions from useTextInput.handleEnter.
-    // The L1074 empty-inputParam guard silently drops Enter when the closure
-    // captured the pre-batch (empty) props.value — log so the regression is
-    // visible in debug.txt even if the user never reports it explicitly.
-    if (inputParam.length === 0 && input.length > 0) {
-      logForDebugging(
-        `[PromptInput.onSubmit] STALE: inputParam empty but PromptInput.input.length=${input.length} — likely useTextInput stale closure`,
-      );
+    // Image-paste barrier: if an async clipboard image paste is still in flight,
+    // defer this Enter until the image has landed in pastedContents (and its
+    // placeholder has been inserted). Without this, paste-then-immediate-Enter
+    // submits before the image exists and the image is silently dropped.
+    // Plain-text Enter (no paste in flight) is never affected: the counter is 0.
+    if (imagePasteInFlightRef.current > 0) {
+      // Capture the typed text now; the replay re-reads the latest input via
+      // latestInputForReplayRef so the freshly-inserted [Image #N] placeholder
+      // is included (the stale `inputParam`/`input` here predates the paste).
+      const typedAtEnter = inputParam;
+      deferredSubmitRef.current = () => {
+        const latest = latestInputForReplayRef.current;
+        // Prefer the latest input (now containing the placeholder); fall back to
+        // the originally-typed text if state hasn't advanced.
+        const replayInput = latest.length >= typedAtEnter.length ? latest : typedAtEnter;
+        void onSubmit(replayInput, isSubmittingSlashCommand);
+      };
+      return;
     }
     inputParam = inputParam.trimEnd();
 
@@ -1190,6 +1216,11 @@ function PromptInput({
       ...prev,
       [pasteId]: newContent
     }));
+    // Arm prune exemption: the placeholder is inserted via async setState below,
+    // so the prune effect may fire on an intermediate render where `input`
+    // doesn't yet contain [Image #pasteId]. Exempt this id until its placeholder
+    // is observed in `input` (cleared in the prune effect).
+    recentlyPastedImageIdsRef.current.add(pasteId);
     // Multi-image paste calls onImagePaste in a loop. If the ref is already
     // armed, the previous pill's lazy space fires now (before this pill)
     // rather than being lost.
@@ -1200,12 +1231,26 @@ function PromptInput({
 
   // Prune images whose [Image #N] placeholder is no longer in the input text.
   // Covers pill backspace, Ctrl+U, char-by-char deletion — any edit that drops
-  // the ref. onImagePaste batches setPastedContents + insertTextAtCursor in the
-  // same event, so this effect sees the placeholder already present.
+  // the ref. onImagePaste runs setPastedContents + insertTextAtCursor, but for
+  // ASYNC clipboard pastes those land in separate renders, so this effect can
+  // fire on an intermediate render where the placeholder isn't in `input` yet.
+  // recentlyPastedImageIdsRef exempts such ids until their placeholder appears
+  // (or the user edits), so we don't clobber an in-flight paste.
   useEffect(() => {
     const referencedIds = new Set(parseReferences(input).map(r => r.id));
+    // Once a pasted image's placeholder is observed in `input`, it's safe to
+    // prune it on future edits — release the exemption.
+    if (recentlyPastedImageIdsRef.current.size > 0) {
+      for (const id of [...recentlyPastedImageIdsRef.current]) {
+        if (referencedIds.has(id)) {
+          recentlyPastedImageIdsRef.current.delete(id);
+        }
+      }
+    }
     setPastedContents(prev => {
-      const orphaned = Object.values(prev).filter(c => c.type === 'image' && !referencedIds.has(c.id));
+      const orphaned = Object.values(prev).filter(
+        c => c.type === 'image' && !referencedIds.has(c.id) && !recentlyPastedImageIdsRef.current.has(c.id)
+      );
       if (orphaned.length === 0) return prev;
       const next = {
         ...prev
@@ -1654,20 +1699,34 @@ function PromptInput({
 
   // Handler for chat:imagePaste - paste image from clipboard
   const handleImagePaste = useCallback(() => {
-    void getImageFromClipboard().then(imageData => {
-      if (imageData) {
-        onImagePaste(imageData.base64, imageData.mediaType);
-      } else {
-        const shortcutDisplay = getShortcutDisplay('chat:imagePaste', 'Chat', 'ctrl+v');
-        const message = env.isSSH() ? "No image found in clipboard. You're SSH'd; try scp?" : `No image found in clipboard. Use ${shortcutDisplay} to paste images.`;
-        addNotification({
-          key: 'no-image-in-clipboard',
-          text: message,
-          priority: 'immediate',
-          timeoutMs: 1000
-        });
-      }
-    });
+    imagePasteInFlightRef.current += 1;
+    void getImageFromClipboard()
+      .then(imageData => {
+        if (imageData) {
+          onImagePaste(imageData.base64, imageData.mediaType);
+        } else {
+          const shortcutDisplay = getShortcutDisplay('chat:imagePaste', 'Chat', 'ctrl+v');
+          const message = env.isSSH() ? "No image found in clipboard. You're SSH'd; try scp?" : `No image found in clipboard. Use ${shortcutDisplay} to paste images.`;
+          addNotification({
+            key: 'no-image-in-clipboard',
+            text: message,
+            priority: 'immediate',
+            timeoutMs: 1000
+          });
+        }
+      })
+      .finally(() => {
+        imagePasteInFlightRef.current = Math.max(0, imagePasteInFlightRef.current - 1);
+        // If an Enter arrived while the paste was in flight, replay it now that
+        // the image is in pastedContents and its placeholder has been inserted.
+        if (imagePasteInFlightRef.current === 0 && deferredSubmitRef.current) {
+          const replay = deferredSubmitRef.current;
+          deferredSubmitRef.current = null;
+          // Defer one tick so the setPastedContents/insertTextAtCursor state
+          // updates from onImagePaste have committed before we read them.
+          setTimeout(replay, 0);
+        }
+      });
   }, [addNotification, onImagePaste]);
 
   // Register chat:submit handler directly in the handler registry (not via
@@ -2024,7 +2083,13 @@ function PromptInput({
     columns,
     rows
   } = useTerminalSize();
-  const textInputColumns = columns - 3 - companionReservedColumns(columns, companionSpeaking);
+  // Reserve exactly the rendered prompt-prefix width (mode/theme dependent) plus
+  // 1 column for the cursor cell, so Cursor.fromText wraps at the same width the
+  // text input's <Text> box actually has. Previously this hard-coded `- 3`, which
+  // under-reserved by 3 in the Matrix theme (prefix 'neo ▸ ' = 6 cols vs 3), making
+  // Cursor wrap wider than the box → needsWrapping → truncate-end collapsed the
+  // whole input to a single truncated row.
+  const textInputColumns = columns - promptPrefixWidth(mode, viewingAgentName) - 1 - companionReservedColumns(columns, companionSpeaking);
 
   // POC: click-to-position-cursor. Mouse tracking is only enabled inside
   // <AlternateScreen>, so this is dormant in the normal main-screen REPL.

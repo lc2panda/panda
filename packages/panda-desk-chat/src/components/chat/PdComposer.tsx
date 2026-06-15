@@ -754,7 +754,7 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(function
                 placeholder={composerPlaceholder}
                 disabled={isWorkspaceMissing || disabled}
                 rows={2}
-                className="flex-1 resize-none border-none bg-transparent py-2 leading-relaxed text-[var(--pd-color-text-primary)] outline-none placeholder:text-[var(--pd-color-text-tertiary)] disabled:opacity-50"
+                className="flex-1 resize-none border-none bg-transparent py-2 leading-relaxed text-[var(--pd-color-text-primary)] outline-none placeholder:text-[var(--pd-color-text-tertiary)] disabled:opacity-50 break-words min-w-0"
               />
             </div>
           ) : (
@@ -769,7 +769,7 @@ export const PdComposer = forwardRef<PdComposerHandle, PdComposerProps>(function
               placeholder={composerPlaceholder}
               disabled={isWorkspaceMissing || disabled}
               rows={1}
-              className="w-full resize-none bg-transparent py-2 pb-12 text-sm leading-relaxed text-[var(--pd-color-text-primary)] outline-none placeholder:text-[var(--pd-color-text-tertiary)] disabled:opacity-50"
+              className="w-full resize-none bg-transparent py-2 pb-12 text-sm leading-relaxed text-[var(--pd-color-text-primary)] outline-none placeholder:text-[var(--pd-color-text-tertiary)] disabled:opacity-50 break-words min-w-0"
             />
           )}
 

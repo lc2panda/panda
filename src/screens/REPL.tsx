@@ -3279,13 +3279,6 @@ export function REPL({
   }, options?: {
     fromKeybinding?: boolean;
   }) => {
-    // Worker Y P0: trace entry input — exposes stale-closure submissions from
-    // useTextInput.handleEnter (Enter clears prompt but message not sent).
-    if (!input || input.length === 0) {
-      logForDebugging(
-        `[REPL.onSubmit] empty input received from PromptInput — possible stale closure (speculationAccept=${!!speculationAccept} fromKeybinding=${!!options?.fromKeybinding})`,
-      );
-    }
     // Re-pin scroll to bottom on submit so the user always sees the new
     // exchange (matches OpenCode's auto-scroll behavior).
     repinScroll();
@@ -3481,12 +3474,28 @@ export function REPL({
     // accepting speculation, or in remote mode (which sends via WS and
     // returns early without calling handlePromptSubmit).
     const submitsNow = !isLoading || speculationAccept || activeRemote.isRemoteMode;
+    // Only clear the prompt when there's real content to send. An empty input
+    // with no images would be dropped by handlePromptSubmit's guard, so clearing
+    // it would lose nothing the user typed — but if a stale-Enter races an async
+    // image paste, `input` can momentarily read empty while pastedContents holds
+    // the image; guarding the clear on hasContent avoids wiping the prompt (and
+    // the pasted image) in that window. Slash commands and remote/speculation
+    // always have content and keep their existing clear behavior.
+    const hasPastedImages = Object.values(pastedContents).some(
+      c => c.type === 'image',
+    );
+    const willSendContent =
+      isSlashCommand ||
+      speculationAccept !== undefined ||
+      activeRemote.isRemoteMode ||
+      input.trim() !== '' ||
+      hasPastedImages;
     if (stashedPrompt !== undefined && !isSlashCommand && submitsNow) {
       setInputValue(stashedPrompt.text);
       helpers.setCursorOffset(stashedPrompt.cursorOffset);
       setPastedContents(stashedPrompt.pastedContents);
       setStashedPrompt(undefined);
-    } else if (submitsNow) {
+    } else if (submitsNow && willSendContent) {
       if (!options?.fromKeybinding) {
         // Clear input when not loading or accepting speculation.
         // Preserve input for keybinding-triggered commands.
@@ -3495,7 +3504,7 @@ export function REPL({
       }
       setPastedContents({});
     }
-    if (submitsNow) {
+    if (submitsNow && willSendContent) {
       setInputMode('prompt');
       setIDESelection(undefined);
       setSubmitCount(_ => _ + 1);

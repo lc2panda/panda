@@ -40,6 +40,30 @@ type PromptCharProps = {
 };
 
 /**
+ * Display width (in terminal columns) of the prompt prefix rendered to the
+ * left of the text input, by mode/theme. Must stay in lockstep with the
+ * strings rendered in PromptChar / PromptInputModeIndicator below:
+ *   - Matrix theme prompt char: 'neo ▸ ' / 'neo ▪ ' → 6 columns
+ *   - bash mode (non-matrix):   '! '                → 2 columns
+ *   - default prompt char:      figures.pointer+' ' → 2 columns
+ *
+ * Used by PromptInput to reserve exactly the prefix width when computing the
+ * text input column budget, so Cursor wraps at the same width the <Text> box
+ * actually has. A mismatch here is what made the Matrix prompt overflow and
+ * collapse the input to a single truncated row.
+ */
+export function promptPrefixWidth(
+  mode: PromptInputMode,
+  viewingAgentName?: string,
+): number {
+  // When viewing an agent, the prefix is always the prompt char (never bash).
+  if (!viewingAgentName && mode === 'bash') {
+    return 2; // '! '
+  }
+  return isMatrixTheme() ? 6 : 2; // 'neo ▸ ' (6) vs figures.pointer+' ' (2)
+}
+
+/**
  * Renders the prompt character (❯).
  * Teammate color overrides the default color when set.
  * Matrix theme: renders "neo ▸" in green (#00ff41).

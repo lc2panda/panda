@@ -177,20 +177,24 @@ export async function handlePromptSubmit(
 
   // Images are only sent if their [Image #N] placeholder is still in the text.
   // Deleting the inline pill drops the image; orphaned entries are filtered here.
+  // Exception: when the text is empty (e.g. an image-only paste, or a stale
+  // Enter where the placeholder text didn't make it into `input`), there are no
+  // refs to match against — keep the images so they're not silently lost.
   const referencedIds = new Set(parseReferences(input).map(r => r.id))
+  const keepAllImages = input.trim() === '' && referencedIds.size === 0
   const pastedContents = Object.fromEntries(
     Object.entries(rawPastedContents).filter(
-      ([, c]) => c.type !== 'image' || referencedIds.has(c.id),
+      ([, c]) => c.type !== 'image' || keepAllImages || referencedIds.has(c.id),
     ),
   )
 
   const hasImages = Object.values(pastedContents).some(isValidImagePaste)
-  if (input.trim() === '') {
-    // Worker Y P0: log unexpected empty-input drops so the next regression of
-    // useTextInput stale-closure-Enter is immediately visible in debug logs.
-    logForDebugging(
-      `[handlePromptSubmit] EARLY-RETURN: input is empty — message dropped (caller=onSubmit)`,
-    )
+  // An image-only submission (no text, or text that trims to empty) still has
+  // valid content to send. Check the RAW map: if the placeholder text was lost
+  // (stale-closure Enter right after an async paste) the orphan filter above
+  // would have dropped the image, so fall back to rawPastedContents here.
+  const hasRawImages = Object.values(rawPastedContents).some(isValidImagePaste)
+  if (input.trim() === '' && !hasImages && !hasRawImages) {
     return
   }
 

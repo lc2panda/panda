@@ -9,8 +9,11 @@ import { getErrnoCode } from './utils/errors.js'
 import { readLinesReverse } from './utils/fsOperations.js'
 import { lock } from './utils/lockfile.js'
 import {
+  hashPastedImage,
   hashPastedText,
+  retrievePastedImage,
   retrievePastedText,
+  storePastedImage,
   storePastedText,
 } from './utils/pasteStore.js'
 import { sleep } from './utils/sleep.js'
@@ -241,9 +244,13 @@ async function resolveStoredPastedContent(
     }
   }
 
-  // If we have a hash reference, fetch from paste store
+  // If we have a hash reference, fetch from the appropriate side store.
+  // Images live in the image store (base64); text lives in the paste store.
   if (stored.contentHash) {
-    const content = await retrievePastedText(stored.contentHash)
+    const content =
+      stored.type === 'image'
+        ? await retrievePastedImage(stored.contentHash)
+        : await retrievePastedText(stored.contentHash)
     if (content) {
       return {
         id: stored.id,
@@ -363,8 +370,24 @@ async function addToPromptHistory(
   const storedPastedContents: Record<number, StoredPastedContent> = {}
   if (entry.pastedContents) {
     for (const [id, content] of Object.entries(entry.pastedContents)) {
-      // Filter out images (they're stored separately in image-cache)
+      // Images: persist the base64 to a content-addressable side store and keep
+      // only a contentHash reference in history.jsonl (large base64 blobs would
+      // otherwise bloat the history file). Resolved back on recall so the image
+      // survives ↑/↓ navigation instead of degrading to a literal "[Image #N]".
       if (content.type === 'image') {
+        if (!content.content) {
+          continue
+        }
+        const hash = hashPastedImage(content.content)
+        storedPastedContents[Number(id)] = {
+          id: content.id,
+          type: content.type,
+          contentHash: hash,
+          mediaType: content.mediaType,
+          filename: content.filename,
+        }
+        // Fire-and-forget disk write - don't block history entry creation
+        void storePastedImage(hash, content.content)
         continue
       }
 
