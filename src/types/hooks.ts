@@ -118,6 +118,16 @@ export const syncHookResponseSchema = lazySchema(() =>
           hookEventName: z.literal('SubagentStart'),
           additionalContext: z.string().optional(),
         }),
+        // [上游 2.1.163] Stop/SubagentStop 钩子可返回 additionalContext 续轮：
+        // 注入到上下文并触发再一轮，让钩子在停止点补充信息后继续。
+        z.object({
+          hookEventName: z.literal('Stop'),
+          additionalContext: z.string().optional(),
+        }),
+        z.object({
+          hookEventName: z.literal('SubagentStop'),
+          additionalContext: z.string().optional(),
+        }),
         z.object({
           hookEventName: z.literal('PostToolUse'),
           additionalContext: z.string().optional(),

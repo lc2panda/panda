@@ -542,6 +542,15 @@ interface TypedSyncHookOutput {
         additionalContext?: string
       }
     | {
+        // [上游 2.1.163] Stop/SubagentStop 钩子可返回 additionalContext 续轮
+        hookEventName: 'Stop'
+        additionalContext?: string
+      }
+    | {
+        hookEventName: 'SubagentStop'
+        additionalContext?: string
+      }
+    | {
         hookEventName: 'PostToolUse'
         additionalContext?: string
         updatedMCPToolOutput?: unknown
@@ -788,6 +797,12 @@ function processHookJSONOutput({
         result.additionalContext = json.hookSpecificOutput.additionalContext
         break
       case 'SubagentStart':
+        result.additionalContext = json.hookSpecificOutput.additionalContext
+        break
+      // [上游 2.1.163] Stop/SubagentStop 钩子返回 additionalContext 时提取，
+      // 由 stopHooks 注入上下文并触发续轮。
+      case 'Stop':
+      case 'SubagentStop':
         result.additionalContext = json.hookSpecificOutput.additionalContext
         break
       case 'PostToolUse':

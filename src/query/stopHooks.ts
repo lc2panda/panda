@@ -288,6 +288,9 @@ export async function* handleStopHooks(
     let preventedContinuation = false
     let stopReason = ''
     let hasOutput = false
+    // [上游 2.1.163] 累积 Stop/SubagentStop 钩子返回的 additionalContext，
+    // 用于注入上下文并触发续轮。
+    const additionalContexts: string[] = []
     const hookErrors: string[] = []
     const hookInfos: StopHookInfo[] = []
 
@@ -373,6 +376,17 @@ export async function* handleStopHooks(
         })
       }
 
+      // [上游 2.1.163] Stop/SubagentStop 钩子返回的 additionalContext 累积，
+      // 待循环结束后注入上下文并触发续轮。executeHooks 以
+      // additionalContexts: string[] 形式 yield。
+      if (Array.isArray(result.additionalContexts)) {
+        for (const ctx of result.additionalContexts) {
+          if (typeof ctx === 'string' && ctx.trim()) {
+            additionalContexts.push(ctx.trim())
+          }
+        }
+      }
+
       // Check if we were aborted during hook execution
       if (toolUseContext.abortController.signal.aborted) {
         logEvent('tengu_pre_stop_hooks_cancelled', {
@@ -423,6 +437,25 @@ export async function* handleStopHooks(
     // Collect blocking errors from stop hooks
     if (blockingErrors.length > 0) {
       return { blockingErrors, preventContinuation: false }
+    }
+
+    // [上游 2.1.163] Stop/SubagentStop 钩子返回 additionalContext 时，注入为
+    // meta user message 并触发续轮（preventContinuation=false）。与 goal-eval
+    // nudge 同一注入路径：caller 收到 blockingErrors[] 后重建 state 续跑下一轮。
+    // 仅在未被钩子显式阻止续轮、且无 blockingError 时生效，避免与停止意图冲突。
+    if (additionalContexts.length > 0) {
+      const merged = additionalContexts.join('\n\n')
+      const contextMessage = createUserMessage({
+        content: merged,
+        isMeta: true,
+      })
+      logForDebugging(
+        `[stop-hook] additionalContext returned (${additionalContexts.length} hook(s)) — injecting and continuing`,
+      )
+      return {
+        blockingErrors: [contextMessage],
+        preventContinuation: false,
+      }
     }
 
     // After Stop hooks pass, run TeammateIdle and TaskCompleted hooks if this is a teammate

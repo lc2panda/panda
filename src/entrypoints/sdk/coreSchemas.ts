@@ -864,6 +864,21 @@ export const SubagentStartHookSpecificOutputSchema = lazySchema(() =>
   }),
 )
 
+// [上游 2.1.163] Stop/SubagentStop 钩子可返回 additionalContext 续轮
+export const StopHookSpecificOutputSchema = lazySchema(() =>
+  z.object({
+    hookEventName: z.literal('Stop'),
+    additionalContext: z.string().optional(),
+  }),
+)
+
+export const SubagentStopHookSpecificOutputSchema = lazySchema(() =>
+  z.object({
+    hookEventName: z.literal('SubagentStop'),
+    additionalContext: z.string().optional(),
+  }),
+)
+
 export const PostToolUseHookSpecificOutputSchema = lazySchema(() =>
   z.object({
     hookEventName: z.literal('PostToolUse'),
@@ -940,6 +955,8 @@ export const SyncHookJSONOutputSchema = lazySchema(() =>
         SessionStartHookSpecificOutputSchema(),
         SetupHookSpecificOutputSchema(),
         SubagentStartHookSpecificOutputSchema(),
+        StopHookSpecificOutputSchema(),
+        SubagentStopHookSpecificOutputSchema(),
         PostToolUseHookSpecificOutputSchema(),
         PostToolUseFailureHookSpecificOutputSchema(),
         PermissionDeniedHookSpecificOutputSchema(),

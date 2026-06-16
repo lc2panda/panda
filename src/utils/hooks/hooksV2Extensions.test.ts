@@ -317,3 +317,74 @@ describe('Wave3-E3 块 B: MessageDisplay hook schema', () => {
     expect(HOOK_EVENTS).toContain('MessageDisplay')
   })
 })
+
+// -----------------------------------------------------------------------
+// 上游 2.1.163 — Stop/SubagentStop 钩子 additionalContext 续轮 (M3)
+// -----------------------------------------------------------------------
+describe('上游 2.1.163: Stop/SubagentStop additionalContext (M3)', () => {
+  test('Stop output schema 接受 additionalContext 字符串', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'Stop',
+        additionalContext: '记得跑测试再结束',
+      },
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      const out = parsed.data.hookSpecificOutput as {
+        hookEventName: string
+        additionalContext?: string
+      }
+      expect(out.hookEventName).toBe('Stop')
+      expect(out.additionalContext).toBe('记得跑测试再结束')
+    }
+  })
+
+  test('SubagentStop output schema 接受 additionalContext 字符串', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'SubagentStop',
+        additionalContext: 'continue with the next step',
+      },
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      const out = parsed.data.hookSpecificOutput as {
+        hookEventName: string
+        additionalContext?: string
+      }
+      expect(out.hookEventName).toBe('SubagentStop')
+      expect(out.additionalContext).toBe('continue with the next step')
+    }
+  })
+
+  test('Stop additionalContext 缺省时解析成功（字段可选，行为不变）', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'Stop',
+      },
+    })
+    expect(parsed.success).toBe(true)
+  })
+
+  test('Stop additionalContext 为数字时 schema 拒绝', () => {
+    const parsed = syncHookResponseSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'Stop',
+        additionalContext: 123,
+      },
+    })
+    expect(parsed.success).toBe(false)
+  })
+
+  test('hookJSONOutputSchema 同样接受 Stop additionalContext', () => {
+    const parsed = hookJSONOutputSchema().safeParse({
+      hookSpecificOutput: {
+        hookEventName: 'Stop',
+        additionalContext: '续轮上下文',
+      },
+    })
+    expect(parsed.success).toBe(true)
+  })
+})
+
