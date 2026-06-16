@@ -77,6 +77,7 @@ import {
   getDefaultSonnetModel,
   getDefaultHaikuModel,
   getDefaultOpusModel,
+  getRuntimeMainLoopModel,
 } from './model/model.js'
 import type { ReadResourceResult } from '@modelcontextprotocol/sdk/types.js'
 import { getSkillToolCommands, getMcpSkillCommands } from '../commands.js'
@@ -211,6 +212,7 @@ import { hasUltrathinkKeyword, isUltrathinkEnabled } from './thinking.js'
 import {
   tokenCountFromLastAPIResponse,
   tokenCountWithEstimation,
+  doesMostRecentAssistantMessageExceed200k,
 } from './tokens.js'
 import {
   getEffectiveContextWindowSize,
@@ -825,6 +827,26 @@ export async function getAttachments(
   // Thread-safe attachments available in sub-agents
   // NOTE: These must be created AFTER userInputAttachments completes to ensure
   // nestedMemoryAttachmentTriggers is populated before getNestedMemoryAttachments runs
+
+  // The deferred-tools-delta announcement must reason about the SAME model the
+  // claude.ts tool-search gate uses. That gate keys on the runtime-resolved
+  // model (getRuntimeMainLoopModel in query.ts), which can differ from the raw
+  // options.mainLoopModel — e.g. a `haiku` setting under plan mode resolves to
+  // Sonnet, and `opusplan` resolves to Opus. Using the raw mainLoopModel here
+  // (which may be haiku → modelSupportsToolReference=false) would suppress the
+  // <available-deferred-tools> announcement while the gate still defers tools
+  // and expects a tool_reference, leaving the model unaware WebFetch/WebSearch
+  // are reachable via ToolSearch. Resolve the runtime model to stay in sync.
+  const deferredToolsPermissionMode =
+    toolUseContext.getAppState().toolPermissionContext.mode
+  const runtimeModelForDeferredTools = getRuntimeMainLoopModel({
+    permissionMode: deferredToolsPermissionMode,
+    mainLoopModel: toolUseContext.options.mainLoopModel,
+    exceeds200kTokens:
+      deferredToolsPermissionMode === 'plan' &&
+      doesMostRecentAssistantMessageExceed200k(messages ?? []),
+  })
+
   const allThreadAttachments = [
     // queuedCommands is already agent-scoped by the drain gate in query.ts —
     // main thread gets agentId===undefined, subagents get their own agentId.
@@ -841,7 +863,7 @@ export async function getAttachments(
       Promise.resolve(
         getDeferredToolsDeltaAttachment(
           toolUseContext.options.tools,
-          toolUseContext.options.mainLoopModel,
+          runtimeModelForDeferredTools,
           messages,
           {
             callSite: isMainThread
