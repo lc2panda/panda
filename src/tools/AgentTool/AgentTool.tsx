@@ -55,7 +55,7 @@ import { spawnTeammate } from '../shared/spawnMultiAgent.js';
 import { setAgentColor } from './agentColorManager.js';
 import { agentToolResultSchema, classifyHandoffIfNeeded, emitTaskProgress, extractPartialResult, finalizeAgentTool, findAgentByLooseType, getLastToolUseName, normalizeAgentType, runAsyncAgentLifecycle } from './agentToolUtils.js';
 import { GENERAL_PURPOSE_AGENT } from './built-in/generalPurposeAgent.js';
-import { AGENT_TOOL_NAME, LEGACY_AGENT_TOOL_NAME, ONE_SHOT_BUILTIN_AGENT_TYPES } from './constants.js';
+import { AGENT_TOOL_NAME, LEGACY_AGENT_TOOL_NAME, MAX_SUBAGENT_DEPTH, ONE_SHOT_BUILTIN_AGENT_TYPES, wouldExceedSubagentDepth } from './constants.js';
 import { resolveSubagentPolicy, filterSubagentTools } from './subagentPolicy.js';
 import { buildForkedMessages, buildWorktreeNotice, FORK_AGENT, isForkSubagentEnabled, isInForkChild } from './forkSubagent.js';
 import type { AgentDefinition } from './loadAgentsDir.js';
@@ -277,6 +277,20 @@ export const AgentTool = buildTool({
           data: undefined,
         }
       }
+    }
+
+    // [上游 2.1.172] 子代理嵌套派生 5 层硬上限。
+    // 新子代理运行深度 = (父 queryTracking.depth ?? -1) + 1。允许 depth 0..4
+    // （5 层），第 6 层（depth 5）起拒绝派生，防止无限递归 fan-out。
+    // fork 子代理已被 forkSubagent 守卫为 1 层；此处约束普通嵌套派生。
+    const parentDepth = toolUseContext.queryTracking?.depth ?? -1;
+    const childDepth = parentDepth + 1;
+    if (wouldExceedSubagentDepth(toolUseContext.queryTracking?.depth)) {
+      return {
+        type: 'result' as const,
+        resultForAssistant: `Subagent nesting limit reached (depth ${childDepth}, max ${MAX_SUBAGENT_DEPTH}). Cannot spawn a deeper subagent. Complete the remaining work directly with Read, Bash, Edit, or other tools instead of nesting another agent.`,
+        data: undefined,
+      };
     }
 
     // Hermes P1-3 subagent policy: haiku 默认 + blocked tools + ~/.pandacc/config/subagent.json 覆盖。
