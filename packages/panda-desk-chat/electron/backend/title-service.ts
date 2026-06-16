@@ -1,5 +1,5 @@
 // Input: sessionId + firstUserMessage + optional firstAssistantMessage + optional provider creds
-// Output: { title: string; source: 'ai' | 'fallback' } — concise Chinese session title
+// Output: { title: string; source: 'ai' | 'fallback' } — concise session title (按对话语言或 language 配置)
 // Pos: packages/panda-desk-chat/electron/backend — v2.27.1 titleService Haiku 两阶段抽取
 
 import * as fs from 'node:fs/promises';
@@ -46,6 +46,53 @@ async function resolveApiKey(provider?: { apiKey?: string }): Promise<string | n
   return null;
 }
 
+// 把 settings.language 配置值映射到人类可读语言名，供标题 prompt 指定语言。
+const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
+  zh: 'Chinese',
+  'zh-cn': 'Chinese',
+  'zh-tw': 'Chinese (Traditional)',
+  en: 'English',
+  ja: 'Japanese',
+  ko: 'Korean',
+  fr: 'French',
+  de: 'German',
+  es: 'Spanish',
+  pt: 'Portuguese',
+  ru: 'Russian',
+  it: 'Italian',
+};
+
+/**
+ * 构造标题语言指令：
+ * - 配置了 language → 固定用该语言生成标题
+ * - 未配置 → 跟随对话语言生成标题
+ * 导出以便复用与单测（不触发 API）。
+ */
+export function buildTitleLanguageDirective(language?: string): string {
+  const normalized = (language ?? '').trim().toLowerCase();
+  if (!normalized) {
+    return 'Write the title in the same language as the conversation.';
+  }
+  const displayName = LANGUAGE_DISPLAY_NAMES[normalized] ?? language!.trim();
+  return `Write the title in ${displayName}.`;
+}
+
+/**
+ * 从 ~/.pandacc/settings.json 读取 language 配置；缺失/解析失败返回 undefined。
+ */
+async function resolveLanguage(): Promise<string | undefined> {
+  const settingsPath = path.join(pandaccRoot(), 'settings.json');
+  try {
+    const raw = await fs.readFile(settingsPath, 'utf-8');
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const lang = parsed.language;
+    if (typeof lang === 'string' && lang.trim()) return lang.trim();
+  } catch {
+    // file missing or parse error → undefined（跟随对话语言）
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -55,6 +102,11 @@ export interface TitleGenerateInput {
   jsonlPath?: string;
   firstUserMessage: string;
   firstAssistantMessage?: string;
+  /**
+   * 固定标题语言（如 'zh'/'en'）。未传时从 settings.json 读取；
+   * 仍未配置则跟随对话语言生成。
+   */
+  language?: string;
   provider?: {
     apiKey: string;
     baseUrl?: string;
@@ -115,8 +167,27 @@ function cleanTitle(raw: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * 调 Anthropic Haiku 生成 4-12 字中文会话标题。
- * 失败/超时时静默返回 deriveTitle fallback。
+ * 拼装会话标题 prompt。language 配置时固定该语言，未配置时跟随对话语言。
+ * 导出以便单测断言语言指令注入（不触发 API）。
+ */
+export function buildTitlePrompt(
+  userSnippet: string,
+  assistantSnippet: string,
+  language?: string,
+): string {
+  return (
+    'Generate a concise title (4-12 characters / 3-7 words) for this conversation.\n' +
+    `${buildTitleLanguageDirective(language)}\n` +
+    'Output JUST the title, no quotes, no punctuation, no markdown.\n\n' +
+    `User message: ${userSnippet}\n` +
+    `Assistant reply: ${assistantSnippet}\n\n` +
+    'Title:'
+  );
+}
+
+/**
+ * 调 Anthropic Haiku 生成会话标题。language 配置时固定该语言，未配置时
+ * 跟随对话语言。失败/超时时静默返回 deriveTitle fallback。
  */
 export async function generateSessionTitle(
   opts: TitleGenerateInput,
@@ -134,12 +205,9 @@ export async function generateSessionTitle(
   const userSnippet = opts.firstUserMessage.slice(0, 500);
   const assistantSnippet = (opts.firstAssistantMessage ?? '').slice(0, 500);
 
-  const promptText =
-    'Generate a concise 4-12 character Chinese title for this conversation.\n' +
-    'Output JUST the title, no quotes, no punctuation, no markdown.\n\n' +
-    `User message: ${userSnippet}\n` +
-    `Assistant reply: ${assistantSnippet}\n\n` +
-    'Title:';
+  // language 配置时固定标题语言，未配置时跟随对话语言
+  const language = opts.language ?? (await resolveLanguage());
+  const promptText = buildTitlePrompt(userSnippet, assistantSnippet, language);
 
   const body = JSON.stringify({
     model: HAIKU_MODEL,

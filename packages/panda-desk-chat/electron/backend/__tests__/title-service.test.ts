@@ -3,10 +3,59 @@
 // Pos: packages/panda-desk-chat/electron/backend/__tests__ — v2.27.1 titleService 单测
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { deriveTitle, generateSessionTitle } from '../title-service';
+import {
+  deriveTitle,
+  generateSessionTitle,
+  buildTitleLanguageDirective,
+  buildTitlePrompt,
+} from '../title-service';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FetchMock = { mockResolvedValueOnce(v: unknown): void; mockRejectedValueOnce(v: unknown): void; not: { toHaveBeenCalled(): void } };
+
+// ---------------------------------------------------------------------------
+// M2: 标题语言指令 — buildTitleLanguageDirective / buildTitlePrompt
+// ---------------------------------------------------------------------------
+
+describe('buildTitleLanguageDirective (M2)', () => {
+  it('未配置 language → 跟随对话语言', () => {
+    expect(buildTitleLanguageDirective()).toContain('same language as the conversation');
+    expect(buildTitleLanguageDirective('')).toContain('same language as the conversation');
+    expect(buildTitleLanguageDirective('   ')).toContain('same language as the conversation');
+  });
+
+  it('language=zh → 固定 Chinese', () => {
+    expect(buildTitleLanguageDirective('zh')).toBe('Write the title in Chinese.');
+    expect(buildTitleLanguageDirective('ZH')).toBe('Write the title in Chinese.');
+  });
+
+  it('language=en → 固定 English', () => {
+    expect(buildTitleLanguageDirective('en')).toBe('Write the title in English.');
+  });
+
+  it('language=ja → 固定 Japanese', () => {
+    expect(buildTitleLanguageDirective('ja')).toBe('Write the title in Japanese.');
+  });
+
+  it('未知 language 码 → 原样使用', () => {
+    expect(buildTitleLanguageDirective('xx-custom')).toBe('Write the title in xx-custom.');
+  });
+});
+
+describe('buildTitlePrompt (M2)', () => {
+  it('配置 language=zh 时 prompt 含中文指令', () => {
+    const p = buildTitlePrompt('user msg', 'assistant reply', 'zh');
+    expect(p).toContain('Write the title in Chinese.');
+    expect(p).toContain('user msg');
+    expect(p).toContain('assistant reply');
+  });
+
+  it('未配置 language 时 prompt 含跟随对话语言指令', () => {
+    const p = buildTitlePrompt('hello', 'hi');
+    expect(p).toContain('same language as the conversation');
+    expect(p).not.toContain('Generate a concise 4-12 character Chinese title');
+  });
+});
 
 // ---------------------------------------------------------------------------
 // deriveTitle — sync unit tests
@@ -193,6 +242,25 @@ describe('generateSessionTitle', () => {
 
     expect(result2.source).toBe('fallback');
     expect(result2.title).toBe('新对话');
+  });
+
+  it('language 选项注入请求 prompt（固定语言）', async () => {
+    const fetchMock = fetch as unknown as FetchMock & { mock: { calls: unknown[][] } };
+    (fetch as unknown as FetchMock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ content: [{ type: 'text', text: 'Code review' }] }),
+    });
+
+    await generateSessionTitle({
+      sessionId: 'test-session-lang',
+      firstUserMessage: '帮我审查代码',
+      language: 'en',
+      provider: BASE_PROVIDER,
+    });
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as { body: string }).body);
+    const promptText = body.messages[0].content as string;
+    expect(promptText).toContain('Write the title in English.');
   });
 
   it('无 provider.apiKey 且无环境变量 → fallback', async () => {

@@ -17,6 +17,7 @@ import { getIsNonInteractiveSession } from '../bootstrap/state.js'
 import { logEvent } from '../services/analytics/index.js'
 import { queryHaiku } from '../services/api/claude.js'
 import type { Message } from '../types/message.js'
+import { getGlobalConfig } from './config.js'
 import { logForDebugging } from './debug.js'
 import { safeParseJSON } from './json.js'
 import { lazySchema } from './lazySchema.js'
@@ -53,7 +54,45 @@ export function extractConversationText(messages: Message[]): string {
     : text
 }
 
-const SESSION_TITLE_PROMPT = `Generate a concise, sentence-case title (3-7 words) that captures the main topic or goal of this coding session. The title should be clear enough that the user recognizes the session in a list. Use sentence case: capitalize only the first word and proper nouns.
+// 把 settings.language 配置值映射到人类可读语言名，供标题 prompt 指定语言。
+const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
+  zh: 'Chinese',
+  'zh-cn': 'Chinese',
+  'zh-tw': 'Chinese (Traditional)',
+  en: 'English',
+  ja: 'Japanese',
+  ko: 'Korean',
+  fr: 'French',
+  de: 'German',
+  es: 'Spanish',
+  pt: 'Portuguese',
+  ru: 'Russian',
+  it: 'Italian',
+}
+
+/**
+ * 构造标题语言指令：
+ * - 配置了 language → 固定用该语言生成标题
+ * - 未配置 → 跟随对话语言生成标题
+ * 导出以便复用与单测（不触发 API）。
+ */
+export function buildTitleLanguageDirective(language?: string): string {
+  const normalized = (language ?? '').trim().toLowerCase()
+  if (!normalized) {
+    return 'Write the title in the same language as the conversation.'
+  }
+  const displayName = LANGUAGE_DISPLAY_NAMES[normalized] ?? language!.trim()
+  return `Write the title in ${displayName}.`
+}
+
+/**
+ * 拼装会话标题 prompt。language 配置时固定该语言，未配置时跟随对话语言。
+ * 导出以便单测断言语言指令注入。
+ */
+export function buildSessionTitlePrompt(language?: string): string {
+  return `Generate a concise, sentence-case title (3-7 words) that captures the main topic or goal of this coding session. The title should be clear enough that the user recognizes the session in a list. Use sentence case: capitalize only the first word and proper nouns.
+
+${buildTitleLanguageDirective(language)}
 
 Return JSON with a single "title" field.
 
@@ -66,6 +105,7 @@ Good examples:
 Bad (too vague): {"title": "Code changes"}
 Bad (too long): {"title": "Investigate and fix the issue where the login button does not respond on mobile devices"}
 Bad (wrong case): {"title": "Fix Login Button On Mobile"}`
+}
 
 const titleSchema = lazySchema(() => z.object({ title: z.string() }))
 
@@ -84,8 +124,16 @@ export async function generateSessionTitle(
   if (!trimmed) return null
 
   try {
+    // language 配置时固定标题语言，未配置时跟随对话语言
+    let configuredLanguage: string | undefined
+    try {
+      configuredLanguage = getGlobalConfig().language
+    } catch {
+      // config 未初始化（极早期调用）时退化为跟随对话语言
+      configuredLanguage = undefined
+    }
     const result = await queryHaiku({
-      systemPrompt: asSystemPrompt([SESSION_TITLE_PROMPT]),
+      systemPrompt: asSystemPrompt([buildSessionTitlePrompt(configuredLanguage)]),
       userPrompt: trimmed,
       outputFormat: {
         type: 'json_schema',
