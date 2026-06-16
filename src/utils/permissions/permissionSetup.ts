@@ -1024,6 +1024,35 @@ export async function initializeToolPermissionContext({
     }
   }
 
+  // 上游 161：只读附加目录（可读不可写）。与上面的读写 additionalDirectories
+  // 并存：先验证目录有效，再以 readOnly: true 应用更新。validateDirectoryForWorkspace
+  // 仅检查目录是否已被覆盖/有效，不区分读写；只读语义体现在 readOnly 标记上，
+  // 由 filesystem 写权限校验消费。未配置该设置时此循环为空，行为不变。
+  const additionalReadOnlyDirectories =
+    settings.permissions?.additionalDirectoriesReadOnly || []
+  if (additionalReadOnlyDirectories.length > 0) {
+    const readOnlyValidationResults = await Promise.all(
+      additionalReadOnlyDirectories.map(dir =>
+        validateDirectoryForWorkspace(dir, toolPermissionContext),
+      ),
+    )
+    for (const result of readOnlyValidationResults) {
+      if (result.resultType === 'success') {
+        toolPermissionContext = applyPermissionUpdate(toolPermissionContext, {
+          type: 'addDirectories',
+          directories: [result.absolutePath],
+          destination: 'cliArg',
+          readOnly: true,
+        })
+      } else if (
+        result.resultType !== 'alreadyInWorkingDirectory' &&
+        result.resultType !== 'pathNotFound'
+      ) {
+        warnings.push(addDirHelpMessage(result))
+      }
+    }
+  }
+
   return {
     toolPermissionContext,
     warnings,

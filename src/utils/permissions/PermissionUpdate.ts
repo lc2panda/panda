@@ -128,6 +128,8 @@ export function applyPermissionUpdate(
         newAdditionalDirs.set(directory, {
           path: directory,
           source: update.destination,
+          // 上游 161：只读附加目录标记。缺省 false = 读写（旧行为）。
+          ...(update.readOnly ? { readOnly: true } : {}),
         })
       }
       return {

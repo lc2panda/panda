@@ -706,6 +706,59 @@ export function pathInAllowedWorkingPath(
   )
 }
 
+/**
+ * 上游 161：判断某路径是否落在「只读」附加目录内，且不落在任何读写工作目录
+ * （cwd 或非只读 additionalDirectories）内。
+ *
+ * 设计：只读目录同时也被加入 additionalWorkingDirectories（故 pathInAllowedWorkingPath
+ * 对读操作放行）。写权限校验额外调用本函数：若命中只读目录且未被任何读写目录覆盖，
+ * 则写操作被拒。读写目录优先 —— 若同一路径既在只读目录又在读写目录内（嵌套场景），
+ * 以读写为准，本函数返回 false（不拦截写）。未配置只读目录时恒返回 false，行为不变。
+ */
+export function pathInReadOnlyWorkingPath(
+  path: string,
+  toolPermissionContext: ToolPermissionContext,
+  precomputedPathsToCheck?: readonly string[],
+): boolean {
+  const readOnlyDirs = Array.from(
+    toolPermissionContext.additionalWorkingDirectories.values(),
+  ).filter(dir => dir.readOnly === true)
+
+  // 无只读目录配置 —— 直接放行（旧行为）
+  if (readOnlyDirs.length === 0) {
+    return false
+  }
+
+  const pathsToCheck =
+    precomputedPathsToCheck ?? getPathsForPermissionCheck(path)
+
+  // 读写工作目录集合：cwd + 非只读 additionalDirectories
+  const readWritePaths = [
+    getOriginalCwd(),
+    ...Array.from(toolPermissionContext.additionalWorkingDirectories.values())
+      .filter(dir => dir.readOnly !== true)
+      .map(dir => dir.path),
+  ].flatMap(wp => getResolvedWorkingDirPaths(wp))
+
+  // 若任一待校验路径已落在读写目录内，则不视为只读（读写优先）
+  const inReadWrite = pathsToCheck.every(pathToCheck =>
+    readWritePaths.some(rw => pathInWorkingPath(pathToCheck, rw)),
+  )
+  if (inReadWrite) {
+    return false
+  }
+
+  // 只读目录集合
+  const readOnlyPaths = readOnlyDirs.flatMap(dir =>
+    getResolvedWorkingDirPaths(dir.path),
+  )
+
+  // 所有待校验路径都落在只读目录内 → 命中只读
+  return pathsToCheck.every(pathToCheck =>
+    readOnlyPaths.some(ro => pathInWorkingPath(pathToCheck, ro)),
+  )
+}
+
 export function pathInWorkingPath(path: string, workingPath: string): boolean {
   const absolutePath = expandPath(path)
   const absoluteWorkingPath = expandPath(workingPath)
@@ -1249,6 +1302,23 @@ export function checkWritePermissionForTool<Input extends AnyObject>(
     return internalEditResult
   }
 
+  // 1.55. 上游 161：只读附加目录写保护。若写目标落在 readOnly 附加目录内、
+  // 且未被任何读写工作目录（cwd / 非只读 additionalDirectories）覆盖，则拒绝写。
+  // 置于显式 deny 规则与内部可编辑路径之后、.pandacc allow / acceptEdits 自动放行
+  // / allow 规则之前 —— 保证只读保护不被 acceptEdits 模式或宽 allow 规则绕过，
+  // 同时读操作仍由 pathInAllowedWorkingPath 放行（只读目录也在 additionalWorkingDirectories 内）。
+  // 未配置只读目录时 pathInReadOnlyWorkingPath 恒为 false，旧行为不变。
+  if (pathInReadOnlyWorkingPath(path, toolPermissionContext, pathsToCheck)) {
+    return {
+      behavior: 'deny',
+      message: `Permission to edit ${path} has been denied: it is inside a read-only additional directory.`,
+      decisionReason: {
+        type: 'workingDir',
+        reason: 'Path is inside a read-only additional directory',
+      },
+    }
+  }
+
   // 1.6. Check for .pandacc/** allow rules BEFORE safety checks
   // This allows session-level permissions to bypass the safety blocks for .pandacc/
   // We only allow this for session-level rules to prevent users from accidentally
@@ -1325,7 +1395,11 @@ export function checkWritePermissionForTool<Input extends AnyObject>(
           },
         ]
       : generateSuggestions(path, 'write', toolPermissionContext, pathsToCheck)
-    const failedCheck = safetyCheck as { safe: false; message: string; classifierApprovable: boolean }
+    const failedCheck = safetyCheck as {
+      safe: false
+      message: string
+      classifierApprovable: boolean
+    }
     return {
       behavior: 'ask',
       message: failedCheck.message,
@@ -1590,7 +1664,9 @@ export function checkEditableInternalPath(
   // .pandacc/ only (not ~/.pandacc/) since launch.json is per-project.
   if (
     normalizeCaseForComparison(normalizedPath) ===
-    normalizeCaseForComparison(join(getOriginalCwd(), '.pandacc', 'launch.json'))
+    normalizeCaseForComparison(
+      join(getOriginalCwd(), '.pandacc', 'launch.json'),
+    )
   ) {
     return {
       behavior: 'allow',

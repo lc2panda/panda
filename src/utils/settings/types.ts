@@ -86,6 +86,12 @@ export const PermissionsSchema = lazySchema(() =>
         .array(z.string())
         .optional()
         .describe('Additional directories to include in the permission scope'),
+      additionalDirectoriesReadOnly: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Additional directories included in the permission scope as read-only (reads allowed, writes denied)',
+        ),
     })
     .passthrough(),
 )
@@ -1159,9 +1165,7 @@ export const SettingsSchema = lazySchema(() =>
           enabled: z
             .boolean()
             .optional()
-            .describe(
-              'Global switch for output compression. Default: true.',
-            ),
+            .describe('Global switch for output compression. Default: true.'),
           level: z
             .enum(['off', 'normal', 'aggressive'])
             .optional()
@@ -1280,10 +1284,7 @@ export const SettingsSchema = lazySchema(() =>
       // Keys are skill names (matches Command.name). Unknown skill names are
       // ignored; unknown modes are treated as no override (skill behaves normally).
       skillOverrides: z
-        .record(
-          z.string(),
-          z.enum(['off', 'user-invocable-only', 'name-only']),
-        )
+        .record(z.string(), z.enum(['off', 'user-invocable-only', 'name-only']))
         .optional()
         .describe(
           'Per-skill override map. ' +

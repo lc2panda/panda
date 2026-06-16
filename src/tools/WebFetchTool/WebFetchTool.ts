@@ -4,7 +4,9 @@ import type { PermissionUpdate } from '../../types/permissions.js'
 import { formatFileSize } from '../../utils/format.js'
 import { lazySchema } from '../../utils/lazySchema.js'
 import type { PermissionDecision } from '../../utils/permissions/PermissionResult.js'
+import type { PermissionRule } from '../../utils/permissions/PermissionRule.js'
 import { getRuleByContentsForTool } from '../../utils/permissions/permissions.js'
+import { matchWildcardPattern } from '../../utils/permissions/shellRuleMatching.js'
 import { isPreapprovedHost } from './preapproved.js'
 import { DESCRIPTION, WEB_FETCH_TOOL_NAME } from './prompt.js'
 import {
@@ -63,6 +65,51 @@ function webFetchToolInputToPermissionRuleContent(input: {
   }
 }
 
+/**
+ * Resolve a WebFetch permission rule for the given rule content.
+ *
+ * 上游 172：domain 规则支持通配子域，如 `WebFetch(domain:*.x.com)` 应匹配
+ * `a.x.com`/`b.x.com` 等子域。匹配优先级：
+ *   1. 精确匹配（`ruleMap.get(ruleContent)`）—— 完整保留旧行为，零变化。
+ *   2. 通配匹配 —— 仅当 ruleContent 形如 `domain:<host>` 且某条规则形如
+ *      `domain:<pattern>`（pattern 含 `*`）时，用既有 matchWildcardPattern 对
+ *      host 与 pattern 做匹配。`*.x.com` 因 `^.*\.x\.com$` 不含裸 apex，
+ *      故不匹配裸 `x.com`，与上游语义一致。
+ * 非 domain 形式（如 `input:...`）或不含通配符的规则不走通配分支。
+ */
+function matchWebFetchDomainRule(
+  ruleMap: ReadonlyMap<string, PermissionRule>,
+  ruleContent: string,
+): PermissionRule | undefined {
+  // 1. 精确匹配优先（旧行为不变）
+  const exact = ruleMap.get(ruleContent)
+  if (exact) {
+    return exact
+  }
+
+  // 2. 仅对 domain: 形式尝试通配匹配
+  const DOMAIN_PREFIX = 'domain:'
+  if (!ruleContent.startsWith(DOMAIN_PREFIX)) {
+    return undefined
+  }
+  const hostname = ruleContent.slice(DOMAIN_PREFIX.length)
+  for (const [content, rule] of ruleMap) {
+    if (!content.startsWith(DOMAIN_PREFIX)) {
+      continue
+    }
+    const pattern = content.slice(DOMAIN_PREFIX.length)
+    // 只有含通配符的规则才走通配匹配；不含通配符的精确域名规则
+    // 已在第 1 步 .get 命中或落空，此处跳过以免行为漂移。
+    if (!pattern.includes('*')) {
+      continue
+    }
+    if (matchWildcardPattern(pattern, hostname)) {
+      return rule
+    }
+  }
+  return undefined
+}
+
 export const WebFetchTool = buildTool({
   name: WEB_FETCH_TOOL_NAME,
   searchHint: 'fetch and extract content from a URL',
@@ -112,11 +159,10 @@ export const WebFetchTool = buildTool({
     // host check is only consulted as a fallback when no explicit rule matches.
     const ruleContent = webFetchToolInputToPermissionRuleContent(input)
 
-    const denyRule = getRuleByContentsForTool(
-      permissionContext,
-      WebFetchTool,
-      'deny',
-    ).get(ruleContent)
+    const denyRule = matchWebFetchDomainRule(
+      getRuleByContentsForTool(permissionContext, WebFetchTool, 'deny'),
+      ruleContent,
+    )
     if (denyRule) {
       return {
         behavior: 'deny',
@@ -128,11 +174,10 @@ export const WebFetchTool = buildTool({
       }
     }
 
-    const askRule = getRuleByContentsForTool(
-      permissionContext,
-      WebFetchTool,
-      'ask',
-    ).get(ruleContent)
+    const askRule = matchWebFetchDomainRule(
+      getRuleByContentsForTool(permissionContext, WebFetchTool, 'ask'),
+      ruleContent,
+    )
     if (askRule) {
       return {
         behavior: 'ask',
@@ -145,11 +190,10 @@ export const WebFetchTool = buildTool({
       }
     }
 
-    const allowRule = getRuleByContentsForTool(
-      permissionContext,
-      WebFetchTool,
-      'allow',
-    ).get(ruleContent)
+    const allowRule = matchWebFetchDomainRule(
+      getRuleByContentsForTool(permissionContext, WebFetchTool, 'allow'),
+      ruleContent,
+    )
     if (allowRule) {
       return {
         behavior: 'allow',

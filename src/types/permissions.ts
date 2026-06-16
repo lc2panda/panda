@@ -123,6 +123,8 @@ export type PermissionUpdate =
       type: 'addDirectories'
       destination: PermissionUpdateDestination
       directories: string[]
+      // 上游 161：标记为只读附加目录（可读不可写）。缺省/false = 读写（旧行为）。
+      readOnly?: boolean
     }
   | {
       type: 'removeDirectories'
@@ -143,6 +145,8 @@ export type WorkingDirectorySource = PermissionRuleSource
 export type AdditionalWorkingDirectory = {
   path: string
   source: WorkingDirectorySource
+  // 上游 161：true = 该目录只读（可读不可写）。缺省 = 读写（旧行为）。
+  readOnly?: boolean
 }
 
 // ============================================================================

@@ -261,6 +261,18 @@ function toolMatchesRule(
     return true
   }
 
+  // 上游 166：工具名位置支持 glob。裸 "*" 匹配全部工具名，
+  // 任意含通配符的工具名规则（如 "Web*"）按通配匹配。
+  // 注意：这里只处理非 MCP 限定形式（不含 "__"），MCP 段通配仍走下方既有分支。
+  const ruleToolName = rule.ruleValue.toolName
+  if (
+    (ruleToolName === '*' ||
+      (ruleToolName.includes('*') && !ruleToolName.includes('__'))) &&
+    matchWildcardPattern(ruleToolName, nameForRuleMatch)
+  ) {
+    return true
+  }
+
   // MCP server-level permission: rule "mcp__server1" matches tool "mcp__server1__tool1"
   // Also supports wildcard: rule "mcp__server1__*" matches all tools from server1
   const ruleInfo = mcpInfoFromString(rule.ruleValue.toolName)
@@ -587,7 +599,6 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
   }
 
   const result = await hasPermissionsToUseToolInner(tool, input, context)
-
 
   // Reset consecutive denials on any allowed tool use in auto mode.
   // This ensures that a successful tool use (even one auto-allowed by rules)
