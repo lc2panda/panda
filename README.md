@@ -2411,7 +2411,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | 主线提交 | v2.28.0（6 项上游 Claude Code 能力同步 + 一行零门槛安装）；详见 `git log` |
 | 本地/远端 | 本地 `main` 已包含 v2.28.0；远端推送以后以 `panda/main` 为准 |
 | 包版本 | `@lc2panda/panda-code@2.28.0`；`@panda/desk-chat@0.3.7`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
-| 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.156 的高价值能力；本次补齐 v2.1.144–149 区间 6 项缺口；v2.1.157+ 作为后续评估范围，不在本 README 虚报为已吸收 |
+| 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.156 的高价值能力；v2.28.2 新增吸收 v2.1.157–178 区间 12 项高价值能力（参数级权限规则 · glob deny · 只读附加目录 · `$HOME` deny · WebFetch 子域通配+显式优先 · fallback 多值 · 子代理 5 层嵌套上限+transcript · TaskCreate 畸形输入自修复 · 会话标题按语言生成 · 钩子 additionalContext 续轮）；M5/M6/S3 滚动后续评估，不在本 README 虚报为已吸收 |
 | v2.28.0 上游同步 | 见下方「v2.28.0 新能力」6 项清单（markdown checkbox 渲染 · `/diff` 行级滚动 · `/model` 会话级切换 · Read PARTIAL 截断 · `agents --json` · `/code-review`） |
 | 新安装方式 | 一行 `curl -fsSL .../install.sh \| bash` 零门槛安装（自动装 bun + 拉 latest Release .tgz + 全局安装），无需 GitHub token / `.npmrc` |
 | 发布状态 | v2.28.0 计划发布到 [GitHub Releases](https://github.com/lc2panda/panda/releases/latest)；Desk Chat 0.3.7 安装资产随 Release 上传，`panda-on-desk-v1.0.4` 仅作历史归档 |
