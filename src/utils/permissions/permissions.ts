@@ -11,6 +11,7 @@ import { shouldUseSandbox } from '../../tools/BashTool/shouldUseSandbox.js'
 import { BASH_TOOL_NAME } from '../../tools/BashTool/toolName.js'
 import { POWERSHELL_TOOL_NAME } from '../../tools/PowerShellTool/toolName.js'
 import { REPL_TOOL_NAME } from '../../tools/REPLTool/constants.js'
+import { WEB_FETCH_TOOL_NAME } from '../../tools/WebFetchTool/prompt.js'
 import type { AssistantMessage } from '../../types/message.js'
 import { extractOutputRedirections } from '../bash/commands.js'
 import { logForDebugging } from '../debug.js'
@@ -317,6 +318,122 @@ export function getAskRuleForTool(
   tool: Pick<Tool, 'name' | 'mcpInfo'>,
 ): PermissionRule | null {
   return getAskRules(context).find(rule => toolMatchesRule(tool, rule)) || null
+}
+
+/**
+ * 上游 178：解析 `Tool(param:value)` 规则中的 ruleContent（即 `param:value` 部分）。
+ *
+ * 匹配 `^([A-Za-z_][\w-]*):(.+)$`，返回 `{ param, valuePattern }`；
+ * 不符合 param:value 形态（如 Bash 的 `npm install`、缺少冒号）返回 null，
+ * 交既有逻辑处理。valuePattern 可含通配符，由 matchWildcardPattern 消费。
+ */
+export function parseParamRule(
+  ruleContent: string,
+): { param: string; valuePattern: string } | null {
+  const match = /^([A-Za-z_][\w-]*):(.+)$/.exec(ruleContent)
+  if (!match) {
+    return null
+  }
+  return { param: match[1]!, valuePattern: match[2]! }
+}
+
+/**
+ * 上游 178：通用参数级权限规则匹配（`Tool(param:value)`）。
+ *
+ * 语义（B 为主 + A 护栏）：
+ * - B（按 input 字段忠实匹配）：规则的 toolName 命中本工具、ruleContent 解析为
+ *   `{param, valuePattern}` 时，取本次调用 `input[param]`（转字符串）。
+ *   **input[param] 必须存在**才参与匹配（不存在 = 不命中）。用既有
+ *   matchWildcardPattern(valuePattern, value) 比对。这天然让
+ *   `WebFetch(domain:*)`（domain 非 WebFetch input 字段）、Bash `node:*`
+ *   （node 非 input 字段）不被误吞。
+ * - A（防御护栏）：对自身 checkPermissions 已消费 ruleContent 的工具——
+ *   MCP（toolName 含 `__` 或 mcpInfoFromString 非 null）、Bash、WebFetch——
+ *   整体跳过通用 param 匹配，保留其专用规则语义。
+ *
+ * 该函数是叠加层：仅在整工具规则未命中时由调用方追加调用，绝不放松既有
+ * deny/ask；allow 侧只做收窄（input[param] 匹配才返回规则）。
+ */
+function getParamRuleForTool(
+  rules: PermissionRule[],
+  tool: Pick<Tool, 'name' | 'mcpInfo'>,
+  input: { [k: string]: unknown } | undefined,
+): PermissionRule | null {
+  if (!input) {
+    return null
+  }
+  const toolName = getToolNameForPermissionCheck(tool)
+
+  // A 护栏：已消费 ruleContent 的专用工具整体排除
+  if (
+    toolName === BASH_TOOL_NAME ||
+    toolName === WEB_FETCH_TOOL_NAME ||
+    toolName.includes('__') ||
+    mcpInfoFromString(toolName) !== null
+  ) {
+    return null
+  }
+
+  for (const rule of rules) {
+    if (rule.ruleValue.toolName !== toolName) {
+      continue
+    }
+    const ruleContent = rule.ruleValue.ruleContent
+    if (ruleContent === undefined) {
+      // 整工具规则不在本函数职责内（由 toolMatchesRule 处理）
+      continue
+    }
+    const parsed = parseParamRule(ruleContent)
+    if (!parsed) {
+      continue
+    }
+    // B：input[param] 必须存在
+    if (!Object.hasOwn(input, parsed.param)) {
+      continue
+    }
+    const rawValue = input[parsed.param]
+    if (rawValue === undefined || rawValue === null) {
+      continue
+    }
+    const value = String(rawValue)
+    if (matchWildcardPattern(parsed.valuePattern, value)) {
+      return rule
+    }
+  }
+  return null
+}
+
+/**
+ * 上游 178：参数级 deny 规则匹配（叠加在整工具 deny 之后）。
+ */
+export function getParamDenyRuleForTool(
+  context: ToolPermissionContext,
+  tool: Pick<Tool, 'name' | 'mcpInfo'>,
+  input: { [k: string]: unknown } | undefined,
+): PermissionRule | null {
+  return getParamRuleForTool(getDenyRules(context), tool, input)
+}
+
+/**
+ * 上游 178：参数级 ask 规则匹配（叠加在整工具 ask 之后）。
+ */
+export function getParamAskRuleForTool(
+  context: ToolPermissionContext,
+  tool: Pick<Tool, 'name' | 'mcpInfo'>,
+  input: { [k: string]: unknown } | undefined,
+): PermissionRule | null {
+  return getParamRuleForTool(getAskRules(context), tool, input)
+}
+
+/**
+ * 上游 178：参数级 allow 规则匹配（只收窄不扩大：input[param] 匹配才命中）。
+ */
+export function getParamAllowRuleForTool(
+  context: ToolPermissionContext,
+  tool: Pick<Tool, 'name' | 'mcpInfo'>,
+  input: { [k: string]: unknown } | undefined,
+): PermissionRule | null {
+  return getParamRuleForTool(getAllowRules(context), tool, input)
 }
 
 /**
@@ -1212,6 +1329,24 @@ export async function checkRuleBasedPermissions(
     }
   }
 
+  // 1a'. 上游 178：参数级 deny 规则（Tool(param:value)），叠加在整工具 deny 之后、
+  // 同优先级。不放松既有 deny，仅在整工具未命中时按 input 字段追加拦截。
+  const paramDenyRule = getParamDenyRuleForTool(
+    appState.toolPermissionContext,
+    tool,
+    input,
+  )
+  if (paramDenyRule) {
+    return {
+      behavior: 'deny',
+      decisionReason: {
+        type: 'rule',
+        rule: paramDenyRule,
+      },
+      message: `Permission to use ${tool.name} has been denied.`,
+    }
+  }
+
   // 1b. Entire tool has an ask rule
   const askRule = getAskRuleForTool(appState.toolPermissionContext, tool)
   if (askRule) {
@@ -1232,6 +1367,23 @@ export async function checkRuleBasedPermissions(
       }
     }
     // Fall through to let tool.checkPermissions handle command-specific rules
+  }
+
+  // 1b'. 上游 178：参数级 ask 规则，叠加在整工具 ask 之后、同优先级。
+  const paramAskRule = getParamAskRuleForTool(
+    appState.toolPermissionContext,
+    tool,
+    input,
+  )
+  if (paramAskRule) {
+    return {
+      behavior: 'ask',
+      decisionReason: {
+        type: 'rule',
+        rule: paramAskRule,
+      },
+      message: createPermissionRequestMessage(tool.name),
+    }
   }
 
   // 1c. Tool-specific permission check (e.g. bash subcommand rules)
@@ -1304,6 +1456,24 @@ async function hasPermissionsToUseToolInner(
     }
   }
 
+  // 1a'. 上游 178：参数级 deny 规则（Tool(param:value)），叠加在整工具 deny 之后、
+  // 同优先级。不放松既有 deny，仅在整工具未命中时按 input 字段追加拦截。
+  const paramDenyRule = getParamDenyRuleForTool(
+    appState.toolPermissionContext,
+    tool,
+    input,
+  )
+  if (paramDenyRule) {
+    return {
+      behavior: 'deny',
+      decisionReason: {
+        type: 'rule',
+        rule: paramDenyRule,
+      },
+      message: `Permission to use ${tool.name} has been denied.`,
+    }
+  }
+
   // 1b. Check if the entire tool should always ask for permission
   const askRule = getAskRuleForTool(appState.toolPermissionContext, tool)
   if (askRule) {
@@ -1327,6 +1497,23 @@ async function hasPermissionsToUseToolInner(
       }
     }
     // Fall through to let Bash's checkPermissions handle command-specific rules
+  }
+
+  // 1b'. 上游 178：参数级 ask 规则，叠加在整工具 ask 之后、同优先级。
+  const paramAskRule = getParamAskRuleForTool(
+    appState.toolPermissionContext,
+    tool,
+    input,
+  )
+  if (paramAskRule) {
+    return {
+      behavior: 'ask',
+      decisionReason: {
+        type: 'rule',
+        rule: paramAskRule,
+      },
+      message: createPermissionRequestMessage(tool.name),
+    }
   }
 
   // 1c. Ask the tool implementation for a permission result
@@ -1416,6 +1603,26 @@ async function hasPermissionsToUseToolInner(
       decisionReason: {
         type: 'rule',
         rule: alwaysAllowedRule,
+      },
+    }
+  }
+
+  // 2b'. 上游 178：参数级 allow 规则（Tool(param:value)）。只做收窄——
+  // 仅当本次 input[param] 匹配 valuePattern 时才放行，绝不扩大放行面。
+  // 置于整工具 allow 之后、转 ask 之前。deny/ask 已在前面优先处理，
+  // 故 param-allow 不会越过更高优先级的 deny/ask。
+  const paramAllowRule = getParamAllowRuleForTool(
+    appState.toolPermissionContext,
+    tool,
+    input,
+  )
+  if (paramAllowRule) {
+    return {
+      behavior: 'allow',
+      updatedInput: getUpdatedInputOrFallback(toolPermissionResult, input),
+      decisionReason: {
+        type: 'rule',
+        rule: paramAllowRule,
       },
     }
   }
