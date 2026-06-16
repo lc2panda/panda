@@ -194,6 +194,7 @@ export type QueryParams = {
   canUseTool: CanUseToolFn
   toolUseContext: ToolUseContext
   fallbackModel?: string
+  fallbackModels?: string[]
   querySource: QuerySource
   maxOutputTokensOverride?: number
   maxTurns?: number
@@ -266,6 +267,7 @@ async function* queryLoop(
     systemContext,
     canUseTool,
     fallbackModel,
+    fallbackModels,
     querySource,
     maxTurns,
     skipCacheWrite,
@@ -636,6 +638,13 @@ async function* queryLoop(
         doesMostRecentAssistantMessageExceed200k(messagesForQuery),
     })
 
+    // The fallback model currently advertised to the API layer. Starts at the
+    // primary fallback (first --fallback-model entry) and, when the user passes
+    // an ordered list (max 3), advances to the next entry each time the current
+    // model overloads — so repeated overloads walk the user-specified chain in
+    // order instead of retrying the same single fallback forever.
+    let currentFallbackModel = fallbackModel
+
     queryCheckpoint('query_setup_end')
 
     // Create fetch wrapper once per query session to avoid memory retention.
@@ -740,7 +749,7 @@ async function* queryLoop(
               toolChoice: undefined,
               isNonInteractiveSession:
                 toolUseContext.options.isNonInteractiveSession,
-              fallbackModel,
+              fallbackModel: currentFallbackModel,
               onStreamingFallback: () => {
                 streamingFallbackOccured = true
               },
@@ -978,6 +987,23 @@ async function* queryLoop(
                 }
               }
             } catch {}
+
+            // If the user supplied an ordered --fallback-model list (max 3),
+            // walk it in order: switch to the fallback the error advertised, and
+            // advance the advertised fallback for the next overload to the next
+            // entry in the user-specified chain. This composes with the routing
+            // path above (routing wins when it produced a different model).
+            if (fallbackModels && fallbackModels.length > 1) {
+              if (effectiveFallback === fallbackModel) {
+                // No routing override: honor the model the error told us to use.
+                effectiveFallback = innerError.fallbackModel
+              }
+              const { getNextFallback } = require('./routing/index.js') as typeof import('./routing/index.js')
+              const nextFallback = getNextFallback(innerError.fallbackModel, fallbackModels)
+              if (nextFallback) {
+                currentFallbackModel = nextFallback
+              }
+            }
 
             // Fallback was triggered - switch model and retry
             currentModel = effectiveFallback

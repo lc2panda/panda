@@ -105,22 +105,11 @@ export const WebFetchTool = buildTool({
     const appState = context.getAppState()
     const permissionContext = appState.toolPermissionContext
 
-    // Check if the hostname is in the preapproved list
-    try {
-      const { url } = input as { url: string }
-      const parsedUrl = new URL(url)
-      if (isPreapprovedHost(parsedUrl.hostname, parsedUrl.pathname)) {
-        return {
-          behavior: 'allow',
-          updatedInput: input,
-          decisionReason: { type: 'other', reason: 'Preapproved host' },
-        }
-      }
-    } catch {
-      // If URL parsing fails, continue with normal permission checks
-    }
-
-    // Check for a rule specific to the tool input (matching hostname)
+    // Check for a rule specific to the tool input (matching hostname).
+    // IMPORTANT: Explicit user rules (deny/ask/allow) are evaluated BEFORE the
+    // built-in preapproved-host allow, so a user's explicit deny (or ask) can
+    // override a domain that would otherwise be auto-approved. The preapproved
+    // host check is only consulted as a fallback when no explicit rule matches.
     const ruleContent = webFetchToolInputToPermissionRuleContent(input)
 
     const denyRule = getRuleByContentsForTool(
@@ -170,6 +159,22 @@ export const WebFetchTool = buildTool({
           rule: allowRule,
         },
       }
+    }
+
+    // No explicit user rule matched. Fall back to the built-in preapproved-host
+    // allowlist for trusted domains.
+    try {
+      const { url } = input as { url: string }
+      const parsedUrl = new URL(url)
+      if (isPreapprovedHost(parsedUrl.hostname, parsedUrl.pathname)) {
+        return {
+          behavior: 'allow',
+          updatedInput: input,
+          decisionReason: { type: 'other', reason: 'Preapproved host' },
+        }
+      }
+    } catch {
+      // If URL parsing fails, continue with the default ask behavior
     }
 
     return {

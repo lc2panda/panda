@@ -85,6 +85,28 @@ export function expandTilde(path: string): string {
   ) {
     return homedir() + path.slice(1)
   }
+  // SECURITY/PARITY: Expand a leading $HOME / ${HOME} to the home directory so
+  // that permission rules targeting the home directory (which are written with
+  // ~ and expand to homedir() here) also match commands that reference the home
+  // directory via $HOME. This is the same deterministic expansion the shell
+  // performs at runtime, so it does NOT introduce a TOCTOU gap: $HOME always
+  // resolves to homedir() with no filesystem-dependent indirection (unlike
+  // ~user, $PWD, $(cmd) or %VAR%, which remain rejected downstream).
+  // Only a leading, whole-segment $HOME token is expanded; any other shell
+  // expansion syntax is left intact so the $/%/= rejection in validatePath
+  // continues to require manual approval.
+  if (path === '$HOME' || path === '${HOME}') {
+    return homedir()
+  }
+  if (path.startsWith('$HOME/') || path.startsWith('${HOME}/')) {
+    return homedir() + path.slice(path.indexOf('/'))
+  }
+  if (
+    process.platform === 'win32' &&
+    (path.startsWith('$HOME\\') || path.startsWith('${HOME}\\'))
+  ) {
+    return homedir() + path.slice(path.indexOf('\\'))
+  }
   return path
 }
 

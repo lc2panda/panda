@@ -72,6 +72,7 @@ const getTeammateUtils = () => require('./utils/teammate.js') as typeof import('
 const getTeammatePromptAddendum = () => require('./utils/swarm/teammatePromptAddendum.js') as typeof import('./utils/swarm/teammatePromptAddendum.js');
 const getTeammateModeSnapshot = () => require('./utils/swarm/backends/teammateModeSnapshot.js') as typeof import('./utils/swarm/backends/teammateModeSnapshot.js');
 /* eslint-enable @typescript-eslint/no-require-imports */
+
 // Dead code elimination: conditional import for COORDINATOR_MODE
 /* eslint-disable @typescript-eslint/no-require-imports */
 const coordinatorModeModule = feature('COORDINATOR_MODE') ? require('./coordinator/coordinatorMode.js') as typeof import('./coordinator/coordinatorMode.js') : null;
@@ -116,6 +117,7 @@ import { getGhAuthStatus } from './utils/github/ghAuthStatus.js';
 import { safeParseJSON } from './utils/json.js';
 import { logError } from './utils/log.js';
 import { getModelDeprecationWarning } from './utils/model/deprecation.js';
+import { collectFallbackModels } from './utils/model/fallbackModels.js';
 import { getDefaultMainLoopModel, getUserSpecifiedModelSetting, normalizeModelStringForAPI, parseUserSpecifiedModel } from './utils/model/model.js';
 import { ensureModelStringsInitialized } from './utils/model/modelStrings.js';
 import { PERMISSION_MODES } from './utils/permissions/PermissionMode.js';
@@ -1068,7 +1070,7 @@ async function run(): Promise<CommanderCommand> {
       throw new InvalidArgumentError(`It must be one of: ${allowed.join(', ')}`);
     }
     return value;
-  })).option('--agent <agent>', `Agent for the current session · 当前会话的 Agent。Overrides the 'agent' setting.`).option('--betas <betas...>', 'Beta headers to include in API requests (API key users only) · API 请求中包含的 Beta 头').option('--fallback-model <model>', 'Enable automatic fallback to specified model when default model is overloaded (only works with --print)').addOption(new Option('--workload <tag>', 'Workload tag for billing-header attribution (cc_workload). Process-scoped; set by SDK daemon callers that spawn subprocesses for cron work. (only works with --print)').hideHelp()).option('--settings <file-or-json>', 'Path to a settings JSON file or a JSON string to load additional settings from').option('--add-dir <directories...>', 'Additional directories to allow tool access to · 允许工具访问的额外目录').option('--ide', 'Automatically connect to IDE on startup · 启动时自动连接 IDE', () => true).option('--strict-mcp-config', 'Only use MCP servers from --mcp-config, ignoring all other MCP configurations', () => true).option('--session-id <uuid>', 'Use a specific session ID for the conversation (must be a valid UUID)').option('-n, --name <name>', 'Set a display name for this session (shown in /resume and terminal title) · 设置会话显示名称').option('--agents <json>', 'JSON object defining custom agents (e.g. \'{"reviewer": {"description": "Reviews code", "prompt": "You are a code reviewer"}}\')').option('--setting-sources <sources>', 'Comma-separated list of setting sources to load (user, project, local).')
+  })).option('--agent <agent>', `Agent for the current session · 当前会话的 Agent。Overrides the 'agent' setting.`).option('--betas <betas...>', 'Beta headers to include in API requests (API key users only) · API 请求中包含的 Beta 头').option('--fallback-model <model>', 'Enable automatic fallback to one or more models (in order, max 3) when the default model is overloaded. Repeat the flag or pass a comma-separated list (only works with --print)', collectFallbackModels).addOption(new Option('--workload <tag>', 'Workload tag for billing-header attribution (cc_workload). Process-scoped; set by SDK daemon callers that spawn subprocesses for cron work. (only works with --print)').hideHelp()).option('--settings <file-or-json>', 'Path to a settings JSON file or a JSON string to load additional settings from').option('--add-dir <directories...>', 'Additional directories to allow tool access to · 允许工具访问的额外目录').option('--ide', 'Automatically connect to IDE on startup · 启动时自动连接 IDE', () => true).option('--strict-mcp-config', 'Only use MCP servers from --mcp-config, ignoring all other MCP configurations', () => true).option('--session-id <uuid>', 'Use a specific session ID for the conversation (must be a valid UUID)').option('-n, --name <name>', 'Set a display name for this session (shown in /resume and terminal title) · 设置会话显示名称').option('--agents <json>', 'JSON object defining custom agents (e.g. \'{"reviewer": {"description": "Reviews code", "prompt": "You are a code reviewer"}}\')').option('--setting-sources <sources>', 'Comma-separated list of setting sources to load (user, project, local).')
   // gh-33508: <paths...> (variadic) consumed everything until the next
   // --flag. `claude --plugin-dir /path mcp add --transport http` swallowed
   // `mcp` and `add` as paths, then choked on --transport as an unknown
@@ -1169,13 +1171,25 @@ async function run(): Promise<CommanderCommand> {
       mcpConfig = [],
       permissionMode: permissionModeCli,
       addDir = [],
-      fallbackModel,
+      fallbackModel: fallbackModelArg,
       betas = [],
       ide = false,
       sessionId,
       includeHookEvents,
       includePartialMessages
     } = options;
+    // --fallback-model accepts an ordered list (max 3) via the collectFallbackModels
+    // parser. The Commander option value is a string[] at runtime (the parser
+    // accumulator) but the generated options type still types it as a string for
+    // backward compatibility, so normalize defensively via unknown. Keep
+    // `fallbackModel` (first entry) for the existing single-value code paths.
+    const fallbackModelRaw = fallbackModelArg as unknown;
+    const fallbackModels: string[] = Array.isArray(fallbackModelRaw)
+      ? (fallbackModelRaw as string[])
+      : typeof fallbackModelRaw === 'string' && fallbackModelRaw.length > 0
+        ? [fallbackModelRaw]
+        : [];
+    const fallbackModel: string | undefined = fallbackModels[0];
     if (options.prefill) {
       seedEarlyInput(options.prefill);
     }
@@ -2089,6 +2103,11 @@ async function run(): Promise<CommanderCommand> {
     // NOTE: Model resolution happens after setup() to ensure trust is established before AWS auth
     const userSpecifiedModel = options.model === 'default' ? getDefaultMainLoopModel() : options.model;
     const userSpecifiedFallbackModel = fallbackModel === 'default' ? getDefaultMainLoopModel() : fallbackModel;
+    // Resolve the 'default' token for every entry of the ordered fallback list so
+    // the full chain (max 3) can drive ordered fallback on repeated overloads.
+    const userSpecifiedFallbackModels = fallbackModels.map(m =>
+      m === 'default' ? getDefaultMainLoopModel() : m,
+    );
 
     // Reuse preSetupCwd unless setup() chdir'd (worktreeEnabled). Saves a
     // getCwd() syscall in the common path.
@@ -2927,6 +2946,7 @@ async function run(): Promise<CommanderCommand> {
         appendSystemPrompt,
         userSpecifiedModel: effectiveModel,
         fallbackModel: userSpecifiedFallbackModel,
+        fallbackModels: userSpecifiedFallbackModels,
         teleport,
         sdkUrl,
         replayUserMessages: effectiveReplayUserMessages,

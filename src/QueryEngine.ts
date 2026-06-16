@@ -157,6 +157,7 @@ export type QueryEngineConfig = {
   appendSystemPrompt?: string
   userSpecifiedModel?: string
   fallbackModel?: string
+  fallbackModels?: string[]
   thinkingConfig?: ThinkingConfig
   maxTurns?: number
   maxBudgetUsd?: number
@@ -240,6 +241,7 @@ export class QueryEngine {
       appendSystemPrompt,
       userSpecifiedModel,
       fallbackModel,
+      fallbackModels,
       jsonSchema,
       getAppState,
       setAppState,
@@ -730,6 +732,7 @@ export class QueryEngine {
       canUseTool: wrappedCanUseTool,
       toolUseContext: processUserInputContext,
       fallbackModel,
+      fallbackModels,
       querySource: 'sdk',
       maxTurns,
       taskBudget,
@@ -1328,6 +1331,7 @@ export async function* ask({
   appendSystemPrompt,
   userSpecifiedModel,
   fallbackModel,
+  fallbackModels,
   jsonSchema,
   getAppState,
   setAppState,
@@ -1357,6 +1361,7 @@ export async function* ask({
   appendSystemPrompt?: string
   userSpecifiedModel?: string
   fallbackModel?: string
+  fallbackModels?: string[]
   jsonSchema?: Record<string, unknown>
   getAppState: () => AppState
   setAppState: (f: (prev: AppState) => AppState) => void
@@ -1385,6 +1390,7 @@ export async function* ask({
     appendSystemPrompt,
     userSpecifiedModel,
     fallbackModel,
+    fallbackModels,
     thinkingConfig,
     maxTurns,
     maxBudgetUsd,
