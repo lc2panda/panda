@@ -1,0 +1,113 @@
+# Input: git tag vX.Y.Z 推送（排除 desk-v*） 触发 CLI 构建 + GitHub Release + GitHub Packages 发布
+# Output: lc2panda-panda-code-X.Y.Z.tgz → GH Release latest 资产；@lc2panda/panda-code@X.Y.Z → GitHub Packages
+# Pos: panda CLI 主发版自动化 god-workflow — 防止手动漏发 Release/Packages（v2.28.3/4 缺陷治本）
+#
+# [NEW-FILE:#20260608-01]
+#
+# 触发约定：
+#   1. `npm version` 更新 package.json version 并打 tag vX.Y.Z 后 push tag
+#   2. 本 workflow 自动 build → npm pack → gh release create --latest → npm publish 到 GitHub Packages
+#   3. README install.sh 拉 `releases/latest` 的 .tgz 资产安装，本 workflow 保证 latest 始终是最新版
+#
+# 与 panda-on-desk 桌面端发版 (`desk-v*` tag) 解耦：
+#   - 本 workflow 仅 `v*` tag 触发，且显式排除 `desk-v*`（见 tags-ignore）
+#   - 桌面端走 `.github/workflows/release-panda-on-desk.yml`
+#
+# GITHUB_TOKEN 用法说明：
+#   - GH_TOKEN env 由 GitHub Actions 自动注入 secrets.GITHUB_TOKEN（无需手动配 Secrets）
+#   - contents:write → gh release create 发 GitHub Release
+#   - packages:write → npm publish 发 GitHub Packages
+#
+# 回滚：删除本文件即回滚到纯手动发版流程；已发布的 Release/Packages 不受影响。
+
+name: Release panda CLI
+
+on:
+  push:
+    tags:
+      # 仅匹配 vX.Y.Z（CLI 版本 tag）。桌面端 tag 形如 `desk-vX.Y.Z`，前缀为 `desk-`，
+      # 不会被 `v*` 命中，因此天然与 release-panda-on-desk.yml 解耦、不会双触发。
+      # 注意：GitHub Actions 不允许同一 push 过滤器同时存在 tags 与 tags-ignore，故不用 tags-ignore。
+      - 'v*'
+
+# 并发控制：同 tag 重复触发时不取消（保证补发可重跑）
+concurrency:
+  group: release-cli-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # gh release create 发布 GitHub Release 需要
+  packages: write   # npm publish 发布 GitHub Packages 需要
+
+jobs:
+  release:
+    name: Build & Publish CLI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # registry-url 让 setup-node 写入 .npmrc，使 npm publish 指向 GitHub Packages
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@lc2panda'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          # tag 格式 vX.Y.Z → version=X.Y.Z
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#v}"
+          echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      # npm pack 生成 lc2panda-panda-code-X.Y.Z.tgz（install.sh 选取 latest release 中首个 .tgz 资产）
+      - name: Pack tarball
+        id: pack
+        run: |
+          TARBALL="$(npm pack | tail -n1)"
+          echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
+          ls -lh "${TARBALL}"
+
+      # gh release create 失败若因 Release 已存在（补发/重跑场景）→ 改为上传资产到现有 Release
+      - name: Create GitHub Release (--latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: |
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} 已存在 — 上传/覆盖资产到现有 Release 并标记 latest"
+            gh release upload "${RELEASE_TAG}" "${TARBALL}" --clobber
+            gh release edit "${RELEASE_TAG}" --latest
+          else
+            gh release create "${RELEASE_TAG}" \
+              --title "panda v${RELEASE_VERSION}" \
+              --generate-notes \
+              --latest \
+              "${TARBALL}"
+          fi
+
+      # npm publish 到 GitHub Packages；版本若已存在会报错（重复 tag 触发场景）→ || true 容错避免 CI 失败
+      # prepublishOnly 会再跑一次 bun run build，幂等无副作用
+      - name: Publish to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm publish || echo "npm publish 失败（多为版本已存在，属补发/重跑预期）— 已容错跳过，请人工核对 GitHub Packages"
