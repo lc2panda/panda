@@ -2,7 +2,7 @@
 
 > 懂你所有数据的 AI 伙伴 | 编码 · 助理 · 感知 · 生活
 
-[![version](https://img.shields.io/badge/version-v2.28.3-blue)](#更新历史) [![desktop](https://img.shields.io/badge/desktop-Panda%20Desk%20Chat-blue)](https://github.com/lc2panda/panda/releases/latest) [![runtime](https://img.shields.io/badge/runtime-Bun-black)](https://bun.sh) [![platform](https://img.shields.io/badge/platform-mac%20%7C%20win%20%7C%20linux-lightgrey)](#7-跨平台支持) [![license](https://img.shields.io/badge/license-MIT-green)](#)
+[![version](https://img.shields.io/badge/version-v2.28.4-blue)](#更新历史) [![desktop](https://img.shields.io/badge/desktop-Panda%20Desk%20Chat-blue)](https://github.com/lc2panda/panda/releases/latest) [![runtime](https://img.shields.io/badge/runtime-Bun-black)](https://bun.sh) [![platform](https://img.shields.io/badge/platform-mac%20%7C%20win%20%7C%20linux-lightgrey)](#7-跨平台支持) [![license](https://img.shields.io/badge/license-MIT-green)](#)
 
 ```
  ██████╗   █████╗  ███╗   ██╗ ██████╗   █████╗
@@ -62,7 +62,7 @@ panda
 # 1) 先装 bun
 irm bun.sh/install.ps1 | iex
 # 2) 再用显式 tarball URL 全局安装（替换为实际版本）
-npm i -g https://github.com/lc2panda/panda/releases/download/v2.28.3/lc2panda-panda-code-2.28.3.tgz
+npm i -g https://github.com/lc2panda/panda/releases/download/v2.28.4/lc2panda-panda-code-2.28.4.tgz
 ```
 
 > `.tgz` 跨平台，已捆绑 win32 ripgrep，Windows 直接可用。
@@ -79,7 +79,7 @@ npm i -g https://github.com/lc2panda/panda/releases/download/v2.28.3/lc2panda-pa
 npm install -g https://github.com/lc2panda/panda/releases/latest/download/lc2panda-panda-code.tgz
 ```
 
-> 将 `latest` 替换为具体 tag（如 `download/v2.28.3/...`）即可锁定版本。Windows PowerShell 同样可用此命令。
+> 将 `latest` 替换为具体 tag（如 `download/v2.28.4/...`）即可锁定版本。Windows PowerShell 同样可用此命令。
 
 </details>
 
@@ -1546,7 +1546,7 @@ irm https://raw.githubusercontent.com/lc2panda/panda/main/install.ps1 | iex
 
 ```powershell
 irm bun.sh/install.ps1 | iex
-npm i -g https://github.com/lc2panda/panda/releases/download/v2.28.3/lc2panda-panda-code-2.28.3.tgz
+npm i -g https://github.com/lc2panda/panda/releases/download/v2.28.4/lc2panda-panda-code-2.28.4.tgz
 ```
 
 > `.tgz` 跨平台，已捆绑 win32 ripgrep，Windows 直接可用。
@@ -2404,13 +2404,13 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 <details>
 <summary>点击展开版本更新记录</summary>
 
-### 当前进度 · v2.28.3
+### 当前进度 · v2.28.4
 
 | 维度 | 状态 |
 |------|------|
-| 主线提交 | v2.28.3（coordinator 放行 channel reply 类 MCP 工具，修复信道回复接缝缺陷）；详见 `git log` |
-| 本地/远端 | 本地 `main` 已包含 v2.28.3；远端推送以后以 `panda/main` 为准 |
-| 包版本 | `@lc2panda/panda-code@2.28.3`；`@panda/desk-chat@0.3.10`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
+| 主线提交 | v2.28.4（修复 channel reply 因 fetchToolsForClient 缓存中毒导致工具池为空）；详见 `git log` |
+| 本地/远端 | 本地 `main` 已包含 v2.28.4；远端推送以后以 `panda/main` 为准 |
+| 包版本 | `@lc2panda/panda-code@2.28.4`；`@panda/desk-chat@0.3.11`；`@lc2panda/panda-on-desk@0.1.0-alpha` |
 | 上游基线 | 已吸收 `@anthropic-ai/claude-code` v2.1.120→v2.1.156 的高价值能力；v2.28.2 新增吸收 v2.1.157–178 区间 12 项高价值能力（参数级权限规则 · glob deny · 只读附加目录 · `$HOME` deny · WebFetch 子域通配+显式优先 · fallback 多值 · 子代理 5 层嵌套上限+transcript · TaskCreate 畸形输入自修复 · 会话标题按语言生成 · 钩子 additionalContext 续轮）；M5/M6/S3 滚动后续评估，不在本 README 虚报为已吸收 |
 | v2.28.0 上游同步 | 见下方「v2.28.0 新能力」6 项清单（markdown checkbox 渲染 · `/diff` 行级滚动 · `/model` 会话级切换 · Read PARTIAL 截断 · `agents --json` · `/code-review`） |
 | 新安装方式 | 一行 `curl -fsSL .../install.sh \| bash` 零门槛安装（自动装 bun + 拉 latest Release .tgz + 全局安装），无需 GitHub token / `.npmrc` |
@@ -2431,6 +2431,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 
 | 版本 | 运行时 | 亮点 |
 |------|--------|-----|
+| 2.28.4 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 修复 channel reply 因 fetchToolsForClient memoize 缓存中毒导致工具池为空（信道回复 "No such tool available"）|
 | 2.28.3 | Bun >= 1.2.0 / Node.js >= 18.0.0 | coordinator 模式放行 channel（微信/飞书）reply 类 MCP 工具，修复信道入站消息回复接缝缺陷 |
 | 2.28.0 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 6 项上游能力同步（markdown checkbox · /diff 行级滚动 · /model 会话级切换 · Read PARTIAL · agents --json · /code-review）· 一行零门槛安装 |
 | 2.27.9 | Bun >= 1.2.0 / Node.js >= 18.0.0 | 第三方中转 cache_control TTL 修复 · workflow 引擎 · daemon · 后台任务面板 |
