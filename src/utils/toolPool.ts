@@ -17,6 +17,23 @@ export function isPrActivitySubscriptionTool(name: string): boolean {
   return PR_ACTIVITY_TOOL_SUFFIXES.some(suffix => name.endsWith(suffix))
 }
 
+// Channel reply tools (e.g. wechat/feishu plugin MCP servers). When the
+// coordinator is the inbound recipient of a channel message, it must reply on
+// the channel directly rather than delegating to a worker (workers have no MCP
+// transport handle). Mirrors the PR-activity exception, matched by tool-name
+// suffix so the MCP server prefix can vary (it is normalized/variable). The
+// `isMcp === true` gate keeps a builtin or non-MCP tool that happens to be
+// named "reply" from ever being let through.
+const CHANNEL_REPLY_TOOL_SUFFIXES = ['reply']
+
+export function isChannelReplyTool(tool: Tool): boolean {
+  if (tool.isMcp !== true) return false
+  const toolName = tool.mcpInfo?.toolName ?? tool.name
+  return CHANNEL_REPLY_TOOL_SUFFIXES.some(
+    suffix => toolName === suffix || tool.name.endsWith(`__${suffix}`),
+  )
+}
+
 // Dead code elimination: conditional imports for feature-gated modules
 /* eslint-disable @typescript-eslint/no-require-imports */
 const coordinatorModeModule = feature('COORDINATOR_MODE')
@@ -30,13 +47,15 @@ const coordinatorModeModule = feature('COORDINATOR_MODE')
  * path (main.tsx) so both stay in sync.
  *
  * PR activity subscription tools are always allowed since subscription
- * management is orchestration.
+ * management is orchestration. Channel reply tools are always allowed since
+ * the coordinator may be the direct inbound recipient of a channel message.
  */
 export function applyCoordinatorToolFilter(tools: Tools): Tools {
   return tools.filter(
     t =>
       COORDINATOR_MODE_ALLOWED_TOOLS.has(t.name) ||
-      isPrActivitySubscriptionTool(t.name),
+      isPrActivitySubscriptionTool(t.name) ||
+      isChannelReplyTool(t),
   )
 }
 
