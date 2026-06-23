@@ -1765,271 +1765,298 @@ export function mcpToolInputToAutoClassifierInput(
     : toolName
 }
 
-export const fetchToolsForClient = memoizeWithLRU(
-  async (client: MCPServerConnection): Promise<Tool[]> => {
-    if (client.type !== 'connected') return []
+// Inner memoized fetcher. ONLY handles the success path: it assumes the client
+// is already connected and advertises tools capability (the outer wrapper
+// guards those). It throws on failure so the wrapper can evict the poisoned
+// cache entry. This avoids the bug where a `Promise<[]>` produced during the
+// initial connection handshake race (client not yet `connected`, or a
+// `tools/list` error mid-handshake) was permanently pinned under the
+// server-name cache key — once connected, later calls hit that stale empty
+// promise and never re-sent `tools/list`, leaving the server's tools empty.
+const fetchToolsForClientMemoized = memoizeWithLRU(
+  async (client: ConnectedMCPServer): Promise<Tool[]> => {
+    const result = (await client.client.request(
+      { method: 'tools/list' },
+      ListToolsResultSchema,
+    )) as ListToolsResult
 
-    try {
-      if (!client.capabilities?.tools) {
-        return []
-      }
+    // Sanitize tool data from MCP server
+    const toolsToProcess = recursivelySanitizeUnicode(result.tools)
 
-      const result = (await client.client.request(
-        { method: 'tools/list' },
-        ListToolsResultSchema,
-      )) as ListToolsResult
+    // Check if we should skip the mcp__ prefix for SDK MCP servers
+    const skipPrefix =
+      client.config.type === 'sdk' &&
+      isEnvTruthy(process.env.CLAUDE_AGENT_SDK_MCP_NO_PREFIX)
 
-      // Sanitize tool data from MCP server
-      const toolsToProcess = recursivelySanitizeUnicode(result.tools)
+    // Convert MCP tools to our Tool format
+    return toolsToProcess
+      .map((tool): Tool => {
+        const fullyQualifiedName = buildMcpToolName(client.name, tool.name)
+        // v2.1.92: MCP tools can override maxResultSizeChars via _meta
+        const metaMaxChars = tool._meta?.['anthropic/maxResultSizeChars']
+        const hasMaxCharsOverride = typeof metaMaxChars === 'number' && Number.isFinite(metaMaxChars) && metaMaxChars > 0
+        return {
+          ...MCPTool,
+          ...(hasMaxCharsOverride ? { maxResultSizeChars: Math.min(metaMaxChars, 500_000) } : {}),
+          // In skip-prefix mode, use the original name for model invocation so MCP tools
+          // can override builtins by name. mcpInfo is used for permission checking.
+          name: skipPrefix ? tool.name : fullyQualifiedName,
+          mcpInfo: { serverName: client.name, toolName: tool.name },
+          isMcp: true,
+          // Collapse whitespace: _meta is open to external MCP servers, and
+          // a newline here would inject orphan lines into the deferred-tool
+          // list (formatDeferredToolLine joins on '\n').
+          searchHint:
+            typeof tool._meta?.['anthropic/searchHint'] === 'string'
+              ? tool._meta['anthropic/searchHint']
+                  .replace(/\s+/g, ' ')
+                  .trim() || undefined
+              : undefined,
+          // v2.1.121: server-level `alwaysLoad: true` in mcp config promotes
+          // *every* tool to alwaysLoad (skip tool-search lazy loading). Per-tool
+          // `_meta['anthropic/alwaysLoad']` still wins individually.
+          alwaysLoad:
+            tool._meta?.['anthropic/alwaysLoad'] === true ||
+            (client.config as { alwaysLoad?: boolean }).alwaysLoad === true,
+          async description() {
+            return tool.description ?? ''
+          },
+          async prompt() {
+            const desc = tool.description ?? ''
+            return desc.length > MAX_MCP_DESCRIPTION_LENGTH
+              ? desc.slice(0, MAX_MCP_DESCRIPTION_LENGTH) + '… [truncated]'
+              : desc
+          },
+          isConcurrencySafe() {
+            return tool.annotations?.readOnlyHint ?? false
+          },
+          isReadOnly() {
+            return tool.annotations?.readOnlyHint ?? false
+          },
+          toAutoClassifierInput(input) {
+            return mcpToolInputToAutoClassifierInput(input, tool.name)
+          },
+          isDestructive() {
+            return tool.annotations?.destructiveHint ?? false
+          },
+          isOpenWorld() {
+            return tool.annotations?.openWorldHint ?? false
+          },
+          isSearchOrReadCommand() {
+            return classifyMcpToolForCollapse(client.name, tool.name)
+          },
+          inputJSONSchema: tool.inputSchema as Tool['inputJSONSchema'],
+          async checkPermissions() {
+            return {
+              behavior: 'passthrough' as const,
+              message: 'MCPTool requires permission.',
+              suggestions: [
+                {
+                  type: 'addRules' as const,
+                  rules: [
+                    {
+                      toolName: fullyQualifiedName,
+                      ruleContent: undefined,
+                    },
+                  ],
+                  behavior: 'allow' as const,
+                  destination: 'localSettings' as const,
+                },
+              ],
+            }
+          },
+          async call(
+            args: Record<string, unknown>,
+            context,
+            _canUseTool,
+            parentMessage,
+            onProgress?: ToolCallProgress<MCPProgress>,
+          ) {
+            const toolUseId = extractToolUseId(parentMessage)
+            const meta = toolUseId
+              ? { 'claudecode/toolUseId': toolUseId }
+              : {}
 
-      // Check if we should skip the mcp__ prefix for SDK MCP servers
-      const skipPrefix =
-        client.config.type === 'sdk' &&
-        isEnvTruthy(process.env.CLAUDE_AGENT_SDK_MCP_NO_PREFIX)
+            // Emit progress when tool starts
+            if (onProgress && toolUseId) {
+              onProgress({
+                toolUseID: toolUseId,
+                data: {
+                  type: 'mcp_progress',
+                  status: 'started',
+                  serverName: client.name,
+                  toolName: tool.name,
+                },
+              })
+            }
 
-      // Convert MCP tools to our Tool format
-      return toolsToProcess
-        .map((tool): Tool => {
-          const fullyQualifiedName = buildMcpToolName(client.name, tool.name)
-          // v2.1.92: MCP tools can override maxResultSizeChars via _meta
-          const metaMaxChars = tool._meta?.['anthropic/maxResultSizeChars']
-          const hasMaxCharsOverride = typeof metaMaxChars === 'number' && Number.isFinite(metaMaxChars) && metaMaxChars > 0
-          return {
-            ...MCPTool,
-            ...(hasMaxCharsOverride ? { maxResultSizeChars: Math.min(metaMaxChars, 500_000) } : {}),
-            // In skip-prefix mode, use the original name for model invocation so MCP tools
-            // can override builtins by name. mcpInfo is used for permission checking.
-            name: skipPrefix ? tool.name : fullyQualifiedName,
-            mcpInfo: { serverName: client.name, toolName: tool.name },
-            isMcp: true,
-            // Collapse whitespace: _meta is open to external MCP servers, and
-            // a newline here would inject orphan lines into the deferred-tool
-            // list (formatDeferredToolLine joins on '\n').
-            searchHint:
-              typeof tool._meta?.['anthropic/searchHint'] === 'string'
-                ? tool._meta['anthropic/searchHint']
-                    .replace(/\s+/g, ' ')
-                    .trim() || undefined
-                : undefined,
-            // v2.1.121: server-level `alwaysLoad: true` in mcp config promotes
-            // *every* tool to alwaysLoad (skip tool-search lazy loading). Per-tool
-            // `_meta['anthropic/alwaysLoad']` still wins individually.
-            alwaysLoad:
-              tool._meta?.['anthropic/alwaysLoad'] === true ||
-              (client.config as { alwaysLoad?: boolean }).alwaysLoad === true,
-            async description() {
-              return tool.description ?? ''
-            },
-            async prompt() {
-              const desc = tool.description ?? ''
-              return desc.length > MAX_MCP_DESCRIPTION_LENGTH
-                ? desc.slice(0, MAX_MCP_DESCRIPTION_LENGTH) + '… [truncated]'
-                : desc
-            },
-            isConcurrencySafe() {
-              return tool.annotations?.readOnlyHint ?? false
-            },
-            isReadOnly() {
-              return tool.annotations?.readOnlyHint ?? false
-            },
-            toAutoClassifierInput(input) {
-              return mcpToolInputToAutoClassifierInput(input, tool.name)
-            },
-            isDestructive() {
-              return tool.annotations?.destructiveHint ?? false
-            },
-            isOpenWorld() {
-              return tool.annotations?.openWorldHint ?? false
-            },
-            isSearchOrReadCommand() {
-              return classifyMcpToolForCollapse(client.name, tool.name)
-            },
-            inputJSONSchema: tool.inputSchema as Tool['inputJSONSchema'],
-            async checkPermissions() {
-              return {
-                behavior: 'passthrough' as const,
-                message: 'MCPTool requires permission.',
-                suggestions: [
-                  {
-                    type: 'addRules' as const,
-                    rules: [
-                      {
-                        toolName: fullyQualifiedName,
-                        ruleContent: undefined,
-                      },
-                    ],
-                    behavior: 'allow' as const,
-                    destination: 'localSettings' as const,
-                  },
-                ],
-              }
-            },
-            async call(
-              args: Record<string, unknown>,
-              context,
-              _canUseTool,
-              parentMessage,
-              onProgress?: ToolCallProgress<MCPProgress>,
-            ) {
-              const toolUseId = extractToolUseId(parentMessage)
-              const meta = toolUseId
-                ? { 'claudecode/toolUseId': toolUseId }
-                : {}
-
-              // Emit progress when tool starts
-              if (onProgress && toolUseId) {
-                onProgress({
-                  toolUseID: toolUseId,
-                  data: {
-                    type: 'mcp_progress',
-                    status: 'started',
-                    serverName: client.name,
-                    toolName: tool.name,
-                  },
+            const startTime = Date.now()
+            const MAX_SESSION_RETRIES = 1
+            for (let attempt = 0; ; attempt++) {
+              try {
+                const connectedClient = await ensureConnectedClient(client)
+                const mcpResult = await callMCPToolWithUrlElicitationRetry({
+                  client: connectedClient,
+                  clientConnection: client,
+                  tool: tool.name,
+                  args,
+                  meta,
+                  signal: context.abortController.signal,
+                  setAppState: context.setAppState,
+                  onProgress:
+                    onProgress && toolUseId
+                      ? progressData => {
+                          onProgress({
+                            toolUseID: toolUseId,
+                            data: progressData,
+                          })
+                        }
+                      : undefined,
+                  handleElicitation: context.handleElicitation,
                 })
-              }
 
-              const startTime = Date.now()
-              const MAX_SESSION_RETRIES = 1
-              for (let attempt = 0; ; attempt++) {
-                try {
-                  const connectedClient = await ensureConnectedClient(client)
-                  const mcpResult = await callMCPToolWithUrlElicitationRetry({
-                    client: connectedClient,
-                    clientConnection: client,
-                    tool: tool.name,
-                    args,
-                    meta,
-                    signal: context.abortController.signal,
-                    setAppState: context.setAppState,
-                    onProgress:
-                      onProgress && toolUseId
-                        ? progressData => {
-                            onProgress({
-                              toolUseID: toolUseId,
-                              data: progressData,
-                            })
-                          }
-                        : undefined,
-                    handleElicitation: context.handleElicitation,
+                // Emit progress when tool completes successfully
+                if (onProgress && toolUseId) {
+                  onProgress({
+                    toolUseID: toolUseId,
+                    data: {
+                      type: 'mcp_progress',
+                      status: 'completed',
+                      serverName: client.name,
+                      toolName: tool.name,
+                      elapsedTimeMs: Date.now() - startTime,
+                    },
                   })
-
-                  // Emit progress when tool completes successfully
-                  if (onProgress && toolUseId) {
-                    onProgress({
-                      toolUseID: toolUseId,
-                      data: {
-                        type: 'mcp_progress',
-                        status: 'completed',
-                        serverName: client.name,
-                        toolName: tool.name,
-                        elapsedTimeMs: Date.now() - startTime,
-                      },
-                    })
-                  }
-
-                  return {
-                    data: mcpResult.content,
-                    ...((mcpResult._meta || mcpResult.structuredContent) && {
-                      mcpMeta: {
-                        ...(mcpResult._meta && {
-                          _meta: mcpResult._meta,
-                        }),
-                        ...(mcpResult.structuredContent && {
-                          structuredContent: mcpResult.structuredContent,
-                        }),
-                      },
-                    }),
-                  }
-                } catch (error) {
-                  // Session expired — the connection cache has been
-                  // cleared, so retry with a fresh client.
-                  if (
-                    error instanceof McpSessionExpiredError &&
-                    attempt < MAX_SESSION_RETRIES
-                  ) {
-                    logMCPDebug(
-                      client.name,
-                      `Retrying tool '${tool.name}' after session recovery`,
-                    )
-                    continue
-                  }
-
-                  // Emit progress when tool fails
-                  if (onProgress && toolUseId) {
-                    onProgress({
-                      toolUseID: toolUseId,
-                      data: {
-                        type: 'mcp_progress',
-                        status: 'failed',
-                        serverName: client.name,
-                        toolName: tool.name,
-                        elapsedTimeMs: Date.now() - startTime,
-                      },
-                    })
-                  }
-                  // Wrap MCP SDK errors so telemetry gets useful context
-                  // instead of just "Error" or "McpError" (the constructor
-                  // name). MCP SDK errors are protocol-level messages and
-                  // don't contain user file paths or code.
-                  if (
-                    error instanceof Error &&
-                    !(
-                      error instanceof
-                      TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
-                    )
-                  ) {
-                    const name = error.constructor.name
-                    if (name === 'Error') {
-                      throw new TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS(
-                        error.message,
-                        error.message.slice(0, 200),
-                      )
-                    }
-                    // McpError has a numeric `code` with the JSON-RPC error
-                    // code (e.g. -32000 ConnectionClosed, -32001 RequestTimeout)
-                    if (
-                      name === 'McpError' &&
-                      'code' in error &&
-                      typeof error.code === 'number'
-                    ) {
-                      throw new TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS(
-                        error.message,
-                        `McpError ${error.code}`,
-                      )
-                    }
-                  }
-                  throw error
                 }
+
+                return {
+                  data: mcpResult.content,
+                  ...((mcpResult._meta || mcpResult.structuredContent) && {
+                    mcpMeta: {
+                      ...(mcpResult._meta && {
+                        _meta: mcpResult._meta,
+                      }),
+                      ...(mcpResult.structuredContent && {
+                        structuredContent: mcpResult.structuredContent,
+                      }),
+                    },
+                  }),
+                }
+              } catch (error) {
+                // Session expired — the connection cache has been
+                // cleared, so retry with a fresh client.
+                if (
+                  error instanceof McpSessionExpiredError &&
+                  attempt < MAX_SESSION_RETRIES
+                ) {
+                  logMCPDebug(
+                    client.name,
+                    `Retrying tool '${tool.name}' after session recovery`,
+                  )
+                  continue
+                }
+
+                // Emit progress when tool fails
+                if (onProgress && toolUseId) {
+                  onProgress({
+                    toolUseID: toolUseId,
+                    data: {
+                      type: 'mcp_progress',
+                      status: 'failed',
+                      serverName: client.name,
+                      toolName: tool.name,
+                      elapsedTimeMs: Date.now() - startTime,
+                    },
+                  })
+                }
+                // Wrap MCP SDK errors so telemetry gets useful context
+                // instead of just "Error" or "McpError" (the constructor
+                // name). MCP SDK errors are protocol-level messages and
+                // don't contain user file paths or code.
+                if (
+                  error instanceof Error &&
+                  !(
+                    error instanceof
+                    TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+                  )
+                ) {
+                  const name = error.constructor.name
+                  if (name === 'Error') {
+                    throw new TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS(
+                      error.message,
+                      error.message.slice(0, 200),
+                    )
+                  }
+                  // McpError has a numeric `code` with the JSON-RPC error
+                  // code (e.g. -32000 ConnectionClosed, -32001 RequestTimeout)
+                  if (
+                    name === 'McpError' &&
+                    'code' in error &&
+                    typeof error.code === 'number'
+                  ) {
+                    throw new TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS(
+                      error.message,
+                      `McpError ${error.code}`,
+                    )
+                  }
+                }
+                throw error
               }
-            },
-            userFacingName() {
-              // Prefer title annotation if available, otherwise use tool name
-              const displayName = tool.annotations?.title || tool.name
-              return `${client.name} - ${displayName} (MCP)`
-            },
-            ...(isClaudeInChromeMCPServer(client.name) &&
-            (client.config.type === 'stdio' || !client.config.type)
-              ? claudeInChromeToolRendering().getClaudeInChromeMCPToolOverrides(
-                  tool.name,
-                )
-              : {}),
-            ...(feature('CHICAGO_MCP') &&
-            (client.config.type === 'stdio' || !client.config.type) &&
-            isComputerUseMCPServer!(client.name)
-              ? computerUseWrapper!().getComputerUseMCPToolOverrides(tool.name)
-              : {}),
-          }
-        })
-        .filter(isIncludedMcpTool)
-    } catch (error) {
-      logMCPError(client.name, `Failed to fetch tools: ${errorMessage(error)}`)
-      return []
-    }
+            }
+          },
+          userFacingName() {
+            // Prefer title annotation if available, otherwise use tool name
+            const displayName = tool.annotations?.title || tool.name
+            return `${client.name} - ${displayName} (MCP)`
+          },
+          ...(isClaudeInChromeMCPServer(client.name) &&
+          (client.config.type === 'stdio' || !client.config.type)
+            ? claudeInChromeToolRendering().getClaudeInChromeMCPToolOverrides(
+                tool.name,
+              )
+            : {}),
+          ...(feature('CHICAGO_MCP') &&
+          (client.config.type === 'stdio' || !client.config.type) &&
+          isComputerUseMCPServer!(client.name)
+            ? computerUseWrapper!().getComputerUseMCPToolOverrides(tool.name)
+            : {}),
+        }
+      })
+      .filter(isIncludedMcpTool)
   },
-  (client: MCPServerConnection) => client.name,
+  (client: ConnectedMCPServer) => client.name,
   MCP_FETCH_CACHE_SIZE,
 )
+
+// Public wrapper. Guards the non-connected / no-tools-capability cases WITHOUT
+// caching them (returning `[]` here never pins a promise in the memo cache).
+// On a genuine fetch failure it evicts the rejected promise so a later retry
+// re-issues `tools/list` instead of replaying the cached rejection.
+//
+// `.cache` mirrors the inner memo cache so callers can clear/inspect entries
+// on reconnect (see client.ts reconnection paths and useManageMCPConnections
+// diffing).
+async function fetchToolsForClientImpl(
+  client: MCPServerConnection,
+): Promise<Tool[]> {
+  if (client.type !== 'connected') return [] // not cached
+  if (!client.capabilities?.tools) return [] // not cached
+
+  try {
+    return await fetchToolsForClientMemoized(client)
+  } catch (error) {
+    logMCPError(client.name, `Failed to fetch tools: ${errorMessage(error)}`)
+    // Evict the poisoned (rejected) promise so the next call retries.
+    fetchToolsForClientMemoized.cache.delete(client.name)
+    return []
+  }
+}
+
+export const fetchToolsForClient: typeof fetchToolsForClientImpl & {
+  cache: typeof fetchToolsForClientMemoized.cache
+} = Object.assign(fetchToolsForClientImpl, {
+  cache: fetchToolsForClientMemoized.cache,
+})
 
 export const fetchResourcesForClient = memoizeWithLRU(
   async (client: MCPServerConnection): Promise<ServerResource[]> => {
