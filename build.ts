@@ -4,6 +4,7 @@
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
 import { readdir, readFile, writeFile } from "fs/promises";
+import { existsSync, cpSync, chmodSync } from "fs";
 import { join } from "path";
 import type { BunPlugin } from "bun";
 
@@ -259,6 +260,14 @@ for (const src of rgSourceCandidates) {
         rgCopied = true;
         break;
     }
+}
+
+// Step 7: Copy bundled statusline script to dist/ for runtime deployment
+const statuslineSrc = join(import.meta.dir, "src", "statusline", "statusline.sh");
+const statuslineDest = join(outdir, "statusline.sh");
+if (existsSync(statuslineSrc)) {
+    cpSync(statuslineSrc, statuslineDest);
+    chmodSync(statuslineDest, 0o755);
 }
 
 console.log(

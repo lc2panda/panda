@@ -30,11 +30,18 @@ import { isMatrixTheme } from './MatrixTheme/isMatrixTheme.js';
 import { MATRIX_UI } from './MatrixTheme/matrixPalette.js';
 import { isVimModeEnabled } from './PromptInput/utils.js';
 import { MiniPet } from '../buddy/MiniPet.js';
+
+/** Default command used when no user/policy statusLine config exists (factory default). */
+const DEFAULT_STATUSLINE_COMMAND = 'bash "$HOME/.pandacc/statusline.sh"';
+
 export function statusLineShouldDisplay(settings: ReadonlySettings): boolean {
   // Assistant mode: statusline fields (model, permission mode, cwd) reflect the
   // REPL/daemon process, not what the agent child is actually running. Hide it.
   if (feature('KAIROS') && getKairosActive()) return false;
-  return settings?.statusLine !== undefined;
+  // Always display — when no user config exists, the built-in default script is
+  // used (factory-activated).  The old guard `settings?.statusLine !== undefined`
+  // is intentionally removed so fresh installs get a statusline out of the box.
+  return true;
 }
 function buildStatusLineCommandInput(permissionMode: PermissionMode, exceeds200kTokens: boolean, settings: ReadonlySettings, messages: Message[], addedDirs: string[], mainLoopModel: ModelName, vimMode?: VimMode): StatusLineCommandInput {
   const agentType = getMainThreadAgentType();
@@ -251,7 +258,7 @@ function StatusLineInner({
   }, [lastAssistantMessageId, permissionMode, vimMode, mainLoopModel, scheduleUpdate]);
 
   // When the statusLine command changes (hot reload), log the next result
-  const statusLineCommand = settings?.statusLine?.command;
+  const statusLineCommand = settings?.statusLine?.command ?? DEFAULT_STATUSLINE_COMMAND;
   const isFirstSettingsRender = useRef(true);
   useEffect(() => {
     if (isFirstSettingsRender.current) {

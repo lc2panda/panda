@@ -6,8 +6,9 @@
 import { profileCheckpoint } from '../utils/startupProfiler.js'
 import '../bootstrap/state.js'
 import '../utils/config.js'
-import { existsSync, cpSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { existsSync, cpSync, copyFileSync, mkdirSync, readFileSync, writeFileSync, statSync, chmodSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { homedir } from 'os'
 import type { Attributes, MetricOptions } from '@opentelemetry/api'
 import memoize from 'lodash-es/memoize.js'
@@ -215,6 +216,9 @@ export const init = memoize(async (): Promise<void> => {
     // Record the first start time
     recordFirstStartTime()
 
+    // Deploy built-in statusline script to ~/.pandacc/ (factory default)
+    ensureStatusLineScript()
+
     // Configure global mTLS settings
     const mtlsStart = Date.now()
     logForDebugging('[init] configureGlobalMTLS starting')
@@ -421,4 +425,61 @@ async function setMeterState(): Promise<void> {
     // would be null there.
     getSessionCounter()?.add(1)
   }
+}
+
+/**
+ * Deploy the built-in statusline.sh to ~/.pandacc/statusline.sh when:
+ *   - The target does not exist yet (fresh install), OR
+ *   - The bundled version is newer than the existing file on disk (update).
+ *
+ * If the user has manually edited their script (its mtime is *newer* than the
+ * bundled version), we do NOT overwrite — their customizations are preserved.
+ */
+function ensureStatusLineScript(): void {
+  try {
+    const pandaccDir = join(homedir(), '.pandacc')
+    const targetPath = join(pandaccDir, 'statusline.sh')
+
+    // Locate the bundled script shipped alongside the compiled CLI.
+    // build.ts copies src/statusline/statusline.sh → dist/statusline.sh.
+    const distDir = dirname(fileURLToPath(import.meta.url))
+    const bundledPath = join(distDir, 'statusline.sh')
+
+    if (!existsSync(bundledPath)) {
+      // Running from source (dev) — try the src/ path instead
+      const srcPath = join(distDir, '..', 'src', 'statusline', 'statusline.sh')
+      if (!existsSync(srcPath)) {
+        logForDebugging('[init] statusline.sh not found in dist/ or src/, skipping deploy')
+        return
+      }
+      deployStatusLineFrom(srcPath, targetPath, pandaccDir)
+      return
+    }
+
+    deployStatusLineFrom(bundledPath, targetPath, pandaccDir)
+  } catch (err) {
+    // Non-fatal — statusline is a nice-to-have, not a blocker
+    logForDebugging(`[init] ensureStatusLineScript failed: ${err}`)
+  }
+}
+
+function deployStatusLineFrom(sourcePath: string, targetPath: string, pandaccDir: string): void {
+  // Ensure ~/.pandacc/ exists
+  if (!existsSync(pandaccDir)) {
+    mkdirSync(pandaccDir, { recursive: true })
+  }
+
+  if (existsSync(targetPath)) {
+    // If user's copy is newer than the bundled version, do not overwrite
+    const targetMtime = statSync(targetPath).mtimeMs
+    const sourceMtime = statSync(sourcePath).mtimeMs
+    if (targetMtime > sourceMtime) {
+      logForDebugging('[init] User statusline.sh is newer than bundled version, preserving')
+      return
+    }
+  }
+
+  copyFileSync(sourcePath, targetPath)
+  chmodSync(targetPath, 0o755)
+  logForDebugging(`[init] Deployed statusline.sh to ${targetPath}`)
 }

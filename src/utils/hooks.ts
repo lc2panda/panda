@@ -1154,6 +1154,13 @@ async function execCommandHook(
     envVars.CLAUDE_ENV_FILE = await getHookEnvFilePath(hookEvent, hookIndex)
   }
 
+  // StatusLine: also expose the JSON input as an environment variable so that
+  // user scripts can read from either stdin (pipe) or $PANDA_STATUS_LINE_INPUT
+  // (backward-compatible with simpler scripts that cannot read stdin).
+  if (hookEvent === 'StatusLine' && jsonInput) {
+    envVars.PANDA_STATUS_LINE_INPUT = jsonInput
+  }
+
   // When agent worktrees are removed, getCwd() may return a deleted path via
   // AsyncLocalStorage. Validate before spawning since spawn() emits async
   // 'error' events for missing cwd rather than throwing synchronously.
@@ -5135,7 +5142,14 @@ export async function executeStatusLineCommand(
     statusLine = getSettings_DEPRECATED()?.statusLine
   }
 
-  if (!statusLine || statusLine.type !== 'command') {
+  // Fall back to the built-in default command when no user/policy config exists.
+  // This makes the statusline active out-of-the-box (factory default).
+  const DEFAULT_STATUSLINE_COMMAND = 'bash "$HOME/.pandacc/statusline.sh"'
+  if (!statusLine) {
+    statusLine = { type: 'command' as const, command: DEFAULT_STATUSLINE_COMMAND }
+  }
+
+  if (statusLine.type !== 'command') {
     return undefined
   }
 
