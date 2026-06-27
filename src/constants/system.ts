@@ -1,9 +1,11 @@
-// Critical system constants extracted to break circular dependencies
+// Input: 环境变量、feature flags、版本信息
+// Output: 系统提示词组件（attribution header、system prompt prefix）
+// Pos: API 请求构建链的上游，影响所有模型的系统提示词前缀
+// 一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
 
 import { feature } from 'bun:bundle'
-import { getFeatureValue_CACHED_MAY_BE_STALE } from '../services/analytics/growthbook.js'
 import { logForDebugging } from '../utils/debug.js'
-import { isEnvDefinedFalsy } from '../utils/envUtils.js'
+import { isEnvTruthy } from '../utils/envUtils.js'
 import {
   getAPIProvider,
   isFirstPartyAnthropicBaseUrl,
@@ -51,13 +53,15 @@ export function getCLISyspromptPrefix(options?: {
 
 /**
  * Check if attribution header is enabled.
- * Enabled by default, can be disabled via env var or GrowthBook killswitch.
+ * Panda fork: 默认禁用 — 该 header 包含动态 fingerprint 和 attestation token，
+ * 会破坏本地模型 KV Cache（推理速度下降 ~90%）。
+ * 如需启用，设置环境变量 CLAUDE_CODE_ATTRIBUTION_HEADER=1
  */
 function isAttributionHeaderEnabled(): boolean {
-  if (isEnvDefinedFalsy(process.env.CLAUDE_CODE_ATTRIBUTION_HEADER)) {
-    return false
+  if (isEnvTruthy(process.env.CLAUDE_CODE_ATTRIBUTION_HEADER)) {
+    return true
   }
-  return getFeatureValue_CACHED_MAY_BE_STALE('tengu_attribution_header', true)
+  return false
 }
 
 /**
