@@ -1,3 +1,7 @@
+// Input: 退出信号（SIGINT/SIGTERM/SIGHUP）、orphan 检测、内存压力触发
+// Output: 优雅退出流程（终端清理、MCP 停止、诊断日志、进程退出）
+// Pos: 进程生命周期末端，所有退出路径的汇聚点
+// 一旦我被修改，请更新我的头部注释，以及所属文件夹的md。
 import chalk from 'chalk'
 import { writeSync } from 'fs'
 import memoize from 'lodash-es/memoize.js'
@@ -129,6 +133,18 @@ function cleanupTerminalModes(): void {
         writeSync(1, CLEAR_TERMINAL_TITLE)
       }
     }
+    // 退出时记录内存状态快照
+    try {
+      const mem = process.memoryUsage()
+      logForDiagnosticsNoPII('info', 'exit_memory_snapshot', {
+        rss_mb: Math.round(mem.rss / 1024 / 1024),
+        heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024),
+        heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024),
+        external_mb: Math.round(mem.external / 1024 / 1024),
+      })
+    } catch {
+      // 退出路径，忽略错误
+    }
   } catch {
     // Terminal may already be gone (e.g., SIGHUP after terminal close).
     // Ignore write errors since we're exiting anyway.
@@ -195,6 +211,15 @@ function forceExit(exitCode: number): never {
   if (failsafeTimer !== undefined) {
     clearTimeout(failsafeTimer)
     failsafeTimer = undefined
+  }
+  // 防御性补发：cleanupTerminalModes() 已在前序路径发送过，
+  // 但异步清理期间可能有新的鼠标事件。DISABLE_MOUSE_TRACKING 是幂等的。
+  if (process.stdout.isTTY) {
+    try {
+      writeSync(1, DISABLE_MOUSE_TRACKING)
+    } catch {
+      // 终端可能已断开（SIGHUP），忽略
+    }
   }
   // Drain stdin LAST, right before exit. cleanupTerminalModes() sent
   // DISABLE_MOUSE_TRACKING early, but the terminal round-trip plus any
@@ -402,6 +427,14 @@ export async function gracefulShutdown(
     return
   }
   shutdownInProgress = true
+  // 新增：记录退出原因和调用栈，用于诊断自动退出问题
+  logForDiagnosticsNoPII('info', 'graceful_shutdown_initiated', {
+    exit_code: exitCode,
+    reason,
+    rss_mb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+    heap_used_mb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    stack: new Error('shutdown_trace').stack?.slice(0, 4000),
+  })
 
   // Resolve the SessionEnd hook budget before arming the failsafe so the
   // failsafe can scale with it. Without this, a user-configured 10s hook
