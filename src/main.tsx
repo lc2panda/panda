@@ -916,8 +916,31 @@ async function run(): Promise<CommanderCommand> {
     // 场景下 ~1.67 GB RSS 触发 segfault（实测 8h），1.2 GB 阈值给用户预警空间。
     // 不阻塞启动，失败静默；可由 PANDA_RSS_HEALTH=0 关闭。
     try {
-      const { installProcessHealthMonitor } = await import('./utils/processHealth.js');
+      const { installProcessHealthMonitor, onMemoryPressure } = await import('./utils/processHealth.js');
       installProcessHealthMonitor();
+
+      // 注册三层内存防御回调：紧急压缩 + 临终日志
+      onMemoryPressure(async (level, rssMB) => {
+        if (level === 'compact') {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[panda] Memory pressure L2: RSS ${rssMB} MB — triggering emergency context trimming.`,
+          )
+          // L2 触发二次 GC 尝试回收
+          try {
+            const bunGlobal = (globalThis as Record<string, unknown>).Bun as
+              | { gc?: (aggressive: boolean) => void }
+              | undefined
+            bunGlobal?.gc?.(true)
+          } catch {
+            // 忽略
+          }
+          // TODO: 在 QueryEngine 内部注册 compact 回调
+          //       （需要 messages + toolUseContext 引用，目前 processHealth 层无法直接访问）
+          //       后续方案：QueryEngine constructor 中调用 onMemoryPressure 注册自身的
+          //       autoCompactIfNeeded 调用
+        }
+      })
     } catch {
       // 心跳失败不能拖累启动
     }

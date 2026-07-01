@@ -1,5 +1,6 @@
 // Input: 模拟 process.memoryUsage().rss 返回值
-// Output: 验证阈值跨越触发 console.warn 一次、getCurrentRssMB 缓存最近采样
+// Output: 验证阈值跨越触发 console.warn 一次、getCurrentRssMB 缓存最近采样、
+//         三层内存防御回调机制
 // Pos: src/utils/ 单元测试，与 initPandaccSettings.test.ts 同级
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
@@ -15,6 +16,7 @@ import {
   getCurrentRssMB,
   getRssHealthLevel,
   installProcessHealthMonitor,
+  onMemoryPressure,
   probeProcessHealth,
   RSS_HEALTH_DEFAULTS,
   stopProcessHealthMonitor,
@@ -167,6 +169,18 @@ describe('processHealth — RSS 健康心跳', () => {
   test('RSS_HEALTH_DEFAULTS 常量值与设计一致', () => {
     expect(RSS_HEALTH_DEFAULTS.WARN_BYTES).toBe(1.2 * GB)
     expect(RSS_HEALTH_DEFAULTS.CRITICAL_BYTES).toBe(1.5 * GB)
+    expect(RSS_HEALTH_DEFAULTS.COMPACT_MB).toBe(1400)
+    expect(RSS_HEALTH_DEFAULTS.SHUTDOWN_MB).toBe(1600)
     expect(RSS_HEALTH_DEFAULTS.INTERVAL_MS).toBe(60_000)
+  })
+
+  test('onMemoryPressure 注册回调、返回 unsubscribe', () => {
+    const calls: Array<{ level: string; rssMB: number }> = []
+    const unsub = onMemoryPressure((level, rssMB) => {
+      calls.push({ level, rssMB })
+    })
+    expect(typeof unsub).toBe('function')
+    // cleanup — 调用 unsubscribe 后回调列表应为空（由 reset 兜底）
+    unsub()
   })
 })

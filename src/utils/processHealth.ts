@@ -1,9 +1,8 @@
-// Input: 进程运行时 RSS（process.memoryUsage().rss），可由 PANDA_RSS_WARN_MB /
-//         PANDA_RSS_CRITICAL_MB env 覆盖默认阈值；可由 PANDA_RSS_HEALTH=0 完全关闭
-// Output: 周期性自检，跨阈值时一次性 console.warn；getCurrentRssMB() 给 status bar 用
-// Pos: 启动钩子（main.tsx preAction 之后调 installProcessHealthMonitor），与 React 渲染
-//       层解耦 — 即便 USER_TYPE 被 build-time 替换、ScreenFrame 不渲染也能跑（避免
-//       useMemoryUsage hook 在 external 构建被 DCE 的问题）
+// Input: process.memoryUsage() RSS 采样、环境变量阈值配置
+//         PANDA_RSS_WARN_MB / PANDA_RSS_CRITICAL_MB / PANDA_RSS_COMPACT_MB /
+//         PANDA_RSS_SHUTDOWN_MB env 覆盖默认阈值；PANDA_RSS_HEALTH=0 完全关闭
+// Output: 内存健康状态（normal/warn/critical）、内存压力回调触发、状态栏 RSS 值
+// Pos: 进程生命周期监控层，60s 心跳，连接 GC/compact/gracefulShutdown
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 //
 // 任务背景：实测 panda 跑 8.6h 后 Bun 1.3.11 segfault，Peak RSS 1.67 GB
@@ -28,11 +27,43 @@ const DEFAULT_WARN_RSS = 1.2 * GB
 const DEFAULT_CRITICAL_RSS = 1.5 * GB
 const DEFAULT_INTERVAL_MS = 60_000 // 60s
 
+// 三层内存防御阈值（L2 紧急压缩、L3 保命退出）
+const COMPACT_RSS_MB =
+  parseInt(process.env.PANDA_RSS_COMPACT_MB || '0') || 1400 // 1.4 GB
+const SHUTDOWN_RSS_MB =
+  parseInt(process.env.PANDA_RSS_SHUTDOWN_MB || '0') || 1600 // 1.6 GB
+
 type HealthLevel = 'normal' | 'warn' | 'critical'
+
+// --- 内存压力回调机制 ---
+export type MemoryPressureLevel = 'warn' | 'compact' | 'critical'
+export type MemoryPressureCallback = (
+  level: MemoryPressureLevel,
+  rssMB: number,
+) => void | Promise<void>
+
+let memoryPressureCallbacks: MemoryPressureCallback[] = []
+
+/**
+ * 注册内存压力回调。当 RSS 超过阈值时，processHealth 心跳会调用注册的回调。
+ * 用于连接 QueryEngine 的上下文压缩机制。
+ * 返回 unsubscribe 函数。
+ */
+export function onMemoryPressure(
+  callback: MemoryPressureCallback,
+): () => void {
+  memoryPressureCallbacks.push(callback)
+  return () => {
+    memoryPressureCallbacks = memoryPressureCallbacks.filter(
+      (cb) => cb !== callback,
+    )
+  }
+}
 
 let currentRssBytes = 0
 let currentLevel: HealthLevel = 'normal'
 let lastWarnedLevel: HealthLevel = 'normal'
+let consecutiveCompactCount = 0 // 连续超过 compact 阈值的心跳次数
 let intervalHandle: ReturnType<typeof setInterval> | undefined
 
 /**
@@ -127,6 +158,87 @@ function shouldWarnAt(level: HealthLevel): boolean {
 }
 
 /**
+ * 三层内存防御心跳（async 包装）:
+ *   L1: RSS > warn → 触发 GC
+ *   L2: RSS > compact 阈值 连续 2 次 → 触发注册的内存压力回调（紧急压缩）
+ *   L3: RSS > shutdown 阈值 → heap dump + graceful shutdown
+ */
+async function heartbeatWithDefense(
+  warnBytes: number,
+  criticalBytes: number,
+): Promise<void> {
+  const { rssBytes } = probeProcessHealth({ warnBytes, criticalBytes })
+  if (rssBytes === 0) return
+
+  const rssMB = Math.floor(rssBytes / MB)
+
+  // L1: RSS > warn 阈值 → 尝试 GC（Bun 环境下可用）
+  if (rssMB > Math.floor(warnBytes / MB)) {
+    try {
+      // Bun.gc 可能不存在（Node.js 环境）
+      const bunGlobal = (globalThis as Record<string, unknown>).Bun as
+        | { gc?: (aggressive: boolean) => void }
+        | undefined
+      bunGlobal?.gc?.(true)
+    } catch {
+      // Bun.gc 不可用，静默忽略
+    }
+  }
+
+  // L2: RSS > compact 阈值，连续 2 次心跳触发紧急压缩
+  if (rssMB > COMPACT_RSS_MB) {
+    consecutiveCompactCount++
+    if (consecutiveCompactCount >= 2) {
+      consecutiveCompactCount = 0
+      for (const cb of [...memoryPressureCallbacks]) {
+        try {
+          await cb('compact', rssMB)
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[panda] Memory pressure callback failed (compact): ${String(e)}`,
+          )
+        }
+      }
+    }
+  } else {
+    consecutiveCompactCount = 0 // 降回阈值以下，重置计数
+  }
+
+  // L3: RSS > shutdown 阈值 → heap dump + graceful shutdown（保命退出）
+  if (rssMB > SHUTDOWN_RSS_MB) {
+    // 通知所有回调
+    for (const cb of [...memoryPressureCallbacks]) {
+      try {
+        await cb('critical', rssMB)
+      } catch {
+        // 退出路径不阻塞
+      }
+    }
+
+    // 尝试 heap dump
+    try {
+      const { performHeapDump } = await import('./heapDumpService.js')
+      await performHeapDump('auto-1.5GB')
+    } catch {
+      // 堆转储失败不阻塞退出
+    }
+
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[panda] RSS ${rssMB} MB exceeded shutdown threshold ${SHUTDOWN_RSS_MB} MB — initiating graceful shutdown to prevent OOM kill.`,
+    )
+
+    // 动态 import 避免循环依赖（processHealth ↔ gracefulShutdown）
+    const { gracefulShutdown } = await import('./gracefulShutdown.js')
+    await gracefulShutdown(
+      137,
+      `OOM prevention: RSS ${rssMB} MB exceeded ${SHUTDOWN_RSS_MB} MB`,
+    )
+  }
+}
+
+/**
  * 启动周期心跳。重复调用是幂等的（保留首次 interval，后续直接 return）。
  *
  * 关闭机制：
@@ -158,7 +270,8 @@ export function installProcessHealthMonitor(): void {
   probeProcessHealth({ warnBytes, criticalBytes })
 
   intervalHandle = setInterval(() => {
-    probeProcessHealth({ warnBytes, criticalBytes })
+    // 三层内存防御在 async 包装中执行；setInterval 不等待 Promise
+    void heartbeatWithDefense(warnBytes, criticalBytes)
   }, intervalMs)
 
   // unref 保证 panda 自然退出时不会卡 event loop
@@ -183,6 +296,8 @@ export function __resetProcessHealthForTest(): void {
   currentRssBytes = 0
   currentLevel = 'normal'
   lastWarnedLevel = 'normal'
+  consecutiveCompactCount = 0
+  memoryPressureCallbacks = []
   if (intervalHandle) {
     clearInterval(intervalHandle)
     intervalHandle = undefined
@@ -196,6 +311,8 @@ export function __resetProcessHealthForTest(): void {
 export const RSS_HEALTH_DEFAULTS = {
   WARN_BYTES: DEFAULT_WARN_RSS,
   CRITICAL_BYTES: DEFAULT_CRITICAL_RSS,
+  COMPACT_MB: COMPACT_RSS_MB,
+  SHUTDOWN_MB: SHUTDOWN_RSS_MB,
   INTERVAL_MS: DEFAULT_INTERVAL_MS,
 } as const
 
