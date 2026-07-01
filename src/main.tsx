@@ -919,14 +919,16 @@ async function run(): Promise<CommanderCommand> {
       const { installProcessHealthMonitor, onMemoryPressure } = await import('./utils/processHealth.js');
       installProcessHealthMonitor();
 
-      // 注册三层内存防御回调：紧急压缩 + 临终日志
+      // 注册三层内存防御回调：L2 GC 辅助 + L3 临终日志
+      // L2 compact 逻辑已在 QueryEngine constructor 中通过 requestMemoryPressureCompact()
+      // 连接到 autoCompactIfNeeded，此处仅做补充 GC 和日志。
       onMemoryPressure(async (level, rssMB) => {
         if (level === 'compact') {
           // eslint-disable-next-line no-console
           console.warn(
-            `[panda] Memory pressure L2: RSS ${rssMB} MB — triggering emergency context trimming.`,
+            `[panda] Memory pressure L2: RSS ${rssMB} MB — compact will execute on next query cycle.`,
           )
-          // L2 触发二次 GC 尝试回收
+          // L2 触发二次 GC 尝试回收（补充 QueryEngine 的 compact 标志机制）
           try {
             const bunGlobal = (globalThis as Record<string, unknown>).Bun as
               | { gc?: (aggressive: boolean) => void }
@@ -935,10 +937,6 @@ async function run(): Promise<CommanderCommand> {
           } catch {
             // 忽略
           }
-          // TODO: 在 QueryEngine 内部注册 compact 回调
-          //       （需要 messages + toolUseContext 引用，目前 processHealth 层无法直接访问）
-          //       后续方案：QueryEngine constructor 中调用 onMemoryPressure 注册自身的
-          //       autoCompactIfNeeded 调用
         }
       })
     } catch {

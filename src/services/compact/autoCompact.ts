@@ -29,6 +29,31 @@ import { trySessionMemoryCompaction } from './sessionMemoryCompact.js'
 // Based on p99.99 of compact summary output being 17,387 tokens.
 const MAX_OUTPUT_TOKENS_FOR_SUMMARY = 20_000
 
+// --- L2 内存压力强制 compact 标志 ---
+// processHealth 心跳检测到 RSS 持续高位时，通过 requestMemoryPressureCompact()
+// 设置此标志。下一轮 query 循环的 autoCompactIfNeeded 会消费此标志，
+// 绕过 shouldAutoCompact 的 token 阈值检查，强制执行上下文压缩。
+let _memoryPressureForceCompact = false
+
+/** 由 processHealth onMemoryPressure 回调调用，请求下次 query 强制 compact */
+export function requestMemoryPressureCompact(): void {
+  _memoryPressureForceCompact = true
+}
+
+/** 消费内存压力 compact 请求（读后清零），供 autoCompactIfNeeded 内部使用 */
+export function consumeMemoryPressureCompactRequest(): boolean {
+  if (_memoryPressureForceCompact) {
+    _memoryPressureForceCompact = false
+    return true
+  }
+  return false
+}
+
+/** 测试用：重置内存压力标志 */
+export function _resetMemoryPressureForceCompact(): void {
+  _memoryPressureForceCompact = false
+}
+
 // Returns the context window size minus the max output tokens for the model
 export function getEffectiveContextWindowSize(model: string): number {
   const reservedTokensForSummary = Math.min(
@@ -279,7 +304,17 @@ export async function autoCompactIfNeeded(
   )
 
   if (!shouldCompact) {
-    return { wasCompacted: false }
+    // L2 内存压力旁路：即使 token 数未达阈值，进程 RSS 持续高位时仍强制 compact
+    const memoryPressureRequested = consumeMemoryPressureCompactRequest()
+    if (!memoryPressureRequested) {
+      return { wasCompacted: false }
+    }
+    logForDebugging(
+      '[L2] Memory pressure forced compact bypass (token threshold not met, RSS high)',
+    )
+  } else {
+    // shouldCompact 为 true 时，也消费掉可能残留的内存压力标志，避免下次重复触发
+    consumeMemoryPressureCompactRequest()
   }
 
   const recompactionInfo: RecompactionInfo = {

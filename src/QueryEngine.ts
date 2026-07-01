@@ -83,6 +83,8 @@ import {
   shouldEnableThinkingByDefault,
   type ThinkingConfig,
 } from './utils/thinking.js'
+import { onMemoryPressure } from './utils/processHealth.js'
+import { requestMemoryPressureCompact } from './services/compact/autoCompact.js'
 
 // Lazy: MessageSelector.tsx pulls React/ink; only needed for message filtering at query time
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -212,6 +214,8 @@ export class QueryEngine {
   // many turns in SDK mode.
   private discoveredSkillNames = new Set<string>()
   private loadedNestedMemoryPaths = new Set<string>()
+  /** L2 内存压力回调的退订函数，在 engine 生命周期结束时调用 */
+  unsubscribeMemoryPressure: (() => void) | undefined
 
   constructor(config: QueryEngineConfig) {
     this.config = config
@@ -220,6 +224,20 @@ export class QueryEngine {
     this.permissionDenials = []
     this.readFileState = config.readFileCache
     this.totalUsage = EMPTY_USAGE
+
+    // L2 内存压力防御：当 processHealth 检测到 RSS 持续高位时，
+    // 设置强制 compact 标志，下一轮 query 循环的 autoCompactIfNeeded
+    // 会消费该标志并绕过 token 阈值检查，强制执行上下文压缩。
+    this.unsubscribeMemoryPressure = onMemoryPressure(
+      async (level, rssMB) => {
+        if (level === 'compact') {
+          requestMemoryPressureCompact()
+          console.warn(
+            `[L2] 内存压力 compact 已请求，将在下一轮 query 强制执行 (RSS: ${rssMB}MB)`,
+          )
+        }
+      },
+    )
   }
 
   async *submitMessage(
@@ -1421,5 +1439,6 @@ export async function* ask({
     })
   } finally {
     setReadFileCache(engine.getReadFileState())
+    engine.unsubscribeMemoryPressure?.()
   }
 }
