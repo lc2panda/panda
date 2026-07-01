@@ -356,6 +356,77 @@ export const setupGracefulShutdown = memoize(() => {
         errorName as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     })
   })
+
+  // === 退出审计日志（P0 诊断增强）===
+  // 'exit' 事件在进程即将退出时同步触发，覆盖所有退出路径
+  // 包括 process.exit()、event loop 排空、未捕获异常后的退出
+  process.on('exit', (code) => {
+    // exit handler 中只能用同步 API
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs')
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const path = require('path')
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const os = require('os')
+      const logDir = path.join(os.homedir(), '.pandacc', 'logs')
+      fs.mkdirSync(logDir, { recursive: true })
+
+      const mem = process.memoryUsage()
+      const exitLog = {
+        timestamp: new Date().toISOString(),
+        event: 'process_exit',
+        exitCode: code,
+        processExitCode: process.exitCode,
+        gracefulShutdownInitiated: shutdownInProgress,
+        rssMB: Math.round(mem.rss / 1024 / 1024),
+        heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+        uptimeSeconds: Math.round(process.uptime()),
+        pid: process.pid,
+      }
+
+      fs.appendFileSync(
+        path.join(logDir, 'exit-audit.jsonl'),
+        JSON.stringify(exitLog) + '\n',
+      )
+    } catch {
+      // exit handler 中绝不能抛错
+    }
+  })
+
+  // beforeExit：检测 event loop 意外排空（正常退出应通过 gracefulShutdown）
+  process.on('beforeExit', (code) => {
+    if (!shutdownInProgress) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const fs = require('fs')
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const path = require('path')
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const os = require('os')
+        const logDir = path.join(os.homedir(), '.pandacc', 'logs')
+        fs.mkdirSync(logDir, { recursive: true })
+
+        const mem = process.memoryUsage()
+        const warnLog = {
+          timestamp: new Date().toISOString(),
+          event: 'unexpected_beforeExit',
+          exitCode: code,
+          rssMB: Math.round(mem.rss / 1024 / 1024),
+          uptimeSeconds: Math.round(process.uptime()),
+          pid: process.pid,
+          note: 'Event loop drained without gracefulShutdown — possible silent crash path',
+        }
+
+        fs.appendFileSync(
+          path.join(logDir, 'exit-audit.jsonl'),
+          JSON.stringify(warnLog) + '\n',
+        )
+      } catch {
+        // exit handler 中绝不能抛错
+      }
+    }
+  })
 })
 
 export function gracefulShutdownSync(
