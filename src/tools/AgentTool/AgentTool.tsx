@@ -68,6 +68,15 @@ import { renderGroupedAgentToolUse, renderToolResultMessage, renderToolUseErrorM
 const proactiveModule = feature('PROACTIVE') || feature('KAIROS') ? require('../../proactive/index.js') as typeof import('../../proactive/index.js') : null;
 /* eslint-enable @typescript-eslint/no-require-imports */
 
+// === Agent 并发门控（P0 内存防御） ===
+const MAX_CONCURRENT_AGENTS = parseInt(process.env.PANDA_MAX_CONCURRENT_AGENTS || '6', 10)
+const RSS_GATE_MB = parseInt(process.env.PANDA_AGENT_RSS_GATE_MB || '1000', 10)
+let _activeAgentCount = 0
+
+/** 当前活跃 agent 数量（测试用） */
+export function getActiveAgentCount(): number { return _activeAgentCount }
+export function _resetActiveAgentCount(): void { _activeAgentCount = 0 }
+
 // Progress display constants (for showing background hint)
 const PROGRESS_THRESHOLD_MS = 2000; // Show background hint after 2 seconds
 
@@ -258,6 +267,25 @@ export const AgentTool = buildTool({
     cwd
   }: AgentToolInput, toolUseContext, canUseTool, assistantMessage, onProgress?) {
     const startTime = Date.now();
+
+    // === 全局并发门控：所有模式均生效（包括 coordinator） ===
+    if (_activeAgentCount >= MAX_CONCURRENT_AGENTS) {
+      return {
+        type: 'result' as const,
+        resultForAssistant: `[内存防护] Agent 并发上限已达 (${_activeAgentCount}/${MAX_CONCURRENT_AGENTS})。请等待当前 agent 完成后再启动新的。可通过环境变量 PANDA_MAX_CONCURRENT_AGENTS 调整上限。`,
+        data: undefined,
+      }
+    }
+
+    // === RSS 内存门控：高内存时拒绝新 agent ===
+    const currentRssMB = Math.round(process.memoryUsage().rss / 1024 / 1024)
+    if (currentRssMB > RSS_GATE_MB) {
+      return {
+        type: 'result' as const,
+        resultForAssistant: `[内存防护] 当前内存过高 (RSS ${currentRssMB}MB > ${RSS_GATE_MB}MB)，暂缓启动新 agent。请等待当前任务完成释放内存，或使用 /compact 压缩上下文。可通过环境变量 PANDA_AGENT_RSS_GATE_MB 调整阈值。`,
+        data: undefined,
+      }
+    }
 
     // v2.20.5: Agent tool per-turn throttle — 源码级防止 LLM 过度 fork。
     // 观测 2cdde826: "读取记忆，激活" 一句话触发 6 个 Agent fork，浪费 7.5×。
@@ -800,6 +828,7 @@ export const AgentTool = buildTool({
       // invocation time — when this `void` fires — and survives every await
       // inside. No capture/restore needed; the detached closure sees the
       // parent turn's workload automatically, isolated from its finally.
+      _activeAgentCount++
       void runWithAgentContext(asyncAgentContext, () => wrapWithCwd(() => runAsyncAgentLifecycle({
         taskId: agentBackgroundTask.agentId,
         abortController: agentBackgroundTask.abortController!,
@@ -819,7 +848,7 @@ export const AgentTool = buildTool({
         agentIdForCleanup: asyncAgentId,
         enableSummarization: isCoordinator || isForkSubagentEnabled() || getSdkAgentProgressSummariesEnabled(),
         getWorktreeResult: cleanupWorktreeIfNeeded
-      })));
+      }))).finally(() => { _activeAgentCount-- });
       const canReadOutputFile = toolUseContext.options.tools.some(t => toolMatchesName(t, FILE_READ_TOOL_NAME) || toolMatchesName(t, BASH_TOOL_NAME));
       return {
         data: {
@@ -938,6 +967,7 @@ export const AgentTool = buildTool({
           worktreePath?: string;
           worktreeBranch?: string;
         } = {};
+        _activeAgentCount++
         try {
           while (true) {
             const elapsed = Date.now() - agentStartTime;
@@ -1297,6 +1327,8 @@ export const AgentTool = buildTool({
           if (!wasBackgrounded) {
             worktreeResult = await cleanupWorktreeIfNeeded();
           }
+
+          _activeAgentCount--
         }
 
         // Re-throw abort errors
