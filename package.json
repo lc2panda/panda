@@ -1,6 +1,6 @@
 {
   "name": "@lc2panda/panda-code",
-  "version": "2.29.1",
+  "version": "2.29.2",
   "description": "AI terminal assistant — multi-provider, privacy-first, cross-platform",
   "main": "dist/cli.js",
   "type": "module",
