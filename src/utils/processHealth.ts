@@ -2,7 +2,7 @@
 //         PANDA_RSS_WARN_MB / PANDA_RSS_CRITICAL_MB / PANDA_RSS_COMPACT_MB /
 //         PANDA_RSS_SHUTDOWN_MB env 覆盖默认阈值；PANDA_RSS_HEALTH=0 完全关闭
 // Output: 内存健康状态（normal/warn/critical）、内存压力回调触发、状态栏 RSS 值
-// Pos: 进程生命周期监控层，60s 心跳，连接 GC/compact/gracefulShutdown
+// Pos: 进程生命周期监控层，动态心跳（5s~60s），连接 GC/compact/gracefulShutdown
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 //
 // 任务背景：实测 panda 跑 8.6h 后 Bun 1.3.11 segfault，Peak RSS 1.67 GB
@@ -64,7 +64,7 @@ let currentRssBytes = 0
 let currentLevel: HealthLevel = 'normal'
 let lastWarnedLevel: HealthLevel = 'normal'
 let consecutiveCompactCount = 0 // 连续超过 compact 阈值的心跳次数
-let intervalHandle: ReturnType<typeof setInterval> | undefined
+let intervalHandle: ReturnType<typeof setTimeout> | undefined
 
 /**
  * 解析 env 阈值（单位 MB，例如 "1500" → 1.5 GB），失败回退默认。
@@ -155,6 +155,19 @@ function shouldWarnAt(level: HealthLevel): boolean {
   if (level === 'warn' && lastWarnedLevel === 'normal') return true
   if (level === 'critical' && lastWarnedLevel !== 'critical') return true
   return false
+}
+
+/**
+ * 动态心跳间隔：内存越高，检查越频繁。
+ *   > 1 GB:  每 5 秒
+ *   > 500 MB: 每 15 秒
+ *   其他:    使用默认间隔（60 秒）
+ */
+function getDynamicIntervalMs(): number {
+  const rssMB = Math.round(currentRssBytes / MB)
+  if (rssMB > 1000) return 5_000
+  if (rssMB > 500) return 15_000
+  return DEFAULT_INTERVAL_MS
 }
 
 /**
@@ -259,23 +272,24 @@ export function installProcessHealthMonitor(): void {
     process.env.PANDA_RSS_CRITICAL_MB,
     DEFAULT_CRITICAL_RSS,
   )
-  const intervalMs = (() => {
-    const raw = process.env.PANDA_RSS_INTERVAL_MS
-    if (!raw) return DEFAULT_INTERVAL_MS
-    const n = Number(raw)
-    return Number.isFinite(n) && n >= 1000 ? n : DEFAULT_INTERVAL_MS
-  })()
+  // 间隔由 getDynamicIntervalMs() 动态决定，不再需要固定 intervalMs
 
   // 立即跑一次，给 UI 一个非零起始值（避免 status bar 首次渲染卡 0）
   probeProcessHealth({ warnBytes, criticalBytes })
 
-  intervalHandle = setInterval(() => {
-    // 三层内存防御在 async 包装中执行；setInterval 不等待 Promise
-    void heartbeatWithDefense(warnBytes, criticalBytes)
-  }, intervalMs)
-
-  // unref 保证 panda 自然退出时不会卡 event loop
-  intervalHandle.unref?.()
+  // 动态 setTimeout 链：内存越高，心跳间隔越短
+  function scheduleNextHeartbeat(): void {
+    const delay = getDynamicIntervalMs()
+    intervalHandle = setTimeout(() => {
+      void (async () => {
+        await heartbeatWithDefense(warnBytes, criticalBytes)
+        scheduleNextHeartbeat()
+      })()
+    }, delay)
+    // unref 保证 panda 自然退出时不会卡 event loop
+    intervalHandle.unref?.()
+  }
+  scheduleNextHeartbeat()
 }
 
 /**
@@ -283,7 +297,7 @@ export function installProcessHealthMonitor(): void {
  */
 export function stopProcessHealthMonitor(): void {
   if (intervalHandle) {
-    clearInterval(intervalHandle)
+    clearTimeout(intervalHandle)
     intervalHandle = undefined
   }
 }
@@ -299,7 +313,7 @@ export function __resetProcessHealthForTest(): void {
   consecutiveCompactCount = 0
   memoryPressureCallbacks = []
   if (intervalHandle) {
-    clearInterval(intervalHandle)
+    clearTimeout(intervalHandle)
     intervalHandle = undefined
   }
 }

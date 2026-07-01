@@ -84,7 +84,15 @@ import {
   type ThinkingConfig,
 } from './utils/thinking.js'
 import { onMemoryPressure } from './utils/processHealth.js'
-import { requestMemoryPressureCompact } from './services/compact/autoCompact.js'
+import {
+  requestMemoryPressureCompact,
+  consumeMemoryPressureCompactRequest,
+} from './services/compact/autoCompact.js'
+import {
+  compactConversation,
+  buildPostCompactMessages,
+} from './services/compact/compact.js'
+import { getLastCacheSafeParams } from './utils/forkedAgent.js'
 
 // Lazy: MessageSelector.tsx pulls React/ink; only needed for message filtering at query time
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -228,6 +236,7 @@ export class QueryEngine {
     // L2 内存压力防御：当 processHealth 检测到 RSS 持续高位时，
     // 设置强制 compact 标志，下一轮 query 循环的 autoCompactIfNeeded
     // 会消费该标志并绕过 token 阈值检查，强制执行上下文压缩。
+    // 若 query 循环 idle（如 coordinator 等待 subagent），20 秒后心跳直接执行 compact。
     this.unsubscribeMemoryPressure = onMemoryPressure(
       async (level, rssMB) => {
         if (level === 'compact') {
@@ -235,9 +244,65 @@ export class QueryEngine {
           console.warn(
             `[L2] 内存压力 compact 已请求，将在下一轮 query 强制执行 (RSS: ${rssMB}MB)`,
           )
+
+          // 20 秒后检查：如果标志未被正常 query 循环消费，直接执行 compact
+          setTimeout(() => {
+            void this._idleCompactFallback()
+          }, 20_000)
         }
       },
     )
+  }
+
+  /**
+   * L2 idle compact 兜底：当 query 循环 idle 20 秒未消费内存压力标志时，
+   * 心跳直接触发 compact，使用 lastCacheSafeParams 和当前 mutableMessages。
+   */
+  private async _idleCompactFallback(): Promise<void> {
+    // 如果标志已被 query 循环消费，无需额外操作
+    if (!consumeMemoryPressureCompactRequest()) return
+
+    console.warn('[L2] Query 循环 idle 20s，心跳直接触发紧急压缩')
+
+    const cached = getLastCacheSafeParams()
+    if (!cached) {
+      console.warn('[L2] 无可用 cacheSafeParams（首轮未执行 query），跳过直接压缩')
+      // 重新设置标志，让下次 query 循环消费
+      requestMemoryPressureCompact()
+      return
+    }
+
+    const msgs = this.mutableMessages
+    if (msgs.length < 4) {
+      console.warn('[L2] 消息数量不足（< 4），跳过直接压缩')
+      return
+    }
+
+    try {
+      const result = await compactConversation(
+        msgs,
+        cached.toolUseContext,
+        cached,
+        /* suppressFollowUpQuestions */ true,
+        /* customInstructions */ undefined,
+        /* isAutoCompact */ true,
+      )
+
+      // 用 compact 结果替换 mutableMessages（原地操作）
+      const postCompactMessages = buildPostCompactMessages(result)
+      msgs.splice(0, msgs.length, ...postCompactMessages)
+
+      console.warn(
+        `[L2] 直接压缩完成: ${result.preCompactTokenCount ?? '?'} → ${result.postCompactTokenCount ?? '?'} tokens`,
+      )
+
+      // 压缩后触发 GC
+      if (typeof Bun !== 'undefined') Bun.gc(true)
+    } catch (e) {
+      console.warn('[L2] 直接压缩失败:', e)
+      // 压缩失败也触发 GC 尝试释放内存
+      if (typeof Bun !== 'undefined') Bun.gc(true)
+    }
   }
 
   async *submitMessage(
