@@ -4615,6 +4615,69 @@ export function REPL({
   });
   // Auto-exit viewing mode when teammate completes or errors
   useTeammateViewAutoExit();
+
+  // Get viewed agent task (inlined from selectors for explicit data flow).
+  // viewedAgentTask: teammate OR local_agent — drives the boolean checks
+  // below. viewedTeammateTask: teammate-only narrowed, for teammate-specific
+  // field access (inProgressToolUseIDs).
+  const viewedTask = viewingAgentTaskId ? tasks[viewingAgentTaskId] : undefined;
+  const viewedTeammateTask = viewedTask && isInProcessTeammateTask(viewedTask) ? viewedTask : undefined;
+  const viewedAgentTask = viewedTeammateTask ?? (viewedTask && isLocalAgentTask(viewedTask) ? viewedTask : undefined);
+
+  // Bypass useDeferredValue when streaming text is showing so Messages renders
+  // the final message in the same frame streaming text clears. Also bypass when
+  // not loading — deferredMessages only matters during streaming (keeps input
+  // responsive); after the turn ends, showing messages immediately prevents a
+  // jitter gap where the spinner is gone but the answer hasn't appeared yet.
+  // Only reducedMotion users keep the deferred path during loading.
+  const usesSyncMessages = showStreamingText || !isLoading;
+  // When viewing an agent, never fall through to leader — empty until
+  // bootstrap/stream fills. Closes the see-leader-type-agent footgun.
+  const displayedMessages = viewedAgentTask ? viewedAgentTask.messages ?? [] : usesSyncMessages ? messages : deferredMessages;
+
+  // [v2.1.154] Fire MessageDisplay hooks for newly arriving assistant messages.
+  // Uses a fire-and-forget useEffect so rendering is never blocked.
+  // NOTE: This useEffect MUST run before the `screen === 'transcript'` early
+  // return below — otherwise the transcript branch skips it and the hook count
+  // diverges between renders ("Rendered fewer hooks than expected" crash).
+  useEffect(() => {
+    const processed = messageDisplayProcessedCountRef.current;
+    const currentCount = displayedMessages.length;
+    if (currentCount <= processed) return;
+    const newMessages = displayedMessages.slice(processed);
+    messageDisplayProcessedCountRef.current = currentCount;
+
+    for (const msg of newMessages) {
+      if (msg.type !== 'assistant') continue;
+      const msgId = (msg as {uuid?: string}).uuid;
+      if (!msgId) continue;
+      // Extract text content from the message for hook input
+      const textContent = (() => {
+        try {
+          const content = (msg as {message?: {content?: unknown}}).message?.content;
+          if (typeof content === 'string') return content;
+          if (Array.isArray(content)) {
+            const textBlock = content.find((b: unknown) => typeof b === 'object' && b !== null && (b as {type?: string}).type === 'text');
+            return textBlock ? String((textBlock as {text?: string}).text ?? '') : '';
+          }
+          return '';
+        } catch { return ''; }
+      })();
+      ;(async () => {
+        try {
+          for await (const result of executeMessageDisplayHooks('assistant', textContent)) {
+            if (result.suppressMessage) {
+              setMessageDisplaySuppressedIds(prev => new Set([...prev, msgId]));
+            }
+            if (typeof result.replacementContent === 'string') {
+              setMessageDisplayReplacements(prev => new Map([...prev, [msgId, result.replacementContent!]]));
+            }
+          }
+        } catch { /* hook errors are non-fatal */ }
+      })();
+    }
+  }, [displayedMessages]);
+
   if (screen === 'transcript') {
     // Virtual scroll replaces the 30-message cap: everything is scrollable
     // and memory is bounded by the viewport. Without it, wrapping transcript
@@ -4714,65 +4777,6 @@ export function REPL({
     }
     return transcriptReturn;
   }
-
-  // Get viewed agent task (inlined from selectors for explicit data flow).
-  // viewedAgentTask: teammate OR local_agent — drives the boolean checks
-  // below. viewedTeammateTask: teammate-only narrowed, for teammate-specific
-  // field access (inProgressToolUseIDs).
-  const viewedTask = viewingAgentTaskId ? tasks[viewingAgentTaskId] : undefined;
-  const viewedTeammateTask = viewedTask && isInProcessTeammateTask(viewedTask) ? viewedTask : undefined;
-  const viewedAgentTask = viewedTeammateTask ?? (viewedTask && isLocalAgentTask(viewedTask) ? viewedTask : undefined);
-
-  // Bypass useDeferredValue when streaming text is showing so Messages renders
-  // the final message in the same frame streaming text clears. Also bypass when
-  // not loading — deferredMessages only matters during streaming (keeps input
-  // responsive); after the turn ends, showing messages immediately prevents a
-  // jitter gap where the spinner is gone but the answer hasn't appeared yet.
-  // Only reducedMotion users keep the deferred path during loading.
-  const usesSyncMessages = showStreamingText || !isLoading;
-  // When viewing an agent, never fall through to leader — empty until
-  // bootstrap/stream fills. Closes the see-leader-type-agent footgun.
-  const displayedMessages = viewedAgentTask ? viewedAgentTask.messages ?? [] : usesSyncMessages ? messages : deferredMessages;
-
-  // [v2.1.154] Fire MessageDisplay hooks for newly arriving assistant messages.
-  // Uses a fire-and-forget useEffect so rendering is never blocked.
-  useEffect(() => {
-    const processed = messageDisplayProcessedCountRef.current;
-    const currentCount = displayedMessages.length;
-    if (currentCount <= processed) return;
-    const newMessages = displayedMessages.slice(processed);
-    messageDisplayProcessedCountRef.current = currentCount;
-
-    for (const msg of newMessages) {
-      if (msg.type !== 'assistant') continue;
-      const msgId = (msg as {uuid?: string}).uuid;
-      if (!msgId) continue;
-      // Extract text content from the message for hook input
-      const textContent = (() => {
-        try {
-          const content = (msg as {message?: {content?: unknown}}).message?.content;
-          if (typeof content === 'string') return content;
-          if (Array.isArray(content)) {
-            const textBlock = content.find((b: unknown) => typeof b === 'object' && b !== null && (b as {type?: string}).type === 'text');
-            return textBlock ? String((textBlock as {text?: string}).text ?? '') : '';
-          }
-          return '';
-        } catch { return ''; }
-      })();
-      ;(async () => {
-        try {
-          for await (const result of executeMessageDisplayHooks('assistant', textContent)) {
-            if (result.suppressMessage) {
-              setMessageDisplaySuppressedIds(prev => new Set([...prev, msgId]));
-            }
-            if (typeof result.replacementContent === 'string') {
-              setMessageDisplayReplacements(prev => new Map([...prev, [msgId, result.replacementContent!]]));
-            }
-          }
-        } catch { /* hook errors are non-fatal */ }
-      })();
-    }
-  }, [displayedMessages]);
 
   // [v2.1.154] Apply MessageDisplay hook results: filter suppressed + apply replacements
   const filteredDisplayedMessages = messageDisplaySuppressedIds.size === 0 && messageDisplayReplacements.size === 0
