@@ -225,6 +225,8 @@ type State = {
   transition: Continue | undefined
   completionGuardCount: number
   antiSlopCount: number
+  /** Consecutive stop-hook block count — prevents infinite blocking loops. */
+  stopHookBlockCount: number
 }
 
 export async function* query(
@@ -290,6 +292,7 @@ async function* queryLoop(
     transition: undefined,
     completionGuardCount: 0,
     antiSlopCount: 0,
+    stopHookBlockCount: 0,
   }
   const budgetTracker = feature('TOKEN_BUDGET') ? createBudgetTracker() : null
 
@@ -334,6 +337,7 @@ async function* queryLoop(
       turnCount,
       completionGuardCount,
       antiSlopCount,
+      stopHookBlockCount,
     } = state
 
     // Skill discovery prefetch — per-iteration (uses findWritePivot guard
@@ -1223,6 +1227,7 @@ async function* queryLoop(
               turnCount,
               completionGuardCount,
               antiSlopCount,
+              stopHookBlockCount: 0,
               transition: {
                 reason: 'collapse_drain_retry',
                 committed: drained.committed,
@@ -1278,6 +1283,7 @@ async function* queryLoop(
             turnCount,
             completionGuardCount,
             antiSlopCount,
+            stopHookBlockCount: 0,
             transition: { reason: 'reactive_compact_retry' },
           }
           state = next
@@ -1335,6 +1341,7 @@ async function* queryLoop(
             turnCount,
             completionGuardCount,
             antiSlopCount,
+            stopHookBlockCount: 0,
             transition: { reason: 'max_output_tokens_escalate' },
           }
           state = next
@@ -1365,6 +1372,7 @@ async function* queryLoop(
             turnCount,
             completionGuardCount,
             antiSlopCount,
+            stopHookBlockCount: 0,
             transition: {
               reason: 'max_output_tokens_recovery',
               attempt: maxOutputTokensRecoveryCount + 1,
@@ -1409,6 +1417,7 @@ async function* queryLoop(
             turnCount,
             completionGuardCount: completionGuardCount + 1,
             antiSlopCount,
+            stopHookBlockCount: 0,
             transition: { reason: 'completion_guard' },
           }
           state = next
@@ -1432,6 +1441,7 @@ async function* queryLoop(
           turnCount,
           completionGuardCount,
           antiSlopCount: antiSlopCount + 1,
+          stopHookBlockCount: 0,
           transition: { reason: 'anti_slop' as any },
         }
         continue
@@ -1462,31 +1472,46 @@ async function* queryLoop(
       }
 
       if (stopHookResult.blockingErrors.length > 0) {
-        const next: State = {
-          messages: [
-            ...messagesForQuery,
-            ...assistantMessages,
-            ...stopHookResult.blockingErrors,
-          ],
-          toolUseContext,
-          autoCompactTracking: tracking,
-          maxOutputTokensRecoveryCount: 0,
-          // Preserve the reactive compact guard — if compact already ran and
-          // couldn't recover from prompt-too-long, retrying after a stop-hook
-          // blocking error will produce the same result. Resetting to false
-          // here caused an infinite loop: compact → still too long → error →
-          // stop hook blocking → compact → … burning thousands of API calls.
-          hasAttemptedReactiveCompact,
-          maxOutputTokensOverride: undefined,
-          pendingToolUseSummary: undefined,
-          stopHookActive: true,
-          turnCount,
-          completionGuardCount,
-          antiSlopCount,
-          transition: { reason: 'stop_hook_blocking' },
+        const blockCap = Math.max(
+          1,
+          parseInt(
+            process.env.CLAUDE_CODE_STOP_HOOK_BLOCK_CAP ?? '8',
+            10,
+          ) || 8,
+        )
+        const nextBlockCount = state.stopHookBlockCount + 1
+        if (nextBlockCount >= blockCap) {
+          logForDebugging(
+            `Stop hook block cap reached (${nextBlockCount}/${blockCap}). Allowing turn to complete to prevent infinite loop.`,
+          )
+        } else {
+          const next: State = {
+            messages: [
+              ...messagesForQuery,
+              ...assistantMessages,
+              ...stopHookResult.blockingErrors,
+            ],
+            toolUseContext,
+            autoCompactTracking: tracking,
+            maxOutputTokensRecoveryCount: 0,
+            // Preserve the reactive compact guard — if compact already ran and
+            // couldn't recover from prompt-too-long, retrying after a stop-hook
+            // blocking error will produce the same result. Resetting to false
+            // here caused an infinite loop: compact → still too long → error →
+            // stop hook blocking → compact → … burning thousands of API calls.
+            hasAttemptedReactiveCompact,
+            maxOutputTokensOverride: undefined,
+            pendingToolUseSummary: undefined,
+            stopHookActive: true,
+            turnCount,
+            completionGuardCount,
+            antiSlopCount,
+            stopHookBlockCount: nextBlockCount,
+            transition: { reason: 'stop_hook_blocking' },
+          }
+          state = next
+          continue
         }
-        state = next
-        continue
       }
 
       if (feature('TOKEN_BUDGET')) {
@@ -1521,6 +1546,7 @@ async function* queryLoop(
             turnCount,
             completionGuardCount,
             antiSlopCount,
+            stopHookBlockCount: 0,
             transition: { reason: 'token_budget_continuation' },
           }
           continue
@@ -1964,6 +1990,7 @@ async function* queryLoop(
       stopHookActive,
       completionGuardCount,
       antiSlopCount,
+      stopHookBlockCount: 0,
       transition: { reason: 'next_turn' },
     }
     state = next

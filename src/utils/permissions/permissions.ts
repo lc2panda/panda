@@ -703,6 +703,14 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
     if (inAutoMode) {
       const hardDenyMatch = matchAutoModeHardDeny(tool, input)
       if (hardDenyMatch) {
+        if (context.addNotification) {
+          context.addNotification({
+            key: `auto-hard-deny-${tool.name}-${Date.now()}`,
+            priority: 'medium',
+            text: `Auto mode denied ${tool.name}: blocked by hard_deny rule "${hardDenyMatch}"`,
+            timeoutMs: 6000,
+          })
+        }
         return {
           behavior: 'deny',
           decisionReason: {
@@ -1117,13 +1125,25 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
         }
 
         // Update denial tracking and check limits
-        const newDenialState = recordDenial(denialState)
+        const denialReason = classifierResult.reason ?? 'unknown'
+        const newDenialState = recordDenial(denialState, denialReason)
         persistDenialState(context, newDenialState)
 
         logForDebugging(
-          `Auto mode classifier blocked action: ${classifierResult.reason}`,
+          `Auto mode classifier blocked action: ${denialReason}`,
           { level: 'warn' },
         )
+
+        // Surface denial reason as a UI toast so the user knows why the
+        // action was blocked without having to check logs.
+        if (context.addNotification) {
+          context.addNotification({
+            key: `auto-deny-${tool.name}-${Date.now()}`,
+            priority: 'medium',
+            text: `Auto mode denied ${tool.name}: ${denialReason}`,
+            timeoutMs: 6000,
+          })
+        }
 
         // If denial limit hit, fall back to prompting so the user
         // can review. We check after the classifier so we can include

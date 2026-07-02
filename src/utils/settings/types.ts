@@ -897,6 +897,18 @@ export const SettingsSchema = lazySchema(() =>
         .describe(
           'Minimum version to stay on - prevents downgrades when switching to stable channel',
         ),
+      requiredMinimumVersion: z
+        .string()
+        .optional()
+        .describe(
+          'Admin-enforced minimum CLI version. CLI exits with an error if running a version below this.',
+        ),
+      requiredMaximumVersion: z
+        .string()
+        .optional()
+        .describe(
+          'Admin-enforced maximum CLI version. CLI exits with an error if running a version above this.',
+        ),
       plansDirectory: z
         .string()
         .optional()

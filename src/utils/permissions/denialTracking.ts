@@ -7,6 +7,8 @@
 export type DenialTrackingState = {
   consecutiveDenials: number
   totalDenials: number
+  /** Reason string from the most recent denial (for UI display). */
+  lastDenialReason?: string
 }
 
 export const DENIAL_LIMITS = {
@@ -21,11 +23,15 @@ export function createDenialTrackingState(): DenialTrackingState {
   }
 }
 
-export function recordDenial(state: DenialTrackingState): DenialTrackingState {
+export function recordDenial(
+  state: DenialTrackingState,
+  reason?: string,
+): DenialTrackingState {
   return {
     ...state,
     consecutiveDenials: state.consecutiveDenials + 1,
     totalDenials: state.totalDenials + 1,
+    lastDenialReason: reason,
   }
 }
 

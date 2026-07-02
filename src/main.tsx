@@ -158,6 +158,7 @@ import { createEmptyAttributionState } from 'src/utils/commitAttribution.js';
 import { countConcurrentSessions, registerSession, updateSessionName } from 'src/utils/concurrentSessions.js';
 import { getCwd } from 'src/utils/cwd.js';
 import { logForDebugging, setHasFormattedOutput } from 'src/utils/debug.js';
+import { lt, gt } from 'src/utils/semver.js';
 import { errorMessage, getErrnoCode, isENOENT, TeleportOperationError, toError } from 'src/utils/errors.js';
 import { getFsImplementation, safeResolvePath } from 'src/utils/fsOperations.js';
 import { gracefulShutdown, gracefulShutdownSync } from 'src/utils/gracefulShutdown.js';
@@ -510,6 +511,47 @@ function eagerLoadSettings(): void {
   }
   profileCheckpoint('eagerLoadSettings_end');
 }
+
+/**
+ * Checks managed settings for requiredMinimumVersion / requiredMaximumVersion.
+ * Exits with a clear error if the running CLI version is outside the allowed range.
+ */
+function checkVersionGate(): void {
+  const policySettings = getSettingsForSource('policySettings');
+  const currentVersion = MACRO.VERSION;
+
+  const reqMin = policySettings?.requiredMinimumVersion;
+  if (reqMin && typeof reqMin === 'string') {
+    try {
+      if (lt(currentVersion, reqMin)) {
+        console.error(
+          `[version-gate] This version of Panda (${currentVersion}) is below the required minimum (${reqMin}).` +
+          `\nPlease update to ${reqMin} or later: panda update`,
+        );
+        process.exit(1);
+      }
+    } catch {
+      // Malformed semver in settings — log and continue
+      logForDebugging(`Invalid requiredMinimumVersion in managed settings: "${reqMin}"`);
+    }
+  }
+
+  const reqMax = policySettings?.requiredMaximumVersion;
+  if (reqMax && typeof reqMax === 'string') {
+    try {
+      if (gt(currentVersion, reqMax)) {
+        console.error(
+          `[version-gate] This version of Panda (${currentVersion}) exceeds the required maximum (${reqMax}).` +
+          `\nPlease downgrade to ${reqMax} or earlier.`,
+        );
+        process.exit(1);
+      }
+    } catch {
+      logForDebugging(`Invalid requiredMaximumVersion in managed settings: "${reqMax}"`);
+    }
+  }
+}
+
 function initializeEntrypoint(isNonInteractive: boolean): void {
   // Skip if already set (e.g., by SDK or other entrypoints)
   if (process.env.CLAUDE_CODE_ENTRYPOINT) {
@@ -846,6 +888,10 @@ export async function main() {
 
   // Parse and load settings flags early, before init()
   eagerLoadSettings();
+
+  // Enforce admin version gates from managed settings
+  checkVersionGate();
+
   profileCheckpoint('main_before_run');
   await run();
   profileCheckpoint('main_after_run');
