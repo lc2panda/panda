@@ -1,6 +1,6 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { MODEL_ALIASES } from './aliases.js'
-import { isModelAllowed } from './modelAllowlist.js'
+import { isModelAllowed, isEnforceAvailableModels } from './modelAllowlist.js'
 import { getAPIProvider } from './providers.js'
 import { sideQuery } from '../sideQuery.js'
 import {
@@ -29,9 +29,12 @@ export async function validateModel(
 
   // Check against availableModels allowlist before any API call
   if (!isModelAllowed(normalizedModel)) {
+    const enforced = isEnforceAvailableModels()
     return {
       valid: false,
-      error: `Model '${normalizedModel}' is not in the list of available models`,
+      error: enforced
+        ? `Model '${normalizedModel}' is not permitted by your organization's enforced model allowlist`
+        : `Model '${normalizedModel}' is not in the list of available models`,
     }
   }
 

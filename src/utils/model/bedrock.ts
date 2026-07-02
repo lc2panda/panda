@@ -49,9 +49,10 @@ export function findFirstMatch(
 
 async function createBedrockClient() {
   const { BedrockClient } = await import('@aws-sdk/client-bedrock')
-  // Match the Anthropic Bedrock SDK's region behavior exactly:
-  // - Reads AWS_REGION or AWS_DEFAULT_REGION env vars (not AWS config files)
-  // - Falls back to 'us-east-1' if neither is set
+  // Match the Anthropic Bedrock SDK's region behavior:
+  // - Reads AWS_REGION or AWS_DEFAULT_REGION env vars
+  // - Falls back to ~/.aws/config [default] region
+  // - Falls back to 'us-east-1' if none are set
   // This ensures we query profiles from the same region the client will use
   const region = getAWSRegion()
 

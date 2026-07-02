@@ -13,6 +13,7 @@ import {
   formatModelPricing,
 } from '../modelCost.js'
 import { getSettings_DEPRECATED } from '../settings/settings.js'
+import { getSettingsForSource } from '../settings/settings.js'
 import { checkOpus1mAccess, checkSonnet1mAccess } from './check1mAccess.js'
 import { getAPIProvider } from './providers.js'
 import { isModelAllowed } from './modelAllowlist.js'
@@ -44,6 +45,10 @@ export type ModelOption = {
 }
 
 export function getDefaultOptionForUser(fastMode = false): ModelOption {
+  // Check if an org/policy-level default model is configured
+  const policyModel = getSettingsForSource('policySettings')?.model
+  const orgDefaultSuffix = policyModel ? ' · Org default' : ''
+
   if (process.env.USER_TYPE === 'ant') {
     const currentModel = renderDefaultModelSetting(
       getDefaultMainLoopModelSetting(),
@@ -51,8 +56,8 @@ export function getDefaultOptionForUser(fastMode = false): ModelOption {
     return {
       value: null,
       label: 'Default (recommended)',
-      description: `Use the default model for Ants (currently ${currentModel})`,
-      descriptionForModel: `Default model (currently ${currentModel})`,
+      description: `Use the default model for Ants (currently ${currentModel})${orgDefaultSuffix}`,
+      descriptionForModel: `Default model (currently ${currentModel})${orgDefaultSuffix}`,
     }
   }
 
@@ -61,7 +66,7 @@ export function getDefaultOptionForUser(fastMode = false): ModelOption {
     return {
       value: null,
       label: 'Default (recommended)',
-      description: getClaudeAiUserDefaultModelDescription(fastMode),
+      description: getClaudeAiUserDefaultModelDescription(fastMode) + orgDefaultSuffix,
     }
   }
 
@@ -70,7 +75,7 @@ export function getDefaultOptionForUser(fastMode = false): ModelOption {
   return {
     value: null,
     label: 'Default (recommended)',
-    description: `Use the default model (currently ${renderDefaultModelSetting(getDefaultMainLoopModelSetting())})${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
+    description: `Use the default model (currently ${renderDefaultModelSetting(getDefaultMainLoopModelSetting())})${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}${orgDefaultSuffix}`,
   }
 }
 

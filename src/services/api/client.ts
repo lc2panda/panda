@@ -300,6 +300,9 @@ export async function getAnthropicClient({
           ? { 'x-claude-remote-session-id': remoteSessionId }
           : {}),
         ...(clientApp ? { 'x-client-app': clientApp } : {}),
+        ...(process.env.ANTHROPIC_WORKSPACE_ID
+          ? { 'anthropic-workspace-id': process.env.ANTHROPIC_WORKSPACE_ID }
+          : {}),
       }
 
   // Log API client configuration for HFI debugging

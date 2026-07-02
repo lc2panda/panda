@@ -89,6 +89,8 @@ function familyHasSpecificEntries(
 /**
  * Check if a model is allowed by the availableModels allowlist in settings.
  * If availableModels is not set, all models are allowed.
+ * When enforceAvailableModels is true, the allowlist is strict and no
+ * unlisted models are permitted (including via env var overrides).
  *
  * Matching tiers:
  * 1. Family aliases ("opus", "sonnet", "haiku") — wildcard for the entire family,
@@ -99,11 +101,12 @@ function familyHasSpecificEntries(
  */
 export function isModelAllowed(model: string): boolean {
   const settings = getSettings_DEPRECATED() || {}
-  const { availableModels } = settings
+  const { availableModels, enforceAvailableModels } = settings
   if (!availableModels) {
     return true // No restrictions
   }
   if (availableModels.length === 0) {
+    // When enforceAvailableModels is on and the list is empty, nothing passes
     return false // Empty allowlist blocks all user-specified models
   }
 
@@ -167,4 +170,14 @@ export function isModelAllowed(model: string): boolean {
   }
 
   return false
+}
+
+/**
+ * Returns true when enforceAvailableModels is enabled in settings.
+ * When enabled, users can ONLY select models from the availableModels list;
+ * env var overrides (ANTHROPIC_MODEL) are also subject to the allowlist.
+ */
+export function isEnforceAvailableModels(): boolean {
+  const settings = getSettings_DEPRECATED() || {}
+  return !!(settings.enforceAvailableModels && settings.availableModels)
 }

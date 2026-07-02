@@ -1,4 +1,5 @@
 import memoize from 'lodash-es/memoize.js'
+import { readFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 
@@ -90,11 +91,51 @@ export function parseEnvVars(
 }
 
 /**
- * Get the AWS region with fallback to default
- * Matches the Anthropic Bedrock SDK's region behavior
+ * Get the AWS region with fallback to default.
+ * Priority: AWS_REGION env > AWS_DEFAULT_REGION env > ~/.aws/config [default] region > 'us-east-1'
  */
 export function getAWSRegion(): string {
-  return process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
+  if (process.env.AWS_REGION) return process.env.AWS_REGION
+  if (process.env.AWS_DEFAULT_REGION) return process.env.AWS_DEFAULT_REGION
+
+  // Fallback: read region from ~/.aws/config [default] profile
+  const awsConfigRegion = readAWSConfigRegion()
+  if (awsConfigRegion) return awsConfigRegion
+
+  return 'us-east-1'
+}
+
+/**
+ * Parse the [default] profile region from ~/.aws/config.
+ * Returns undefined if the file doesn't exist or region is not set.
+ */
+function readAWSConfigRegion(): string | undefined {
+  try {
+    const configPath =
+      process.env.AWS_CONFIG_FILE || join(homedir(), '.aws', 'config')
+    const content = readFileSync(configPath, 'utf-8')
+    // Find [default] section and extract region
+    const lines = content.split('\n')
+    let inDefault = false
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (trimmed === '[default]') {
+        inDefault = true
+        continue
+      }
+      if (trimmed.startsWith('[')) {
+        inDefault = false
+        continue
+      }
+      if (inDefault) {
+        const match = trimmed.match(/^region\s*=\s*(.+)$/)
+        if (match) return match[1].trim()
+      }
+    }
+  } catch {
+    // File doesn't exist or is unreadable — fall through
+  }
+  return undefined
 }
 
 /**

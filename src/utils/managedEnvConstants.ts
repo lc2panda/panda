@@ -36,6 +36,8 @@ const PROVIDER_MANAGED_ENV_VARS = new Set([
   'CLAUDE_CODE_SKIP_BEDROCK_AUTH',
   'CLAUDE_CODE_SKIP_VERTEX_AUTH',
   'CLAUDE_CODE_SKIP_FOUNDRY_AUTH',
+  // Workspace isolation (workload identity federation)
+  'ANTHROPIC_WORKSPACE_ID',
   // Model defaults — often set to provider-specific ID formats
   'ANTHROPIC_MODEL',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
@@ -126,6 +128,7 @@ export const SAFE_ENV_VARS = new Set([
   'ANTHROPIC_MODEL',
   'ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION',
   'ANTHROPIC_SMALL_FAST_MODEL',
+  'ANTHROPIC_WORKSPACE_ID',
   'AWS_DEFAULT_REGION',
   'AWS_PROFILE',
   'AWS_REGION',
