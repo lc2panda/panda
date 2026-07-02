@@ -516,6 +516,12 @@ export const SettingsSchema = lazySchema(() =>
         .describe(
           'Disable inline shell execution in skills and custom slash commands from user, project, or plugin sources. Commands are stripped but other skill content still loads.',
         ),
+      disableBundledSkills: z
+        .boolean()
+        .optional()
+        .describe(
+          'When true, all bundled skills are disabled and will not be loaded or available as slash commands.',
+        ),
       // v2.1.92: Block startup until remote managed settings are fetched
       forceRemoteSettingsRefresh: z
         .boolean()

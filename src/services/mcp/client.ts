@@ -1840,13 +1840,23 @@ export function mcpToolInputToAutoClassifierInput(
 // promise and never re-sent `tools/list`, leaving the server's tools empty.
 const fetchToolsForClientMemoized = memoizeWithLRU(
   async (client: ConnectedMCPServer): Promise<Tool[]> => {
-    const result = (await client.client.request(
-      { method: 'tools/list' },
-      ListToolsResultSchema,
-    )) as ListToolsResult
+    // Paginate tools/list: some MCP servers return paginated results with
+    // nextCursor. Loop until no more pages to avoid silently dropping tools.
+    let allTools: ListToolsResult['tools'] = []
+    let cursor: string | undefined
+    do {
+      const result = (await client.client.request(
+        { method: 'tools/list', params: cursor ? { cursor } : undefined },
+        ListToolsResultSchema,
+      )) as ListToolsResult
+      allTools = allTools.concat(result.tools ?? [])
+      cursor = (result as Record<string, unknown>).nextCursor as
+        | string
+        | undefined
+    } while (cursor)
 
     // Sanitize tool data from MCP server
-    const toolsToProcess = recursivelySanitizeUnicode(result.tools)
+    const toolsToProcess = recursivelySanitizeUnicode(allTools)
 
     // Check if we should skip the mcp__ prefix for SDK MCP servers
     const skipPrefix =
@@ -2132,18 +2142,34 @@ export const fetchResourcesForClient = memoizeWithLRU(
         return []
       }
 
-      const result = await client.client.request(
-        { method: 'resources/list' },
-        ListResourcesResultSchema,
-      )
+      // Paginate resources/list to avoid silently dropping resources
+      let allResources: Array<Record<string, unknown>> = []
+      let resCursor: string | undefined
+      do {
+        const result = await client.client.request(
+          {
+            method: 'resources/list',
+            params: resCursor ? { cursor: resCursor } : undefined,
+          },
+          ListResourcesResultSchema,
+        )
+        allResources = allResources.concat(
+          (result as Record<string, unknown>).resources as Array<
+            Record<string, unknown>
+          > ?? [],
+        )
+        resCursor = (result as Record<string, unknown>).nextCursor as
+          | string
+          | undefined
+      } while (resCursor)
 
-      if (!result.resources) return []
+      if (!allResources.length) return []
 
       // Add server name to each resource
-      return result.resources.map(resource => ({
+      return allResources.map(resource => ({
         ...resource,
         server: client.name,
-      }))
+      })) as ServerResource[]
     } catch (error) {
       logMCPError(
         client.name,
@@ -2165,16 +2191,27 @@ export const fetchCommandsForClient = memoizeWithLRU(
         return []
       }
 
-      // Request prompts list from client
-      const result = (await client.client.request(
-        { method: 'prompts/list' },
-        ListPromptsResultSchema,
-      )) as ListPromptsResult
+      // Paginate prompts/list to avoid silently dropping prompts
+      let allPrompts: ListPromptsResult['prompts'] = []
+      let promptCursor: string | undefined
+      do {
+        const result = (await client.client.request(
+          {
+            method: 'prompts/list',
+            params: promptCursor ? { cursor: promptCursor } : undefined,
+          },
+          ListPromptsResultSchema,
+        )) as ListPromptsResult
+        allPrompts = allPrompts.concat(result.prompts ?? [])
+        promptCursor = (result as Record<string, unknown>).nextCursor as
+          | string
+          | undefined
+      } while (promptCursor)
 
-      if (!result.prompts) return []
+      if (!allPrompts.length) return []
 
       // Sanitize prompt data from MCP server
-      const promptsToProcess = recursivelySanitizeUnicode(result.prompts)
+      const promptsToProcess = recursivelySanitizeUnicode(allPrompts)
 
       // Convert MCP prompts to our Command format
       return promptsToProcess.map(prompt => {

@@ -398,7 +398,16 @@ async function getSkills(cwd: string): Promise<{
       }),
     ])
     // Bundled skills are registered synchronously at startup
-    const bundledSkills = getBundledSkills()
+    // disableBundledSkills: enterprise managed setting to suppress all bundled skills
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    const { getSettingsForSource: _gfs } = require('./utils/settings/settings.js') as typeof import('./utils/settings/settings.js')
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    const bundledSkillsDisabled =
+      _gfs('policySettings')?.disableBundledSkills === true
+    const bundledSkills = bundledSkillsDisabled ? [] : getBundledSkills()
+    if (bundledSkillsDisabled) {
+      logForDebugging('Bundled skills disabled via managed setting disableBundledSkills')
+    }
     // Built-in plugin skills come from enabled built-in plugins
     const builtinPluginSkills = getBuiltinPluginSkillCommands()
     logForDebugging(

@@ -453,6 +453,15 @@ export function endLLMRequestSpan(
 
     // Add experimental response attributes (model_output, thinking_output)
     addBetaLLMResponseAttributes(endAttributes, metadata)
+
+    // OTEL_LOG_ASSISTANT_RESPONSES: opt-in logging of assistant text to spans
+    // (mirrors OTEL_LOG_USER_PROMPTS for the response side)
+    if (
+      isEnvTruthy(process.env.OTEL_LOG_ASSISTANT_RESPONSES) &&
+      metadata.modelOutput !== undefined
+    ) {
+      endAttributes['response.assistant_message'] = metadata.modelOutput
+    }
   }
 
   llmSpanContext.span.setAttributes(endAttributes)
