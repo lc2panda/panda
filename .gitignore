@@ -36,3 +36,11 @@ monitor/tmp/
 package-v2.1.156/
 # Upstream proprietary snapshots (never push) — catch-all for all probed versions
 package-v2.1.*/
+
+# Build artifacts (tarballs)
+*.tgz
+
+# Local dev files
+.claude/
+CLAUDE1.md
+CLAUDE-FABLE-5.md
