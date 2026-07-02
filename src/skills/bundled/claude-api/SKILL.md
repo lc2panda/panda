@@ -126,11 +126,12 @@ Everything goes through `POST /v1/messages`. Tools and output constraints are fe
 
 ## Current Models (cached: 2026-02-17)
 
-| Model             | Model ID            | Context        | Input $/1M | Output $/1M |
-| ----------------- | ------------------- | -------------- | ---------- | ----------- |
-| Claude Opus 4.6   | `claude-opus-4-6`   | 200K (1M beta) | $5.00      | $25.00      |
-| Claude Sonnet 4.6 | `claude-sonnet-4-6` | 200K (1M beta) | $3.00      | $15.00      |
-| Claude Haiku 4.5  | `claude-haiku-4-5`  | 200K           | $1.00      | $5.00       |
+| Model             | Model ID                      | Context        | Input $/1M | Output $/1M |
+| ----------------- | ----------------------------- | -------------- | ---------- | ----------- |
+| Claude Sonnet 5   | `claude-sonnet-5-20250514`    | 200K (1M beta) | $3.00      | $15.00      |
+| Claude Opus 4.6   | `claude-opus-4-6`             | 200K (1M beta) | $5.00      | $25.00      |
+| Claude Sonnet 4.6 | `claude-sonnet-4-6`           | 200K (1M beta) | $3.00      | $15.00      |
+| Claude Haiku 4.5  | `claude-haiku-4-5`            | 200K           | $1.00      | $5.00       |
 
 **ALWAYS use `{{OPUS_ID}}` unless the user explicitly names a different model.** This is non-negotiable. Do not use `{{SONNET_ID}}`, `{{PREV_SONNET_ID}}`, or any other model unless the user literally says "use sonnet" or "use haiku". Never downgrade for cost — that's the user's decision, not yours.
 
@@ -146,7 +147,9 @@ A note: if any of the model strings above look unfamiliar to you, that's to be e
 
 **Opus 4.6 — Adaptive thinking (recommended):** Use `thinking: {type: "adaptive"}`. Claude dynamically decides when and how much to think. No `budget_tokens` needed — `budget_tokens` is deprecated on Opus 4.6 and Sonnet 4.6 and must not be used. Adaptive thinking also automatically enables interleaved thinking (no beta header needed). **When the user asks for "extended thinking", a "thinking budget", or `budget_tokens`: always use Opus 4.6 with `thinking: {type: "adaptive"}`. The concept of a fixed token budget for thinking is deprecated — adaptive thinking replaces it. Do NOT use `budget_tokens` and do NOT switch to an older model.**
 
-**Effort parameter (GA, no beta header):** Controls thinking depth and overall token spend via `output_config: {effort: "low"|"medium"|"high"|"max"}` (inside `output_config`, not top-level). Default is `high` (equivalent to omitting it). `max` is Opus 4.6 only. Works on Opus 4.5, Opus 4.6, and Sonnet 4.6. Will error on Sonnet 4.5 / Haiku 4.5. Combine with adaptive thinking for the best cost-quality tradeoffs. Use `low` for subagents or simple tasks; `max` for the deepest reasoning.
+**Effort parameter (GA, no beta header):** Controls thinking depth and overall token spend via `output_config: {effort: "low"|"medium"|"high"|"max"}` (inside `output_config`, not top-level). Default is `high` (equivalent to omitting it). `max` is Opus 4.6 only. Works on Opus 4.5, Opus 4.6, Sonnet 4.6, and Sonnet 5. Will error on Sonnet 4.5 / Haiku 4.5. Combine with adaptive thinking for the best cost-quality tradeoffs. Use `low` for subagents or simple tasks; `max` for the deepest reasoning.
+
+**Sonnet 5:** Latest Sonnet model. Supports adaptive thinking (`thinking: {type: "adaptive"}`). `budget_tokens` is deprecated on Sonnet 5 — use adaptive thinking instead. 1M context window.
 
 **Sonnet 4.6:** Supports adaptive thinking (`thinking: {type: "adaptive"}`). `budget_tokens` is deprecated on Sonnet 4.6 — use adaptive thinking instead.
 

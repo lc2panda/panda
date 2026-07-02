@@ -94,14 +94,25 @@ function getCustomSonnetOption(): ModelOption | undefined {
 
 // @[MODEL LAUNCH]: Update or add model option functions (getSonnetXXOption, getOpusXXOption, etc.)
 // with the new model's label and description. These appear in the /model picker.
+function getSonnet5Option(): ModelOption {
+  const is3P = getAPIProvider() !== 'firstParty'
+  return {
+    value: is3P ? getModelStrings().sonnet50 : 'sonnet',
+    label: 'Sonnet',
+    description: `Sonnet 5 · Best for everyday tasks, 1M context${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
+    descriptionForModel:
+      'Sonnet 5 - best for everyday tasks with 1M context. Generally recommended for most coding tasks',
+  }
+}
+
 function getSonnet46Option(): ModelOption {
   const is3P = getAPIProvider() !== 'firstParty'
   return {
     value: is3P ? getModelStrings().sonnet46 : 'sonnet',
-    label: 'Sonnet',
-    description: `Sonnet 4.6 · Best for everyday tasks${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
+    label: 'Sonnet 4.6',
+    description: `Sonnet 4.6 · Previous generation${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
     descriptionForModel:
-      'Sonnet 4.6 - best for everyday tasks. Generally recommended for most coding tasks',
+      'Sonnet 4.6 - previous generation Sonnet model',
   }
 }
 
@@ -186,7 +197,7 @@ function getHaiku45Option(): ModelOption {
     label: 'Haiku',
     description: `Haiku 4.5 · Fastest for quick answers${is3P ? '' : ` · ${formatModelPricing(COST_HAIKU_45)}`}`,
     descriptionForModel:
-      'Haiku 4.5 - fastest for quick answers. Lower cost but less capable than Sonnet 4.6.',
+      'Haiku 4.5 - fastest for quick answers. Lower cost but less capable than Sonnet 5.',
   }
 }
 
@@ -223,7 +234,7 @@ export function getMaxSonnet46_1MOption(): ModelOption {
   return {
     value: 'sonnet[1m]',
     label: 'Sonnet (1M context)',
-    description: `Sonnet 4.6 with 1M context${billingInfo}${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
+    description: `Sonnet 5 with 1M context${billingInfo}${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
   }
 }
 
@@ -250,7 +261,7 @@ function getMergedOpus1MOption(fastMode = false): ModelOption {
 const MaxSonnet46Option: ModelOption = {
   value: 'sonnet',
   label: 'Sonnet',
-  description: 'Sonnet 4.6 · Best for everyday tasks',
+  description: 'Sonnet 5 · Best for everyday tasks',
 }
 
 const MaxHaiku45Option: ModelOption = {
@@ -263,7 +274,7 @@ function getOpusPlanOption(): ModelOption {
   return {
     value: 'opusplan',
     label: 'Opus Plan Mode',
-    description: 'Use Opus 4.6 in plan mode, Sonnet 4.6 otherwise',
+    description: 'Use Opus 4.6 in plan mode, Sonnet 5 otherwise',
   }
 }
 
@@ -282,6 +293,7 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
       getDefaultOptionForUser(),
       ...antModelOptions,
       getMergedOpus1MOption(fastMode),
+      getSonnet5Option(),
       getSonnet46Option(),
       getSonnet46_1MOption(),
       getHaiku45Option(),

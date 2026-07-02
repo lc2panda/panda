@@ -90,6 +90,13 @@ export const CLAUDE_SONNET_4_6_CONFIG = {
   foundry: 'claude-sonnet-4-6',
 } as const satisfies ModelConfig
 
+export const CLAUDE_SONNET_5_CONFIG = {
+  firstParty: 'claude-sonnet-5-20250514',
+  bedrock: 'us.anthropic.claude-sonnet-5-20250514-v1:0',
+  vertex: 'claude-sonnet-5@20250514',
+  foundry: 'claude-sonnet-5',
+} as const satisfies ModelConfig
+
 // @[MODEL LAUNCH]: Register the new config here.
 export const ALL_MODEL_CONFIGS = {
   haiku35: CLAUDE_3_5_HAIKU_CONFIG,
@@ -99,6 +106,7 @@ export const ALL_MODEL_CONFIGS = {
   sonnet40: CLAUDE_SONNET_4_CONFIG,
   sonnet45: CLAUDE_SONNET_4_5_CONFIG,
   sonnet46: CLAUDE_SONNET_4_6_CONFIG,
+  sonnet50: CLAUDE_SONNET_5_CONFIG,
   opus40: CLAUDE_OPUS_4_CONFIG,
   opus41: CLAUDE_OPUS_4_1_CONFIG,
   opus45: CLAUDE_OPUS_4_5_CONFIG,

@@ -128,11 +128,12 @@ export function getDefaultSonnetModel(): ModelName {
   if (process.env.ANTHROPIC_DEFAULT_SONNET_MODEL) {
     return process.env.ANTHROPIC_DEFAULT_SONNET_MODEL
   }
-  // Default to Sonnet 4.5 for 3P since they may not have 4.6 yet
+  // 3P providers (Bedrock, Vertex, Foundry) — Sonnet 5 rollout lags firstParty,
+  // keep 3P on 4.6 until providers publish Sonnet 5 in their inference profiles.
   if (getAPIProvider() !== 'firstParty') {
-    return getModelStrings().sonnet45
+    return getModelStrings().sonnet46
   }
-  return getModelStrings().sonnet46
+  return getModelStrings().sonnet50
 }
 
 // @[MODEL LAUNCH]: Update the default Haiku model (3P providers may lag so keep defaults unchanged).
@@ -240,6 +241,9 @@ export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
   }
   if (name.includes('claude-opus-4')) {
     return 'claude-opus-4'
+  }
+  if (name.includes('claude-sonnet-5')) {
+    return 'claude-sonnet-5'
   }
   if (name.includes('claude-sonnet-4-6')) {
     return 'claude-sonnet-4-6'
@@ -378,6 +382,10 @@ export function getPublicModelDisplayName(model: ModelName): string | null {
       return 'Opus 4.1'
     case getModelStrings().opus40:
       return 'Opus 4'
+    case getModelStrings().sonnet50 + '[1m]':
+      return 'Sonnet 5 (1M context)'
+    case getModelStrings().sonnet50:
+      return 'Sonnet 5'
     case getModelStrings().sonnet46 + '[1m]':
       return 'Sonnet 4.6 (1M context)'
     case getModelStrings().sonnet46:
@@ -610,6 +618,9 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
   }
   if (canonical.includes('claude-opus-4')) {
     return 'Opus 4'
+  }
+  if (canonical.includes('claude-sonnet-5')) {
+    return has1m ? 'Sonnet 5 (with 1M context)' : 'Sonnet 5'
   }
   if (canonical.includes('claude-sonnet-4-6')) {
     return has1m ? 'Sonnet 4.6 (with 1M context)' : 'Sonnet 4.6'
