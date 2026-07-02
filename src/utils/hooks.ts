@@ -1957,6 +1957,35 @@ export async function getMatchingHooks(
       }))
     })
 
+    // [Wave5] SessionStart / Setup / SubagentStart run before the model is
+    // available, so only command-type hooks are valid. Warn the user and
+    // filter out prompt/agent hooks that would silently fail.
+    const COMMAND_ONLY_EVENTS: ReadonlySet<string> = new Set([
+      'SessionStart',
+      'Setup',
+      'SubagentStart',
+    ])
+    if (COMMAND_ONLY_EVENTS.has(hookEvent)) {
+      const incompatible = matchedHooks.filter(
+        m => m.hook.type === 'prompt' || m.hook.type === 'agent',
+      )
+      if (incompatible.length > 0) {
+        for (const m of incompatible) {
+          logError(
+            new Error(
+              `Hook config error: "${m.hook.type}" hook on ${hookEvent} event is not supported — use a command-type hook instead.`,
+            ),
+          )
+        }
+        // Remove incompatible hooks so they don't cause downstream failures
+        const compatibleHooks = matchedHooks.filter(
+          m => m.hook.type !== 'prompt' && m.hook.type !== 'agent',
+        )
+        matchedHooks.length = 0
+        matchedHooks.push(...compatibleHooks)
+      }
+    }
+
     // Deduplicate hooks by command/prompt/url within the same source context.
     // Key is namespaced by pluginRoot/skillRoot (see hookDedupKey above) so
     // cross-plugin template collisions don't drop hooks (gh-29724).

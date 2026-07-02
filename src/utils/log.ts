@@ -2,7 +2,7 @@ import { feature } from 'bun:bundle'
 import type { BetaMessageStreamParams } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import { readdir, readFile, stat } from 'fs/promises'
 import memoize from 'lodash-es/memoize.js'
-import { join } from 'path'
+import { basename, join } from 'path'
 import type { QuerySource } from 'src/constants/querySource.js'
 import {
   setLastAPIRequest,
@@ -48,6 +48,9 @@ export function getLogDisplayTitle(
     log.summary ||
     (useFirstPrompt ? strippedFirstPrompt : undefined) ||
     defaultTitle ||
+    // Use the project directory basename as a readable fallback for
+    // background / headless sessions that have no user prompt yet.
+    (log.projectPath ? basename(log.projectPath) : undefined) ||
     // For autonomous sessions without other context, show a meaningful label
     (isAutonomousPrompt ? 'Autonomous session' : undefined) ||
     // Fall back to truncated session ID for lite logs with no metadata

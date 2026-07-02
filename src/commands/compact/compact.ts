@@ -131,14 +131,15 @@ export const call: LocalCommandCall = async (args, context) => {
     }
   } catch (error) {
     if (abortController.signal.aborted) {
-      throw new Error('Compaction canceled.')
+      return { type: 'text', value: chalk.yellow(isZh() ? '⚠ 压缩已取消' : '⚠ Compaction canceled') }
     } else if (hasExactErrorMessage(error, ERROR_MESSAGE_NOT_ENOUGH_MESSAGES)) {
-      throw new Error(ERROR_MESSAGE_NOT_ENOUGH_MESSAGES)
+      return { type: 'text', value: chalk.yellow(isZh() ? '⚠ 消息不足，无法压缩' : `⚠ ${ERROR_MESSAGE_NOT_ENOUGH_MESSAGES}`) }
     } else if (hasExactErrorMessage(error, ERROR_MESSAGE_INCOMPLETE_RESPONSE)) {
-      throw new Error(ERROR_MESSAGE_INCOMPLETE_RESPONSE)
+      return { type: 'text', value: chalk.yellow(isZh() ? '⚠ 压缩中断，请重试' : `⚠ ${ERROR_MESSAGE_INCOMPLETE_RESPONSE}`) }
     } else {
       logError(error)
-      throw new Error(`Error during compaction: ${error}`)
+      const msg = error instanceof Error ? error.message : String(error)
+      return { type: 'text', value: chalk.yellow(`⚠ ${isZh() ? '压缩失败' : 'Compaction failed'}: ${msg}`) }
     }
   }
 }

@@ -36,6 +36,31 @@ export async function openPath(path: string): Promise<boolean> {
   }
 }
 
+/**
+ * Reveal a file in the system file manager (Finder on macOS, Explorer on
+ * Windows, xdg-open on Linux). Unlike openPath which *opens* the file,
+ * this selects/highlights it in the containing folder.
+ */
+export async function revealPath(path: string): Promise<boolean> {
+  try {
+    const platform = process.platform
+    if (platform === 'darwin') {
+      const { code } = await execFileNoThrow('open', ['-R', path])
+      return code === 0
+    }
+    if (platform === 'win32') {
+      const { code } = await execFileNoThrow('explorer', ['/select,', path])
+      return code === 0
+    }
+    // Linux: xdg-open opens the containing directory
+    const { dirname } = await import('path')
+    const { code } = await execFileNoThrow('xdg-open', [dirname(path)])
+    return code === 0
+  } catch (_) {
+    return false
+  }
+}
+
 export async function openBrowser(url: string): Promise<boolean> {
   try {
     // Parse and validate the URL

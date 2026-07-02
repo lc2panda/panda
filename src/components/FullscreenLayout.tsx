@@ -9,7 +9,7 @@ import ScrollBox, { type ScrollBoxHandle } from '../ink/components/ScrollBox.js'
 import instances from '../ink/instances.js';
 import { Box, Text } from '../ink.js';
 import type { Message } from '../types/message.js';
-import { openBrowser, openPath } from '../utils/browser.js';
+import { openBrowser, revealPath } from '../utils/browser.js';
 import { isFullscreenEnvEnabled } from '../utils/fullscreen.js';
 import { plural } from '../utils/stringUtils.js';
 import { isNullRenderingAttachment } from './messages/nullRenderingAttachments.js';
@@ -482,7 +482,7 @@ function _temp3() {
 function _temp2(url) {
   if (url.startsWith("file:")) {
     try {
-      openPath(fileURLToPath(url));
+      revealPath(fileURLToPath(url));
     } catch {}
   } else {
     openBrowser(url);

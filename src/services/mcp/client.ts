@@ -2710,6 +2710,19 @@ export async function transformResultContent(
       )
     }
     case 'image': {
+      // Unsupported MIME types (e.g. SVG) cannot be resized — save to disk
+      // and return a text reference instead of crashing.
+      if (
+        resultContent.mimeType &&
+        !IMAGE_MIME_TYPES.has(resultContent.mimeType)
+      ) {
+        return await persistBlobToTextBlock(
+          Buffer.from(String(resultContent.data), 'base64'),
+          resultContent.mimeType,
+          serverName,
+          `[Image from ${serverName}] `,
+        )
+      }
       // Resize and compress image data, enforcing API dimension limits
       const imageBuffer = Buffer.from(String(resultContent.data), 'base64')
       const ext = resultContent.mimeType?.split('/')[1] || 'png'
