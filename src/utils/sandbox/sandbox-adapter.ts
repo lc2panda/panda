@@ -60,6 +60,14 @@ import { ripgrepCommand } from '../ripgrep.js'
 
 // Local copies to avoid circular dependency
 // (permissions.ts imports SandboxManager, bashPermissions.ts imports permissions.ts)
+
+/**
+ * Hosts (or host patterns) approved by the user for this session.
+ * Populated when the user selects "remember for this session" in the
+ * sandbox network permission dialog.
+ */
+const sessionApprovedHosts = new Set<string>()
+
 function permissionRuleValueFromString(
   ruleString: string,
 ): PermissionRuleValue {
@@ -744,6 +752,10 @@ async function initialize(
   // This ensures all code paths (REPL, print/SDK) are covered.
   const wrappedCallback: SandboxAskCallback | undefined = sandboxAskCallback
     ? async (hostPattern: NetworkHostPattern) => {
+        // Auto-approve hosts the user already approved for this session
+        if (sessionApprovedHosts.has(hostPattern.host)) {
+          return true
+        }
         if (shouldAllowManagedSandboxDomainsOnly()) {
           logForDebugging(
             `[sandbox] Blocked network request to ${hostPattern.host} (allowManagedDomainsOnly)`,
@@ -983,3 +995,11 @@ export type {
 }
 
 export { SandboxViolationStore, SandboxRuntimeConfigSchema }
+
+/**
+ * Mark a host (or host pattern) as approved for the remainder of this session.
+ * Called from the UI when the user selects "Allow for this session".
+ */
+export function rememberHostForSession(host: string): void {
+  sessionApprovedHosts.add(host)
+}

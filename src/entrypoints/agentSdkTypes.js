@@ -29,6 +29,8 @@ export const HOOK_EVENTS = [
   'InstructionsLoaded',
   'CwdChanged',
   'FileChanged',
+  'AgentNeedsInput',
+  'AgentCompleted',
 ]
 
 export const EXIT_REASONS = [

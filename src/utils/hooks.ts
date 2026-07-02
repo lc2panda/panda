@@ -95,6 +95,8 @@ import type {
   StopFailureHookInput,
   SubagentStartHookInput,
   SubagentStopHookInput,
+  AgentNeedsInputHookInput,
+  AgentCompletedHookInput,
   TeammateIdleHookInput,
   TaskCreatedHookInput,
   TaskCompletedHookInput,
@@ -890,6 +892,15 @@ function processHookJSONOutput({
           result.replacementContent = json.hookSpecificOutput.replacementContent
         }
         break
+    }
+
+    // [Wave6] Agent status notification hooks — handled outside the
+    // discriminated-union switch to avoid TS narrowing issues.
+    const eventName = json.hookSpecificOutput.hookEventName as string
+    if (eventName === 'AgentNeedsInput' || eventName === 'AgentCompleted') {
+      result.additionalContext = (
+        json.hookSpecificOutput as Record<string, unknown>
+      ).additionalContext as string | undefined
     }
   }
 
@@ -1912,6 +1923,10 @@ export async function getMatchingHooks(
         break
       case 'FileChanged':
         matchQuery = basename(hookInput.file_path as string)
+        break
+      case 'AgentNeedsInput':
+      case 'AgentCompleted':
+        matchQuery = hookInput.agent_id as string
         break
       default:
         break
@@ -4503,6 +4518,60 @@ export async function* executeSubagentStartHooks(
     hookInput,
     toolUseID: randomUUID(),
     matchQuery: agentType,
+    signal,
+    timeoutMs,
+  })
+}
+
+/**
+ * Execute AgentNeedsInput hooks when a background agent requires user input.
+ */
+export async function* executeAgentNeedsInputHooks(
+  agentId: string,
+  agentType?: string,
+  promptText?: string,
+  signal?: AbortSignal,
+  timeoutMs: number = TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+): AsyncGenerator<AggregatedHookResult> {
+  const hookInput: AgentNeedsInputHookInput = {
+    ...createBaseHookInput(undefined),
+    hook_event_name: 'AgentNeedsInput',
+    agent_id: agentId,
+    ...(agentType && { agent_type: agentType }),
+    ...(promptText && { prompt_text: promptText }),
+  }
+
+  yield* executeHooks({
+    hookInput,
+    toolUseID: randomUUID(),
+    matchQuery: agentId,
+    signal,
+    timeoutMs,
+  })
+}
+
+/**
+ * Execute AgentCompleted hooks when a background agent finishes its task.
+ */
+export async function* executeAgentCompletedHooks(
+  agentId: string,
+  agentType?: string,
+  resultSummary?: string,
+  signal?: AbortSignal,
+  timeoutMs: number = TOOL_HOOK_EXECUTION_TIMEOUT_MS,
+): AsyncGenerator<AggregatedHookResult> {
+  const hookInput: AgentCompletedHookInput = {
+    ...createBaseHookInput(undefined),
+    hook_event_name: 'AgentCompleted',
+    agent_id: agentId,
+    ...(agentType && { agent_type: agentType }),
+    ...(resultSummary && { result_summary: resultSummary }),
+  }
+
+  yield* executeHooks({
+    hookInput,
+    toolUseID: randomUUID(),
+    matchQuery: agentId,
     signal,
     timeoutMs,
   })

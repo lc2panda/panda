@@ -88,6 +88,9 @@ declare module "*/sdk/coreTypes.generated.js" {
   export type InstructionsLoadedHookInput = HookInput
   export type CwdChangedHookInput = HookInput & { cwd: string }
   export type FileChangedHookInput = HookInput & { path: string }
+  export type MessageDisplayHookInput = HookInput
+  export type AgentNeedsInputHookInput = HookInput & { agent_id: string }
+  export type AgentCompletedHookInput = HookInput & { agent_id: string }
 
   // SDK Message types
   export type SDKMessage = { type: string; [key: string]: unknown }

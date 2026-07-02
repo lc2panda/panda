@@ -77,6 +77,7 @@ import { checkPermissionMode } from './modeValidation.js'
 import { checkPathConstraints } from './pathValidation.js'
 import { checkSedConstraints } from './sedValidation.js'
 import { shouldUseSandbox } from './shouldUseSandbox.js'
+import { getSettings_DEPRECATED } from '../../utils/settings/settings.js'
 
 // DCE cliff: Bun's feature() evaluator has a per-function complexity budget.
 // bashToolHasPermission is right at the limit. `import { X as Y }` aliases
@@ -1347,6 +1348,39 @@ function checkSandboxAutoAllow(
     }
   }
   // No explicit rules, so auto-allow with sandbox
+
+  // macOS: osascript / AppleScript commands can send Apple Events to
+  // other apps — require explicit permission unless allowAppleEvents is set.
+  if (
+    process.platform === 'darwin' &&
+    !getSettings_DEPRECATED()?.sandbox?.allowAppleEvents
+  ) {
+    const allCmds =
+      subcommands.length > 1 ? subcommands : [command]
+    const hasOsascript = allCmds.some(sub => {
+      const trimmed = sub.trim()
+      return (
+        trimmed === 'osascript' ||
+        trimmed.startsWith('osascript ') ||
+        trimmed.startsWith('osascript\t')
+      )
+    })
+    if (hasOsascript) {
+      return {
+        behavior: 'ask',
+        message: createPermissionRequestMessage(BashTool.name, {
+          type: 'other' as const,
+          reason:
+            'osascript can send Apple Events to other applications. ' +
+            'Set sandbox.allowAppleEvents to auto-allow.',
+        }),
+        decisionReason: {
+          type: 'other' as const,
+          reason: 'osascript requires explicit approval (allowAppleEvents not set)',
+        },
+      }
+    }
+  }
 
   return {
     behavior: 'allow',

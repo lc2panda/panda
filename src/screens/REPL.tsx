@@ -250,7 +250,7 @@ import { usePromptsFromClaudeInChrome } from 'src/hooks/usePromptsFromClaudeInCh
 import { getTipToShowOnSpinner, recordShownTip } from 'src/services/tips/tipScheduler.js';
 import type { Theme } from 'src/utils/theme.js';
 import { checkAndDisableBypassPermissionsIfNeeded, checkAndDisableAutoModeIfNeeded, useKickOffCheckAndDisableBypassPermissionsIfNeeded, useKickOffCheckAndDisableAutoModeIfNeeded } from 'src/utils/permissions/bypassPermissionsKillswitch.js';
-import { SandboxManager } from 'src/utils/sandbox/sandbox-adapter.js';
+import { SandboxManager, rememberHostForSession } from 'src/utils/sandbox/sandbox-adapter.js';
 import { SANDBOX_NETWORK_ACCESS_TOOL_NAME } from 'src/cli/structuredIO.js';
 import { useFileHistorySnapshotInit } from 'src/hooks/useFileHistorySnapshotInit.js';
 import { SandboxPermissionRequest } from 'src/components/permissions/SandboxPermissionRequest.js';
@@ -4893,14 +4893,22 @@ export function REPL({
                 {focusedInputDialog === 'sandbox-permission' && <SandboxPermissionRequest key={sandboxPermissionRequestQueue[0]!.hostPattern.host} hostPattern={sandboxPermissionRequestQueue[0]!.hostPattern} onUserResponse={(response: {
             allow: boolean;
             persistToSettings: boolean;
+            rememberForSession?: boolean;
           }) => {
             const {
               allow,
-              persistToSettings
+              persistToSettings,
+              rememberForSession: rememberSession
             } = response;
             const currentRequest = sandboxPermissionRequestQueue[0];
             if (!currentRequest) return;
             const approvedHost = currentRequest.hostPattern.host;
+
+            // Remember the host for the remainder of this session (no disk persistence)
+            if (rememberSession && allow) {
+              rememberHostForSession(approvedHost);
+            }
+
             if (persistToSettings) {
               const update = {
                 type: 'addRules' as const,

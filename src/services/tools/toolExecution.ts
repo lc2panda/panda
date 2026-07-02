@@ -100,6 +100,7 @@ import {
 } from '../../utils/sessionActivity.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import { Stream } from '../../utils/stream.js'
+import { getAgentContext } from '../../utils/agentContext.js'
 import { logOTelEvent } from '../../utils/telemetry/events.js'
 import {
   addToolContentEvent,
@@ -971,6 +972,12 @@ async function checkPermissionsAndCallTool(
     tool.name,
     toolAttributes,
     isBetaTracingEnabled() ? jsonStringify(processedInput) : undefined,
+    {
+      agentId: toolUseContext.agentId,
+      parentAgentId: toolUseContext.agentId
+        ? undefined
+        : getAgentContext()?.agentId,
+    },
   )
   startToolBlockedOnUserSpan()
 

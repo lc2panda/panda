@@ -11,6 +11,7 @@ export type SandboxPermissionRequestProps = {
   onUserResponse: (response: {
     allow: boolean;
     persistToSettings: boolean;
+    rememberForSession?: boolean;
   }) => void;
 };
 export function SandboxPermissionRequest(t0) {
@@ -31,6 +32,15 @@ export function SandboxPermissionRequest(t0) {
             onUserResponse({
               allow: true,
               persistToSettings: false
+            });
+            break bb4;
+          }
+        case "yes-remember-session":
+          {
+            onUserResponse({
+              allow: true,
+              persistToSettings: false,
+              rememberForSession: true
             });
             break bb4;
           }
@@ -78,6 +88,9 @@ export function SandboxPermissionRequest(t0) {
   let t5;
   if ($[4] !== host) {
     t5 = !managedDomainsOnly ? [{
+      label: <Text>Yes, remember for this session for <Text bold={true}>{host}</Text></Text>,
+      value: "yes-remember-session"
+    }, {
       label: <Text>Yes, and don't ask again for <Text bold={true}>{host}</Text></Text>,
       value: "yes-dont-ask-again"
     }] : [];

@@ -380,6 +380,8 @@ export const HOOK_EVENTS = [
   'InstructionsLoaded',
   'CwdChanged',
   'FileChanged',
+  'AgentNeedsInput',
+  'AgentCompleted',
 ] as const
 
 export const HookEventSchema = lazySchema(() => z.enum(HOOK_EVENTS))
@@ -583,6 +585,34 @@ export const SubagentStopHookInputSchema = lazySchema(() =>
           'Text content of the last assistant message before stopping. ' +
             'Avoids the need to read and parse the transcript file.',
         ),
+    }),
+  ),
+)
+
+export const AgentNeedsInputHookInputSchema = lazySchema(() =>
+  BaseHookInputSchema().and(
+    z.object({
+      hook_event_name: z.literal('AgentNeedsInput'),
+      agent_id: z.string().describe('The agent that requires user input.'),
+      agent_type: z.string().optional(),
+      prompt_text: z
+        .string()
+        .optional()
+        .describe('Human-readable description of the input required.'),
+    }),
+  ),
+)
+
+export const AgentCompletedHookInputSchema = lazySchema(() =>
+  BaseHookInputSchema().and(
+    z.object({
+      hook_event_name: z.literal('AgentCompleted'),
+      agent_id: z.string().describe('The agent that completed its task.'),
+      agent_type: z.string().optional(),
+      result_summary: z
+        .string()
+        .optional()
+        .describe('Short human-readable summary of the result.'),
     }),
   ),
 )

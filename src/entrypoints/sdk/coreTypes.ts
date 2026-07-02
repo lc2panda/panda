@@ -52,6 +52,10 @@ export const HOOK_EVENTS = [
   'FileChanged',
   /** [v2.1.154] Fired before a message is rendered; hook may suppress or replace content. */
   'MessageDisplay',
+  /** [Wave6] Fired when a background agent needs user input. */
+  'AgentNeedsInput',
+  /** [Wave6] Fired when a background agent completes its task. */
+  'AgentCompleted',
 ] as const
 
 export const EXIT_REASONS = [

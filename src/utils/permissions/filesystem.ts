@@ -79,6 +79,24 @@ export const DANGEROUS_DIRECTORIES = [
 ] as const
 
 /**
+ * Credential file paths (relative to home directory) that must never be
+ * written by sandboxed tools.  Patterns use exact directory/file names;
+ * the check is performed against the expanded absolute path.
+ */
+export const CREDENTIAL_PATHS = [
+  '.ssh',
+  '.gnupg',
+  '.aws/credentials',
+  '.aws/config',
+  '.npmrc',
+  '.pypirc',
+  '.docker/config.json',
+  '.kube/config',
+  '.netrc',
+  '.gem/credentials',
+] as const
+
+/**
  * Normalizes a path for case-insensitive comparison.
  * This prevents bypassing security checks using mixed-case paths on case-insensitive
  * filesystems (macOS/Windows) like `.pAnDaCc/Settings.locaL.json`.
@@ -479,6 +497,23 @@ function isDangerousFilePathToAutoEdit(path: string): boolean {
         dangerousFile =>
           normalizeCaseForComparison(dangerousFile) === normalizedFileName,
       )
+    ) {
+      return true
+    }
+  }
+
+  // Block writes to credential files/directories (sandbox credential protection)
+  const home = homedir()
+  const normalizedAbsolute = normalizeCaseForComparison(absolutePath)
+  const normalizedHome = normalizeCaseForComparison(home)
+  for (const credPath of CREDENTIAL_PATHS) {
+    const fullCredPath = normalizeCaseForComparison(
+      `${home}${sep}${credPath}`,
+    )
+    // Block if the path IS the credential file/dir or is inside it
+    if (
+      normalizedAbsolute === fullCredPath ||
+      normalizedAbsolute.startsWith(fullCredPath + sep)
     ) {
       return true
     }

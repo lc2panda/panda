@@ -476,6 +476,7 @@ export function startToolSpan(
   toolName: string,
   toolAttributes?: Record<string, string | number | boolean>,
   toolInput?: string,
+  agentContext?: { agentId?: string; parentAgentId?: string },
 ): Span {
   // Start Perfetto span regardless of OTel tracing state
   const perfettoSpanId = isPerfettoTracingEnabled()
@@ -506,6 +507,10 @@ export function startToolSpan(
   const attributes = createSpanAttributes('tool', {
     tool_name: toolName,
     ...toolAttributes,
+    ...(agentContext?.agentId && { agent_id: agentContext.agentId }),
+    ...(agentContext?.parentAgentId && {
+      parent_agent_id: agentContext.parentAgentId,
+    }),
   })
 
   const ctx = parentSpanCtx

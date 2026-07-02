@@ -103,6 +103,18 @@ export type MessageDisplayHookInput = HookInput & {
   /** Abbreviated text content (first 500 chars) of the message. */
   message_content: string
 }
+/** [Wave6] Input for AgentNeedsInput hooks; fired when a background agent requires user input. */
+export type AgentNeedsInputHookInput = HookInput & {
+  agent_id: string
+  agent_type?: string
+  prompt_text?: string
+}
+/** [Wave6] Input for AgentCompleted hooks; fired when a background agent finishes. */
+export type AgentCompletedHookInput = HookInput & {
+  agent_id: string
+  agent_type?: string
+  result_summary?: string
+}
 
 // SDK Message types
 export type SDKMessage = { type: string; [key: string]: unknown }

@@ -209,6 +209,16 @@ export const syncHookResponseSchema = lazySchema(() =>
           /** Replacement text content for the message (first text block). */
           replacementContent: z.string().optional(),
         }),
+        /** [Wave6] AgentNeedsInput — background agent status notification. */
+        z.object({
+          hookEventName: z.literal('AgentNeedsInput'),
+          additionalContext: z.string().optional(),
+        }),
+        /** [Wave6] AgentCompleted — background agent completion notification. */
+        z.object({
+          hookEventName: z.literal('AgentCompleted'),
+          additionalContext: z.string().optional(),
+        }),
       ])
       .optional(),
   }),
