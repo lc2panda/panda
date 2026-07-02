@@ -725,29 +725,51 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
 
   const result = await hasPermissionsToUseToolInner(tool, input, context)
 
+  // classifyAllShell: when enabled in auto mode, force all Bash commands through
+  // the classifier even when they matched a permissions.allow rule.
+  let forceClassify = false
+
   // Reset consecutive denials on any allowed tool use in auto mode.
   // This ensures that a successful tool use (even one auto-allowed by rules)
   // breaks the consecutive denial streak.
   if (result.behavior === 'allow') {
     const appState = context.getAppState()
-    if (feature('TRANSCRIPT_CLASSIFIER')) {
-      const currentDenialState =
-        context.localDenialTracking ?? appState.denialTracking
-      if (
-        appState.toolPermissionContext.mode === 'auto' &&
-        currentDenialState &&
-        currentDenialState.consecutiveDenials > 0
-      ) {
-        const newDenialState = recordSuccess(currentDenialState)
-        persistDenialState(context, newDenialState)
+
+    // classifyAllShell: when enabled in auto mode, force Bash commands through
+    // the classifier even when they matched a permissions.allow rule.
+    const autoModeConfig = getAutoModeConfig()
+    const isAutoLike =
+      feature('TRANSCRIPT_CLASSIFIER') &&
+      (appState.toolPermissionContext.mode === 'auto' ||
+        (appState.toolPermissionContext.mode === 'plan' &&
+          (autoModeStateModule?.isAutoModeActive() ?? false)))
+    if (
+      autoModeConfig?.classifyAllShell &&
+      isAutoLike &&
+      tool.name === 'Bash'
+    ) {
+      // Override: skip the allow return, re-route to the classifier
+      forceClassify = true
+    } else {
+      if (feature('TRANSCRIPT_CLASSIFIER')) {
+        const currentDenialState =
+          context.localDenialTracking ?? appState.denialTracking
+        if (
+          appState.toolPermissionContext.mode === 'auto' &&
+          currentDenialState &&
+          currentDenialState.consecutiveDenials > 0
+        ) {
+          const newDenialState = recordSuccess(currentDenialState)
+          persistDenialState(context, newDenialState)
+        }
       }
+      return result
     }
-    return result
   }
 
   // Apply dontAsk mode transformation: convert 'ask' to 'deny'
   // This is done at the end so it can't be bypassed by early returns
-  if (result.behavior === 'ask') {
+  if (result.behavior === 'ask' || forceClassify) {
     const appState = context.getAppState()
 
     if (appState.toolPermissionContext.mode === 'dontAsk') {

@@ -2291,7 +2291,8 @@ export function REPL({
     isHelpOpen,
     inputMode,
     inputValue,
-    streamMode
+    streamMode,
+    onClearInput: () => setInputValue(''),
   };
   useEffect(() => {
     const totalCost = getTotalCost();

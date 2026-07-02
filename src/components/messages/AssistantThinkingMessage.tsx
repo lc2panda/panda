@@ -4,7 +4,7 @@
 // 一旦我被修改，请更新 messages/README.md
 import { c as _c } from "react/compiler-runtime";
 import type { ThinkingBlock, ThinkingBlockParam } from '@anthropic-ai/sdk/resources/index.mjs';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from '../../ink.js';
 import { CtrlOToExpand } from '../CtrlOToExpand.js';
 import { Markdown } from '../Markdown.js';
@@ -73,13 +73,35 @@ export function AssistantThinkingMessage(t0: Props) {
   const spinnerEnabled = matrix && !isTranscriptMode && !verbose;
   const spinner = useMatrixSpinner(spinnerEnabled);
 
+  // 3-second auto-collapse: after thinking content appears, auto-collapse
+  // to a single-line summary after a readable delay.
+  const [autoCollapsed, setAutoCollapsed] = useState(false);
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shouldShowFullThinking = isTranscriptMode || verbose;
+
+  useEffect(() => {
+    // Only auto-collapse when in expanded (non-collapsed) mode and not in
+    // transcript/verbose mode (those always show full thinking).
+    if (!shouldShowFullThinking || !thinking) return;
+
+    // Start a 3-second timer to auto-collapse
+    collapseTimerRef.current = setTimeout(() => {
+      setAutoCollapsed(true);
+    }, 3000);
+
+    return () => {
+      if (collapseTimerRef.current) {
+        clearTimeout(collapseTimerRef.current);
+      }
+    };
+  }, [shouldShowFullThinking, thinking]);
+
   if (!thinking) {
     return null;
   }
   if (hideInTranscript) {
     return null;
   }
-  const shouldShowFullThinking = isTranscriptMode || verbose;
   if (!shouldShowFullThinking) {
     // ── Collapsed state (AI is thinking) ──
     const marginTop = addMargin ? 1 : 0;
@@ -105,7 +127,40 @@ export function AssistantThinkingMessage(t0: Props) {
 
   // ── Expanded state (user pressed Ctrl+O) ──
   const marginTop = addMargin ? 1 : 0;
-  const displayThinking = verbose ? thinking : (thinking.length > 200 ? thinking.slice(0, 200) + (isZh() ? '…\n\n_Ctrl+O 展开完整思考_' : '…\n\n_Ctrl+O to expand full thinking_') : thinking);
+
+  // 10-line cap: show at most MAX_VISIBLE_LINES, fold the rest
+  const MAX_VISIBLE_LINES = 10;
+  const lines = thinking.split('\n');
+  const totalLines = lines.length;
+  const isOverCap = totalLines > MAX_VISIBLE_LINES;
+
+  // After 3-sec auto-collapse, show single-line summary
+  if (autoCollapsed && !verbose) {
+    const summaryLine = lines[0]!.slice(0, 80) + (lines[0]!.length > 80 || totalLines > 1 ? '...' : '');
+    if (matrix) {
+      return (
+        <Box marginTop={marginTop}>
+          <Text color={MATRIX_SCALE.NEON} bold>{"\u27E9\u27E9"} </Text>
+          <Text color={MATRIX_SCALE.SHADOW} italic>{summaryLine}</Text>
+          <Text color={MATRIX_SCALE.SHADOW} italic> <CtrlOToExpand /></Text>
+        </Box>
+      );
+    }
+    return (
+      <Box marginTop={marginTop}>
+        <Text dimColor={true} italic={true}>
+          {isZh() ? "\u2234 " : "\u2234 "}{summaryLine} <CtrlOToExpand />
+        </Text>
+      </Box>
+    );
+  }
+
+  const displayThinking = isOverCap && !verbose
+    ? lines.slice(0, MAX_VISIBLE_LINES).join('\n') +
+      (isZh()
+        ? `\n\n_... 还有 ${totalLines - MAX_VISIBLE_LINES} 行，Ctrl+O 展开_`
+        : `\n\n_... ${totalLines - MAX_VISIBLE_LINES} more lines, Ctrl+O to expand_`)
+    : thinking;
 
   if (matrix) {
     // T-B1: 用 TurnGutter (thinking) + TurnHeader 包裹，统一身份色 ╎ + ∴ 标签

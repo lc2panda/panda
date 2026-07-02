@@ -1021,6 +1021,7 @@ export function getAutoModeConfig():
       soft_deny?: string[]
       hard_deny?: string[]
       environment?: string[]
+      classifyAllShell?: boolean
     }
   | undefined {
   if (feature('TRANSCRIPT_CLASSIFIER')) {
@@ -1030,12 +1031,14 @@ export function getAutoModeConfig():
       hard_deny: z.array(z.string()).optional(),
       deny: z.array(z.string()).optional(),
       environment: z.array(z.string()).optional(),
+      classifyAllShell: z.boolean().optional(),
     })
 
     const allow: string[] = []
     const soft_deny: string[] = []
     const hard_deny: string[] = []
     const environment: string[] = []
+    let classifyAllShell: boolean | undefined
 
     for (const source of [
       'userSettings',
@@ -1057,6 +1060,10 @@ export function getAutoModeConfig():
         }
         if (result.data.environment)
           environment.push(...result.data.environment)
+        // classifyAllShell: any source setting it to true wins
+        if (result.data.classifyAllShell !== undefined) {
+          classifyAllShell = classifyAllShell || result.data.classifyAllShell
+        }
       }
     }
 
@@ -1064,13 +1071,15 @@ export function getAutoModeConfig():
       allow.length > 0 ||
       soft_deny.length > 0 ||
       hard_deny.length > 0 ||
-      environment.length > 0
+      environment.length > 0 ||
+      classifyAllShell !== undefined
     ) {
       return {
         ...(allow.length > 0 && { allow }),
         ...(soft_deny.length > 0 && { soft_deny }),
         ...(hard_deny.length > 0 && { hard_deny }),
         ...(environment.length > 0 && { environment }),
+        ...(classifyAllShell !== undefined && { classifyAllShell }),
       }
     }
   }

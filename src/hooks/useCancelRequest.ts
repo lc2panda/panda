@@ -55,6 +55,7 @@ type CancelRequestHandlerProps = {
   inputMode?: PromptInputMode
   inputValue?: string
   streamMode?: SpinnerMode
+  onClearInput?: () => void
 }
 
 /**
@@ -77,6 +78,7 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
     inputMode,
     inputValue,
     streamMode,
+    onClearInput,
   } = props
   const store = useAppStateStore()
   const setAppState = useSetAppState()
@@ -110,6 +112,12 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
       }
     }
 
+    // Priority 3: Discard draft input when idle at prompt
+    if (inputValue && onClearInput) {
+      onClearInput()
+      return
+    }
+
     // Fallback: nothing to cancel or pop (shouldn't reach here if isActive is correct)
     logEvent('tengu_cancel', cancelProps)
     setToolUseConfirmQueue(() => [])
@@ -120,6 +128,8 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
     setToolUseConfirmQueue,
     onCancel,
     streamMode,
+    inputValue,
+    onClearInput,
   ])
 
   // Determine if this handler should be active
@@ -147,10 +157,12 @@ export function CancelRequestHandler(props: CancelRequestHandlerProps): null {
     !(isVimModeEnabled() && vimMode === 'INSERT')
 
   // Escape (chat:cancel) defers to mode-exit when in special mode with empty
-  // input, and to useBackgroundTaskNavigation when viewing a teammate
+  // input, and to useBackgroundTaskNavigation when viewing a teammate.
+  // Also active when idle at prompt with non-empty input (discard draft first).
+  const hasDraftInput = !!(inputValue && inputMode === 'prompt')
   const isEscapeActive =
     isContextActive &&
-    (canCancelRunningTask || hasQueuedCommands) &&
+    (canCancelRunningTask || hasQueuedCommands || hasDraftInput) &&
     !isInSpecialModeWithEmptyInput &&
     !isViewingTeammate
 

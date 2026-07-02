@@ -1119,6 +1119,13 @@ export const SettingsSchema = lazySchema(() =>
                   .describe(
                     'Entries for the auto mode classifier environment section',
                   ),
+                classifyAllShell: z
+                  .boolean()
+                  .optional()
+                  .describe(
+                    'When true, all shell commands go through the auto mode classifier ' +
+                      'even if they match a permissions.allow rule.',
+                  ),
               })
               .optional()
               .describe('Auto mode classifier prompt customization'),
