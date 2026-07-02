@@ -13,6 +13,7 @@ import { getStoredChangelogFromMemory, parseChangelog } from './releaseNotes.js'
 import { gt } from './semver.js'
 import { loadMessageLogs } from './sessionStorage.js'
 import { getInitialSettings } from './settings/settings.js'
+import { getAPIProvider, isThirdPartyProvider } from './model/providers.js'
 
 // Layout constants
 const MAX_LEFT_WIDTH = 56
@@ -22,6 +23,36 @@ const DIVIDER_WIDTH = 1
 const CONTENT_PADDING = 2
 
 export type LayoutMode = 'horizontal' | 'compact'
+
+/**
+ * Returns a provider-specific billing label for the welcome banner.
+ */
+function getProviderBillingLabel(): string {
+  const provider = getAPIProvider()
+  switch (provider) {
+    case 'bedrock':
+      return 'Amazon Bedrock'
+    case 'vertex':
+      return 'Google Cloud Vertex AI'
+    case 'foundry':
+      return 'Azure AI Foundry'
+    case 'firstParty':
+      return 'API Usage Billing'
+    default:
+      if (isThirdPartyProvider()) {
+        const baseUrl = process.env.ANTHROPIC_BASE_URL
+        if (baseUrl) {
+          try {
+            return new URL(baseUrl).hostname
+          } catch {
+            // fall through
+          }
+        }
+        return 'Third-Party API'
+      }
+      return 'API Usage Billing'
+  }
+}
 
 export type LayoutDimensions = {
   leftWidth: number
@@ -256,7 +287,7 @@ export function getLogoDisplayData(): {
     : displayPath
   const billingType = isClaudeAISubscriber()
     ? getSubscriptionName()
-    : 'API Usage Billing'
+    : getProviderBillingLabel()
   const agentName = getInitialSettings().agent
 
   return {

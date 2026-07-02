@@ -223,6 +223,68 @@ const DEFAULT_MCP_TOOL_TIMEOUT_MS = 100_000_000
 const MAX_MCP_DESCRIPTION_LENGTH = 2048
 
 /**
+ * Hard byte cap for MCP SSE/StreamableHTTP response bodies.
+ * Prevents a misbehaving MCP server from causing OOM via unbounded streaming.
+ */
+const MAX_MCP_RESPONSE_BYTES = 16_000_000 // 16 MB
+
+/**
+ * Wraps a fetch function to enforce a byte cap on response bodies.
+ * If the response body exceeds MAX_MCP_RESPONSE_BYTES, the stream is aborted
+ * and an error response is returned.
+ */
+function wrapFetchWithByteLimit(baseFetch: FetchLike): FetchLike {
+  return async (url: string | URL, init?: RequestInit) => {
+    const response = await baseFetch(url, init)
+    return wrapResponseWithByteLimit(response)
+  }
+}
+
+/**
+ * Wraps a Response to enforce a byte cap on its body stream.
+ */
+function wrapResponseWithByteLimit(response: Response): Response {
+  if (!response.body) return response
+
+  let totalBytes = 0
+  const reader = response.body.getReader()
+  const limitedStream = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read()
+        if (done) {
+          controller.close()
+          return
+        }
+        totalBytes += value.byteLength
+        if (totalBytes > MAX_MCP_RESPONSE_BYTES) {
+          controller.error(
+            new Error(
+              `MCP response exceeded ${MAX_MCP_RESPONSE_BYTES} byte limit (received ${totalBytes} bytes). ` +
+                'The MCP server may be misbehaving.',
+            ),
+          )
+          reader.cancel().catch(() => {})
+          return
+        }
+        controller.enqueue(value)
+      } catch (err) {
+        controller.error(err)
+      }
+    },
+    cancel() {
+      reader.cancel().catch(() => {})
+    },
+  })
+
+  return new Response(limitedStream, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  })
+}
+
+/**
  * Gets the timeout for MCP tool calls in milliseconds.
  * Uses MCP_TOOL_TIMEOUT environment variable if set, otherwise defaults to ~27.8 hours.
  */
@@ -501,7 +563,7 @@ export function wrapFetchWithTimeout(baseFetch: FetchLike): FetchLike {
     // Skip timeout for GET requests - in MCP transports, these are long-lived SSE streams.
     // (OAuth discovery GETs in auth.ts use a separate createAuthFetch() with its own timeout.)
     if (method === 'GET') {
-      return baseFetch(url, init)
+      return wrapFetchWithByteLimit(baseFetch)(url, init)
     }
 
     // Normalize headers and guarantee the Streamable-HTTP Accept value. new Headers()
@@ -546,7 +608,8 @@ export function wrapFetchWithTimeout(baseFetch: FetchLike): FetchLike {
         signal: controller.signal,
       })
       cleanup()
-      return response
+      // Apply byte cap to POST responses (StreamableHTTP) to prevent OOM
+      return wrapResponseWithByteLimit(response)
     } catch (error) {
       cleanup()
       throw error
@@ -661,7 +724,7 @@ export const connectToServer = memoize(
 
             const proxyOptions = getProxyFetchOptions()
             // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
-            return fetch(url, {
+            const response = await fetch(url, {
               ...init,
               ...proxyOptions,
               headers: {
@@ -672,6 +735,7 @@ export const connectToServer = memoize(
                 Accept: 'text/event-stream',
               },
             })
+            return wrapResponseWithByteLimit(response)
           },
         }
 
@@ -691,7 +755,7 @@ export const connectToServer = memoize(
                 eventSourceInit: {
                   fetch: async (url: string | URL, init?: RequestInit) => {
                     // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
-                    return fetch(url, {
+                    const response = await fetch(url, {
                       ...init,
                       ...proxyOptions,
                       headers: {
@@ -699,6 +763,7 @@ export const connectToServer = memoize(
                         ...init?.headers,
                       },
                     })
+                    return wrapResponseWithByteLimit(response)
                   },
                 },
               }

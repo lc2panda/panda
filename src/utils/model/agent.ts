@@ -13,6 +13,7 @@ import {
   parseUserSpecifiedModel,
 } from './model.js'
 import { getAPIProvider } from './providers.js'
+import { isTeammate } from '../teammate.js'
 
 // ── Panda: Multi-Model Routing target cache ──────────────
 // Stores the last routing decision so downstream consumers (claude.ts,
@@ -57,7 +58,8 @@ export function getAgentModel(
   /** Panda: agent definition for Multi-Model Routing (optional, no-op when routing disabled) */
   agentDefinition?: { modelPreferences?: Record<string, unknown>; modelPreset?: string; agentType?: string; name?: string },
 ): string {
-  if (process.env.CLAUDE_CODE_SUBAGENT_MODEL) {
+  // Teammates inherit the team coordinator's model — skip env override
+  if (process.env.CLAUDE_CODE_SUBAGENT_MODEL && !isTeammate()) {
     return parseUserSpecifiedModel(process.env.CLAUDE_CODE_SUBAGENT_MODEL)
   }
 

@@ -54,6 +54,28 @@ import { extractConnectionErrorDetails, formatAPIError } from './errorUtils.js'
 
 export const API_ERROR_MESSAGE_PREFIX = 'API Error'
 
+/**
+ * Returns a provider-appropriate status dashboard hint for error messages.
+ */
+function getProviderStatusHint(): string {
+  const provider = getAPIProvider()
+  switch (provider) {
+    case 'bedrock':
+      return 'AWS Health Dashboard'
+    case 'vertex':
+      return 'Google Cloud Status Dashboard'
+    case 'foundry':
+      return 'Azure Status'
+    case 'firstParty':
+      return 'status.anthropic.com'
+    default:
+      if (isThirdPartyProvider()) {
+        return 'your configured API provider'
+      }
+      return 'status.anthropic.com'
+  }
+}
+
 export function startsWithApiErrorPrefix(text: string): boolean {
   return (
     text.startsWith(API_ERROR_MESSAGE_PREFIX) ||
@@ -567,8 +589,9 @@ export function getAssistantMessageFromError(
     const stripped = error.message.replace(/^429\s+/, '')
     const innerMessage = stripped.match(/"message"\s*:\s*"([^"]*)"/)?.[1]
     const detail = innerMessage || stripped
+    const statusHint = getProviderStatusHint()
     return createAssistantAPIErrorMessage({
-      content: `${API_ERROR_MESSAGE_PREFIX}: Request rejected (429) · ${detail || 'this may be a temporary capacity issue — check status.anthropic.com'}`,
+      content: `${API_ERROR_MESSAGE_PREFIX}: Request rejected (429) · ${detail || `this may be a temporary capacity issue — check ${statusHint}`}`,
       error: 'rate_limit',
     })
   }
