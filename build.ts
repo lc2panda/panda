@@ -1,6 +1,8 @@
 // Input: src/entrypoints/cli.tsx + feature flags 配置
-// Output: dist/ 目录（编译后的 JS bundle，flags 内联替换）
+// Output: dist/ 目录（编译后的 JS bundle，flags 内联替换，NODE_ENV=production 注入）
 // Pos: 项目根目录构建脚本，bun build 入口
+// 变更理由: 注入 define process.env.NODE_ENV=production，避免打包 React dev
+//   reconciler（每帧 performance.measure 永久累积 → 741MB/2GB RSS 内存泄漏）。
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
 import { readdir, readFile, writeFile } from "fs/promises";
@@ -188,6 +190,14 @@ const result = await Bun.build({
     target: "bun",
     splitting: true,
     plugins: [featureFlagPlugin],
+    // Inject NODE_ENV=production so React reconciler & third-party deps compile
+    // their production builds. Without this, the dev react-reconciler ships,
+    // whose per-frame performance.measure() calls accumulate forever in Bun's
+    // native Performance buffer → 741MB Performance object → 2GB RSS (610MB/h leak).
+    // Statically replacing process.env.NODE_ENV also DCE's dev-only branches.
+    define: {
+        "process.env.NODE_ENV": JSON.stringify("production"),
+    },
 });
 
 if (!result.success) {
