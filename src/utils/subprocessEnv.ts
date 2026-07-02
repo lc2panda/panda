@@ -1,6 +1,25 @@
 import { isEnvTruthy } from './envUtils.js'
 
 /**
+ * NO_COLOR / FORCE_COLOR isolation (v2.29.4):
+ *
+ * Users may set NO_COLOR=1 or FORCE_COLOR=0 in their shell profile. These
+ * env vars should apply to *child processes* spawned by Panda (bash, MCP,
+ * hooks) but should NOT force-strip colours from Panda's own ink/TUI.
+ *
+ * On module load we snapshot their values, strip them from process.env (so
+ * chalk/ink see their own auto-detection), and re-inject them into
+ * subprocessEnv().
+ */
+const _savedColorEnv: Record<string, string> = {}
+for (const key of ['NO_COLOR', 'FORCE_COLOR'] as const) {
+  if (process.env[key] !== undefined) {
+    _savedColorEnv[key] = process.env[key]!
+    delete process.env[key]
+  }
+}
+
+/**
  * Env vars to strip from subprocess environments when running inside GitHub
  * Actions. This prevents prompt-injection attacks from exfiltrating secrets
  * via shell expansion (e.g., ${ANTHROPIC_API_KEY}) in Bash tool commands.
@@ -83,12 +102,17 @@ export function subprocessEnv(): NodeJS.ProcessEnv {
   // CCR containers.
   const proxyEnv = _getUpstreamProxyEnv?.() ?? {}
 
+  // Re-inject user's NO_COLOR / FORCE_COLOR that we stripped from process.env
+  // at module load (so Panda's own ink UI was unaffected).
+  const colorEnv = _savedColorEnv
+
   if (!isEnvTruthy(process.env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB)) {
-    return Object.keys(proxyEnv).length > 0
-      ? { ...process.env, ...proxyEnv }
+    const hasExtra = Object.keys(proxyEnv).length > 0 || Object.keys(colorEnv).length > 0
+    return hasExtra
+      ? { ...process.env, ...proxyEnv, ...colorEnv }
       : process.env
   }
-  const env = { ...process.env, ...proxyEnv }
+  const env = { ...process.env, ...proxyEnv, ...colorEnv }
   for (const k of GHA_SUBPROCESS_SCRUB) {
     delete env[k]
     // GitHub Actions auto-creates INPUT_<NAME> for `with:` inputs, duplicating

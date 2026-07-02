@@ -185,7 +185,7 @@ async function heartbeatWithDefense(
 
   const rssMB = Math.floor(rssBytes / MB)
 
-  // L1: RSS > warn 阈值 → 尝试 GC（Bun 环境下可用）
+  // L1: RSS > warn 阈值 → 尝试 GC（Bun 环境下可用）+ 回收空闲后台 shell
   if (rssMB > Math.floor(warnBytes / MB)) {
     try {
       // Bun.gc 可能不存在（Node.js 环境）
@@ -195,6 +195,14 @@ async function heartbeatWithDefense(
       bunGlobal?.gc?.(true)
     } catch {
       // Bun.gc 不可用，静默忽略
+    }
+    // v2.29.4: fire memory pressure callbacks at warn level for idle reaping
+    for (const cb of memoryPressureCallbacks) {
+      try {
+        void cb('warn', rssMB)
+      } catch {
+        // handlers must not crash the health monitor
+      }
     }
   }
 

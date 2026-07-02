@@ -347,6 +347,16 @@ export function AttachmentMessage({
             gracefully
           </Text>
         </Box>;
+    case 'compaction_reminder':
+      return <Box flexDirection="row" width="100%" marginTop={1} backgroundColor={bg}>
+          <Text dimColor color={isMatrixTheme() ? MATRIX_UI.systemMsg : 'yellow'}>
+            {isMatrixTheme() ? '│' : BLACK_CIRCLE}{' '}
+          </Text>
+          <Text dimColor>
+            Context is getting large. Consider running{' '}
+            <Text bold>/compact</Text> to free up space.
+          </Text>
+        </Box>;
     default:
       // Exhaustiveness: every type reaching here must be in NULL_RENDERING_TYPES.
       // If TS errors, a new Attachment type was added without a case above AND

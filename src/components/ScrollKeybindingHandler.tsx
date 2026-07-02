@@ -174,6 +174,14 @@ export type WheelAccelState = {
  *  step=0 (scrollBy(0) is a no-op, onScroll(false) is idempotent). Exported
  *  for tests. */
 export function computeWheelStep(state: WheelAccelState, dir: 1 | -1, now: number): number {
+  // v2.29.4: when wheelScrollAccelerationEnabled=false, skip all ramp logic —
+  // each tick returns the baseline rows without velocity multiplier.
+  if (!readWheelAccelEnabled()) {
+    state.dir = dir;
+    state.time = now;
+    return state.base;
+  }
+
   if (!state.xtermJs) {
     // Device-switch guard ①: idle disengage. Runs BEFORE pendingFlip resolve
     // so a pending bounce (28% of last-mouse-events) doesn't bypass it via
@@ -322,6 +330,21 @@ export function readScrollSpeedBase(): number {
     // fallthrough to default
   }
   return 1;
+}
+
+/** Check whether wheel-scroll acceleration is enabled (default: true).
+ *  When false, each wheel tick returns the baseline without velocity ramp.
+ *  Read is best-effort — mirrors readScrollSpeedBase error handling. */
+export function readWheelAccelEnabled(): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getInitialSettings } = require('../utils/settings/settings.js') as typeof import('../utils/settings/settings.js');
+    const v = getInitialSettings().wheelScrollAccelerationEnabled;
+    if (typeof v === 'boolean') return v;
+  } catch {
+    // fallthrough to default
+  }
+  return true;
 }
 
 /** Initial wheel accel state. xtermJs=true selects the decay curve.

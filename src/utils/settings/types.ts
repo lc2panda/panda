@@ -1032,6 +1032,21 @@ export const SettingsSchema = lazySchema(() =>
               ),
           }
         : {}),
+      wheelScrollAccelerationEnabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Enable mouse-wheel scroll acceleration (default: true). ' +
+            'When false, each wheel tick scrolls the baseline number of rows ' +
+            'without velocity ramp-up.',
+        ),
+      respondToBashCommands: z
+        .boolean()
+        .optional()
+        .describe(
+          'When true, output from ! bash commands is automatically fed back ' +
+            'to Claude for a response (default: false).',
+        ),
       prefersReducedMotion: z
         .boolean()
         .optional()

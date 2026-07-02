@@ -74,3 +74,44 @@ export function killShellTasksForAgent(
   // harmlessly (no consumer matches a dead agentId).
   dequeueAllMatching(cmd => cmd.agentId === agentId)
 }
+
+/**
+ * v2.29.4: Reap idle background shell tasks under memory pressure.
+ * Called by memory pressure handlers when RSS exceeds the warn threshold.
+ * Kills background shell tasks that have been idle for > idleMs.
+ */
+const IDLE_SHELL_THRESHOLD_MS = 5 * 60_000 // 5 minutes
+
+export function reapIdleShellTasks(
+  getAppState: () => AppState,
+  setAppState: SetAppStateFn,
+): number {
+  const tasks = getAppState().tasks ?? {}
+  const now = Date.now()
+  let reaped = 0
+
+  for (const [taskId, task] of Object.entries(tasks)) {
+    if (
+      isLocalShellTask(task) &&
+      task.status === 'running' &&
+      task.isBackgrounded &&
+      task.startTime != null &&
+      now - task.startTime > IDLE_SHELL_THRESHOLD_MS
+    ) {
+      logForDebugging(
+        `reapIdleShellTasks: killing idle backgrounded shell ${taskId} ` +
+          `(age ${Math.round((now - task.startTime) / 1000)}s, memory pressure)`,
+      )
+      killTask(taskId, setAppState)
+      reaped++
+    }
+  }
+
+  if (reaped > 0) {
+    logForDebugging(
+      `reapIdleShellTasks: reaped ${reaped} idle backgrounded shell(s)`,
+    )
+  }
+
+  return reaped
+}

@@ -1196,7 +1196,13 @@ export function REPL({
   // Track the count of messages we've already processed for MessageDisplay hooks
   const messageDisplayProcessedCountRef = useRef(0);
   const agentTitle = mainThreadAgentDefinition?.agentType;
-  const terminalTitle = sessionTitle ?? agentTitle ?? haikuTitle ?? 'Panda';
+  const baseTitle = sessionTitle ?? agentTitle ?? haikuTitle ?? 'Panda';
+  // v2.29.4: show awaiting-input count in tab title so user can spot pending
+  // approvals without switching to the Panda terminal tab.
+  const awaitingCount = toolUseConfirmQueue.length;
+  const terminalTitle = awaitingCount > 0
+    ? `(${awaitingCount}) ${baseTitle}`
+    : baseTitle;
   const isWaitingForApproval = toolUseConfirmQueue.length > 0 || promptQueue.length > 0 || pendingWorkerRequest || pendingSandboxRequest;
   // Local-jsx commands (like /plugin, /config) show user-facing dialogs that
   // wait for input. Require jsx != null — if the flag is stuck true but jsx

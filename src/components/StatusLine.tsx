@@ -134,7 +134,12 @@ function buildStatusLineCommandInput(permissionMode: PermissionMode, exceeds200k
         original_cwd: worktreeSession.originalCwd,
         original_branch: worktreeSession.originalBranch
       }
-    })
+    }),
+    // v2.29.4: terminal dimensions so status line commands can adapt layout
+    terminal: {
+      columns: process.stdout.columns ?? 80,
+      lines: process.stdout.rows ?? 24,
+    },
   };
 }
 type Props = {

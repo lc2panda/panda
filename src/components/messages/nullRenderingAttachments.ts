@@ -42,7 +42,6 @@ const NULL_RENDERING_TYPES = [
   'output_token_usage',
   'verify_plan_reminder',
   'current_session_memory',
-  'compaction_reminder',
   'date_change',
 ] as const satisfies readonly Attachment['type'][]
 

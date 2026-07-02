@@ -3,7 +3,7 @@
 // Pos: src/daemon/ —— DAEMON feature gate 路由入口；复用 bgSpawn/PID registry/tmux/bridge
 
 import { spawn, type ChildProcess } from 'child_process'
-import { mkdir, writeFile, readFile, unlink, chmod, readdir } from 'fs/promises'
+import { mkdir, writeFile, readFile, unlink, chmod, readdir, stat } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
 
@@ -565,14 +565,46 @@ async function runSupervisor(workerSpecs: WorkerSpec[]): Promise<void> {
     `[daemon] supervisor running pid=${process.pid} workers=${workerSpecs.length} tmux=${useTmux}`,
   )
 
+  // v2.29.4: detect binary upgrade — if the executable changed on disk since
+  // the daemon started, exit cleanly so the process manager (systemd/launchd/
+  // the user) can re-launch with the new version.
+  const binaryPath = process.execPath
+  let binaryMtimeAtStart: number | null = null
+  try {
+    const st = await stat(binaryPath)
+    binaryMtimeAtStart = st.mtimeMs
+  } catch {
+    // stat failed — skip upgrade detection (e.g. Bun single-exe without a
+    // stable path)
+  }
+
   // 保活主循环：定期输出心跳，直到 shuttingDown
   return new Promise<void>(resolve => {
-    const heartbeat = setInterval(() => {
+    const heartbeat = setInterval(async () => {
       if (shuttingDown) {
         clearInterval(heartbeat)
         resolve()
         return
       }
+
+      // Binary upgrade detection
+      if (binaryMtimeAtStart !== null) {
+        try {
+          const st = await stat(binaryPath)
+          if (st.mtimeMs !== binaryMtimeAtStart) {
+            logForDebugging(
+              `[daemon] binary upgraded on disk (mtime ${binaryMtimeAtStart} → ${st.mtimeMs}), initiating clean exit`,
+            )
+            clearInterval(heartbeat)
+            await gracefulShutdown('binary-upgrade')
+            resolve()
+            return
+          }
+        } catch {
+          // stat failed mid-flight — ignore this cycle
+        }
+      }
+
       logForDebugging(
         `[daemon] heartbeat workers=${workers.size} pid=${process.pid}`,
       )

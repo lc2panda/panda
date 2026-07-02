@@ -11,6 +11,7 @@ import { errorMessage, ShellError } from '../errors.js';
 import { createSyntheticUserCaveatMessage, createUserInterruptionMessage, createUserMessage, prepareUserContent } from '../messages.js';
 import { resolveDefaultShell } from '../shell/resolveDefaultShell.js';
 import { isPowerShellToolEnabled } from '../shell/shellToolUtils.js';
+import { getInitialSettings } from '../settings/settings.js';
 import { processToolResultBlock } from '../toolResultStorage.js';
 import { escapeXml } from '../xml.js';
 import type { ProcessUserInputContext } from './processUserInput.js';
@@ -104,11 +105,14 @@ export async function processBashCommand(inputString: string, precedingInputBloc
     // tags into &lt;persisted-output&gt;, breaking the model's parse and
     // UserBashOutputMessage's extractTag. Escape the raw fallback only.
     const stdout = typeof mapped.content === 'string' ? mapped.content : escapeXml(data.stdout);
+    // v2.29.4: when respondToBashCommands is enabled, feed output back to
+    // Claude automatically so the model can react to ! command results.
+    const shouldRespondToBash = getInitialSettings().respondToBashCommands === true;
     return {
       messages: [createSyntheticUserCaveatMessage(), userMessage, ...attachmentMessages, createUserMessage({
         content: `<bash-stdout>${stdout}</bash-stdout><bash-stderr>${escapeXml(stderr)}</bash-stderr>`
       })],
-      shouldQuery: false
+      shouldQuery: shouldRespondToBash
     };
   } catch (e) {
     if (e instanceof ShellError) {
