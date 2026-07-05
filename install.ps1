@@ -19,7 +19,7 @@ function Install-Panda {
     $NpmPkg          = '@lc2panda/panda-code'
     $TgzNamePrefix   = 'lc2panda-panda-code-'
     # 解析全部失败时的兜底直链（与备选命令一致，确保至少能装上）
-    $FallbackTgzUrl  = 'https://github.com/lc2panda/panda/releases/download/v2.28.0/lc2panda-panda-code-2.28.0.tgz'
+    $FallbackTgzUrl  = 'https://github.com/lc2panda/panda/releases/download/v2.29.7/lc2panda-panda-code-2.29.7.tgz'
 
     function Write-Info { param([string]$Msg) Write-Host "==> $Msg" -ForegroundColor Cyan }
     function Write-Ok   { param([string]$Msg) Write-Host "[ok] $Msg" -ForegroundColor Green }
