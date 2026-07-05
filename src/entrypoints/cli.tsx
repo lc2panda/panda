@@ -240,6 +240,12 @@ if (feature("ABLATION_BASELINE") && process.env.CLAUDE_CODE_ABLATION_BASELINE) {
  * Fast-path for --version has zero imports beyond this file.
  */
 async function main(): Promise<void> {
+    // Windows UTF-8 encoding fix for terminal output
+    if (process.platform === 'win32') {
+        process.stdout.setDefaultEncoding('utf8');
+        process.stderr.setDefaultEncoding('utf8');
+    }
+
     const args = process.argv.slice(2);
 
     // Fast-path for --version/-v: zero module loading needed

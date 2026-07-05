@@ -623,6 +623,12 @@ const _pendingSSH: PendingSSH | undefined = feature('SSH_REMOTE') ? {
 export async function main() {
   profileCheckpoint('main_function_start');
 
+  // Windows UTF-8 encoding fix for terminal output
+  if (process.platform === 'win32') {
+    process.stdout.setDefaultEncoding('utf8');
+    process.stderr.setDefaultEncoding('utf8');
+  }
+
   // SECURITY: Prevent Windows from executing commands from current directory
   // This must be set before ANY command execution to prevent PATH hijacking attacks
   // See: https://docs.microsoft.com/en-us/windows/win32/api/processenv/nf-processenv-searchpathw
