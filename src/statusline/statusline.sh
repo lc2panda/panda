@@ -53,14 +53,45 @@ if [ -z "$input" ]; then
 fi
 
 # ── Colors ──────────────────────────────────────────────
-blue='\033[38;2;0;153;255m'
-orange='\033[38;2;255;176;85m'
-green='\033[38;2;0;175;80m'
-cyan='\033[38;2;86;182;194m'
-red='\033[38;2;255;85;85m'
-yellow='\033[38;2;230;200;0m'
-white='\033[38;2;220;220;220m'
-magenta='\033[38;2;180;140;255m'
+# Detect Termius environment: TERMIUS_VERSION is set by Termius itself,
+# or check SSH_CLIENT + TERM pattern (common Termius SSH session signature)
+IS_TERMIUS=0
+if [[ -n "$TERMIUS_VERSION" ]] || [[ -n "$SSH_CLIENT" && "$TERM" == "xterm-256color" ]]; then
+    IS_TERMIUS=1
+fi
+
+# Detect Windows platform
+IS_WINDOWS=0
+OS_NAME=$(uname -s | tr '[:upper:]' '[:lower:]')
+if [[ "$OS_NAME" == mingw* ]] || [[ "$OS_NAME" == msys* ]] || [[ "$OS_NAME" == cygwin* ]]; then
+    IS_WINDOWS=1
+fi
+
+# Windows Termius has incomplete True Color support — use ANSI 256-color mode
+# Mac Termius and other terminals preserve True Color (24-bit RGB)
+# Escape hatch: set PANDA_FORCE_TRUECOLOR=1 to override
+if [[ "$IS_TERMIUS" == "1" && "$IS_WINDOWS" == "1" && "$PANDA_FORCE_TRUECOLOR" != "1" ]]; then
+    # ANSI 256-color palette (closest match to True Color values)
+    blue='\033[38;5;39m'      # rgb(0,153,255) → idx 39 (approx)
+    orange='\033[38;5;214m'   # rgb(255,176,85) → idx 214 (approx)
+    green='\033[38;5;35m'     # rgb(0,175,80) → idx 35 (approx)
+    cyan='\033[38;5;44m'      # rgb(86,182,194) → idx 44 (approx)
+    red='\033[38;5;203m'      # rgb(255,85,85) → idx 203 (approx)
+    yellow='\033[38;5;220m'   # rgb(230,200,0) → idx 220 (approx)
+    white='\033[38;5;253m'    # rgb(220,220,220) → idx 253 (approx)
+    magenta='\033[38;5;141m'  # rgb(180,140,255) → idx 141 (approx)
+else
+    # True Color (24-bit RGB) — default for most modern terminals
+    blue='\033[38;2;0;153;255m'
+    orange='\033[38;2;255;176;85m'
+    green='\033[38;2;0;175;80m'
+    cyan='\033[38;2;86;182;194m'
+    red='\033[38;2;255;85;85m'
+    yellow='\033[38;2;230;200;0m'
+    white='\033[38;2;220;220;220m'
+    magenta='\033[38;2;180;140;255m'
+fi
+
 dim='\033[2m'
 reset='\033[0m'
 

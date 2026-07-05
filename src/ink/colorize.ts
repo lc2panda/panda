@@ -1,5 +1,6 @@
 import chalk from 'chalk'
 import type { Color, TextStyles } from './styles.js'
+import { isWindowsTermius } from './terminal.js'
 
 /**
  * xterm.js (VS Code, Cursor, code-server, Coder) has supported truecolor
@@ -55,11 +56,31 @@ function clampChalkLevelForTmux(): boolean {
   }
   return false
 }
+
+/**
+ * Windows Termius has incomplete True Color support — 24-bit RGB sequences
+ * (\\033[38;2;R;G;Bm) render incorrectly and cause display corruption.
+ * Downgrade to 256-color mode (level 2) to avoid ANSI rendering bugs.
+ * Mac Termius has proper True Color support and is NOT affected.
+ * Escape hatch: set PANDA_FORCE_TRUECOLOR=1 to override.
+ */
+function clampChalkLevelForWindowsTermius(): boolean {
+  // Escape hatch: user explicitly wants True Color (e.g., verified their
+  // Termius version supports it)
+  if (process.env.PANDA_FORCE_TRUECOLOR === '1') return false
+  if (isWindowsTermius() && chalk.level > 2) {
+    chalk.level = 2
+    return true
+  }
+  return false
+}
+
 // Computed once at module load — terminal/tmux environment doesn't change mid-session.
 // Order matters: boost first so the tmux clamp can re-clamp if tmux is running
 // inside a VS Code terminal. Exported for debugging — tree-shaken if unused.
 export const CHALK_BOOSTED_FOR_XTERMJS = boostChalkLevelForXtermJs()
 export const CHALK_CLAMPED_FOR_TMUX = clampChalkLevelForTmux()
+export const CHALK_CLAMPED_FOR_WINDOWS_TERMIUS = clampChalkLevelForWindowsTermius()
 
 export type ColorType = 'foreground' | 'background'
 

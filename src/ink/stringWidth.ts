@@ -45,8 +45,15 @@ function stringWidthJavaScript(str: string): number {
   }
 
   // Strip ANSI if escape character is present
+  // Windows Termius may have residual cursor control sequences (e.g., \033[H, \033[s, \033[u)
+  // that strip-ansi doesn't fully catch. Apply a two-pass cleaning strategy.
   if (str.includes('\x1b')) {
     str = stripAnsi(str)
+    // Double-check: if ESC byte remains, apply broader regex to catch cursor control
+    if (str.includes('\x1b')) {
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC byte (0x1b) is intentional for ANSI cleaning
+      str = str.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+    }
     if (str.length === 0) {
       return 0
     }

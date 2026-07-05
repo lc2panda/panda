@@ -145,6 +145,25 @@ export function isXtermJs(): boolean {
   return xtversionName?.startsWith('xterm.js') ?? false
 }
 
+/** True if running in Termius terminal. Checks TERMIUS_VERSION environment
+ *  variable or SSH_CLIENT with TERM pattern. Returns false if env vars are
+ *  undefined (defensive programming). */
+export function isTermius(): boolean {
+  if (process.env.TERMIUS_VERSION) return true
+  // SSH session with xterm-256color or similar (common Termius pattern)
+  if (process.env.SSH_CLIENT && process.env.TERM?.includes('xterm')) {
+    return true
+  }
+  return false
+}
+
+/** True if running in Termius on Windows. Combines isTermius() with platform
+ *  check. Used to downgrade ANSI features (e.g., True Color -> 256-color) for
+ *  Windows Termius which has incomplete True Color support. */
+export function isWindowsTermius(): boolean {
+  return isTermius() && process.platform === 'win32'
+}
+
 // Terminals known to correctly implement the Kitty keyboard protocol
 // (CSI >1u) and/or xterm modifyOtherKeys (CSI >4;2m) for ctrl+shift+<letter>
 // disambiguation. We previously enabled unconditionally (#23350), assuming
