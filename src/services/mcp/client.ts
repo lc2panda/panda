@@ -383,9 +383,9 @@ export function clearMcpAuthCache(): void {
 }
 
 /**
- * Windows 平台下解析命令，自动追加 .exe 扩展名
- * @param command 原始命令（如 "node" / "python"）
- * @returns 解析后的命令（如 "node.exe"）
+ * Windows 平台下解析命令，自动追加 .exe 或 .cmd 扩展名
+ * @param command 原始命令（如 "node" / "python" / "npx"）
+ * @returns 解析后的命令（如 "node.exe" / "npx.cmd"）
  */
 function resolveWindowsCommand(command: string): string {
   // 已经是绝对路径且包含扩展名，直接返回
@@ -398,13 +398,12 @@ function resolveWindowsCommand(command: string): string {
     return command
   }
 
-  // 常见 CLI 工具自动追加 .exe
-  const commonCommands = [
+  // npm/npx/yarn/pnpm 是 .cmd 脚本（非 .exe）
+  const cmdScripts = ['npm', 'npx', 'yarn', 'pnpm']
+
+  // 其他常见 CLI 工具追加 .exe
+  const exeCommands = [
     'node',
-    'npm',
-    'npx',
-    'pnpm',
-    'yarn',
     'python',
     'python3',
     'py',
@@ -415,9 +414,15 @@ function resolveWindowsCommand(command: string): string {
   ]
 
   const baseName = basename(command)
-  if (commonCommands.includes(baseName)) {
-    // 保留路径部分，仅给 basename 追加 .exe
-    const dir = dirname(command)
+  const dir = dirname(command)
+
+  if (cmdScripts.includes(baseName)) {
+    // npm/npx/yarn/pnpm → .cmd（cross-spawn 会自动处理 .cmd 脚本）
+    return dir === '.' ? `${baseName}.cmd` : join(dir, `${baseName}.cmd`)
+  }
+
+  if (exeCommands.includes(baseName)) {
+    // node/python 等 → .exe
     return dir === '.' ? `${baseName}.exe` : join(dir, `${baseName}.exe`)
   }
 
