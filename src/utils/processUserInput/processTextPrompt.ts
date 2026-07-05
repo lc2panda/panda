@@ -6,6 +6,7 @@ import type {
   SystemMessage,
   UserMessage,
 } from 'src/types/message.js'
+import { removeImagePlaceholders } from 'src/history.js'
 import { logEvent } from '../../services/analytics/index.js'
 import type { PermissionMode } from '../../types/permissions.js'
 import { createUserMessage } from '../messages.js'
@@ -65,13 +66,14 @@ export function processTextPrompt(
 
   // If we have pasted images, create a message with image content
   if (imageContentBlocks.length > 0) {
-    // Build content: text first, then images below
+    // Build content: text first (with image placeholders removed), then images below
+    const cleanedInput = typeof input === 'string' ? removeImagePlaceholders(input) : input
     const textContent =
-      typeof input === 'string'
-        ? input.trim()
-          ? [{ type: 'text' as const, text: input }]
+      typeof cleanedInput === 'string'
+        ? cleanedInput.trim()
+          ? [{ type: 'text' as const, text: cleanedInput }]
           : []
-        : input
+        : cleanedInput
     const userMessage = createUserMessage({
       content: [...textContent, ...imageContentBlocks],
       uuid: uuid,

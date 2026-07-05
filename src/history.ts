@@ -102,6 +102,15 @@ export function expandPastedTextRefs(
   return expanded
 }
 
+/**
+ * Remove [Image #N] placeholders from input string.
+ * Used after images are extracted into content blocks.
+ */
+export function removeImagePlaceholders(input: string): string {
+  const imageRefPattern = /\[Image #(\d+)\]/g
+  return input.replace(imageRefPattern, '').trim()
+}
+
 function deserializeLogEntry(line: string): LogEntry {
   return jsonParse(line) as LogEntry
 }
