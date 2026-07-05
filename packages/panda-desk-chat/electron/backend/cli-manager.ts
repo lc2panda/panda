@@ -793,7 +793,8 @@ export class CLISession extends EventEmitter {
       message: {
         role: 'user',
         content: [
-          { type: 'text', text: content },
+          // 仅当 content 非空时插入 text block
+          ...(content.trim() ? [{ type: 'text' as const, text: content }] : []),
           ...(attachments || []).map(a => ({
             type: 'image' as const,
             source: { type: 'base64' as const, media_type: a.mediaType, data: a.data },
