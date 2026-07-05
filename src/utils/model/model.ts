@@ -261,6 +261,10 @@ export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
   if (name.includes('claude-3-7-sonnet')) {
     return 'claude-3-7-sonnet'
   }
+  // Fable-5 is a virtual model that maps to claude-3-7-sonnet backend
+  if (name.includes('claude-fable-5') || name.includes('fable-5')) {
+    return 'claude-fable-5'
+  }
   if (name.includes('claude-3-5-sonnet')) {
     return 'claude-3-5-sonnet'
   }
@@ -633,6 +637,9 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
   }
   if (canonical.includes('claude-3-7-sonnet')) {
     return 'Claude 3.7 Sonnet'
+  }
+  if (canonical.includes('claude-fable-5')) {
+    return 'Claude 3.7 Fable (Agentic)'
   }
   if (canonical.includes('claude-3-5-sonnet')) {
     return 'Claude 3.5 Sonnet'

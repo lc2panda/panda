@@ -121,6 +121,17 @@ function getSonnet46Option(): ModelOption {
   }
 }
 
+function getFable5Option(): ModelOption {
+  const is3P = getAPIProvider() !== 'firstParty'
+  return {
+    value: getModelStrings().fable5,
+    label: 'Fable',
+    description: `Claude 3.7 Fable (Agentic)${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
+    descriptionForModel:
+      'Claude 3.7 Fable - agentic model optimized for extended reasoning tasks',
+  }
+}
+
 function getCustomOpusOption(): ModelOption | undefined {
   const is3P = getAPIProvider() !== 'firstParty'
   const customOpusModel = process.env.ANTHROPIC_DEFAULT_OPUS_MODEL
@@ -300,6 +311,7 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
       getMergedOpus1MOption(fastMode),
       getSonnet5Option(),
       getSonnet46Option(),
+      getFable5Option(),
       getSonnet46_1MOption(),
       getHaiku45Option(),
     ]
@@ -314,6 +326,7 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
       }
 
       premiumOptions.push(MaxSonnet46Option)
+      premiumOptions.push(getFable5Option())
       if (checkSonnet1mAccess()) {
         premiumOptions.push(getMaxSonnet46_1MOption())
       }
@@ -324,6 +337,7 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
 
     // Pro/Team Standard/Enterprise users: Sonnet is default, show Opus as alternative
     const standardOptions = [getDefaultOptionForUser(fastMode)]
+    standardOptions.push(getFable5Option())
     if (checkSonnet1mAccess()) {
       standardOptions.push(getMaxSonnet46_1MOption())
     }
@@ -344,6 +358,7 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
   // PAYG 1P API: Default (Sonnet) + Sonnet 1M + Opus 4.6 + Opus 1M + Haiku
   if (getAPIProvider() === 'firstParty') {
     const payg1POptions = [getDefaultOptionForUser(fastMode)]
+    payg1POptions.push(getFable5Option())
     if (checkSonnet1mAccess()) {
       payg1POptions.push(getSonnet46_1MOption())
     }
@@ -368,6 +383,7 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
   } else {
     // Add Sonnet 4.6 since Sonnet 4.5 is the default
     payg3pOptions.push(getSonnet46Option())
+    payg3pOptions.push(getFable5Option())
     if (checkSonnet1mAccess()) {
       payg3pOptions.push(getSonnet46_1MOption())
     }

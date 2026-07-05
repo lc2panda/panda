@@ -13,6 +13,13 @@ export const CLAUDE_3_7_SONNET_CONFIG = {
   foundry: 'claude-3-7-sonnet',
 } as const satisfies ModelConfig
 
+export const CLAUDE_FABLE_5_CONFIG = {
+  firstParty: 'claude-fable-5',
+  bedrock: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0',
+  vertex: 'claude-3-7-sonnet@20250219',
+  foundry: 'claude-3-7-sonnet',
+} as const satisfies ModelConfig
+
 export const CLAUDE_3_5_V2_SONNET_CONFIG = {
   firstParty: 'claude-3-5-sonnet-20241022',
   bedrock: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
@@ -103,6 +110,7 @@ export const ALL_MODEL_CONFIGS = {
   haiku45: CLAUDE_HAIKU_4_5_CONFIG,
   sonnet35: CLAUDE_3_5_V2_SONNET_CONFIG,
   sonnet37: CLAUDE_3_7_SONNET_CONFIG,
+  fable5: CLAUDE_FABLE_5_CONFIG,
   sonnet40: CLAUDE_SONNET_4_CONFIG,
   sonnet45: CLAUDE_SONNET_4_5_CONFIG,
   sonnet46: CLAUDE_SONNET_4_6_CONFIG,
