@@ -48,7 +48,7 @@ function createDarwinNativeModule(): NativeModule {
       try {
         // Use osascript to read clipboard image as PNG data and write to a temp file,
         // then read the temp file back
-        const tmpPath = `/tmp/claude_clipboard_native_${Date.now()}.png`
+        const tmpPath = `/tmp/panda_clipboard_native_${Date.now()}.png`
         const script = `
 set png_data to (the clipboard as «class PNGf»)
 set fp to open for access POSIX file "${tmpPath}" with write permission
@@ -154,7 +154,7 @@ function createWin32NativeModule(): NativeModule {
         }
 
         // PowerShell fallback（兼容路径）
-        const tmpPath = `${process.env.TEMP || 'C:\\Temp'}\\claude_clipboard_${Date.now()}.png`
+        const tmpPath = `${process.env.TEMP || 'C:\\Temp'}\\panda_clipboard_${Date.now()}.png`
         const script = `
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
