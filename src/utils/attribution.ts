@@ -259,19 +259,26 @@ async function getTranscriptStats(): Promise<{
     // skipped at the fd level so peak scales with output, not file size. The
     // one surviving attr-snap at EOF is a no-op for the count functions
     // (neither checks type === 'attribution-snapshot'). When the last
-    // boundary has preservedSegment the reader returns full (no truncate);
-    // the findLastIndex below still slices to post-boundary.
+    // boundary has preservedSegment, the reader returns the full post-boundary
+    // content and sets hasPreservedSegment=true; we use all entries directly.
+    // For old format or boundaries without preservedSegment, we fallback to
+    // manual boundary search and slice.
     const scan = await readTranscriptForLoad(filePath, fileSize)
     const buf = scan.postBoundaryBuf
     const entries = parseJSONL<Entry>(buf)
-    const lastBoundaryIdx = entries.findLastIndex(
-      e =>
-        e.type === 'system' &&
-        'subtype' in e &&
-        e.subtype === 'compact_boundary',
-    )
-    const postBoundary =
-      lastBoundaryIdx >= 0 ? entries.slice(lastBoundaryIdx + 1) : entries
+    const postBoundary = scan.hasPreservedSegment
+      ? entries
+      : (() => {
+          const lastBoundaryIdx = entries.findLastIndex(
+            e =>
+              e.type === 'system' &&
+              'subtype' in e &&
+              e.subtype === 'compact_boundary',
+          )
+          return lastBoundaryIdx >= 0
+            ? entries.slice(lastBoundaryIdx + 1)
+            : entries
+        })()
     return {
       promptCount: countUserPromptsFromEntries(postBoundary),
       memoryAccessCount: countMemoryFileAccessFromEntries(postBoundary),
