@@ -26,7 +26,8 @@ if [ -d "${PANDA_HOME}/vendor/jq" ]; then
 
     if [ -n "${PLATFORM}" ]; then
         VENDORED_JQ="${PANDA_HOME}/vendor/jq/${PLATFORM}/jq"
-        [ "${OS}" = "mingw" ] || [ "${OS}" = "msys" ] || [ "${OS}" = "cygwin" ] && VENDORED_JQ="${VENDORED_JQ}.exe"
+        # Windows Git Bash/MSYS/Cygwin: append .exe extension (use wildcard matching for version suffix)
+        [[ "${OS}" == mingw* ]] || [[ "${OS}" == msys* ]] || [[ "${OS}" == cygwin* ]] && VENDORED_JQ="${VENDORED_JQ}.exe"
 
         if [ -x "${VENDORED_JQ}" ]; then
             JQ_BIN="${VENDORED_JQ}"
