@@ -102,4 +102,19 @@ describe('resolveWindowsCommand', () => {
     expect(resolveWindowsCommand('./bin/node')).toMatch(/node\.exe$/)
     expect(resolveWindowsCommand('tools/node')).toMatch(/node\.exe$/)
   })
+
+  test('MCP 常见场景：npx 启动 @modelcontextprotocol/server-*', () => {
+    // 典型的 MCP stdio 配置中 command 为 "npx"
+    expect(resolveWindowsCommand('npx')).toBe('npx.cmd')
+  })
+
+  test('MCP 常见场景：使用全局安装的 npm 包', () => {
+    expect(resolveWindowsCommand('npm')).toBe('npm.cmd')
+    expect(resolveWindowsCommand('yarn')).toBe('yarn.cmd')
+  })
+
+  test('边界情况：空字符串和点开头', () => {
+    expect(resolveWindowsCommand('')).toBe('')
+    expect(resolveWindowsCommand('.')).toBe('.')
+  })
 })
