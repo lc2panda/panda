@@ -240,10 +240,21 @@ if (feature("ABLATION_BASELINE") && process.env.CLAUDE_CODE_ABLATION_BASELINE) {
  * Fast-path for --version has zero imports beyond this file.
  */
 async function main(): Promise<void> {
-    // Windows UTF-8 encoding fix for terminal output
+    // Windows UTF-8 encoding fix: change both terminal codepage AND output encoding
     if (process.platform === 'win32') {
-        process.stdout.setDefaultEncoding('utf8');
-        process.stderr.setDefaultEncoding('utf8');
+        try {
+            // Step 1: Change terminal codepage to UTF-8 (65001)
+            require('child_process').execSync('chcp 65001 >nul 2>&1', {
+                stdio: 'pipe',
+                windowsHide: true
+            });
+
+            // Step 2: Set stdout/stderr encoding to match terminal
+            process.stdout.setDefaultEncoding('utf8');
+            process.stderr.setDefaultEncoding('utf8');
+        } catch (error) {
+            // Fallback: if chcp fails, don't change encoding (keep consistency)
+        }
     }
 
     const args = process.argv.slice(2);
