@@ -316,7 +316,7 @@ const isComputerUseMCPServer = feature('CHICAGO_MCP')
   : undefined
 
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
-import { dirname, join } from 'path'
+import { basename, dirname, extname, isAbsolute, join } from 'path'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
@@ -380,6 +380,49 @@ export function clearMcpAuthCache(): void {
   void unlink(getMcpAuthCachePath()).catch(() => {
     // Cache file may not exist
   })
+}
+
+/**
+ * Windows 平台下解析命令，自动追加 .exe 扩展名
+ * @param command 原始命令（如 "node" / "python"）
+ * @returns 解析后的命令（如 "node.exe"）
+ */
+function resolveWindowsCommand(command: string): string {
+  // 已经是绝对路径且包含扩展名，直接返回
+  if (isAbsolute(command) && extname(command)) {
+    return command
+  }
+
+  // 已包含扩展名（相对路径），直接返回
+  if (extname(command)) {
+    return command
+  }
+
+  // 常见 CLI 工具自动追加 .exe
+  const commonCommands = [
+    'node',
+    'npm',
+    'npx',
+    'pnpm',
+    'yarn',
+    'python',
+    'python3',
+    'py',
+    'deno',
+    'bun',
+    'docker',
+    'podman',
+  ]
+
+  const baseName = basename(command)
+  if (commonCommands.includes(baseName)) {
+    // 保留路径部分，仅给 basename 追加 .exe
+    const dir = dirname(command)
+    return dir === '.' ? `${baseName}.exe` : join(dir, `${baseName}.exe`)
+  }
+
+  // 其他命令：假设用户知道自己在做什么，返回原值
+  return command
 }
 
 /**
@@ -1017,11 +1060,17 @@ export const connectToServer = memoize(
         logMCPDebug(name, `In-process Computer Use MCP server started`)
       } else if ((serverRef as ScopedMcpServerConfig).type === 'stdio' || !(serverRef as ScopedMcpServerConfig).type) {
         const stdioRef = serverRef as McpStdioServerConfig
-        const finalCommand =
+        let finalCommand =
           process.env.CLAUDE_CODE_SHELL_PREFIX || stdioRef.command
         const finalArgs = process.env.CLAUDE_CODE_SHELL_PREFIX
           ? [[stdioRef.command, ...stdioRef.args].join(' ')]
           : stdioRef.args
+
+        // Windows 平台下自动解析命令
+        if (process.platform === 'win32' && !process.env.CLAUDE_CODE_SHELL_PREFIX) {
+          finalCommand = resolveWindowsCommand(finalCommand)
+        }
+
         transport = new StdioClientTransport({
           command: finalCommand,
           args: finalArgs,
@@ -1389,11 +1438,17 @@ export const connectToServer = memoize(
               name,
               `Process not found - stdio server process terminated`,
             )
-          } else if (error.message.includes('spawn')) {
-            logMCPDebug(
-              name,
-              `Failed to spawn process - check command and permissions`,
-            )
+          } else if (
+            error.message.includes('spawn') ||
+            (error as NodeJS.ErrnoException).code === 'ENOENT'
+          ) {
+            const isWindows = process.platform === 'win32'
+            const commandName =
+              (serverRef as McpStdioServerConfig).command || 'unknown'
+            const hint = isWindows
+              ? `Command '${commandName}' not found. Windows requires .exe extension or full path.`
+              : `Command '${commandName}' not found. Check PATH or use full path.`
+            logMCPDebug(name, `Failed to spawn process: ${hint}`)
           } else {
             logMCPDebug(name, `Connection error: ${error.message}`)
           }
