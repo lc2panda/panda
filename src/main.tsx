@@ -4474,6 +4474,36 @@ async function run(): Promise<CommanderCommand> {
     } = await import('./cli/handlers/plugins.js');
     await pluginDetailsHandler(plugin, options);
   });
+  // Plugin init command
+  pluginCmd.command('init').description('Initialize a new plugin project · 初始化新插件项目').option('--name <name>', 'Plugin name').option('--type <type>', 'Plugin type: tool, hook, agent, mcp').option('--description <desc>', 'Plugin description').option('--author <author>', 'Plugin author').option('--output <path>', 'Output directory').option('--non-interactive', 'Skip interactive prompts').action(async (options: {
+    name?: string;
+    type?: 'tool' | 'hook' | 'agent' | 'mcp';
+    description?: string;
+    author?: string;
+    output?: string;
+    nonInteractive?: boolean;
+  }) => {
+    const {
+      pluginInitHandler
+    } = await import('./cli/handlers/pluginInit.js');
+    const exitCode = await pluginInitHandler(options);
+    process.exit(exitCode);
+  });
+
+  // Skill init command
+  program.command('skill').description('Manage Panda skills · 管理技能').configureHelp(createSortedHelpConfig()).command('init').description('Initialize a new skill · 初始化新技能').option('--name <name>', 'Skill name').option('--command <cmd>', 'Entry command (e.g., /my-skill)').option('--description <desc>', 'Skill description').option('--output <path>', 'Output directory').option('--non-interactive', 'Skip interactive prompts').action(async (options: {
+    name?: string;
+    command?: string;
+    description?: string;
+    output?: string;
+    nonInteractive?: boolean;
+  }) => {
+    const {
+      skillInitHandler
+    } = await import('./cli/handlers/skillInit.js');
+    const exitCode = await skillInitHandler(options);
+    process.exit(exitCode);
+  });
   // END ANT-ONLY
 
   // Setup token command
