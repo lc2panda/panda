@@ -123,15 +123,16 @@ export async function hasImageInClipboard(): Promise<boolean> {
 }
 
 export async function getImageFromClipboard(): Promise<ImageWithDimensions | null> {
-  // Fast path: native NSPasteboard reader (macOS only). Reads PNG bytes
-  // directly in-process and downsamples via CoreGraphics if over the
-  // dimension cap. ~5ms cold, sub-ms warm — vs. ~1.5s for the osascript
-  // path below. Throws if the native module is unavailable, in which case
-  // the catch block falls through to osascript. A `null` return from the
+  // Fast path: native clipboard reader (macOS + Windows). Reads PNG bytes
+  // directly in-process (macOS: NSPasteboard, Windows: Win32 API via PowerShell
+  // or @napi-rs/clipboard) and downsamples if over the dimension cap.
+  // ~5ms macOS, ~30-100ms Windows (PowerShell), ~5ms Windows (@napi-rs/clipboard).
+  // Throws if the native module is unavailable, in which case the catch block
+  // falls through to osascript/PowerShell fallback. A `null` return from the
   // native call is authoritative (clipboard has no image).
   if (
     feature('NATIVE_CLIPBOARD_IMAGE') &&
-    process.platform === 'darwin' &&
+    (process.platform === 'darwin' || process.platform === 'win32') &&
     getFeatureValue_CACHED_MAY_BE_STALE('tengu_collage_kaleidoscope', true)
   ) {
     try {
