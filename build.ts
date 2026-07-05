@@ -6,8 +6,8 @@
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
 import { readdir, readFile, writeFile } from "fs/promises";
-import { existsSync, cpSync, chmodSync } from "fs";
-import { join } from "path";
+import { existsSync, cpSync, chmodSync, mkdirSync } from "fs";
+import { join, dirname } from "path";
 import type { BunPlugin } from "bun";
 
 const outdir = "dist";
@@ -269,6 +269,29 @@ for (const src of rgSourceCandidates) {
         }
         rgCopied = true;
         break;
+    }
+}
+
+// Step 6.5: Vendor jq binaries (similar to ripgrep)
+const jqSourceDir = join(import.meta.dir, 'vendor', 'jq');
+const jqDestDir = join(outdir, 'vendor', 'jq');
+
+if (existsSync(jqSourceDir)) {
+    const platforms = ['darwin-x64', 'darwin-arm64', 'linux-x64', 'linux-arm64', 'win32-x64'];
+
+    for (const platform of platforms) {
+        const ext = platform.startsWith('win32') ? '.exe' : '';
+        const srcPath = join(jqSourceDir, platform, `jq${ext}`);
+        const destPath = join(jqDestDir, platform, `jq${ext}`);
+
+        if (existsSync(srcPath)) {
+            mkdirSync(dirname(destPath), { recursive: true });
+            cpSync(srcPath, destPath);
+            if (!platform.startsWith('win32')) {
+                try { chmodSync(destPath, 0o755); } catch {}
+            }
+            console.log(`Vendored jq binary: ${platform}`);
+        }
     }
 }
 

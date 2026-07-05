@@ -6,9 +6,37 @@
 
 set -f
 
+# ── jq binary resolution (vendored → system) ────────────
+PANDA_HOME="${HOME}/.pandacc"
+JQ_BIN="jq"
+
+if [ -d "${PANDA_HOME}/vendor/jq" ]; then
+    # Detect platform and architecture
+    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+    ARCH=$(uname -m)
+
+    case "${OS}-${ARCH}" in
+        darwin-x86_64) PLATFORM="darwin-x64" ;;
+        darwin-arm64)  PLATFORM="darwin-arm64" ;;
+        linux-x86_64)  PLATFORM="linux-x64" ;;
+        linux-aarch64) PLATFORM="linux-arm64" ;;
+        mingw*|msys*|cygwin*) PLATFORM="win32-x64" ;;  # Windows Git Bash
+        *) PLATFORM="" ;;
+    esac
+
+    if [ -n "${PLATFORM}" ]; then
+        VENDORED_JQ="${PANDA_HOME}/vendor/jq/${PLATFORM}/jq"
+        [ "${OS}" = "mingw" ] || [ "${OS}" = "msys" ] || [ "${OS}" = "cygwin" ] && VENDORED_JQ="${VENDORED_JQ}.exe"
+
+        if [ -x "${VENDORED_JQ}" ]; then
+            JQ_BIN="${VENDORED_JQ}"
+        fi
+    fi
+fi
+
 # ── jq dependency check ────────────────────────────────
-if ! command -v jq >/dev/null 2>&1; then
-    printf "Panda Code | install jq for enhanced statusline"
+if ! command -v "${JQ_BIN}" >/dev/null 2>&1; then
+    printf "Panda Code | jq binary missing (should be auto-installed)"
     exit 0
 fi
 
@@ -123,14 +151,14 @@ iso_to_epoch() {
 }
 
 # ── Extract JSON data ───────────────────────────────────
-model_name=$(echo "$input" | jq -r '.model.display_name // "Claude"')
+model_name=$(echo "$input" | "${JQ_BIN}" -r '.model.display_name // "Claude"')
 
-size=$(echo "$input" | jq -r '.context_window.context_window_size // 200000')
+size=$(echo "$input" | "${JQ_BIN}" -r '.context_window.context_window_size // 200000')
 [ "$size" -eq 0 ] 2>/dev/null && size=200000
 
-input_tokens=$(echo "$input" | jq -r '.context_window.current_usage.input_tokens // 0')
-cache_create=$(echo "$input" | jq -r '.context_window.current_usage.cache_creation_input_tokens // 0')
-cache_read=$(echo "$input" | jq -r '.context_window.current_usage.cache_read_input_tokens // 0')
+input_tokens=$(echo "$input" | "${JQ_BIN}" -r '.context_window.current_usage.input_tokens // 0')
+cache_create=$(echo "$input" | "${JQ_BIN}" -r '.context_window.current_usage.cache_creation_input_tokens // 0')
+cache_read=$(echo "$input" | "${JQ_BIN}" -r '.context_window.current_usage.cache_read_input_tokens // 0')
 current=$(( input_tokens + cache_create + cache_read ))
 
 if [ "$size" -gt 0 ]; then
@@ -142,12 +170,12 @@ fi
 effort="default"
 settings_path="$HOME/.pandacc/settings.json"
 if [ -f "$settings_path" ]; then
-    effort=$(jq -r '.effortLevel // "default"' "$settings_path" 2>/dev/null)
+    effort=$("${JQ_BIN}" -r '.effortLevel // "default"' "$settings_path" 2>/dev/null)
 fi
 
 # ── LINE 1: Model │ Context % │ Directory (branch) │ Session │ Effort ──
 pct_color=$(color_for_pct "$pct_used")
-cwd=$(echo "$input" | jq -r '.cwd // ""')
+cwd=$(echo "$input" | "${JQ_BIN}" -r '.cwd // ""')
 [ -z "$cwd" ] || [ "$cwd" = "null" ] && cwd=$(pwd)
 dirname=$(basename "$cwd")
 
@@ -161,7 +189,7 @@ if git -C "$cwd" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 session_duration=""
-session_start=$(echo "$input" | jq -r '.session.start_time // empty')
+session_start=$(echo "$input" | "${JQ_BIN}" -r '.session.start_time // empty')
 if [ -n "$session_start" ] && [ "$session_start" != "null" ]; then
     start_epoch=$(iso_to_epoch "$session_start")
     if [ -n "$start_epoch" ]; then
@@ -210,13 +238,13 @@ five_hour_reset_epoch=""
 seven_day_pct=""
 seven_day_reset_epoch=""
 
-stdin_five_pct=$(echo "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
+stdin_five_pct=$(echo "$input" | "${JQ_BIN}" -r '.rate_limits.five_hour.used_percentage // empty')
 if [ -n "$stdin_five_pct" ]; then
     has_stdin_rates=true
     five_hour_pct=$(printf "%.0f" "$stdin_five_pct")
-    five_hour_reset_epoch=$(echo "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
-    seven_day_pct=$(echo "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty' | awk '{printf "%.0f", $1}')
-    seven_day_reset_epoch=$(echo "$input" | jq -r '.rate_limits.seven_day.resets_at // empty')
+    five_hour_reset_epoch=$(echo "$input" | "${JQ_BIN}" -r '.rate_limits.five_hour.resets_at // empty')
+    seven_day_pct=$(echo "$input" | "${JQ_BIN}" -r '.rate_limits.seven_day.used_percentage // empty' | awk '{printf "%.0f", $1}')
+    seven_day_reset_epoch=$(echo "$input" | "${JQ_BIN}" -r '.rate_limits.seven_day.resets_at // empty')
 fi
 
 # ── Fallback: API call (cached) ────────────────────────
@@ -249,20 +277,20 @@ if ! $has_stdin_rates; then
         elif command -v security >/dev/null 2>&1; then
             blob=$(security find-generic-password -s "Panda Code-credentials" -w 2>/dev/null)
             if [ -n "$blob" ]; then
-                token=$(echo "$blob" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+                token=$(echo "$blob" | "${JQ_BIN}" -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
             fi
         fi
         if [ -z "$token" ] || [ "$token" = "null" ]; then
             creds_file="${HOME}/.pandacc/.credentials.json"
             if [ -f "$creds_file" ]; then
-                token=$(jq -r '.claudeAiOauth.accessToken // empty' "$creds_file" 2>/dev/null)
+                token=$("${JQ_BIN}" -r '.claudeAiOauth.accessToken // empty' "$creds_file" 2>/dev/null)
             fi
         fi
         if [ -z "$token" ] || [ "$token" = "null" ]; then
             if command -v secret-tool >/dev/null 2>&1; then
                 blob=$(timeout 2 secret-tool lookup service "Panda Code-credentials" 2>/dev/null)
                 if [ -n "$blob" ]; then
-                    token=$(echo "$blob" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
+                    token=$(echo "$blob" | "${JQ_BIN}" -r '.claudeAiOauth.accessToken // empty' 2>/dev/null)
                 fi
             fi
         fi
@@ -276,7 +304,7 @@ if ! $has_stdin_rates; then
                 -H "anthropic-beta: oauth-2025-04-20" \
                 -H "User-Agent: panda-code/2.28.4" \
                 "https://api.anthropic.com/api/oauth/usage" 2>/dev/null)
-            if [ -n "$response" ] && echo "$response" | jq -e '.five_hour' >/dev/null 2>&1; then
+            if [ -n "$response" ] && echo "$response" | "${JQ_BIN}" -e '.five_hour' >/dev/null 2>&1; then
                 usage_data="$response"
                 echo "$response" > "$cache_file"
             fi
@@ -286,21 +314,21 @@ if ! $has_stdin_rates; then
         fi
     fi
 
-    if [ -n "$usage_data" ] && echo "$usage_data" | jq -e . >/dev/null 2>&1; then
-        five_hour_pct=$(echo "$usage_data" | jq -r '.five_hour.utilization // 0' | awk '{printf "%.0f", $1}')
-        five_hour_reset_iso=$(echo "$usage_data" | jq -r '.five_hour.resets_at // empty')
+    if [ -n "$usage_data" ] && echo "$usage_data" | "${JQ_BIN}" -e . >/dev/null 2>&1; then
+        five_hour_pct=$(echo "$usage_data" | "${JQ_BIN}" -r '.five_hour.utilization // 0' | awk '{printf "%.0f", $1}')
+        five_hour_reset_iso=$(echo "$usage_data" | "${JQ_BIN}" -r '.five_hour.resets_at // empty')
         five_hour_reset_epoch=$(iso_to_epoch "$five_hour_reset_iso")
-        seven_day_pct=$(echo "$usage_data" | jq -r '.seven_day.utilization // 0' | awk '{printf "%.0f", $1}')
-        seven_day_reset_iso=$(echo "$usage_data" | jq -r '.seven_day.resets_at // empty')
+        seven_day_pct=$(echo "$usage_data" | "${JQ_BIN}" -r '.seven_day.utilization // 0' | awk '{printf "%.0f", $1}')
+        seven_day_reset_iso=$(echo "$usage_data" | "${JQ_BIN}" -r '.seven_day.resets_at // empty')
         seven_day_reset_epoch=$(iso_to_epoch "$seven_day_reset_iso")
 
-        extra_enabled=$(echo "$usage_data" | jq -r '.extra_usage.is_enabled // false')
+        extra_enabled=$(echo "$usage_data" | "${JQ_BIN}" -r '.extra_usage.is_enabled // false')
     fi
 else
     if [ -f "$cache_file" ]; then
         usage_data=$(cat "$cache_file" 2>/dev/null)
-        if [ -n "$usage_data" ] && echo "$usage_data" | jq -e . >/dev/null 2>&1; then
-            extra_enabled=$(echo "$usage_data" | jq -r '.extra_usage.is_enabled // false')
+        if [ -n "$usage_data" ] && echo "$usage_data" | "${JQ_BIN}" -e . >/dev/null 2>&1; then
+            extra_enabled=$(echo "$usage_data" | "${JQ_BIN}" -r '.extra_usage.is_enabled // false')
         fi
     fi
 fi
@@ -331,9 +359,9 @@ if [ -n "$seven_day_pct" ]; then
 fi
 
 if [ "$extra_enabled" = "true" ] && [ -n "$usage_data" ]; then
-    extra_pct=$(echo "$usage_data" | jq -r '.extra_usage.utilization // 0' | awk '{printf "%.0f", $1}')
-    extra_used=$(echo "$usage_data" | jq -r '.extra_usage.used_credits // 0' | awk '{printf "%.2f", $1/100}')
-    extra_limit=$(echo "$usage_data" | jq -r '.extra_usage.monthly_limit // 0' | awk '{printf "%.2f", $1/100}')
+    extra_pct=$(echo "$usage_data" | "${JQ_BIN}" -r '.extra_usage.utilization // 0' | awk '{printf "%.0f", $1}')
+    extra_used=$(echo "$usage_data" | "${JQ_BIN}" -r '.extra_usage.used_credits // 0' | awk '{printf "%.2f", $1/100}')
+    extra_limit=$(echo "$usage_data" | "${JQ_BIN}" -r '.extra_usage.monthly_limit // 0' | awk '{printf "%.2f", $1/100}')
     extra_bar=$(build_bar "$extra_pct" "$bar_width")
     extra_pct_color=$(color_for_pct "$extra_pct")
 

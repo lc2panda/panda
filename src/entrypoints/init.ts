@@ -219,6 +219,9 @@ export const init = memoize(async (): Promise<void> => {
     // Deploy built-in statusline script to ~/.pandacc/ (factory default)
     ensureStatusLineScript()
 
+    // Deploy vendored jq binary for statusline
+    ensureVendoredJq()
+
     // Configure global mTLS settings
     const mtlsStart = Date.now()
     logForDebugging('[init] configureGlobalMTLS starting')
@@ -482,4 +485,62 @@ function deployStatusLineFrom(sourcePath: string, targetPath: string, pandaccDir
   copyFileSync(sourcePath, targetPath)
   chmodSync(targetPath, 0o755)
   logForDebugging(`[init] Deployed statusline.sh to ${targetPath}`)
+}
+
+/**
+ * Deploy vendored jq binary to ~/.pandacc/vendor/jq/<platform>/jq[.exe]
+ * Only deploy the binary for the current platform.
+ */
+function ensureVendoredJq(): void {
+  try {
+    const pandaccDir = join(homedir(), '.pandacc')
+    const distDir = dirname(fileURLToPath(import.meta.url))
+
+    // Detect current platform
+    const platform = process.platform === 'darwin'
+      ? (process.arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64')
+      : process.platform === 'linux'
+      ? (process.arch === 'arm64' ? 'linux-arm64' : 'linux-x64')
+      : process.platform === 'win32'
+      ? 'win32-x64'
+      : null
+
+    if (!platform) {
+      logForDebugging(`[init] Unsupported platform for jq vendor: ${process.platform}-${process.arch}`)
+      return
+    }
+
+    const ext = platform.startsWith('win32') ? '.exe' : ''
+    const srcJq = join(distDir, 'vendor', 'jq', platform, `jq${ext}`)
+
+    if (!existsSync(srcJq)) {
+      // Running from source (dev) — try the project root vendor/ path
+      const devJq = join(distDir, '..', 'vendor', 'jq', platform, `jq${ext}`)
+      if (!existsSync(devJq)) {
+        logForDebugging(`[init] jq binary not found for ${platform}, skipping vendor`)
+        return
+      }
+      deployJqBinary(devJq, platform, pandaccDir, ext)
+      return
+    }
+
+    deployJqBinary(srcJq, platform, pandaccDir, ext)
+  } catch (err) {
+    // Non-fatal — statusline will fall back to system jq if available
+    logForDebugging(`[init] ensureVendoredJq failed: ${err}`)
+  }
+}
+
+function deployJqBinary(srcPath: string, platform: string, pandaccDir: string, ext: string): void {
+  const destDir = join(pandaccDir, 'vendor', 'jq', platform)
+  const destPath = join(destDir, `jq${ext}`)
+
+  mkdirSync(destDir, { recursive: true })
+
+  // Always deploy vendored jq (overwrites older versions on upgrade)
+  copyFileSync(srcPath, destPath)
+  if (!platform.startsWith('win32')) {
+    chmodSync(destPath, 0o755)
+  }
+  logForDebugging(`[init] Deployed vendored jq binary: ${platform}`)
 }
