@@ -30,6 +30,7 @@ import { toError } from './errors.js'
 import { execFileNoThrow } from './execFileNoThrow.js'
 import { logError } from './log.js'
 import { getPlatform } from './platform.js'
+import { tmpdir } from 'os'
 
 // Constants for tmux socket management
 const TMUX_COMMAND = 'tmux'
@@ -374,11 +375,11 @@ async function doInitialize(): Promise<void> {
   }
 
   // Fallback: construct the socket path from standard tmux location
-  // tmux sockets are typically at $TMPDIR/tmux-<UID>/<socket_name> (or /tmp/tmux-<UID>/ if TMPDIR is not set)
+  // tmux sockets are typically at $TMPDIR/tmux-<UID>/<socket_name> (or tmpdir()/tmux-<UID>/ if TMPDIR is not set)
   // On Windows this path is inside WSL, so always use POSIX separators.
   // process.getuid() is undefined on Windows; WSL default user is root (uid 0) in CI.
   const uid = process.getuid?.() ?? 0
-  const baseTmpDir = process.env.TMPDIR || '/tmp'
+  const baseTmpDir = process.env.TMPDIR || tmpdir()
   const fallbackPath = posix.join(baseTmpDir, `tmux-${uid}`, socket)
 
   // Get server PID separately

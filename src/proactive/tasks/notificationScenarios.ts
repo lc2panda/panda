@@ -4,7 +4,7 @@
 
 import { pushNotification } from '../../assistant/sense.js'
 // P3-T4-β: panda-on-desk 联动桥接（feature('BUDDY') 内 gate；on-desk 离线静默）
-// notification 聚合类按 A3 §2 表全部 F badge only — 不直接打扰，仅累加角标
+// notification 聚合类按 A3 §2 表全部 F badge only — 不直接打扰,仅累加角标
 import {
   bumpBadge as bumpDeskBadge,
   isOnDeskEnabled as isDeskOnDeskEnabled,
@@ -12,6 +12,7 @@ import {
 import { getProactiveConfig, isScenarioEnabled } from '../proactiveConfig.js'
 import { localDateStr } from '../../utils/date.js'
 import { logForDebugging } from '../../utils/debug.js'
+import { tmpdir } from 'os'
 import { IS_MAC, IS_WIN, HOME } from '../platform.js'
 
 interface SmartCronTask {
@@ -54,8 +55,8 @@ function readMacNotifications(sinceMs: number): NotificationRecord[] {
       return []
     }
 
-    // 复制到 /tmp 避免锁定
-    const tmpPath = `/tmp/pandacc_notif_${Date.now()}.db`
+    // 复制到临时目录避免锁定
+    const tmpPath = join(tmpdir(), `pandacc_notif_${Date.now()}.db`)
     try {
       copyFileSync(dbPath, tmpPath)
     } catch (e) {
@@ -139,7 +140,7 @@ function readWinNotifications(sinceMs: number): NotificationRecord[] {
       return []
     }
 
-    const tmpPath = join(process.env.TEMP || '/tmp', `pandacc_notif_${Date.now()}.db`)
+    const tmpPath = join(tmpdir(), `pandacc_notif_${Date.now()}.db`)
     try {
       copyFileSync(dbPath, tmpPath)
     } catch (e) {
