@@ -44,3 +44,11 @@ package-v2.1.*/
 .claude/
 CLAUDE1.md
 CLAUDE-FABLE-5.md
+
+# Development reports (never commit)
+*_REPORT.md
+SYNC_*.md
+P[0-9]-*.md
+WINDOWS_*.md
+FABLE*.md
+UPSTREAM_*.md
