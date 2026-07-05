@@ -2,7 +2,8 @@ import { execFileSync, spawn } from 'child_process'
 import { constants as fsConstants, readFileSync, unlinkSync } from 'fs'
 import { type FileHandle, mkdir, open, realpath } from 'fs/promises'
 import memoize from 'lodash-es/memoize.js'
-import { isAbsolute, resolve } from 'path'
+import { tmpdir } from 'os'
+import { isAbsolute, join, resolve } from 'path'
 import { join as posixJoin } from 'path/posix'
 import { logEvent } from 'src/services/analytics/index.js'
 import {
@@ -68,7 +69,40 @@ function isExecutable(shellPath: string): boolean {
 }
 
 /**
+ * Attempts to find Git Bash on Windows via common install paths.
+ * Returns null on non-Windows platforms or if Git Bash is not found.
+ */
+async function findGitBash(): Promise<string | null> {
+  if (getPlatform() !== 'windows') {
+    return null
+  }
+
+  // Common Git Bash installation paths on Windows
+  const gitBashPaths = [
+    join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'bin', 'bash.exe'),
+    join(
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
+      'Git',
+      'bin',
+      'bash.exe',
+    ),
+    join(process.env.LOCALAPPDATA || '', 'Programs', 'Git', 'bin', 'bash.exe'),
+  ]
+
+  for (const bashPath of gitBashPaths) {
+    if (isExecutable(bashPath)) {
+      logForDebugging(`Found Git Bash at: ${bashPath}`)
+      return bashPath
+    }
+  }
+
+  return null
+}
+
+/**
  * Determines the best available shell to use.
+ * On Windows: prioritizes Git Bash, falls back to PowerShell.
+ * On Unix: prioritizes bash/zsh based on user preference.
  */
 export async function findSuitableShell(): Promise<string> {
   // Check for explicit shell override first
@@ -86,6 +120,20 @@ export async function findSuitableShell(): Promise<string> {
         `CLAUDE_CODE_SHELL="${shellOverride}" is not a valid bash/zsh path, falling back to detection`,
       )
     }
+  }
+
+  // Windows-specific: prioritize Git Bash over PowerShell for POSIX compatibility
+  if (getPlatform() === 'windows') {
+    const gitBash = await findGitBash()
+    if (gitBash) {
+      return gitBash
+    }
+    // If Git Bash not found, error out (PowerShell requires separate provider)
+    const errorMsg =
+      'No Git Bash found on Windows. Claude CLI requires Git Bash for POSIX shell compatibility. ' +
+      'Please install Git for Windows from https://git-scm.com/download/win'
+    logError(new Error(errorMsg))
+    throw new Error(errorMsg)
   }
 
   // Check user's preferred shell from environment
@@ -202,7 +250,7 @@ export async function exec(
 
   // Sandbox temp directory - use per-user directory name to prevent multi-user permission conflicts
   const sandboxTmpDir = posixJoin(
-    process.env.CLAUDE_CODE_TMPDIR || '/tmp',
+    process.env.CLAUDE_CODE_TMPDIR || tmpdir(),
     getClaudeTempDirName(),
   )
 
