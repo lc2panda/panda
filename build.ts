@@ -153,7 +153,10 @@ const featureFlagPlugin: BunPlugin = {
                 );
             }
 
-            code = code.replace(/\("external"\s+as\s+string\)/g, '("ant" as string)');
+            // 排除 mcp.tsx，保持其运行时判断逻辑
+            if (!args.path.includes('/commands/mcp/mcp.tsx')) {
+                code = code.replace(/\("external"\s+as\s+string\)/g, '("ant" as string)');
+            }
 
             // Replace process.env.USER_TYPE runtime checks to "ant" at build time.
             // This unlocks ALL ant-only code paths (commands, GrowthBook, debug,
