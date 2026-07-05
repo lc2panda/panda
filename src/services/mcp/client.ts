@@ -1079,6 +1079,7 @@ export const connectToServer = memoize(
         transport = new StdioClientTransport({
           command: finalCommand,
           args: finalArgs,
+          cwd: getOriginalCwd(),
           env: {
             ...subprocessEnv(),
             // v2.1.139: stdio MCP servers receive CLAUDE_PROJECT_DIR so they
