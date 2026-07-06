@@ -113,7 +113,8 @@ test('imports — TurnHeader / TurnGutter / ScanLine 可加载', async () => {
 
 test('isMatrixTheme — env 未设置 + isolate user config → false', async () => {
   delete process.env.PANDA_THEME
-  const { isMatrixTheme } = await import('./isMatrixTheme.js')
+  const { isMatrixTheme, setMatrixThemeCache } = await import('./isMatrixTheme.js')
+  setMatrixThemeCache(false)
   expect(isMatrixTheme()).toBe(false)
 })
 

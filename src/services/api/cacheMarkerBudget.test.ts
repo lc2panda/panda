@@ -2,7 +2,7 @@
 // Output: addCacheBreakpoints 按 Anthropic 4-marker 上限动态收缩 messages primary/secondary
 // Pos:    Wave 14 Rho-3 P0-A — 5-marker 超限防御单元测试
 
-import { describe, expect, test } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import {
   MAX_CACHE_CONTROL_MARKERS,
   addCacheBreakpoints,
@@ -10,6 +10,27 @@ import {
 } from './claude.js'
 import { createUserMessage } from '../../utils/messages.js'
 import type { UserMessage } from '../../types/message.js'
+
+const originalAnthropicApiKey = process.env.ANTHROPIC_API_KEY
+const originalFirstPartyApiKey = process.env.FIRST_PARTY_ANTHROPIC_API_KEY
+
+beforeAll(() => {
+  process.env.ANTHROPIC_API_KEY = 'test-api-key'
+  process.env.FIRST_PARTY_ANTHROPIC_API_KEY = 'test-api-key'
+})
+
+afterAll(() => {
+  if (originalAnthropicApiKey === undefined) {
+    delete process.env.ANTHROPIC_API_KEY
+  } else {
+    process.env.ANTHROPIC_API_KEY = originalAnthropicApiKey
+  }
+  if (originalFirstPartyApiKey === undefined) {
+    delete process.env.FIRST_PARTY_ANTHROPIC_API_KEY
+  } else {
+    process.env.FIRST_PARTY_ANTHROPIC_API_KEY = originalFirstPartyApiKey
+  }
+})
 
 function mkMsgs(n: number): UserMessage[] {
   return Array.from({ length: n }, (_, i) =>
