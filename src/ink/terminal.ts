@@ -157,11 +157,41 @@ export function isTermius(): boolean {
   return false
 }
 
-/** True if running in Termius on Windows. Combines isTermius() with platform
- *  check. Used to downgrade ANSI features (e.g., True Color -> 256-color) for
- *  Windows Termius which has incomplete True Color support. */
+/** Checks if the terminal requires downgraded color support (True Color -> 256-color).
+ *  Targets Windows SSH clients with incomplete True Color rendering:
+ *  - Termius (TERMIUS_VERSION or SSH_CLIENT pattern)
+ *  - Generic SSH terminals (SSH_CLIENT/SSH_CONNECTION, except MobaXterm)
+ *  - PuTTY (heuristic: TERM=xterm-256color without COLORTERM)
+ *
+ *  Excludes:
+ *  - MobaXterm (MOBAXTERM_VERSION) — supports True Color
+ *  - Native terminals on macOS/Linux
+ *
+ *  @returns true if color downgrade is required, false otherwise
+ */
+export function shouldUseDegradedColors(): boolean {
+  if (process.platform !== 'win32') return false
+
+  // Explicit Termius detection (always downgrade)
+  if (process.env.TERMIUS_VERSION) return true
+
+  // MobaXterm supports True Color — exclude it
+  if (process.env.MOBAXTERM_VERSION) return false
+
+  // Generic SSH clients (Xshell, SecureCRT, etc.) — conservative downgrade
+  if (process.env.SSH_CLIENT || process.env.SSH_CONNECTION) return true
+
+  // PuTTY heuristic: xterm-256color TERM without COLORTERM (True Color indicator)
+  if (process.env.TERM?.includes('256') && !process.env.COLORTERM) {
+    return true
+  }
+
+  return false
+}
+
+/** @deprecated Use {@link shouldUseDegradedColors} instead. Legacy alias for Windows Termius detection. */
 export function isWindowsTermius(): boolean {
-  return isTermius() && process.platform === 'win32'
+  return shouldUseDegradedColors()
 }
 
 // Terminals known to correctly implement the Kitty keyboard protocol

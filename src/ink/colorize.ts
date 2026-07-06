@@ -1,6 +1,6 @@
 import chalk from 'chalk'
 import type { Color, TextStyles } from './styles.js'
-import { isWindowsTermius } from './terminal.js'
+import { shouldUseDegradedColors } from './terminal.js'
 
 /**
  * xterm.js (VS Code, Cursor, code-server, Coder) has supported truecolor
@@ -58,17 +58,22 @@ function clampChalkLevelForTmux(): boolean {
 }
 
 /**
- * Windows Termius has incomplete True Color support — 24-bit RGB sequences
- * (\\033[38;2;R;G;Bm) render incorrectly and cause display corruption.
- * Downgrade to 256-color mode (level 2) to avoid ANSI rendering bugs.
- * Mac Termius has proper True Color support and is NOT affected.
- * Escape hatch: set PANDA_FORCE_TRUECOLOR=1 to override.
+ * Downgrade True Color to 256-color for Windows SSH clients with incomplete
+ * 24-bit RGB support (Termius, PuTTY, generic SSH terminals). Prevents ANSI
+ * rendering bugs and display corruption.
+ *
+ * Detection logic (see shouldUseDegradedColors):
+ * - Explicit: TERMIUS_VERSION
+ * - Generic SSH: SSH_CLIENT/SSH_CONNECTION (excludes MobaXterm)
+ * - PuTTY heuristic: TERM=xterm-256color without COLORTERM
+ *
+ * Escape hatch: PANDA_FORCE_TRUECOLOR=1 overrides downgrade (e.g., verified
+ * client supports True Color).
  */
-function clampChalkLevelForWindowsTermius(): boolean {
-  // Escape hatch: user explicitly wants True Color (e.g., verified their
-  // Termius version supports it)
+function clampChalkLevelForDegradedTerminals(): boolean {
+  // Escape hatch: user explicitly wants True Color
   if (process.env.PANDA_FORCE_TRUECOLOR === '1') return false
-  if (isWindowsTermius() && chalk.level > 2) {
+  if (shouldUseDegradedColors() && chalk.level > 2) {
     chalk.level = 2
     return true
   }
@@ -80,7 +85,9 @@ function clampChalkLevelForWindowsTermius(): boolean {
 // inside a VS Code terminal. Exported for debugging — tree-shaken if unused.
 export const CHALK_BOOSTED_FOR_XTERMJS = boostChalkLevelForXtermJs()
 export const CHALK_CLAMPED_FOR_TMUX = clampChalkLevelForTmux()
-export const CHALK_CLAMPED_FOR_WINDOWS_TERMIUS = clampChalkLevelForWindowsTermius()
+export const CHALK_CLAMPED_FOR_DEGRADED_TERMINALS = clampChalkLevelForDegradedTerminals()
+/** @deprecated Use CHALK_CLAMPED_FOR_DEGRADED_TERMINALS */
+export const CHALK_CLAMPED_FOR_WINDOWS_TERMIUS = CHALK_CLAMPED_FOR_DEGRADED_TERMINALS
 
 export type ColorType = 'foreground' | 'background'
 
