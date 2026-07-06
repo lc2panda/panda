@@ -16,6 +16,9 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { getMarketingNameForModel } from '../../utils/model/model.js'
+import { getModelOptions } from '../../utils/model/modelOptions.js'
+import { getModelPricingString } from '../../utils/modelCost.js'
 
 // ── 纯函数复刻：model.tsx handleSelect 的 setAppState(prev => ...) 两分支 ──
 // 与 src/commands/model/model.tsx handleSelect 中的 reducer 一一对应。
@@ -67,6 +70,34 @@ describe('/model handleSelect 语义（v2.1.144）', () => {
     const next = applyModelSelect(withPlan, 'opus', true)
     expect(next.mainLoopModel).toBe('opus') // 新默认（持久化）
     expect(next.mainLoopModelForSession).toBeNull() // override 被清
+  })
+})
+
+describe('/model Fable 5 展示守护', () => {
+  test('Fable 选项显示 Fable 5 与 $10/$50，且不残留 3.7', () => {
+    const previousApiKey = process.env.ANTHROPIC_API_KEY
+    process.env.ANTHROPIC_API_KEY = previousApiKey ?? 'test-key-for-model-options'
+    try {
+      const fable = getModelOptions().find(option => option.label === 'Fable')
+
+      expect(fable).toBeDefined()
+      expect(fable?.description).toContain('Fable 5')
+      expect(fable?.description).toContain('$10/$50 per Mtok')
+      expect(fable?.description).not.toContain('3.7')
+      expect(fable?.descriptionForModel).toContain('Claude Fable 5')
+      expect(fable?.descriptionForModel).not.toContain('3.7')
+    } finally {
+      if (previousApiKey === undefined) {
+        delete process.env.ANTHROPIC_API_KEY
+      } else {
+        process.env.ANTHROPIC_API_KEY = previousApiKey
+      }
+    }
+  })
+
+  test('claude-fable-5 营销名与成本估算使用 Fable 5 官方档位', () => {
+    expect(getMarketingNameForModel('claude-fable-5')).toBe('Claude Fable 5')
+    expect(getModelPricingString('claude-fable-5')).toBe('$10/$50 per Mtok')
   })
 })
 

@@ -8,6 +8,7 @@ import {
 import { getModelStrings } from './modelStrings.js'
 import {
   COST_TIER_3_15,
+  COST_TIER_10_50,
   COST_HAIKU_35,
   COST_HAIKU_45,
   formatModelPricing,
@@ -126,9 +127,9 @@ function getFable5Option(): ModelOption {
   return {
     value: getModelStrings().fable5,
     label: 'Fable',
-    description: `Claude 3.7 Fable (Agentic)${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
+    description: `Fable 5 · Long-running agents${is3P ? '' : ` · ${formatModelPricing(COST_TIER_10_50)}`}`,
     descriptionForModel:
-      'Claude 3.7 Fable - agentic model optimized for extended reasoning tasks',
+      'Claude Fable 5 - next-generation intelligence for long-running agents',
   }
 }
 
