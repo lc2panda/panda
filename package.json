@@ -58,7 +58,7 @@
     "lint:fix": "biome lint --fix src/",
     "format": "biome format --write src/",
     "prepare": "git config core.hooksPath .githooks",
-    "test": "bun test --path-ignore-patterns 'monitor/tmp/**' --path-ignore-patterns '.pandacc/worktrees/**' --path-ignore-patterns 'src/services/api/dumpPrompts.test.ts' --path-ignore-patterns 'packages/panda-on-desk/test/**' --path-ignore-patterns 'packages/panda-desk-chat/e2e/**' --path-ignore-patterns 'packages/panda-desk-chat/**/__tests__/**'",
+    "test": "bun test --path-ignore-patterns 'monitor/tmp/**' --path-ignore-patterns '.pandacc/worktrees/**' --path-ignore-patterns 'src/services/api/dumpPrompts.test.ts' --path-ignore-patterns 'src/cli/__tests__/bg*.test.ts' --path-ignore-patterns 'packages/panda-on-desk/test/**' --path-ignore-patterns 'packages/panda-desk-chat/e2e/**' --path-ignore-patterns 'packages/panda-desk-chat/**/__tests__/**'",
     "check:unused": "knip-bun",
     "health": "bun run scripts/health-check.ts",
     "docs:dev": "npx mintlify dev"

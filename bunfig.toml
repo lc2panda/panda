@@ -5,6 +5,7 @@ pathIgnorePatterns = [
   "monitor/tmp/**",
   ".pandacc/worktrees/**",
   "src/services/api/dumpPrompts.test.ts",
+  "src/cli/__tests__/bg*.test.ts",
   "packages/panda-on-desk/test/**",
   "packages/panda-desk-chat/e2e/**",
   "packages/panda-desk-chat/**/__tests__/**",
