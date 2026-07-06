@@ -216,7 +216,8 @@ class TelegramConnector implements IMConnector {
         })),
         fetchedAt: Date.now(),
       }
-    } catch {
+    } catch (e) {
+      logForDebugging(`[telegram] getUnreadSummary 失败: ${(e as Error).message}`)
       return emptyUnreadSummary()
     }
   }

@@ -160,7 +160,8 @@ export abstract class MCPBridgeConnector implements IMConnector {
     try {
       await this._sendRpc('ping', {})
       return true
-    } catch {
+    } catch (e) {
+      logForDebugging(`[MCPBridge:${this.platform}] healthCheck 失败: ${(e as Error).message}`)
       this._status = 'error'
       return false
     }

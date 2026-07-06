@@ -445,9 +445,12 @@ class WechatLocalDBConnector implements IMConnector {
           fetchedAt: Date.now(),
         }
       } finally {
-        try { db.close() } catch {}
+        try { db.close() } catch (e) {
+          logForDebugging(`[wechat] getUnreadSummary: 关闭 session db 失败: ${(e as Error).message}`)
+        }
       }
-    } catch {
+    } catch (e) {
+      logForDebugging(`[wechat] getUnreadSummary 失败: ${(e as Error).message}`)
       return emptyUnreadSummary()
     }
   }

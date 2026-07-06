@@ -68,7 +68,10 @@ class TeamsConnector implements IMConnector {
       // client_credentials 不支持 /me，改用 /organization 作为轻量检查
       const resp = await this.graphGet('/organization')
       return resp?.value != null
-    } catch { return false }
+    } catch (e) {
+      logForDebugging(`[teams] healthCheck 失败: ${(e as Error).message}`)
+      return false
+    }
   }
 
   async dispose(): Promise<void> {

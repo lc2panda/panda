@@ -233,12 +233,16 @@ export function pushViaChannelMCP(title: string, body: string): void {
       void server.client.callTool({
         name: toolName,
         arguments: args,
-      }).catch(() => {
-        // 静默降级——推送失败不影响主流程
+      }).catch((e: unknown) => {
+        logForDebugging(
+          `[channelRegistry] pushViaChannelMCP: reply 调用失败 (channel=${channel}): ${(e as Error)?.message || e}`,
+        )
       })
       delivered = true
-    } catch {
-      // 静默降级
+    } catch (e) {
+      logForDebugging(
+        `[channelRegistry] pushViaChannelMCP: 处理 channel=${channel} 时异常: ${(e as Error)?.message || e}`,
+      )
     }
   }
 
@@ -311,13 +315,15 @@ function _flushPending(channel: string): void {
       void server.client.callTool({
         name: toolName,
         arguments: args,
-      }).catch(() => {
+      }).catch((e: unknown) => {
         logForDebugging(
-          `[channelRegistry] Failed to flush pending notification to ${channel}: ${msg.title}`,
+          `[channelRegistry] Failed to flush pending notification to ${channel}: ${msg.title} (${(e as Error)?.message || e})`,
         )
       })
-    } catch {
-      // 静默降级
+    } catch (e) {
+      logForDebugging(
+        `[channelRegistry] _flushPending: 处理 channel=${channel} 消息时异常: ${(e as Error)?.message || e}`,
+      )
     }
   }
 }

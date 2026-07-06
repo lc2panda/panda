@@ -136,7 +136,8 @@ class DingtalkMCPConnector extends MCPBridgeConnector {
     try {
       const msgs = await this.getMessages({ unreadOnly: true, limit: 500 })
       return buildUnreadSummary(msgs)
-    } catch {
+    } catch (e) {
+      logForDebugging(`[dingtalk] getUnreadSummary 失败: ${(e as Error).message}`)
       return emptyUnreadSummary()
     }
   }

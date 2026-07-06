@@ -35,7 +35,8 @@ let _cachedMtime: number = 0
 function getFileMtime(): number {
   try {
     return statSync(CONFIG_PATH).mtimeMs
-  } catch {
+  } catch (e) {
+    logForDebugging(`[connectors/config] 读取配置文件 mtime 失败 (${CONFIG_PATH}): ${(e as Error).message}`)
     return 0
   }
 }

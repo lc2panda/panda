@@ -156,7 +156,8 @@ class FeishuMCPConnector extends MCPBridgeConnector {
     try {
       const msgs = await this.getMessages({ unreadOnly: true, limit: 500 })
       return buildUnreadSummary(msgs, 'feishu')
-    } catch {
+    } catch (e) {
+      logForDebugging(`[feishu:MCP] getUnreadSummary 失败: ${(e as Error).message}`)
       return emptyUnreadSummary('feishu')
     }
   }
@@ -433,7 +434,8 @@ class FeishuAPIConnector implements IMConnector {
     try {
       const msgs = await this.getMessages({ unreadOnly: true, limit: 500 })
       return buildUnreadSummary(msgs, 'feishu')
-    } catch {
+    } catch (e) {
+      logForDebugging(`[feishu:API] getUnreadSummary 失败: ${(e as Error).message}`)
       return emptyUnreadSummary('feishu')
     }
   }
