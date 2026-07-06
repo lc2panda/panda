@@ -33,14 +33,21 @@ export type BgSpawnResult = {
 /** tmux session name 用于 bg sessions */
 export const BG_TMUX_SESSION = 'claude-bg'
 
+type BgSpawnTestGlobal = typeof globalThis & {
+  __pandaTestTmuxAvailable?: boolean
+  __pandaTestCaptureBgSpawn?: boolean
+  __pandaBgSpawnCalls?: Array<[string, string[], unknown]>
+}
+
 /**
  * 检测 tmux 是否可用（封装 detection.ts，供 bg.ts/daemon.ts 复用）。
  */
 export async function ensureTmuxAvailable(): Promise<
   { ok: true } | { ok: false; error: string }
 > {
-  if (process.env.PANDA_TEST_TMUX_AVAILABLE === '1') return { ok: true }
-  if (process.env.PANDA_TEST_TMUX_AVAILABLE === '0') {
+  const testTmuxAvailable = (globalThis as BgSpawnTestGlobal).__pandaTestTmuxAvailable
+  if (testTmuxAvailable === true || process.env.PANDA_TEST_TMUX_AVAILABLE === '1') return { ok: true }
+  if (testTmuxAvailable === false || process.env.PANDA_TEST_TMUX_AVAILABLE === '0') {
     return {
       ok: false,
       error:
@@ -66,7 +73,7 @@ export async function ensureTmuxAvailable(): Promise<
 async function ensureTmuxSession(
   sessionName: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (process.env.PANDA_TEST_CAPTURE_BG_SPAWN === '1') return { ok: true }
+  if ((globalThis as BgSpawnTestGlobal).__pandaTestCaptureBgSpawn || process.env.PANDA_TEST_CAPTURE_BG_SPAWN === '1') return { ok: true }
   // 检测是否已存在
   const check = await execFileNoThrow(
     TMUX_COMMAND,
@@ -100,10 +107,8 @@ async function openTmuxWindow(
   windowName: string,
   command: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (process.env.PANDA_TEST_CAPTURE_BG_SPAWN === '1') {
-    const calls = (globalThis as typeof globalThis & {
-      __pandaBgSpawnCalls?: Array<[string, string[], unknown]>
-    }).__pandaBgSpawnCalls
+  if ((globalThis as BgSpawnTestGlobal).__pandaTestCaptureBgSpawn || process.env.PANDA_TEST_CAPTURE_BG_SPAWN === '1') {
+    const calls = (globalThis as BgSpawnTestGlobal).__pandaBgSpawnCalls
     calls?.push([
       TMUX_COMMAND,
       ['new-window', '-t', sessionName, '-n', windowName, command],

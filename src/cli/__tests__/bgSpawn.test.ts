@@ -28,6 +28,12 @@ mock.module('../../utils/swarm/constants.js', () => ({
 
 let mockTmuxAvailable = true
 
+type BgSpawnTestGlobal = typeof globalThis & {
+  __pandaTestTmuxAvailable?: boolean
+  __pandaTestCaptureBgSpawn?: boolean
+  __pandaBgSpawnCalls?: Array<[string, string[], unknown]>
+}
+
 async function importBgSpawn() {
   return await import('../bgSpawn.js')
 }
@@ -36,20 +42,18 @@ describe('bgSpawn — ensureTmuxAvailable', () => {
   beforeEach(() => {
     mockTmuxAvailable = true
     mockExecReturn = { stdout: '', stderr: '', code: 0 }
-    process.env.PANDA_TEST_TMUX_AVAILABLE = '1'
+    ;(globalThis as BgSpawnTestGlobal).__pandaTestTmuxAvailable = true
   })
 
   afterEach(() => {
-    delete process.env.PANDA_TEST_TMUX_AVAILABLE
-    delete process.env.PANDA_TEST_CAPTURE_BG_SPAWN
-    delete (globalThis as typeof globalThis & {
-      __pandaBgSpawnCalls?: Array<[string, string[], unknown]>
-    }).__pandaBgSpawnCalls
+    delete (globalThis as BgSpawnTestGlobal).__pandaTestTmuxAvailable
+    delete (globalThis as BgSpawnTestGlobal).__pandaTestCaptureBgSpawn
+    delete (globalThis as BgSpawnTestGlobal).__pandaBgSpawnCalls
   })
 
   test('tmux 可用时返回 { ok: true }', async () => {
     mockTmuxAvailable = true
-    process.env.PANDA_TEST_TMUX_AVAILABLE = '1'
+    ;(globalThis as BgSpawnTestGlobal).__pandaTestTmuxAvailable = true
     const { ensureTmuxAvailable } = await importBgSpawn()
     const result = await ensureTmuxAvailable()
     expect(result.ok).toBe(true)
@@ -57,7 +61,7 @@ describe('bgSpawn — ensureTmuxAvailable', () => {
 
   test('tmux 不可用时返回 { ok: false, error: ... }', async () => {
     mockTmuxAvailable = false
-    process.env.PANDA_TEST_TMUX_AVAILABLE = '0'
+    ;(globalThis as BgSpawnTestGlobal).__pandaTestTmuxAvailable = false
     const { ensureTmuxAvailable } = await importBgSpawn()
     const result = await ensureTmuxAvailable()
     expect(result.ok).toBe(false)
@@ -76,11 +80,9 @@ describe('bgSpawn — CLAUDE_CODE_SESSION_KIND env 注入', () => {
   test('spawnBgSession 构造的 env 包含 CLAUDE_CODE_SESSION_KIND=bg', async () => {
     // 捕获 bgSpawn 测试钩子的调用参数来验证 env 注入
     const calls: Array<[string, string[], unknown]> = []
-    ;(globalThis as typeof globalThis & {
-      __pandaBgSpawnCalls?: Array<[string, string[], unknown]>
-    }).__pandaBgSpawnCalls = calls
-    process.env.PANDA_TEST_CAPTURE_BG_SPAWN = '1'
-    process.env.PANDA_TEST_TMUX_AVAILABLE = '1'
+    ;(globalThis as BgSpawnTestGlobal).__pandaBgSpawnCalls = calls
+    ;(globalThis as BgSpawnTestGlobal).__pandaTestCaptureBgSpawn = true
+    ;(globalThis as BgSpawnTestGlobal).__pandaTestTmuxAvailable = true
 
     const { spawnBgSession } = await import('../bgSpawn.js')
     const testId = '11111111-2222-3333-4444-555555555555'
@@ -121,8 +123,8 @@ describe('bgSpawn — CLAUDE_CODE_SESSION_KIND env 注入', () => {
   })
 
   test('tmux 不可用时 spawnBgSession 返回 { ok: false }', async () => {
-    process.env.PANDA_TEST_TMUX_AVAILABLE = '0'
-    delete process.env.PANDA_TEST_CAPTURE_BG_SPAWN
+    ;(globalThis as BgSpawnTestGlobal).__pandaTestTmuxAvailable = false
+    delete (globalThis as BgSpawnTestGlobal).__pandaTestCaptureBgSpawn
     const { spawnBgSession } = await import('../bgSpawn.js')
     const result = await spawnBgSession([], 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee')
     expect(result.ok).toBe(false)

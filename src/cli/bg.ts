@@ -33,8 +33,12 @@ type PidEntry = {
 
 // ─── 内部工具 ────────────────────────────────────────────────────────────────
 
+function getConfigHomeDir(): string {
+  return process.env.PANDA_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? getClaudeConfigHomeDir()
+}
+
 function getSessionsDir(): string {
-  return join(getClaudeConfigHomeDir(), 'sessions')
+  return join(getConfigHomeDir(), 'sessions')
 }
 
 /** 读取所有 live PID 文件，过滤 bg kind，dead 进程跳过 */
@@ -148,7 +152,7 @@ export const logsHandler: (
   }
 
   // 定位 transcript 文件：~/.pandacc/projects/<sanitized-cwd>/<sessionId>.jsonl
-  const configDir = getClaudeConfigHomeDir()
+  const configDir = getConfigHomeDir()
   const sanitizedCwd = target.cwd.replace(/\//g, '-')
   const projectDir = join(configDir, 'projects', sanitizedCwd)
   const transcriptPath = join(projectDir, `${target.sessionId}.jsonl`)
