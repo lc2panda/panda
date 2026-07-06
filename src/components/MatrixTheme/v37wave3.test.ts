@@ -237,7 +237,7 @@ test('波次3 — AgentTool/UI 已 import WorkerScope 并替换波次2 单线 ch
 test('波次3/3.8 — REPL.tsx 保留 Matrix import 且不再挂载顶底过度装饰', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/screens/REPL.tsx',
+    resolve(SRC_ROOT, 'screens/REPL.tsx'),
     'utf-8',
   )
   // import 保留：模块仍可复用，避免死代码路径误删
@@ -253,7 +253,7 @@ test('波次3/3.8 — REPL.tsx 保留 Matrix import 且不再挂载顶底过度�
 test('波次3/3.8 — Messages.tsx 保留 TurnSeparator import 但不再挂载扫描线', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/components/Messages.tsx',
+    resolve(SRC_ROOT, 'components/Messages.tsx'),
     'utf-8',
   )
   expect(src).toContain("import { TurnSeparator }")

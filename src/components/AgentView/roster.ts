@@ -22,7 +22,8 @@ const LOCKFILE_STALE_MS = 10_000
 const LOCKFILE_RETRIES = 5
 
 function getJobsDir(): string {
-  return join(getClaudeConfigHomeDir(), 'jobs')
+  const configHome = process.env.PANDA_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? getClaudeConfigHomeDir()
+  return join(configHome, 'jobs')
 }
 
 function getRosterPath(): string {

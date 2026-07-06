@@ -175,7 +175,7 @@ describe('P0 修复 2 — attribution header cc_workload 剥离（non-firstParty
   beforeEach(() => {
     for (const k of ENV_KEYS) saved[k] = process.env[k]
     // 保证 attribution header 启用
-    delete process.env.CLAUDE_CODE_ATTRIBUTION_HEADER
+    process.env.CLAUDE_CODE_ATTRIBUTION_HEADER = '1'
     process.env.CLAUDE_CODE_ENTRYPOINT = 'cli'
   })
   afterEach(() => {

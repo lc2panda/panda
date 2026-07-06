@@ -144,12 +144,15 @@ function dumpRequest(
   requestId: string,
   state: DumpState,
   filePath: string,
+  shouldDump: boolean,
 ): void {
   try {
     const req = jsonParse(body) as Record<string, unknown>
-    addApiRequestToCache(req)
+    if (shouldDump) {
+      addApiRequestToCache(req)
+    }
 
-    if (process.env.USER_TYPE !== 'ant') return
+    if (!shouldDump) return
     const entries: string[] = []
     const messages = (req.messages ?? []) as Array<{ role?: string }>
 
@@ -220,6 +223,8 @@ export function createDumpPromptsFetch(
   agentIdOrSessionId: string,
 ): ClientOptions['fetch'] {
   const filePath = getDumpPromptsPath(agentIdOrSessionId)
+  const shouldDump = process.env.USER_TYPE === 'ant'
+  const fetchImpl = globalThis.fetch.bind(globalThis)
 
   return async (input: RequestInfo | URL, init?: RequestInit) => {
     const state = dumpState.get(agentIdOrSessionId) ?? {
@@ -246,14 +251,15 @@ export function createDumpPromptsFetch(
         requestId,
         state,
         filePath,
+        shouldDump,
       )
     }
 
     // eslint-disable-next-line eslint-plugin-n/no-unsupported-features/node-builtins
-    const response = await globalThis.fetch(input, init)
+    const response = await fetchImpl(input, init)
 
     // Save response async
-    if (timestamp && response.ok && process.env.USER_TYPE === 'ant') {
+    if (timestamp && response.ok && shouldDump) {
       const cloned = response.clone()
       void (async () => {
         try {

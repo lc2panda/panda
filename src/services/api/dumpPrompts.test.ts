@@ -95,6 +95,9 @@ globalThis.fetch = ((url: RequestInfo | URL, init?: RequestInit) =>
   currentFetchHook(url, init)) as typeof globalThis.fetch
 
 beforeEach(() => {
+  process.env.USER_TYPE = 'ant'
+  process.env.CLAUDE_CONFIG_DIR = __tmpHome
+  delete process.env.PANDA_CONFIG_DIR
   clearAllDumpState()
   clearApiRequestCache()
   currentFetchHook = async () => stubResponse()

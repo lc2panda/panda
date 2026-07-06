@@ -512,7 +512,7 @@ const buddy = {
                 process.once('exit', cleanup)
               } catch (e) {
                 const msg = e instanceof Error ? e.message : String(e)
-                onDone(`panda-on-desk 日志 follow 失败: ${msg}`, { display: 'system' })
+                onDone(`panda-on-desk 日志不存在或 follow 失败: ${msg}`, { display: 'system' })
               }
               return null
             }
@@ -533,7 +533,7 @@ const buddy = {
               )
             } catch (e) {
               const msg = e instanceof Error ? e.message : String(e)
-              onDone(`panda-on-desk 日志读取失败: ${msg}`, { display: 'system' })
+              onDone(`panda-on-desk 日志不存在或读取失败: ${msg}`, { display: 'system' })
             }
             return null
           }
