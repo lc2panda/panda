@@ -36,6 +36,11 @@ describe('bgSpawn — ensureTmuxAvailable', () => {
   beforeEach(() => {
     mockTmuxAvailable = true
     mockExecReturn = { stdout: '', stderr: '', code: 0 }
+    process.env.PANDA_TEST_TMUX_AVAILABLE = '1'
+  })
+
+  afterEach(() => {
+    delete process.env.PANDA_TEST_TMUX_AVAILABLE
   })
 
   test('tmux 可用时返回 { ok: true }', async () => {
@@ -47,6 +52,7 @@ describe('bgSpawn — ensureTmuxAvailable', () => {
 
   test('tmux 不可用时返回 { ok: false, error: ... }', async () => {
     mockTmuxAvailable = false
+    process.env.PANDA_TEST_TMUX_AVAILABLE = '0'
     const { ensureTmuxAvailable } = await importBgSpawn()
     const result = await ensureTmuxAvailable()
     expect(result.ok).toBe(false)

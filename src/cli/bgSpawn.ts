@@ -39,6 +39,15 @@ export const BG_TMUX_SESSION = 'claude-bg'
 export async function ensureTmuxAvailable(): Promise<
   { ok: true } | { ok: false; error: string }
 > {
+  if (process.env.PANDA_TEST_TMUX_AVAILABLE === '1') return { ok: true }
+  if (process.env.PANDA_TEST_TMUX_AVAILABLE === '0') {
+    return {
+      ok: false,
+      error:
+        'tmux is required for --bg sessions but was not found in PATH.\n' +
+        'Install tmux (e.g. `brew install tmux` or `apt install tmux`) then retry.',
+    }
+  }
   const avail = await isTmuxAvailable()
   if (!avail) {
     return {

@@ -150,6 +150,7 @@ function captureConsole(): {
 
 describe('bg.ts — psHandler', () => {
   beforeEach(async () => {
+    process.env.PANDA_CONFIG_DIR = TEST_CONFIG_DIR
     await setupMockPidFiles()
   })
 
@@ -192,6 +193,7 @@ describe('bg.ts — psHandler', () => {
 
 describe('bg.ts — killHandler', () => {
   beforeEach(async () => {
+    process.env.PANDA_CONFIG_DIR = TEST_CONFIG_DIR
     await setupMockPidFiles()
   })
 
@@ -322,6 +324,7 @@ describe('bg.ts — attachHandler', () => {
 
 describe('bg.ts — handleBgFlag', () => {
   beforeEach(async () => {
+    process.env.PANDA_CONFIG_DIR = TEST_CONFIG_DIR
     await setupMockPidFiles()
   })
 
