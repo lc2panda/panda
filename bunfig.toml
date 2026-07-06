@@ -1,3 +1,11 @@
 [test]
 root = "."
 timeout = 10000
+jobs = 1
+pathIgnorePatterns = [
+  "monitor/tmp/**",
+  ".pandacc/worktrees/**",
+  "packages/panda-on-desk/test/**",
+  "packages/panda-desk-chat/e2e/**",
+  "packages/panda-desk-chat/**/__tests__/**",
+]

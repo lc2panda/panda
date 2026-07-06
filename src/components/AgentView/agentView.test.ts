@@ -604,9 +604,17 @@ describe('roster: file path helpers', () => {
   })
 
   test('jobs directory anchored under PANDA_CONFIG_DIR', () => {
-    process.env.PANDA_CONFIG_DIR = '/tmp/panda-test-config'
-    expect(rosterInternal.getJobsDir()).toBe('/tmp/panda-test-config/jobs')
-    process.env.PANDA_CONFIG_DIR = FAKE_HOME
+    const previousConfigDir = process.env.PANDA_CONFIG_DIR
+    try {
+      process.env.PANDA_CONFIG_DIR = '/tmp/panda-test-config'
+      expect(rosterInternal.getJobsDir()).toBe('/tmp/panda-test-config/jobs')
+    } finally {
+      if (previousConfigDir === undefined) {
+        delete process.env.PANDA_CONFIG_DIR
+      } else {
+        process.env.PANDA_CONFIG_DIR = previousConfigDir
+      }
+    }
   })
 })
 

@@ -1,7 +1,7 @@
 // Input:  W13-T1 端到端集成 — 模拟 npm install → panda --install-desk → panda 启动
 //         → 桌面宠物 spawn 完整链路；mock spawn / process.platform / os.tmpdir 注入
 //         三场景（成功 / EUNSUPPORTEDPROTOCOL / timeout）+ ENV PANDA_DESK_INSTALL_TIMEOUT_MS
-//         覆盖；跨平台路径校验（darwin / win32 / linux）
+//         覆盖；跨平台路径校验（darwin / win32 / linux / tmpdir realpath）
 // Output: ≥10 端到端用例 — 防止 v2.25.17/18 修过的 workspace + timeout P0 回归
 // Pos:    src/desk/installer.ts + src/desk/launcher.ts + src/cli/handlers/desk-install.ts
 //         三件套联动；W13-T1 install→spawn 闭环测试
@@ -23,6 +23,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -300,9 +301,11 @@ function writeFakeNpm(opts: {
     // sleep 一段较长时间 — installer setTimeout 应远早触发 SIGKILL；
     // why 不用 setInterval(() => {}, 60s)：windows shell:true 下 child.kill 只杀 cmd shell，
     // 子 node 不死，bun:test 等不到 close → 测试超时。
-    // 这里 8s 自杀作为兜底，让 close 事件最终能 fire（即便 SIGKILL 没穿透）。
-    // 实际生产中 timeoutMs 会远大于 8s（默认 1800s），不会撞到 self-exit。
-    lines.push('setTimeout(() => process.exit(99), 8_000);')
+    // 这里 6s 自杀作为兜底，让 close 事件最终能 fire（即便 SIGKILL 没穿透）。
+    // 6s 仍显著大于 500ms 测试 timeout，足以验证 installer timeout 优先触发，
+    // 同时避免 CI 串行执行两个 timeout 用例时逼近 15s 性能预算。
+    // 实际生产中 timeoutMs 会远大于 6s（默认 1800s），不会撞到 self-exit。
+    lines.push('setTimeout(() => process.exit(99), 6_000);')
   } else {
     lines.push(`process.exit(${opts.exitCode ?? 0});`)
   }
@@ -310,6 +313,8 @@ function writeFakeNpm(opts: {
   // 通过 process.execPath（当前 node/bun）调起 — 跨平台稳定
   return `${JSON.stringify(process.execPath)} ${JSON.stringify(script)}`
 }
+
+const installTimeoutExpectationMs = process.env.CI ? 20_000 : 15_000
 
 describe('W13-T1 / e2e · 失败注入', () => {
   test('4) npm exit 1 → ok:false + 友好中文消息（不抛 + 不污染）', async () => {
@@ -352,7 +357,7 @@ describe('W13-T1 / e2e · 失败注入', () => {
     expect(existsSync(cwdMarker)).toBe(true)
     const spawnedCwd = readFileSync(cwdMarker, 'utf-8').trim()
     expect(spawnedCwd.length).toBeGreaterThan(0)
-    expect(spawnedCwd.startsWith(tmpdir())).toBe(true)
+    expect(spawnedCwd.startsWith(realpathSync(tmpdir()))).toBe(true)
     expect(spawnedCwd).not.toBe(desk)
     // stage 目录命名前缀应含 'pandacc-desk-install-'
     expect(spawnedCwd).toContain('pandacc-desk-install-')
@@ -386,7 +391,7 @@ describe('W13-T1 / e2e · 失败注入', () => {
     expect(result.ok).toBe(false)
     // 应在 500ms ENV 设定后触发，而非 1800s 默认（防止 ENV 失效）
     // 容忍 fake-npm self-exit 的 8s 兜底（Windows shell:true 下 SIGKILL 不穿透）
-    expect(elapsed).toBeLessThan(15_000)
+    expect(elapsed).toBeLessThan(installTimeoutExpectationMs)
     expect(result.message).toMatch(/超时|timeout/i)
   }, 25_000)
 
@@ -402,7 +407,7 @@ describe('W13-T1 / e2e · 失败注入', () => {
     })
     const elapsed = Date.now() - t0
     expect(result.ok).toBe(false)
-    expect(elapsed).toBeLessThan(15_000)
+    expect(elapsed).toBeLessThan(installTimeoutExpectationMs)
     expect(result.message).toMatch(/超时|timeout/i)
   }, 25_000)
 

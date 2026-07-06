@@ -7,7 +7,7 @@
 // 2026-04-19 +08:00 P2-T1 扩展：dispatchEvent 场景分发器 + 4 新事件白名单（agent-α-P2-protocol）
 
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, renameSync, writeFileSync, unlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, unlinkSync } from 'node:fs'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -64,9 +64,20 @@ function writeRuntimeJson(data: RuntimeJson): void {
   renameSync(tmp, path)
 }
 
-function safeUnlinkRuntimeJson(): void {
+function safeUnlinkRuntimeJson(expected?: Pick<RuntimeJson, 'port' | 'secret' | 'pid'>): void {
   try {
-    unlinkSync(getRuntimePath())
+    const path = getRuntimePath()
+    if (expected) {
+      const current = JSON.parse(readFileSync(path, 'utf-8')) as Partial<RuntimeJson>
+      if (
+        current.port !== expected.port ||
+        current.secret !== expected.secret ||
+        current.pid !== expected.pid
+      ) {
+        return
+      }
+    }
+    unlinkSync(path)
   } catch {
     // ignore
   }
@@ -441,14 +452,15 @@ export async function startBridgeServer(
   )
 
   // 落盘 runtime.json（只在成功 listen 后）
-  writeRuntimeJson({
+  const runtime: RuntimeJson = {
     version: RUNTIME_SCHEMA_VERSION,
     port,
     secret,
     pid: process.pid,
     startedAt,
     appVersion: opts.appVersion,
-  })
+  }
+  writeRuntimeJson(runtime)
 
   return {
     port,
@@ -458,7 +470,7 @@ export async function startBridgeServer(
       new Promise<void>(resolve => {
         hub.closeAll()
         closeChatSseHub()
-        safeUnlinkRuntimeJson()
+        safeUnlinkRuntimeJson(runtime)
         server.close(() => resolve())
       }),
   }

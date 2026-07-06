@@ -1367,7 +1367,7 @@ export function checkWritePermissionForTool<Input extends AnyObject>(
     {
       ...toolPermissionContext,
       alwaysAllowRules: {
-        session: toolPermissionContext.alwaysAllowRules.session ?? [],
+        session: toolPermissionContext.alwaysAllowRules?.session ?? [],
       },
     },
     'edit',

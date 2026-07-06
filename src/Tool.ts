@@ -141,9 +141,9 @@ export const getEmptyToolPermissionContext: () => ToolPermissionContext =
   () => ({
     mode: 'default',
     additionalWorkingDirectories: new Map(),
-    alwaysAllowRules: {},
-    alwaysDenyRules: {},
-    alwaysAskRules: {},
+    alwaysAllowRules: { cliArg: [], command: [], project: [], localSettings: [], policy: [] },
+    alwaysDenyRules: { cliArg: [], command: [], project: [], localSettings: [], policy: [] },
+    alwaysAskRules: { cliArg: [], command: [], project: [], localSettings: [], policy: [] },
     isBypassPermissionsModeAvailable: false,
   })
 

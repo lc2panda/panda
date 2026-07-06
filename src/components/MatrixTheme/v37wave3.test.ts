@@ -1,14 +1,18 @@
 // Input: 无（bun test 注入）
-// Output: v3.7 Pro 波次3 — 屏幕骨架 4 大块单元测试
+// Output: v3.7/v3.8 Matrix Pro 波次3 — 屏幕骨架 4 大块单元测试
 //   1. ScreenFrame 顶/底位置 + 字段渲染 + 圆角 fallback
 //   2. StaticCharRain 字符密度 + 种子稳定
 //   3. TurnSeparator 升级为扫描线 + ╳ 坐标
-//   4. WorkerScope 三重边框
+//   4. WorkerScope 三重边框 + REPL v3.8 保留 import 但移除过度挂载
 // Pos: matrix v3.7 Pro 波次3 验证；与 v37wave1/2 同套守护
 //
 // [NEW-FILE:#20260426-MTX3-5] · 仅测试逻辑层与导出，不依赖 ink-testing-library
 
 import { test, expect } from 'bun:test'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const SRC_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 // ─── Block 1: ScreenFrame ────────────────────────────────────────────
 
@@ -21,7 +25,7 @@ test('波次3 — ScreenFrame 默认走方角字符（兼容性最大化）', as
   // 私有 helper 通过源码扫描验证（不暴露 export 避免污染 API）
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/components/MatrixTheme/ScreenFrame.tsx',
+    resolve(SRC_ROOT, 'components/MatrixTheme/ScreenFrame.tsx'),
     'utf-8',
   )
   // 方角双线
@@ -37,7 +41,7 @@ test('波次3 — ScreenFrame 默认走方角字符（兼容性最大化）', as
 test('波次3 — ScreenFrame 窄终端阈值 NARROW_TERMINAL_THRESHOLD=80', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/components/MatrixTheme/ScreenFrame.tsx',
+    resolve(SRC_ROOT, 'components/MatrixTheme/ScreenFrame.tsx'),
     'utf-8',
   )
   expect(src).toContain('NARROW_TERMINAL_THRESHOLD = 80')
@@ -46,7 +50,7 @@ test('波次3 — ScreenFrame 窄终端阈值 NARROW_TERMINAL_THRESHOLD=80', asy
 test('波次3 — ScreenFrame 顶 status bar 含 PANDA / MATRIX TERMINAL v3.7 文案', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/components/MatrixTheme/ScreenFrame.tsx',
+    resolve(SRC_ROOT, 'components/MatrixTheme/ScreenFrame.tsx'),
     'utf-8',
   )
   expect(src).toContain('PANDA')
@@ -62,7 +66,7 @@ test('波次3 — ScreenFrame 顶 status bar 含 PANDA / MATRIX TERMINAL v3.7 �
 test('波次3 — ScreenFrame 底 status bar 含快捷键 hint', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/components/MatrixTheme/ScreenFrame.tsx',
+    resolve(SRC_ROOT, 'components/MatrixTheme/ScreenFrame.tsx'),
     'utf-8',
   )
   // ↑↓ scroll  ⏎ submit  ⌃c abort  ⌃R rewind  ⌃B bg  /help
@@ -156,7 +160,7 @@ test('波次3 — TurnSeparator pattern 同种子可复现', async () => {
 test('波次3 — TurnSeparator 源码含 ╳ 十字坐标字符', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/components/MatrixTheme/TurnSeparator.tsx',
+    resolve(SRC_ROOT, 'components/MatrixTheme/TurnSeparator.tsx'),
     'utf-8',
   )
   expect(src).toContain('\\u2573') // ╳
@@ -175,7 +179,7 @@ test('波次3 — WorkerScope 模块可加载且导出组件', async () => {
 test('波次3 — WorkerScope 源码含三重边框字符 ╔══▶ ┃ ╚══·', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/components/MatrixTheme/WorkerScope.tsx',
+    resolve(SRC_ROOT, 'components/MatrixTheme/WorkerScope.tsx'),
     'utf-8',
   )
   // 顶 ╔══▶
@@ -190,7 +194,7 @@ test('波次3 — WorkerScope 源码含三重边框字符 ╔══▶ ┃ ╚�
 test('波次3 — WorkerScope 状态色映射：completed → SYSTEM_FAINT', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/components/MatrixTheme/WorkerScope.tsx',
+    resolve(SRC_ROOT, 'components/MatrixTheme/WorkerScope.tsx'),
     'utf-8',
   )
   expect(src).toContain('SYSTEM_FAINT')
@@ -200,7 +204,7 @@ test('波次3 — WorkerScope 状态色映射：completed → SYSTEM_FAINT', asy
 test('波次3 — WorkerScope 三种状态 running/completed/failed 都被处理', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/components/MatrixTheme/WorkerScope.tsx',
+    resolve(SRC_ROOT, 'components/MatrixTheme/WorkerScope.tsx'),
     'utf-8',
   )
   expect(src).toContain("'running'")
@@ -216,7 +220,7 @@ test('波次3 — WorkerScope 三种状态 running/completed/failed 都被处理
 test('波次3 — AgentTool/UI 已 import WorkerScope 并替换波次2 单线 chrome', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/tools/AgentTool/UI.tsx',
+    resolve(SRC_ROOT, 'tools/AgentTool/UI.tsx'),
     'utf-8',
   )
   expect(src).toContain('WorkerScope')
@@ -228,29 +232,33 @@ test('波次3 — AgentTool/UI 已 import WorkerScope 并替换波次2 单线 ch
   // 注意：波次2 注释还可能在，我们只检查 WorkerScope 替换路径已生效
 })
 
-// ─── Integration: REPL 已挂 ScreenFrame + StaticCharRain ─────────────
+// ─── Integration: REPL 保留 Matrix import，但移除过度装饰挂载 ─────────────
 
-test('波次3 — REPL.tsx 已 import + 挂载 ScreenFrame + StaticCharRain', async () => {
+test('波次3/3.8 — REPL.tsx 保留 Matrix import 且不再挂载顶底过度装饰', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
     '/Users/panda/Downloads/cc-panda/src/screens/REPL.tsx',
     'utf-8',
   )
-  // import
+  // import 保留：模块仍可复用，避免死代码路径误删
   expect(src).toContain('import { ScreenFrame }')
   expect(src).toContain('import { StaticCharRain }')
-  // 顶 / 底两次挂载
-  expect(src).toContain('position="top"')
-  expect(src).toContain('position="bottom"')
+  // v3.8 简化：顶 / 底 ScreenFrame + StaticCharRain 挂载已移除，仅保留 MatrixBanner
+  expect(src).toContain('移除顶 ScreenFrame + StaticCharRain')
+  expect(src).toContain('移除底 ScreenFrame + StaticCharRain')
+  expect(src).not.toContain('position="top"')
+  expect(src).not.toContain('position="bottom"')
 })
 
-test('波次3 — Messages.tsx 传 width 给 TurnSeparator（响应式）', async () => {
+test('波次3/3.8 — Messages.tsx 保留 TurnSeparator import 但不再挂载扫描线', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(
     '/Users/panda/Downloads/cc-panda/src/components/Messages.tsx',
     'utf-8',
   )
-  expect(src).toMatch(/TurnSeparator[^>]*width=\{columns\}/)
+  expect(src).toContain("import { TurnSeparator }")
+  expect(src).toContain('移除 ╳ ─── ╳ 扫描线')
+  expect(src).not.toMatch(/<TurnSeparator[^>]*width=\{columns\}/)
 })
 
 // ─── Sanity: 全套测试聚合 ─────────────────────────────────────────────

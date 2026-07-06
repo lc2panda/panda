@@ -132,7 +132,7 @@ export function getAllowRules(
   context: ToolPermissionContext,
 ): PermissionRule[] {
   return PERMISSION_RULE_SOURCES.flatMap(source =>
-    (context.alwaysAllowRules[source] || []).map(ruleString => ({
+    (context.alwaysAllowRules?.[source] || []).map(ruleString => ({
       source,
       ruleBehavior: 'allow',
       ruleValue: permissionRuleValueFromString(ruleString),
@@ -224,7 +224,7 @@ export function createPermissionRequestMessage(
 
 export function getDenyRules(context: ToolPermissionContext): PermissionRule[] {
   return PERMISSION_RULE_SOURCES.flatMap(source =>
-    (context.alwaysDenyRules[source] || []).map(ruleString => ({
+    (context.alwaysDenyRules?.[source] || []).map(ruleString => ({
       source,
       ruleBehavior: 'deny',
       ruleValue: permissionRuleValueFromString(ruleString),
@@ -234,7 +234,7 @@ export function getDenyRules(context: ToolPermissionContext): PermissionRule[] {
 
 export function getAskRules(context: ToolPermissionContext): PermissionRule[] {
   return PERMISSION_RULE_SOURCES.flatMap(source =>
-    (context.alwaysAskRules[source] || []).map(ruleString => ({
+    (context.alwaysAskRules?.[source] || []).map(ruleString => ({
       source,
       ruleBehavior: 'ask',
       ruleValue: permissionRuleValueFromString(ruleString),

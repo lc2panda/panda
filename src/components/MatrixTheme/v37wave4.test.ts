@@ -11,8 +11,10 @@
 
 import { test, expect } from 'bun:test'
 import * as fs from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const BASE = '/Users/panda/Downloads/cc-panda/src'
+const BASE = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 // ─── Block 1: 状态灯心跳（WorkerScope） ───────────────────────────────
 
