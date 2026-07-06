@@ -168,6 +168,19 @@ let linuxCopy: 'wl-copy' | 'xclip' | 'xsel' | null | undefined
  * the remote machine's clipboard — OSC 52 is the right path there).
  * Fire-and-forget: failures are silent since OSC 52 may have succeeded.
  */
+export function getWindowsClipboardCommands(text: string): Array<{ command: string; args: string[]; input: string }> {
+  const powershellScript = 'Set-Clipboard -Value ([Console]::In.ReadToEnd())'
+  const commands = [
+    { command: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', powershellScript], input: text },
+    { command: 'powershell', args: ['-NoProfile', '-NonInteractive', '-Command', powershellScript], input: text },
+  ]
+
+  if ([...text].every(char => char.charCodeAt(0) <= 0x7f)) {
+    commands.push({ command: 'clip', args: [], input: text })
+  }
+  return commands
+}
+
 function copyNative(text: string): void {
   const opts = { input: text, useCwd: false, timeout: 2000 }
   switch (process.platform) {
@@ -211,9 +224,17 @@ function copyNative(text: string): void {
       return
     }
     case 'win32':
-      // clip.exe is always available on Windows. Unicode handling is
-      // imperfect (system locale encoding) but good enough for a fallback.
-      void execFileNoThrow('clip', [], opts)
+      // Prefer PowerShell Set-Clipboard: clip.exe corrupts non-ASCII text on
+      // legacy code pages. clip.exe remains a final ASCII-only fallback.
+      void (async () => {
+        for (const command of getWindowsClipboardCommands(text)) {
+          const { code } = await execFileNoThrow(command.command, command.args, {
+            ...opts,
+            input: command.input,
+          })
+          if (code === 0) return
+        }
+      })()
       return
   }
 }

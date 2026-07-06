@@ -53,24 +53,23 @@ if [ -z "$input" ]; then
 fi
 
 # ── Colors ──────────────────────────────────────────────
-# Detect Termius environment: TERMIUS_VERSION is set by Termius itself,
-# or check SSH_CLIENT + TERM pattern (common Termius SSH session signature)
-IS_TERMIUS=0
-if [[ -n "$TERMIUS_VERSION" ]] || [[ -n "$SSH_CLIENT" && "$TERM" == "xterm-256color" ]]; then
-    IS_TERMIUS=1
+# Detect terminals that need ANSI 256-color mode. This must not depend on the
+# remote OS because Windows SSH clients can render a Linux/macOS session.
+USE_ANSI256=0
+if [[ "$PANDA_FORCE_TRUECOLOR" == "1" ]]; then
+    USE_ANSI256=0
+elif [[ "$PANDA_FORCE_ANSI256" == "1" ]]; then
+    USE_ANSI256=1
+elif [[ -n "$MOBAXTERM_VERSION" ]]; then
+    USE_ANSI256=0
+elif [[ -n "$TERMIUS_VERSION" ]]; then
+    USE_ANSI256=1
+elif [[ ( -n "$SSH_CLIENT" || -n "$SSH_CONNECTION" ) && "$TERM" == "xterm-256color" && "$COLORTERM" != "truecolor" && "$COLORTERM" != "24bit" ]]; then
+    USE_ANSI256=1
 fi
 
-# Detect Windows platform
-IS_WINDOWS=0
-OS_NAME=$(uname -s | tr '[:upper:]' '[:lower:]')
-if [[ "$OS_NAME" == mingw* ]] || [[ "$OS_NAME" == msys* ]] || [[ "$OS_NAME" == cygwin* ]]; then
-    IS_WINDOWS=1
-fi
-
-# Windows Termius has incomplete True Color support — use ANSI 256-color mode
-# Mac Termius and other terminals preserve True Color (24-bit RGB)
-# Escape hatch: set PANDA_FORCE_TRUECOLOR=1 to override
-if [[ "$IS_TERMIUS" == "1" && "$IS_WINDOWS" == "1" && "$PANDA_FORCE_TRUECOLOR" != "1" ]]; then
+# Windows SSH clients often have incomplete True Color support — use ANSI 256-color mode.
+if [[ "$USE_ANSI256" == "1" ]]; then
     # ANSI 256-color palette (closest match to True Color values)
     blue='\033[38;5;39m'      # rgb(0,153,255) → idx 39 (approx)
     orange='\033[38;5;214m'   # rgb(255,176,85) → idx 214 (approx)

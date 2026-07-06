@@ -20,6 +20,11 @@ type Props = {
   showSuccessMessage: boolean;
   verbose: boolean;
 };
+
+function isReleaseVersion(version: string | undefined | null): version is string {
+  return typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version);
+}
+
 export function AutoUpdater({
   isUpdating,
   onChangeIsUpdating,
@@ -54,6 +59,10 @@ export function AutoUpdater({
       return;
     }
     const currentVersion = MACRO.VERSION;
+    if (!isReleaseVersion(currentVersion)) {
+      logForDebugging(`AutoUpdater: Skipping update check for non-release version ${String(currentVersion)}`);
+      return;
+    }
     const channel = getInitialSettings()?.autoUpdatesChannel ?? 'latest';
     let latestVersion = await getLatestVersion(channel);
     const isDisabled = isAutoUpdaterDisabled();

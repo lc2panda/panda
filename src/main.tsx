@@ -631,8 +631,13 @@ export async function main() {
         stdio: 'pipe',
         windowsHide: true
       });
+      require('child_process').execSync(
+        'powershell.exe -NoProfile -NonInteractive -Command "[Console]::InputEncoding=[Text.UTF8Encoding]::new($false); [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)"',
+        { stdio: 'pipe', windowsHide: true }
+      );
 
-      // Step 2: Set stdout/stderr encoding to match terminal
+      // Step 2: Set stdio encoding to match terminal
+      process.stdin.setEncoding('utf8');
       process.stdout.setDefaultEncoding('utf8');
       process.stderr.setDefaultEncoding('utf8');
     } catch (error) {

@@ -8,7 +8,7 @@
 import { feature } from 'bun:bundle';
 if (typeof globalThis.MACRO === "undefined") {
     (globalThis as any).MACRO = {
-        VERSION: "2.1.120",
+        VERSION: "0.0.0-dev",
         BUILD_TIME: new Date().toISOString(),
         FEEDBACK_CHANNEL: "",
         ISSUES_EXPLAINER: "",
@@ -248,8 +248,13 @@ async function main(): Promise<void> {
                 stdio: 'pipe',
                 windowsHide: true
             });
+            require('child_process').execSync(
+                'powershell.exe -NoProfile -NonInteractive -Command "[Console]::InputEncoding=[Text.UTF8Encoding]::new($false); [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)"',
+                { stdio: 'pipe', windowsHide: true },
+            );
 
-            // Step 2: Set stdout/stderr encoding to match terminal
+            // Step 2: Set stdio encoding to match terminal
+            process.stdin.setEncoding('utf8');
             process.stdout.setDefaultEncoding('utf8');
             process.stderr.setDefaultEncoding('utf8');
         } catch (error) {

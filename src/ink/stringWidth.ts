@@ -5,6 +5,17 @@ import { getGraphemeSegmenter } from '../utils/intl.js'
 
 const EMOJI_REGEX = emojiRegex()
 
+function stripTerminalControls(str: string): string {
+  if (!str.includes('\x1b')) return str
+
+  str = stripAnsi(str)
+  if (str.includes('\x1b')) {
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC byte (0x1b) is intentional for ANSI cleaning
+    str = str.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+  }
+  return str
+}
+
 /**
  * Fallback JavaScript implementation of stringWidth when Bun.stringWidth is not available.
  *
@@ -48,12 +59,7 @@ function stringWidthJavaScript(str: string): number {
   // Windows Termius may have residual cursor control sequences (e.g., \033[H, \033[s, \033[u)
   // that strip-ansi doesn't fully catch. Apply a two-pass cleaning strategy.
   if (str.includes('\x1b')) {
-    str = stripAnsi(str)
-    // Double-check: if ESC byte remains, apply broader regex to catch cursor control
-    if (str.includes('\x1b')) {
-      // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC byte (0x1b) is intentional for ANSI cleaning
-      str = str.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
-    }
+    str = stripTerminalControls(str)
     if (str.length === 0) {
       return 0
     }
@@ -225,5 +231,5 @@ const bunStringWidth =
 const BUN_STRING_WIDTH_OPTS = { ambiguousIsNarrow: true } as const
 
 export const stringWidth: (str: string) => number = bunStringWidth
-  ? str => bunStringWidth(str, BUN_STRING_WIDTH_OPTS)
+  ? str => bunStringWidth(stripTerminalControls(str), BUN_STRING_WIDTH_OPTS)
   : stringWidthJavaScript

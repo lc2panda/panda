@@ -20,6 +20,8 @@ const PANDA_MACROS = {
     NATIVE_PACKAGE_URL: pkg.name,
 };
 
+const LEGACY_VERSION_FALLBACKS = ["2.1.120", "2.1.142"];
+
 // Feature flags to enable in production builds.
 // When a flag is in this set, `feature('FLAG')` is replaced with `true`;
 // otherwise it is replaced with `false` (same as the default bun:bundle behaviour).
@@ -169,7 +171,7 @@ const featureFlagPlugin: BunPlugin = {
 
             // Replace MACRO defaults in cli.tsx with build-time values from package.json
             if (hasMacro) {
-                code = code.replace(/VERSION: "[\d.]+"/, `VERSION: "${PANDA_MACROS.VERSION}"`);
+                code = code.replace(/VERSION: "[^"]+"/, `VERSION: "${PANDA_MACROS.VERSION}"`);
                 code = code.replace(/PACKAGE_URL: "[^"]*"/, `PACKAGE_URL: "${PANDA_MACROS.PACKAGE_URL}"`);
                 code = code.replace(/NATIVE_PACKAGE_URL: "[^"]*"/, `NATIVE_PACKAGE_URL: "${PANDA_MACROS.NATIVE_PACKAGE_URL}"`);
             }
@@ -240,6 +242,13 @@ if (cliContent.startsWith("#!/usr/bin/env bun")) {
     await writeFile(cliPath, cliContent);
 } else if (!cliContent.startsWith("#!")) {
     await writeFile(cliPath, `#!/usr/bin/env node\n${cliContent}`);
+}
+
+// Guard against stale runtime version fallbacks that can mislead auto-update checks.
+const staleFallback = LEGACY_VERSION_FALLBACKS.find((version) => cliContent.includes(`VERSION: "${version}"`));
+if (staleFallback) {
+    console.error(`Build failed: stale MACRO.VERSION fallback ${staleFallback} remained in dist/cli.js`);
+    process.exit(1);
 }
 
 // Step 6: Copy vendored ripgrep binary if available

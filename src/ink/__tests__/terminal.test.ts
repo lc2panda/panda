@@ -51,66 +51,47 @@ describe('Termius Environment Detection', () => {
   })
 
   describe('shouldUseDegradedColors()', () => {
-    // Note: These tests run on the current platform. Windows-specific behavior
-    // is tested conditionally to avoid false positives on macOS/Linux CI.
-
-    it('should detect Termius via TERMIUS_VERSION on Windows', async () => {
-      if (process.platform !== 'win32') {
-        return // Skip on non-Windows
-      }
+    it('should detect Termius via TERMIUS_VERSION on any runtime OS', async () => {
       process.env.TERMIUS_VERSION = '8.5.0'
       delete process.env.MOBAXTERM_VERSION
       delete process.env.SSH_CLIENT
+      delete process.env.SSH_CONNECTION
+      delete require.cache[require.resolve('../terminal.js')]
+      const { shouldUseDegradedColors } = await import('../terminal.js')
+      expect(shouldUseDegradedColors()).toBe(true)
+    })
+
+    it('should allow PANDA_FORCE_TRUECOLOR to bypass Termius downgrade', async () => {
+      process.env.PANDA_FORCE_TRUECOLOR = '1'
+      process.env.TERMIUS_VERSION = '8.5.0'
+      delete require.cache[require.resolve('../terminal.js')]
+      const { shouldUseDegradedColors } = await import('../terminal.js')
+      expect(shouldUseDegradedColors()).toBe(false)
+    })
+
+    it('should allow PANDA_FORCE_ANSI256 to force downgrade', async () => {
+      process.env.PANDA_FORCE_ANSI256 = '1'
+      process.env.COLORTERM = 'truecolor'
+      delete process.env.TERMIUS_VERSION
       delete require.cache[require.resolve('../terminal.js')]
       const { shouldUseDegradedColors } = await import('../terminal.js')
       expect(shouldUseDegradedColors()).toBe(true)
     })
 
     it('should exclude MobaXterm (True Color support)', async () => {
-      if (process.platform !== 'win32') {
-        return // Skip on non-Windows
-      }
       process.env.MOBAXTERM_VERSION = '23.2'
       process.env.SSH_CLIENT = '192.168.1.100 12345 22'
+      process.env.TERM = 'xterm-256color'
       delete process.env.TERMIUS_VERSION
       delete require.cache[require.resolve('../terminal.js')]
       const { shouldUseDegradedColors } = await import('../terminal.js')
       expect(shouldUseDegradedColors()).toBe(false)
     })
 
-    it('should detect generic SSH via SSH_CLIENT on Windows', async () => {
-      if (process.platform !== 'win32') {
-        return // Skip on non-Windows
-      }
+    it('should downgrade SSH xterm-256color without COLORTERM on any runtime OS', async () => {
       process.env.SSH_CLIENT = '10.0.0.5 54321 22'
-      delete process.env.TERMIUS_VERSION
-      delete process.env.MOBAXTERM_VERSION
-      delete require.cache[require.resolve('../terminal.js')]
-      const { shouldUseDegradedColors } = await import('../terminal.js')
-      expect(shouldUseDegradedColors()).toBe(true)
-    })
-
-    it('should detect generic SSH via SSH_CONNECTION on Windows', async () => {
-      if (process.platform !== 'win32') {
-        return // Skip on non-Windows
-      }
-      process.env.SSH_CONNECTION = '10.0.0.5 54321 10.0.0.10 22'
-      delete process.env.SSH_CLIENT
-      delete process.env.TERMIUS_VERSION
-      delete process.env.MOBAXTERM_VERSION
-      delete require.cache[require.resolve('../terminal.js')]
-      const { shouldUseDegradedColors } = await import('../terminal.js')
-      expect(shouldUseDegradedColors()).toBe(true)
-    })
-
-    it('should detect PuTTY via TERM heuristic (256-color without COLORTERM) on Windows', async () => {
-      if (process.platform !== 'win32') {
-        return // Skip on non-Windows
-      }
       process.env.TERM = 'xterm-256color'
       delete process.env.COLORTERM
-      delete process.env.SSH_CLIENT
-      delete process.env.SSH_CONNECTION
       delete process.env.TERMIUS_VERSION
       delete process.env.MOBAXTERM_VERSION
       delete require.cache[require.resolve('../terminal.js')]
@@ -118,14 +99,11 @@ describe('Termius Environment Detection', () => {
       expect(shouldUseDegradedColors()).toBe(true)
     })
 
-    it('should exclude True Color terminals with COLORTERM=truecolor on Windows', async () => {
-      if (process.platform !== 'win32') {
-        return // Skip on non-Windows
-      }
+    it('should not downgrade SSH xterm-256color when COLORTERM=truecolor', async () => {
+      process.env.SSH_CONNECTION = '10.0.0.5 54321 10.0.0.10 22'
       process.env.TERM = 'xterm-256color'
       process.env.COLORTERM = 'truecolor'
       delete process.env.SSH_CLIENT
-      delete process.env.SSH_CONNECTION
       delete process.env.TERMIUS_VERSION
       delete process.env.MOBAXTERM_VERSION
       delete require.cache[require.resolve('../terminal.js')]
@@ -133,38 +111,13 @@ describe('Termius Environment Detection', () => {
       expect(shouldUseDegradedColors()).toBe(false)
     })
 
-    it('should return false on macOS/Linux even with TERMIUS_VERSION', async () => {
-      if (process.platform === 'win32') {
-        return // Skip on Windows
-      }
-      process.env.TERMIUS_VERSION = '8.5.0'
-      delete require.cache[require.resolve('../terminal.js')]
-      const { shouldUseDegradedColors } = await import('../terminal.js')
-      expect(shouldUseDegradedColors()).toBe(false)
-    })
-
-    it('should return false for native Windows terminals (no SSH env)', async () => {
-      if (process.platform !== 'win32') {
-        return // Skip on non-Windows
-      }
+    it('should return false for native terminals without SSH env', async () => {
       delete process.env.SSH_CLIENT
       delete process.env.SSH_CONNECTION
       delete process.env.TERMIUS_VERSION
       delete process.env.TERM
       delete process.env.MOBAXTERM_VERSION
-      delete require.cache[require.resolve('../terminal.js')]
-      const { shouldUseDegradedColors } = await import('../terminal.js')
-      expect(shouldUseDegradedColors()).toBe(false)
-    })
-
-    it('should prioritize MOBAXTERM_VERSION exclusion over SSH_CLIENT', async () => {
-      if (process.platform !== 'win32') {
-        return // Skip on non-Windows
-      }
-      process.env.MOBAXTERM_VERSION = '23.2'
-      process.env.SSH_CLIENT = '192.168.1.100 12345 22'
-      process.env.TERM = 'xterm-256color'
-      delete process.env.TERMIUS_VERSION
+      delete process.env.COLORTERM
       delete require.cache[require.resolve('../terminal.js')]
       const { shouldUseDegradedColors } = await import('../terminal.js')
       expect(shouldUseDegradedColors()).toBe(false)
@@ -184,6 +137,24 @@ describe('Termius Environment Detection', () => {
       expect(isWindowsTermius()).toBe(shouldUseDegradedColors())
       expect(isWindowsTermius()).toBe(true)
     })
+  })
+})
+
+describe('Windows clipboard command selection', () => {
+  it('should prefer PowerShell and avoid clip.exe for non-ASCII clipboard text', async () => {
+    const { getWindowsClipboardCommands } = await import('../termio/osc.js')
+    const commands = getWindowsClipboardCommands('中文👋\n第二行')
+
+    expect(commands[0]?.command).toBe('powershell.exe')
+    expect(commands.some(command => command.command === 'clip')).toBe(false)
+  })
+
+  it('should keep clip.exe as final ASCII fallback', async () => {
+    const { getWindowsClipboardCommands } = await import('../termio/osc.js')
+    const commands = getWindowsClipboardCommands('plain ascii\nsecond line')
+
+    expect(commands[0]?.command).toBe('powershell.exe')
+    expect(commands.at(-1)?.command).toBe('clip')
   })
 })
 

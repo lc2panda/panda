@@ -26,6 +26,7 @@ import { collapseReadSearchGroups } from '../utils/collapseReadSearch.js';
 import { collapseRepetitiveMessages } from '../utils/collapseRepetitiveMessages.js';
 import { collapseTeammateShutdowns } from '../utils/collapseTeammateShutdowns.js';
 import { getGlobalConfig } from '../utils/config.js';
+import { logForDebugging } from '../utils/debug.js';
 import { isEnvTruthy } from '../utils/envUtils.js';
 import { isFullscreenEnvEnabled } from '../utils/fullscreen.js';
 import { applyGrouping } from '../utils/groupToolUses.js';
@@ -595,7 +596,12 @@ const MessagesImpl = ({
     if (b_0?.type !== 'tool_result' || b_0.is_error || !msg_6.toolUseResult) return false;
     const name = lookupsRef.current.toolUseByToolUseID.get(b_0.tool_use_id!)?.name;
     const tool = name ? findToolByName(tools, name) : undefined;
-    return tool?.isResultTruncated?.(msg_6.toolUseResult as never) ?? false;
+    try {
+      return tool?.isResultTruncated?.(msg_6.toolUseResult as never) ?? false;
+    } catch (error) {
+      logForDebugging('Messages: failed to check tool result truncation', { toolName: name, error });
+      return false;
+    }
   }, [tools]);
   const canAnimate = (!toolJSX || !!toolJSX.shouldContinueAnimation) && !toolUseConfirmQueue.length && !isMessageSelectorVisible;
   const hasToolsInProgress = inProgressToolUseIDs.size > 0;

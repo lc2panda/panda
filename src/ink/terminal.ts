@@ -170,21 +170,23 @@ export function isTermius(): boolean {
  *  @returns true if color downgrade is required, false otherwise
  */
 export function shouldUseDegradedColors(): boolean {
-  if (process.platform !== 'win32') return false
+  if (process.env.PANDA_FORCE_TRUECOLOR === '1') return false
+  if (process.env.PANDA_FORCE_ANSI256 === '1') return true
 
-  // Explicit Termius detection (always downgrade)
-  if (process.env.TERMIUS_VERSION) return true
-
-  // MobaXterm supports True Color — exclude it
+  // MobaXterm supports True Color — exclude it unless explicitly forced above.
   if (process.env.MOBAXTERM_VERSION) return false
 
-  // Generic SSH clients (Xshell, SecureCRT, etc.) — conservative downgrade
-  if (process.env.SSH_CLIENT || process.env.SSH_CONNECTION) return true
+  // Explicit Termius detection (also applies when running over SSH on Linux/macOS).
+  if (process.env.TERMIUS_VERSION) return true
 
-  // PuTTY heuristic: xterm-256color TERM without COLORTERM (True Color indicator)
-  if (process.env.TERM?.includes('256') && !process.env.COLORTERM) {
-    return true
-  }
+  const colorterm = process.env.COLORTERM?.toLowerCase()
+  const hasTrueColor = colorterm === 'truecolor' || colorterm === '24bit'
+  const isSshSession = Boolean(process.env.SSH_CLIENT || process.env.SSH_CONNECTION)
+  const isXterm256 = process.env.TERM === 'xterm-256color'
+
+  // Windows SSH clients often forward only TERM=xterm-256color, not COLORTERM.
+  // In that case prefer stable ANSI 256 colors to broken True Color rendering.
+  if (isSshSession && isXterm256 && !hasTrueColor) return true
 
   return false
 }

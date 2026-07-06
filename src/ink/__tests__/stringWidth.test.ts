@@ -63,9 +63,8 @@ describe('stringWidth — ANSI Stripping', () => {
     expect(stringWidth(str)).toBe(4) // "Text"
   })
 
-  it('should handle control characters (non-printable)', () => {
-    const str = 'Hello\x00\x01\x02World'
-    // Control chars (0x00-0x1f) should not contribute to width
-    expect(stringWidth(str)).toBe(10) // "HelloWorld"
+  it('should strip terminal controls before measuring Chinese and emoji', () => {
+    const str = '\x1b[?25l中文👋\x1b[?25h'
+    expect(stringWidth(str)).toBe(6) // 中文 (4) + emoji (2)
   })
 })
