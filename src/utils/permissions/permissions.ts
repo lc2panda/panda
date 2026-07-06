@@ -62,12 +62,14 @@ import {
 } from './permissionsLoader.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const classifierDecisionModule = feature('TRANSCRIPT_CLASSIFIER')
-  ? (require('./classifierDecision.js') as typeof import('./classifierDecision.js'))
-  : null
-const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
-  ? (require('./autoModeState.js') as typeof import('./autoModeState.js'))
-  : null
+let classifierDecisionModule: typeof import('./classifierDecision.js') | null = null
+if (feature('TRANSCRIPT_CLASSIFIER')) {
+  classifierDecisionModule = require('./classifierDecision.js') as typeof import('./classifierDecision.js')
+}
+let autoModeStateModule: typeof import('./autoModeState.js') | null = null
+if (feature('TRANSCRIPT_CLASSIFIER')) {
+  autoModeStateModule = require('./autoModeState.js') as typeof import('./autoModeState.js')
+}
 
 import {
   addToTurnClassifierDuration,
@@ -147,11 +149,14 @@ export function createPermissionRequestMessage(
 ): string {
   // Handle different decision reason types
   if (decisionReason) {
-    if (
-      (feature('BASH_CLASSIFIER') || feature('TRANSCRIPT_CLASSIFIER')) &&
-      decisionReason.type === 'classifier'
-    ) {
-      return `Classifier '${decisionReason.classifier}' requires approval for this ${toolName} command: ${decisionReason.reason}`
+    // Check if classifier reason should be displayed
+    if (decisionReason.type === 'classifier') {
+      if (feature('BASH_CLASSIFIER')) {
+        return `Classifier '${decisionReason.classifier}' requires approval for this ${toolName} command: ${decisionReason.reason}`
+      }
+      if (feature('TRANSCRIPT_CLASSIFIER')) {
+        return `Classifier '${decisionReason.classifier}' requires approval for this ${toolName} command: ${decisionReason.reason}`
+      }
     }
     switch (decisionReason.type) {
       case 'hook': {
@@ -738,11 +743,13 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
     // classifyAllShell: when enabled in auto mode, force Bash commands through
     // the classifier even when they matched a permissions.allow rule.
     const autoModeConfig = getAutoModeConfig()
-    const isAutoLike =
-      feature('TRANSCRIPT_CLASSIFIER') &&
-      (appState.toolPermissionContext.mode === 'auto' ||
+    let isAutoLike = false
+    if (feature('TRANSCRIPT_CLASSIFIER')) {
+      isAutoLike =
+        appState.toolPermissionContext.mode === 'auto' ||
         (appState.toolPermissionContext.mode === 'plan' &&
-          (autoModeStateModule?.isAutoModeActive() ?? false)))
+          (autoModeStateModule?.isAutoModeActive() ?? false))
+    }
     if (
       autoModeConfig?.classifyAllShell &&
       isAutoLike &&
@@ -836,10 +843,15 @@ export const hasPermissionsToUseTool: CanUseToolFn = async (
       // permissionSetup.ts: isOverlyBroadPowerShellAllowRule strips PowerShell(*)
       // and isDangerousPowerShellPermission strips iex/pwsh/Start-Process
       // prefix rules for ant users and auto mode entry.
-      if (
-        tool.name === POWERSHELL_TOOL_NAME &&
-        !feature('POWERSHELL_AUTO_MODE')
-      ) {
+      let powershellNeedsApproval = false
+      if (feature('POWERSHELL_AUTO_MODE')) {
+        // Feature enabled: PowerShell can proceed
+        powershellNeedsApproval = false
+      } else {
+        // Feature disabled: PowerShell requires interactive approval
+        powershellNeedsApproval = true
+      }
+      if (tool.name === POWERSHELL_TOOL_NAME && powershellNeedsApproval) {
         if (appState.toolPermissionContext.shouldAvoidPermissionPrompts) {
           return {
             behavior: 'deny',
