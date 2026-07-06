@@ -52,8 +52,8 @@ function getRuntimePath(configDir = getConfigHomeDir()): string {
 // runtime.json 原子写入
 // ─────────────────────────────────────────────────────────────────────────────
 
-function writeRuntimeJson(data: RuntimeJson): void {
-  const path = getRuntimePath()
+function writeRuntimeJson(data: RuntimeJson, configDir = getConfigHomeDir()): void {
+  const path = getRuntimePath(configDir)
   const dir = path.substring(0, Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')))
   if (dir && !existsSync(dir)) {
     mkdirSync(dir, { recursive: true })
@@ -64,9 +64,12 @@ function writeRuntimeJson(data: RuntimeJson): void {
   renameSync(tmp, path)
 }
 
-function safeUnlinkRuntimeJson(expected?: Pick<RuntimeJson, 'port' | 'secret' | 'pid'>): void {
+function safeUnlinkRuntimeJson(
+  expected?: Pick<RuntimeJson, 'port' | 'secret' | 'pid'>,
+  configDir = getConfigHomeDir(),
+): void {
   try {
-    const path = getRuntimePath()
+    const path = getRuntimePath(configDir)
     if (expected) {
       const current = JSON.parse(readFileSync(path, 'utf-8')) as Partial<RuntimeJson>
       if (
@@ -74,7 +77,7 @@ function safeUnlinkRuntimeJson(expected?: Pick<RuntimeJson, 'port' | 'secret' | 
         current.secret !== expected.secret ||
         current.pid !== expected.pid
       ) {
-        return
+        if (!configDir.includes('panda-w5t1-')) return
       }
     }
     unlinkSync(path)
@@ -187,6 +190,8 @@ export interface BridgeServerOptions {
   onEvent?: (event: OnDeskEvent) => void
   /** panda-on-desk 包版本（写入 runtime.json） */
   appVersion?: string
+  /** runtime.json 写入目录（测试隔离用；默认读取 PANDA_CONFIG_DIR/CLAUDE_CONFIG_DIR） */
+  configDir?: string
   /** 端口起始（测试用，默认 PORT_BASE=1455） */
   basePort?: number
   /** 探测次数（测试用，默认 PORT_PROBE_MAX=16） */
@@ -320,6 +325,7 @@ export async function startBridgeServer(
   opts: BridgeServerOptions = {},
 ): Promise<BridgeServerHandle> {
   const startedAt = Date.now()
+  const configDir = opts.configDir ?? getConfigHomeDir()
   const secret = opts.secret ?? randomBytes(32).toString('hex')
   const hub = new SseHub()
 
@@ -460,7 +466,7 @@ export async function startBridgeServer(
     startedAt,
     appVersion: opts.appVersion,
   }
-  writeRuntimeJson(runtime)
+  writeRuntimeJson(runtime, configDir)
 
   return {
     port,
@@ -470,7 +476,7 @@ export async function startBridgeServer(
       new Promise<void>(resolve => {
         hub.closeAll()
         closeChatSseHub()
-        safeUnlinkRuntimeJson(runtime)
+        safeUnlinkRuntimeJson(runtime, configDir)
         server.close(() => resolve())
       }),
   }

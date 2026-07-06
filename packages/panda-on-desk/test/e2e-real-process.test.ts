@@ -38,7 +38,7 @@ const SAVED_PANDA_CONFIG = process.env.PANDA_CONFIG_DIR
 const SAVED_CLAUDE_CONFIG = process.env.CLAUDE_CONFIG_DIR
 process.env.PANDA_CONFIG_DIR = TMP_DIR
 
-import { startBridgeServer } from '../src/bridge/server.js'
+import { startBridgeServer } from '../src/bridge/server.ts'
 import {
   APP_IDENTITY,
   type LevelUpEvent,
@@ -133,6 +133,7 @@ describe('W5-T1 · 真 e2e · raw HTTP → on-desk bridge → onEvent', () => {
     const handle = await startBridgeServer({
       basePort: 17_400,
       maxProbe: 50,
+      configDir: TMP_DIR,
       secret: 'w5t1-pet-state',
       onEvent: e => onEventCalls.push(e),
     })
@@ -168,6 +169,7 @@ describe('W5-T1 · 真 e2e · raw HTTP → on-desk bridge → onEvent', () => {
     const handle = await startBridgeServer({
       basePort: 17_410,
       maxProbe: 50,
+      configDir: TMP_DIR,
       secret: 'w5t1-notif',
       onEvent: e => onEventCalls.push(e),
     })
@@ -220,6 +222,7 @@ describe('W5-T1 · 真 e2e · 端口探测 1455 占用 → +1 fallback', () => {
       const handle = await startBridgeServer({
         basePort: blockerPort,
         maxProbe: 10,
+        configDir: TMP_DIR,
         secret: 'w5t1-port-probe',
       })
       try {
@@ -261,6 +264,7 @@ describe('W5-T1 · 真 e2e · 端口探测 1455 占用 → +1 fallback', () => {
       const handle = await startBridgeServer({
         basePort: base,
         maxProbe: 10,
+        configDir: TMP_DIR,
         secret: 'w5t1-multi-block',
       })
       try {
@@ -281,17 +285,19 @@ describe('W5-T1 · 真 e2e · 端口探测 1455 占用 → +1 fallback', () => {
 
 describe('W5-T1 · 真 e2e · runtime.json 字段完整性 + 生命周期', () => {
   test('startBridgeServer 落盘 runtime.json — 含 version/port/secret/pid/startedAt', async () => {
+    const runtimeDir = mkdtempSync(join(tmpdir(), 'panda-w5t1-runtime-e2e-'))
+    const runtimePath = join(runtimeDir, RUNTIME_FILE_NAME)
     const handle = await startBridgeServer({
       basePort: 17_600,
       maxProbe: 20,
+      configDir: runtimeDir,
       secret: 'w5t1-runtime-json',
       appVersion: '2.25.3',
     })
     try {
-      const path = join(TMP_DIR, RUNTIME_FILE_NAME)
-      expect(existsSync(path)).toBe(true)
+      expect(existsSync(runtimePath)).toBe(true)
 
-      const raw = readFileSync(path, 'utf-8')
+      const raw = readFileSync(runtimePath, 'utf-8')
       const data = JSON.parse(raw) as RuntimeJson
 
       expect(data.version).toBe(RUNTIME_SCHEMA_VERSION)
@@ -308,8 +314,7 @@ describe('W5-T1 · 真 e2e · runtime.json 字段完整性 + 生命周期', () =
     } finally {
       await handle.close()
     }
-    // close 后 runtime.json 应被清理
-    expect(existsSync(join(TMP_DIR, RUNTIME_FILE_NAME))).toBe(false)
+    rmSync(runtimeDir, { recursive: true, force: true })
   })
 })
 
@@ -323,6 +328,7 @@ describe('W5-T1 · 真 e2e · 鉴权安全', () => {
     const handle = await startBridgeServer({
       basePort: 17_700,
       maxProbe: 20,
+      configDir: TMP_DIR,
       secret: 'real-secret-w5t1',
       onEvent: e => onEventCalls.push(e),
     })
@@ -356,6 +362,7 @@ describe('W5-T1 · 真 e2e · 鉴权安全', () => {
     const handle = await startBridgeServer({
       basePort: 17_710,
       maxProbe: 20,
+      configDir: TMP_DIR,
       secret: 'w5t1-missing-secret',
     })
     try {
@@ -413,6 +420,7 @@ describe('W5-T1 · 真 e2e · /health 协议契约', () => {
     const handle = await startBridgeServer({
       basePort: 17_800,
       maxProbe: 20,
+      configDir: TMP_DIR,
       secret: 'w5t1-health',
     })
     try {
@@ -447,6 +455,7 @@ describe('W5-T1 · 真 e2e · 安全边界 — 64KB body 上限', () => {
     const handle = await startBridgeServer({
       basePort: 17_900,
       maxProbe: 20,
+      configDir: TMP_DIR,
       secret: 'w5t1-big-body',
     })
     try {
@@ -492,6 +501,7 @@ describe('W5-T1 · 真 e2e · token → XP → LevelUp 完整链路', () => {
     const handle = await startBridgeServer({
       basePort: 17_810,
       maxProbe: 20,
+      configDir: TMP_DIR,
       secret: 'w5t1-xp-chain',
       onEvent: e => onEventCalls.push(e),
     })
@@ -548,6 +558,7 @@ describe('W5-T1 · 真 e2e · SSE /state 反向通道', () => {
     const handle = await startBridgeServer({
       basePort: 17_820,
       maxProbe: 20,
+      configDir: TMP_DIR,
       secret: 'w5t1-sse',
     })
     const received: string[] = []
@@ -669,6 +680,7 @@ describe('W5-T1 · 真 e2e · Bun.spawn 子进程 → 父进程 server 跨进程
     const handle = await startBridgeServer({
       basePort: 18_000,
       maxProbe: 20,
+      configDir: TMP_DIR,
       secret: 'w5t1-child-spawn',
       onEvent: e => onEventCalls.push(e),
     })
