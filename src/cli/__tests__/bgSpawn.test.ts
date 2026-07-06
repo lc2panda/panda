@@ -14,15 +14,15 @@ let mockExecReturn: { stdout: string; stderr: string; code: number } = {
   code: 0,
 }
 
-mock.module('../../../src/utils/execFileNoThrow.js', () => ({
+mock.module('../../utils/execFileNoThrow.js', () => ({
   execFileNoThrow: async () => mockExecReturn,
 }))
 
-mock.module('../../../src/utils/swarm/backends/detection.js', () => ({
+mock.module('../../utils/swarm/backends/detection.js', () => ({
   isTmuxAvailable: async () => mockTmuxAvailable,
 }))
 
-mock.module('../../../src/utils/swarm/constants.js', () => ({
+mock.module('../../utils/swarm/constants.js', () => ({
   TMUX_COMMAND: 'tmux',
 }))
 
@@ -65,13 +65,13 @@ describe('bgSpawn — CLAUDE_CODE_SESSION_KIND env 注入', () => {
   test('spawnBgSession 构造的 env 包含 CLAUDE_CODE_SESSION_KIND=bg', async () => {
     // 捕获 execFileNoThrow 的调用参数来验证 env 注入
     const calls: Array<[string, string[], unknown]> = []
-    mock.module('../../../src/utils/execFileNoThrow.js', () => ({
+    mock.module('../../utils/execFileNoThrow.js', () => ({
       execFileNoThrow: async (file: string, args: string[], opts: unknown) => {
         calls.push([file, args, opts])
         return { stdout: '', stderr: '', code: 0 }
       },
     }))
-    mock.module('../../../src/utils/swarm/backends/detection.js', () => ({
+    mock.module('../../utils/swarm/backends/detection.js', () => ({
       isTmuxAvailable: async () => true,
     }))
 
@@ -92,7 +92,7 @@ describe('bgSpawn — CLAUDE_CODE_SESSION_KIND env 注入', () => {
 
   test('spawnBgSession 构造的 env 包含 CALLER_DIR', async () => {
     const calls: Array<[string, string[], unknown]> = []
-    mock.module('../../../src/utils/execFileNoThrow.js', () => ({
+    mock.module('../../utils/execFileNoThrow.js', () => ({
       execFileNoThrow: async (file: string, args: string[], opts: unknown) => {
         calls.push([file, args, opts])
         return { stdout: '', stderr: '', code: 0 }
@@ -114,7 +114,7 @@ describe('bgSpawn — CLAUDE_CODE_SESSION_KIND env 注入', () => {
   })
 
   test('tmux 不可用时 spawnBgSession 返回 { ok: false }', async () => {
-    mock.module('../../../src/utils/swarm/backends/detection.js', () => ({
+    mock.module('../../utils/swarm/backends/detection.js', () => ({
       isTmuxAvailable: async () => false,
     }))
     const { spawnBgSession } = await import('../bgSpawn.js')

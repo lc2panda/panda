@@ -11,12 +11,12 @@ import { tmpdir } from 'os'
 const TEST_CONFIG_DIR = join(tmpdir(), `panda-bg-test-${Date.now()}`)
 
 // mock envUtils 返回测试专用目录
-mock.module('../../../src/utils/envUtils.js', () => ({
+mock.module('../../utils/envUtils.js', () => ({
   getClaudeConfigHomeDir: () => TEST_CONFIG_DIR,
 }))
 
 // mock genericProcessUtils.isProcessRunning：总返回 true（测试场景假设进程存活）
-mock.module('../../../src/utils/genericProcessUtils.js', () => ({
+mock.module('../../utils/genericProcessUtils.js', () => ({
   isProcessRunning: (pid: number) => pid > 0,
 }))
 
@@ -37,28 +37,28 @@ mock.module('../bgSpawn.js', () => ({
 }))
 
 // mock execFileNoThrow
-mock.module('../../../src/utils/execFileNoThrow.js', () => ({
+mock.module('../../utils/execFileNoThrow.js', () => ({
   execFileNoThrow: async () => ({ stdout: '', stderr: '', code: 0 }),
 }))
 
 // mock swarm/constants
-mock.module('../../../src/utils/swarm/constants.js', () => ({
+mock.module('../../utils/swarm/constants.js', () => ({
   TMUX_COMMAND: 'tmux',
 }))
 
 // mock slowOperations（jsonParse 用于读取 PID 文件）
-mock.module('../../../src/utils/slowOperations.js', () => ({
+mock.module('../../utils/slowOperations.js', () => ({
   jsonParse: (s: string) => JSON.parse(s),
   jsonStringify: (v: unknown) => JSON.stringify(v),
 }))
 
 // mock debug
-mock.module('../../../src/utils/debug.js', () => ({
+mock.module('../../utils/debug.js', () => ({
   logForDebugging: () => {},
 }))
 
 // mock errors
-mock.module('../../../src/utils/errors.js', () => ({
+mock.module('../../utils/errors.js', () => ({
   errorMessage: (e: unknown) =>
     e instanceof Error ? e.message : String(e),
   isFsInaccessible: () => false,
@@ -204,7 +204,7 @@ describe('bg.ts — killHandler', () => {
     }
 
     // isProcessRunning: 收到 SIGTERM 后立即返回 false（进程"已退出"）
-    mock.module('../../../src/utils/genericProcessUtils.js', () => ({
+    mock.module('../../utils/genericProcessUtils.js', () => ({
       isProcessRunning: (pid: number) => !killed.includes(pid),
     }))
 
