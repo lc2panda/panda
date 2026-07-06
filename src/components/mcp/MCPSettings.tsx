@@ -144,10 +144,11 @@ export function MCPSettings(t0) {
   if ($[10] !== agentMcpServers.length || $[11] !== filteredClients.length || $[12] !== onComplete || $[13] !== servers.length) {
     t7 = () => {
       if (servers.length === 0 && filteredClients.length > 0) {
+        onComplete("MCP servers are configured but none connected. Please run /doctor for diagnostics, then check `panda mcp list`.");
         return;
       }
       if (servers.length === 0 && agentMcpServers.length === 0) {
-        onComplete("No MCP servers configured. Please run /doctor if this is unexpected. Otherwise, run `claude mcp --help` or visit https://code.claude.com/docs/en/mcp to learn more.");
+        onComplete("No MCP servers configured. Please run /doctor if this is unexpected. Otherwise, run `panda mcp --help`, `panda mcp list`, or `panda mcp add` to configure Panda MCP servers.");
       }
     };
     t8 = [servers.length, filteredClients.length, agentMcpServers.length, onComplete];

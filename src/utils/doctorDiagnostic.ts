@@ -1,5 +1,5 @@
 import { execa } from 'execa'
-import { readFile, realpath } from 'fs/promises'
+import { readFile, realpath, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { delimiter, join, posix, win32 } from 'path'
 import { checkGlobalInstallPermissions } from './autoUpdater.js'
@@ -11,7 +11,7 @@ import {
   type InstallMethod,
 } from './config.js'
 import { getCwd } from './cwd.js'
-import { isEnvTruthy } from './envUtils.js'
+import { getClaudeConfigHomeDir, isEnvTruthy } from './envUtils.js'
 import { execFileNoThrow } from './execFileNoThrow.js'
 import { getFsImplementation } from './fsOperations.js'
 import {
@@ -51,6 +51,28 @@ export type InstallationType =
   | 'development'
   | 'unknown'
 
+export type McpConfigPathDiagnostic = {
+  label: string
+  path: string
+  exists: boolean
+  hasMcpServers: boolean
+  mcpServerCount: number
+  error?: string
+}
+
+export type McpConfigDiagnostic = {
+  pandaConfigDir: string | null
+  claudeConfigDir: string | null
+  homeDir: string
+  pandaSettingsPath: string
+  globalPandaccJsonPath: string
+  globalPandaccLegacyJsonPath: string
+  projectMcpJsonPath: string
+  enterpriseManagedMcpPath: string
+  appDataClaudeDesktopConfigPath: string | null
+  paths: McpConfigPathDiagnostic[]
+}
+
 export type DiagnosticInfo = {
   installationType: InstallationType
   version: string
@@ -63,10 +85,113 @@ export type DiagnosticInfo = {
   warnings: Array<{ issue: string; fix: string }>
   recommendation?: string
   packageManager?: string
+  mcpConfig: McpConfigDiagnostic
   ripgrepStatus: {
     working: boolean
     mode: 'system' | 'builtin' | 'embedded' | 'vscode-ripgrep'
     systemPath: string | null
+  }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function countMcpServers(value: unknown): number {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    !('mcpServers' in value) ||
+    !value.mcpServers ||
+    typeof value.mcpServers !== 'object' ||
+    Array.isArray(value.mcpServers)
+  ) {
+    return 0
+  }
+
+  return Object.keys(value.mcpServers).length
+}
+
+async function inspectMcpConfigPath(
+  label: string,
+  path: string,
+): Promise<McpConfigPathDiagnostic> {
+  if (!(await pathExists(path))) {
+    return { label, path, exists: false, hasMcpServers: false, mcpServerCount: 0 }
+  }
+
+  try {
+    const raw = await readFile(path, 'utf8')
+    const parsed: unknown = jsonParse(raw)
+    const mcpServerCount = countMcpServers(parsed)
+    return {
+      label,
+      path,
+      exists: true,
+      hasMcpServers: mcpServerCount > 0,
+      mcpServerCount,
+    }
+  } catch (error) {
+    return {
+      label,
+      path,
+      exists: true,
+      hasMcpServers: false,
+      mcpServerCount: 0,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+export async function getMcpConfigDiagnostic(
+  homeDir = homedir(),
+): Promise<McpConfigDiagnostic> {
+  const pandaConfigDir = process.env.PANDA_CONFIG_DIR ?? null
+  const claudeConfigDir = process.env.CLAUDE_CONFIG_DIR ?? null
+  const pandaSettingsPath = join(getClaudeConfigHomeDir(), 'settings.json')
+  const globalPandaccJsonPath = join(homeDir, '.pandacc.json')
+  const globalPandaccLegacyJsonPath = join(homeDir, '.panda.json')
+  const projectMcpJsonPath = join(getCwd(), '.mcp.json')
+  const enterpriseManagedMcpPath = join(getManagedFilePath(), 'managed-mcp.json')
+  const appDataClaudeDesktopConfigPath = process.env.APPDATA
+    ? join(process.env.APPDATA, 'Claude', 'claude_desktop_config.json')
+    : null
+
+  const pathEntries: Array<[string, string]> = [
+    ['Panda settings', pandaSettingsPath],
+    ['Global Panda config', globalPandaccJsonPath],
+    ['Legacy Panda config', globalPandaccLegacyJsonPath],
+    ['Project .mcp.json', projectMcpJsonPath],
+    ['Enterprise managed MCP', enterpriseManagedMcpPath],
+    ['Misplaced Claude global config', join(homeDir, '.claude.json')],
+    ['Misplaced Claude settings', join(homeDir, '.claude', 'settings.json')],
+  ]
+
+  if (appDataClaudeDesktopConfigPath) {
+    pathEntries.push([
+      'Misplaced Claude Desktop config',
+      appDataClaudeDesktopConfigPath,
+    ])
+  }
+
+  return {
+    pandaConfigDir,
+    claudeConfigDir,
+    homeDir,
+    pandaSettingsPath,
+    globalPandaccJsonPath,
+    globalPandaccLegacyJsonPath,
+    projectMcpJsonPath,
+    enterpriseManagedMcpPath,
+    appDataClaudeDesktopConfigPath,
+    paths: await Promise.all(
+      pathEntries.map(([label, path]) => inspectMcpConfigPath(label, path)),
+    ),
   }
 }
 
@@ -602,6 +727,8 @@ export async function getDoctorDiagnostic(): Promise<DiagnosticInfo> {
       ? await getPackageManager()
       : undefined
 
+  const mcpConfig = await getMcpConfigDiagnostic()
+
   const diagnostic: DiagnosticInfo = {
     installationType,
     version,
@@ -618,6 +745,7 @@ export async function getDoctorDiagnostic(): Promise<DiagnosticInfo> {
     multipleInstallations,
     warnings,
     packageManager,
+    mcpConfig,
     ripgrepStatus,
   }
 

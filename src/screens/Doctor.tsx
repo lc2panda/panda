@@ -354,9 +354,20 @@ export function Doctor(t0) {
   } else {
     t22 = $[39];
   }
+  const mcpConfigLines = diagnostic.mcpConfig.paths.map(pathInfo => {
+    const status = pathInfo.exists
+      ? pathInfo.hasMcpServers
+        ? `exists, has mcpServers (${pathInfo.mcpServerCount})`
+        : pathInfo.error
+          ? `exists, unreadable (${pathInfo.error})`
+          : 'exists, no mcpServers'
+      : 'missing';
+    return <Text key={`${pathInfo.label}:${pathInfo.path}`}>└ {pathInfo.label}: {pathInfo.path} — {status}</Text>;
+  });
+  const tMcpConfig = <Box flexDirection="column" marginTop={1}><Text bold={true}>MCP Config Diagnostics</Text><Text>└ PANDA_CONFIG_DIR: {diagnostic.mcpConfig.pandaConfigDir ?? '(not set)'}</Text><Text>└ CLAUDE_CONFIG_DIR: {diagnostic.mcpConfig.claudeConfigDir ?? '(not set)'}</Text><Text>└ Home: {diagnostic.mcpConfig.homeDir}</Text><Text>└ Panda settings path: {diagnostic.mcpConfig.pandaSettingsPath}</Text><Text>└ Global Panda config: {diagnostic.mcpConfig.globalPandaccJsonPath}</Text><Text>└ Legacy Panda config: {diagnostic.mcpConfig.globalPandaccLegacyJsonPath}</Text><Text>└ Project MCP config: {diagnostic.mcpConfig.projectMcpJsonPath}</Text><Text>└ Enterprise managed MCP: {diagnostic.mcpConfig.enterpriseManagedMcpPath}</Text>{diagnostic.mcpConfig.appDataClaudeDesktopConfigPath ? <Text>└ Claude Desktop config: {diagnostic.mcpConfig.appDataClaudeDesktopConfigPath}</Text> : null}{mcpConfigLines}</Box>;
   let t23;
   if ($[40] !== t11 || $[41] !== t12 || $[42] !== t13 || $[43] !== t14 || $[44] !== t15 || $[45] !== t18 || $[46] !== t19 || $[47] !== t20 || $[48] !== t21 || $[49] !== t22) {
-    t23 = <Box flexDirection="column">{t10}{t11}{t12}{t13}{t14}{t15}{t18}{t19}{t20}{t21}{t22}</Box>;
+    t23 = <Box flexDirection="column">{t10}{t11}{t12}{t13}{t14}{t15}{t18}{t19}{t20}{t21}{tMcpConfig}{t22}</Box>;
     $[40] = t11;
     $[41] = t12;
     $[42] = t13;
