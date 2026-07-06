@@ -1,4 +1,3 @@
-// biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { c as _c } from "react/compiler-runtime";
 import { Box, Text, type TextProps } from '../../ink.js';
 import { feature } from 'bun:bundle';

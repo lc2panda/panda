@@ -1,4 +1,3 @@
-// biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import type {
   ToolResultBlockParam,
   ToolUseBlock,
@@ -305,7 +304,7 @@ async function* queryLoop(
   // multiple compacts: each subtracts the final context at that compact's
   // trigger point. Loop-local (not on State) to avoid touching the 7 continue
   // sites.
-  let taskBudgetRemaining: number | undefined = undefined
+  let taskBudgetRemaining: number | undefined
 
   // Snapshot immutable env/statsig/session state once at entry. See QueryConfig
   // for what's included and why feature() gates are intentionally excluded.
@@ -2181,7 +2180,7 @@ function checkAntiSlop(assistantMessages: AssistantMessage[]): UserMessage | nul
 
   // 3. 空洞长文本（无代码块无文件引用）
   const hasCodeBlock = /```[\s\S]*?```/.test(fullText)
-  const hasFileRef = /[a-zA-Z_\-]+\/[a-zA-Z_\-]+\.[a-zA-Z]{1,5}/.test(fullText) ||
+  const hasFileRef = /[a-zA-Z_-]+\/[a-zA-Z_-]+\.[a-zA-Z]{1,5}/.test(fullText) ||
     /\b\w+\.(ts|tsx|js|jsx|py|rs|go|java|c|cpp|h|css|html|json|yaml|yml|toml|md|sh|sql)\b/.test(fullText)
   if (fullText.length > 2000 && !hasCodeBlock && !hasFileRef) {
     issues.push('long response without code or file references')

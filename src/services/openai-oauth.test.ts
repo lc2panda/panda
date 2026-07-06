@@ -116,7 +116,7 @@ test('postFormViaAxiosWithCA reads CA file and attaches it via https.Agent', asy
   writeFileSync(caPath, caPem)
 
   let capturedUrl = ''
-  let capturedAgentCa: unknown = undefined
+  let capturedAgentCa: unknown
   mock.module('axios', () => ({
     default: {
       post: async (

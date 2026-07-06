@@ -73,7 +73,7 @@ export function MCPSettings(t0) {
           const isSSE = client_0.config.type === "sse";
           const isHTTP = client_0.config.type === "http";
           const isClaudeAIProxy = client_0.config.type === "claudeai-proxy";
-          let isAuthenticated = undefined;
+          let isAuthenticated ;
           if (isSSE || isHTTP) {
             const authProvider = new ClaudeAuthProvider(client_0.name, client_0.config as McpSSEServerConfig | McpHTTPServerConfig);
             const tokens = await authProvider.tokens();

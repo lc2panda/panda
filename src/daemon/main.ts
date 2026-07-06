@@ -188,7 +188,7 @@ async function spawnWorker(
   if (state.respawnCount > 0) {
     const delay =
       RESPAWN_BASE_DELAY_MS *
-      Math.min(Math.pow(2, state.respawnCount - 1), 32)
+      Math.min(2 ** (state.respawnCount - 1), 32)
     logForDebugging(
       `[daemon] worker ${workerId} respawn #${state.respawnCount}, backoff ${delay}ms`,
     )

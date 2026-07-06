@@ -314,8 +314,6 @@ export async function runWorkflowSteps(
 
       // ---- Poll settled promise (check if resolved) ----
       if (agent.status === 'running' && agentPromises.has(step.id)) {
-        // Status is updated via the .then() callback above; nothing to do here
-        continue
       }
     }
 

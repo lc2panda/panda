@@ -26,7 +26,7 @@ export function BypassPermissionsModeDialog(t0) {
   let t2;
   if ($[1] !== onAccept) {
     t2 = function onChange(value) {
-      bb3: switch (value) {
+      switch (value) {
         case "accept":
           {
             logEvent("tengu_bypass_permissions_mode_dialog_accept", {});
@@ -34,7 +34,7 @@ export function BypassPermissionsModeDialog(t0) {
               skipDangerousModePermissionPrompt: true
             });
             onAccept();
-            break bb3;
+            break;
           }
         case "decline":
           {

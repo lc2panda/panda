@@ -76,7 +76,7 @@ When a user describes what they want an agent to do, you will:
       user: "Hello"
       assistant: "I'm going to use the ${AGENT_TOOL_NAME} tool to launch the greeting-responder agent to respond with a friendly joke"
       <commentary>
-      Since the user is greeting, use the greeting-responder agent to respond with a friendly joke. 
+      Since the user is greeting, use the greeting-responder agent to respond with a friendly joke.
       </commentary>
     </example>
   - If the user mentioned or implied that the agent should be used proactively, you should include examples of this.

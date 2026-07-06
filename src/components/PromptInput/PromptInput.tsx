@@ -327,7 +327,6 @@ function PromptInput({
   // REPL.tsx) — teammate view falls back to SpinnerWithVerbInner which has
   // its own marginTop, so the gap stays even without ours.
   const briefOwnsGap = feature('KAIROS') || feature('KAIROS_BRIEF') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useAppState(s => s.isBriefOnly) && !viewingAgentTaskId : false;
   const mainLoopModel_ = useAppState(s => s.mainLoopModel);
   const mainLoopModelForSession = useAppState(s => s.mainLoopModelForSession);
@@ -2077,7 +2076,6 @@ function PromptInput({
   }, [effortNotificationText, addNotification, removeNotification]);
   useBuddyNotification();
   const companionSpeaking = feature('BUDDY') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useAppState(s => s.companionReaction !== undefined) : false;
   const {
     columns,

@@ -39,7 +39,6 @@ export function UserToolSuccessMessage({
   // per-scrollback-message store subscription — same pattern as
   // UserPromptMessage.tsx.
   const isBriefOnly = feature('KAIROS') || feature('KAIROS_BRIEF') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useAppState(s => s.isBriefOnly) : false;
 
   // Capture classifier approval once on mount, then delete from Map to prevent linear growth.

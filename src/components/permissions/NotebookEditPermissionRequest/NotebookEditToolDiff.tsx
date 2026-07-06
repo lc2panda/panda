@@ -151,16 +151,16 @@ function NotebookEditToolDiffInner(t0: InnerProps) {
   }
   const hunks = t3;
   let editTypeDescription;
-  bb2: switch (edit_mode) {
+  switch (edit_mode) {
     case "insert":
       {
         editTypeDescription = "Insert new cell";
-        break bb2;
+        break;
       }
     case "delete":
       {
         editTypeDescription = "Delete cell";
-        break bb2;
+        break;
       }
     default:
       {

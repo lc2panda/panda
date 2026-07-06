@@ -1593,7 +1593,7 @@ export const connectToServer = memoize(
               }
 
               // Wait for graceful shutdown with rapid escalation (total 500ms to keep CLI responsive)
-              // biome-ignore lint/suspicious/noAsyncPromiseExecutor: pre-existing decompiled pattern — safe here as resolve is only called once
+              // biome-ignore lint/suspicious/noAsyncPromiseExecutor: sequential signal escalation uses awaited sleeps inside the cleanup executor
               await new Promise<void>(async resolve => {
                 let resolved = false
 

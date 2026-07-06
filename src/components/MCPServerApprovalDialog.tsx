@@ -22,7 +22,7 @@ export function MCPServerApprovalDialog(t0) {
       logEvent("tengu_mcp_dialog_choice", {
         choice: value as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
       });
-      bb2: switch (value) {
+      switch (value) {
         case "yes":
         case "yes_all":
           {
@@ -39,7 +39,7 @@ export function MCPServerApprovalDialog(t0) {
               });
             }
             onDone();
-            break bb2;
+            break;
           }
         case "no":
           {

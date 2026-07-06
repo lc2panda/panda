@@ -2,7 +2,6 @@
 // Output: hook 执行结果（stdout/stderr/exitCode）
 // Pos: utils/ 生命周期 hook 系统，被 query/tool 调用链在各阶段触发
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
-// biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 /**
  * Hooks are user-defined shell commands that can be executed at various points
  * in Panda's lifecycle.
@@ -1360,7 +1359,6 @@ async function execCommandHook(
                 child.stdin.destroy()
               }
             })
-            continue
           }
         } catch {
           // Not JSON, just a normal line
@@ -1871,7 +1869,7 @@ export async function getMatchingHooks(
 
     // If you change the criteria below, then you must change
     // src/utils/hooks/hooksConfigManager.ts as well.
-    let matchQuery: string | undefined = undefined
+    let matchQuery: string | undefined
     switch (hookInput.hook_event_name) {
       case 'PreToolUse':
       case 'PostToolUse':

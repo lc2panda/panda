@@ -62,7 +62,7 @@ This PR adds a GitHub Actions workflow that enables Panda integration in our rep
 ### What is Panda?
 
 [Panda](https://claude.com/claude-code) is an AI coding agent that can help with:
-- Bug fixes and improvements  
+- Bug fixes and improvements
 - Documentation updates
 - Implementing new features
 - Code reviews and suggestions

@@ -220,13 +220,10 @@ export function useVoiceIntegration({
   // Voice state selectors. useVoiceEnabled = user intent (settings) +
   // auth + GB kill-switch, with the auth half memoized on authVersion so
   // render loops never hit a cold keychain spawn.
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   const voiceEnabled = feature('VOICE_MODE') ? useVoiceEnabled() : false;
   const voiceState = feature('VOICE_MODE') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useVoiceState(s => s.voiceState) : 'idle' as const;
   const voiceInterimTranscript: string = feature('VOICE_MODE') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useVoiceState(s_0 => s_0.voiceInterimTranscript) as string : '';
 
   // Set the voice anchor for focus mode (where recording starts via terminal
@@ -387,10 +384,8 @@ export function useVoiceKeybindingHandler({
   const setVoiceState = useSetVoiceState();
   const keybindingContext = useOptionalKeybindingContext();
   const isModalOverlayActive = useIsModalOverlayActive();
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   const voiceEnabled = feature('VOICE_MODE') ? useVoiceEnabled() : false;
   const voiceState = feature('VOICE_MODE') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useVoiceState(s => s.voiceState) : 'idle';
 
   // Find the configured key for voice:pushToTalk from keybinding context.

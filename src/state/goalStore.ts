@@ -234,8 +234,6 @@ export function findActiveGoalMarker(
               : GOAL_MAX_TURNS_DEFAULT,
         }
       }
-      // Malformed payload: keep scanning to maybe find an older valid marker.
-      continue
     }
   }
   return null

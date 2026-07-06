@@ -29,9 +29,9 @@ const DEFAULT_INTERVAL_MS = 60_000 // 60s
 
 // 三层内存防御阈值（L2 紧急压缩、L3 保命退出）
 const COMPACT_RSS_MB =
-  parseInt(process.env.PANDA_RSS_COMPACT_MB || '0') || 1400 // 1.4 GB
+  parseInt(process.env.PANDA_RSS_COMPACT_MB || '0', 10) || 1400 // 1.4 GB
 const SHUTDOWN_RSS_MB =
-  parseInt(process.env.PANDA_RSS_SHUTDOWN_MB || '0') || 1600 // 1.6 GB
+  parseInt(process.env.PANDA_RSS_SHUTDOWN_MB || '0', 10) || 1600 // 1.6 GB
 
 type HealthLevel = 'normal' | 'warn' | 'critical'
 

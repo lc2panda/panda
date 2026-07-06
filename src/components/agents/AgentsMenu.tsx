@@ -373,7 +373,7 @@ export function AgentsMenu(t0) {
         let t18;
         if ($[66] !== agentToUse || $[67] !== modeState) {
           t18 = value_0 => {
-            bb129: switch (value_0) {
+            switch (value_0) {
               case "view":
                 {
                   setModeState({
@@ -381,7 +381,7 @@ export function AgentsMenu(t0) {
                     agent: agentToUse,
                     previousMode: modeState.previousMode
                   });
-                  break bb129;
+                  break;
                 }
               case "edit":
                 {
@@ -390,7 +390,7 @@ export function AgentsMenu(t0) {
                     agent: agentToUse,
                     previousMode: modeState
                   });
-                  break bb129;
+                  break;
                 }
               case "delete":
                 {
@@ -399,7 +399,7 @@ export function AgentsMenu(t0) {
                     agent: agentToUse,
                     previousMode: modeState
                   });
-                  break bb129;
+                  break;
                 }
               case "back":
                 {

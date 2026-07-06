@@ -270,7 +270,6 @@ async function main(): Promise<void> {
         (args[0] === "--version" || args[0] === "-v" || args[0] === "-V")
     ) {
         // MACRO.VERSION is inlined at build time
-        // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.log(`${MACRO.VERSION} (Panda)`);
         return;
     }
@@ -306,7 +305,6 @@ async function main(): Promise<void> {
             (modelIdx !== -1 && args[modelIdx + 1]) || getMainLoopModel();
         const { getSystemPrompt } = await import("../constants/prompts.js");
         const prompt = await getSystemPrompt([], model);
-        // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.log(prompt.join("\n"));
         return;
     }

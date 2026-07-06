@@ -71,13 +71,13 @@ function ClaudeInChromeMenu(t0) {
   let t4;
   if ($[4] !== enabledByDefault) {
     t4 = function handleAction(action) {
-      bb22: switch (action) {
+      switch (action) {
         case "install-extension":
           {
             setSelectKey(_temp3);
             setShowInstallHint(true);
             openUrl(CHROME_EXTENSION_URL);
-            break bb22;
+            break;
           }
         case "reconnect":
           {
@@ -89,13 +89,13 @@ function ClaudeInChromeMenu(t0) {
               }
             });
             openUrl(CHROME_RECONNECT_URL);
-            break bb22;
+            break;
           }
         case "manage-permissions":
           {
             setSelectKey(_temp5);
             openUrl(CHROME_PERMISSIONS_URL);
-            break bb22;
+            break;
           }
         case "toggle-default":
           {

@@ -18,11 +18,11 @@ export function DevChannelsDialog(t0) {
   let t1;
   if ($[0] !== onAccept) {
     t1 = function onChange(value) {
-      bb2: switch (value) {
+      switch (value) {
         case "accept":
           {
             onAccept();
-            break bb2;
+            break;
           }
         case "exit":
           {

@@ -105,7 +105,7 @@ export function AdvisorMessage(t0) {
     return t10;
   }
   let body;
-  bb0: switch (block.content.type) {
+  switch (block.content.type) {
     case "advisor_tool_result_error":
       {
         let t1;
@@ -117,7 +117,7 @@ export function AdvisorMessage(t0) {
           t1 = $[23];
         }
         body = t1;
-        break bb0;
+        break;
       }
     case "advisor_result":
       {
@@ -131,7 +131,7 @@ export function AdvisorMessage(t0) {
           t1 = $[26];
         }
         body = t1;
-        break bb0;
+        break;
       }
     case "advisor_redacted_result":
       {

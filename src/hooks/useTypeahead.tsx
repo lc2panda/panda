@@ -529,7 +529,6 @@ export function useTypeahead({
   const debouncedFetchSlackChannels = useDebounceCallback(fetchSlackChannels, 150);
 
   // Handle immediate suggestion logic (cheap operations)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: store is a stable context ref, read imperatively at call-time
   const updateSuggestions = useCallback(async (value: string, inputCursorOffset?: number): Promise<void> => {
     // Use provided cursor offset or fall back to ref (avoids dependency on cursorOffset)
     const effectiveCursorOffset = inputCursorOffset ?? cursorOffsetRef.current;
@@ -728,7 +727,7 @@ export function useTypeahead({
 
     // Determine whether to display the argument hint and command suggestions.
     if (mode === 'prompt' && isCommandInput(value) && effectiveCursorOffset > 0 && !hasCommandWithArguments(isAtEndWithWhitespace, value)) {
-      let commandArgumentHint: string | undefined = undefined;
+      let commandArgumentHint: string | undefined ;
       if (value.length > 1) {
         // We have a partial or complete command without arguments
         // Check if it matches a command exactly and has an argument hint

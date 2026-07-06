@@ -1180,7 +1180,6 @@ async function run(): Promise<CommanderCommand> {
     // Ignore "code" as a prompt - treat it the same as no prompt
     if (prompt === 'code') {
       logEvent('tengu_code_prompt_ignored', {});
-      // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.warn(chalk.yellow(isZh() ? '提示: 你可以直接用 `panda` 启动' : 'Tip: You can launch Panda with just `panda`'));
       prompt = undefined;
     }
@@ -1227,7 +1226,6 @@ async function run(): Promise<CommanderCommand> {
       agentId?: unknown;
     }).agentId && kairosGate) {
       if (!checkHasTrustDialogAccepted()) {
-        // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.warn(chalk.yellow('Assistant mode disabled: directory is not trusted. Accept the trust dialog and restart.'));
       } else {
         // Blocking gate check — returns cached `true` instantly; if disk
@@ -1729,7 +1727,6 @@ async function run(): Promise<CommanderCommand> {
         });
         logForDebugging(`[Panda in Chrome] Error: ${error}`);
         logError(error);
-        // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.error(`Error: Failed to run with Panda in Chrome.`);
         process.exit(1);
       }
@@ -1946,7 +1943,6 @@ async function run(): Promise<CommanderCommand> {
 
     // Print any warnings from initialization
     warnings.forEach(warning => {
-      // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.error(warning);
     });
     void assertMinVersion();
@@ -1990,12 +1986,10 @@ async function run(): Promise<CommanderCommand> {
     // NOTE: We do NOT call prefetchAllMcpResources here - that's deferred until after trust dialog
 
     if (inputFormat && inputFormat !== 'text' && inputFormat !== 'stream-json') {
-      // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.error(`Error: Invalid input format "${inputFormat}".`);
       process.exit(1);
     }
     if (inputFormat === 'stream-json' && outputFormat !== 'stream-json') {
-      // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.error(`Error: --input-format=stream-json requires output-format=stream-json.`);
       process.exit(1);
     }
@@ -2003,7 +1997,6 @@ async function run(): Promise<CommanderCommand> {
     // Validate sdkUrl is only used with appropriate formats (formats are auto-set above)
     if (sdkUrl) {
       if (inputFormat !== 'stream-json' || outputFormat !== 'stream-json') {
-        // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.error(`Error: --sdk-url requires both --input-format=stream-json and --output-format=stream-json.`);
         process.exit(1);
       }
@@ -2012,7 +2005,6 @@ async function run(): Promise<CommanderCommand> {
     // Validate replayUserMessages is only used with stream-json formats
     if (options.replayUserMessages) {
       if (inputFormat !== 'stream-json' || outputFormat !== 'stream-json') {
-        // biome-ignore lint/suspicious/noConsole:: intentional console output
         console.error(`Error: --replay-user-messages requires both --input-format=stream-json and --output-format=stream-json.`);
         process.exit(1);
       }
@@ -3553,13 +3545,13 @@ async function run(): Promise<CommanderCommand> {
       } = await import('./commands/clear/caches.js');
       clearSessionCaches();
       let messages: MessageType[] | null = null;
-      let processedResume: ProcessedResume | undefined = undefined;
+      let processedResume: ProcessedResume | undefined ;
       let maybeSessionId = validateUuid(options.resume);
-      let searchTerm: string | undefined = undefined;
+      let searchTerm: string | undefined ;
       // Store full LogOption when found by custom title (for cross-worktree resume)
       let matchedLog: LogOption | null = null;
       // PR filter for --from-pr flag
-      let filterByPr: boolean | number | string | undefined = undefined;
+      let filterByPr: boolean | number | string | undefined ;
 
       // Handle --from-pr flag
       if (options.fromPr) {
@@ -4274,7 +4266,6 @@ async function run(): Promise<CommanderCommand> {
         setDirectConnectServerUrl(serverUrl);
         connectConfig = session.config;
       } catch (err) {
-        // biome-ignore lint/suspicious/noConsole: intentional error output
         console.error(err instanceof DirectConnectError ? err.message : String(err));
         process.exit(1);
       }

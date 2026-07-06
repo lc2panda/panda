@@ -74,7 +74,6 @@ export function filterAllowedSdkBetas(
   }
 
   if (isClaudeAISubscriber()) {
-    // biome-ignore lint/suspicious/noConsole: intentional warning
     console.warn(
       'Warning: Custom betas are only available for API key users. Ignoring provided betas.',
     )
@@ -83,7 +82,6 @@ export function filterAllowedSdkBetas(
 
   const { allowed, disallowed } = partitionBetasByAllowlist(sdkBetas)
   for (const beta of disallowed) {
-    // biome-ignore lint/suspicious/noConsole: intentional warning
     console.warn(
       `Warning: Beta header '${beta}' is not allowed. Only the following betas are supported: ${ALLOWED_SDK_BETAS.join(', ')}`,
     )

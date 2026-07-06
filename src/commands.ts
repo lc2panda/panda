@@ -4,7 +4,6 @@
 //
 // v2.1.129: getSkillToolCommands / getSlashCommandToolSkills 现在应用 skillOverrides
 //           settings.json 字段（off / user-invocable-only / name-only）。
-// biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import addDir from './commands/add-dir/index.js'
 import autofixPr from './commands/autofix-pr/index.js'
 import backfillSessions from './commands/backfill-sessions/index.js'
@@ -619,7 +618,7 @@ function resolveSkillOverrideMode(name: string): SkillOverrideMode | undefined {
     // of the schema may not have it. Cast through `unknown` so non-strict
     // runtimes still resolve cleanly.
     const overrides = (settings as unknown as { skillOverrides?: Record<string, SkillOverrideMode> } | null)?.skillOverrides
-    if (overrides && Object.prototype.hasOwnProperty.call(overrides, name)) {
+    if (overrides && Object.hasOwn(overrides, name)) {
       return overrides[name]
     }
   }

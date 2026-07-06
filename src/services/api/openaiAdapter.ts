@@ -1195,8 +1195,6 @@ export async function* convertResponsesAPIStreamToAnthropic(
       },
     }
   }
-
-  try {
     for await (const evt of readSSE) {
       const eventType = evt.event ?? (evt.data?.type as string | undefined)
       const data = evt.data
@@ -1387,11 +1385,6 @@ export async function* convertResponsesAPIStreamToAnthropic(
 
     // 流自然结束但没收到 response.completed —— 兜底 finalize（保 I2）
     yield* finalize()
-  } catch (err) {
-    // 异常路径（response.failed / 上游 throw）：直接透传，不再补 finalize
-    // —— 客户端的 stream watchdog 会感知异常并自行降级，多 emit 一帧反而扰乱协议
-    throw err
-  }
 }
 
 // ---- ChatGPTBackendClient 本体 --------------------------------------------
@@ -1599,6 +1592,7 @@ export class ChatGPTBackendClient {
       return underlying
     }
     return {
+      // biome-ignore lint/suspicious/noThenProperty: axios-compatible wrapper intentionally exposes a thenable interface
       then: (onfulfilled, onrejected) =>
         getUnderlying()
           .then(r => r.data)
@@ -1628,6 +1622,7 @@ export class ChatGPTBackendClient {
       return underlying
     }
     return {
+      // biome-ignore lint/suspicious/noThenProperty: axios-compatible wrapper intentionally exposes a thenable interface
       then: (onfulfilled, onrejected) =>
         getUnderlying()
           .then(r => r.stream as AsyncIterable<Record<string, unknown>>)
@@ -1834,7 +1829,7 @@ async function fetchWithRetry(
       return resp
     }
     if (attempt >= opts.maxRetries) return resp
-    let delayMs = 1000 * Math.pow(2, attempt)
+    let delayMs = 1000 * 2 ** attempt
     if (resp.status === 429) {
       // 克隆读 body（避免消费原 resp）
       try {
@@ -1911,7 +1906,7 @@ class ChatGPTCurlNotAvailableError extends Error {
  *   null       — 已探测但无代理（避免重复 exec reg）
  *   string     — 已探测到的代理 URL（带 scheme）
  */
-let cachedSystemProxy: string | null | undefined = undefined
+let cachedSystemProxy: string | null | undefined
 
 /** 仅打印一次"检测到系统代理"提示，避免刷屏。 */
 let systemProxyLogged = false

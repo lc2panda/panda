@@ -47,7 +47,7 @@ function renderPreview(speed: number): string {
   // "feel" without needing to actually grab the ScrollBox handle.
   const rows = Math.min(Math.floor(speed), PREVIEW_LINES.length - 1)
   return PREVIEW_LINES.map((line, idx) =>
-    idx === rows ? line.replace(/^  /, '→ ') : line,
+    idx === rows ? line.replace(/^ {2}/, '→ ') : line,
   ).join('\n')
 }
 

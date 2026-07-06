@@ -186,7 +186,7 @@ export function SkillPermissionRequest(props) {
   let t10;
   if ($[24] !== onDone || $[25] !== onReject || $[26] !== skill || $[27] !== toolUseConfirm) {
     t10 = (value, feedback) => {
-      bb33: switch (value) {
+      switch (value) {
         case "yes":
           {
             logUnaryEvent({
@@ -200,7 +200,7 @@ export function SkillPermissionRequest(props) {
             });
             toolUseConfirm.onAllow(toolUseConfirm.input, [], feedback);
             onDone();
-            break bb33;
+            break;
           }
         case "yes-exact":
           {
@@ -223,7 +223,7 @@ export function SkillPermissionRequest(props) {
               destination: "localSettings"
             }]);
             onDone();
-            break bb33;
+            break;
           }
         case "yes-prefix":
           {
@@ -248,7 +248,7 @@ export function SkillPermissionRequest(props) {
               destination: "localSettings"
             }]);
             onDone();
-            break bb33;
+            break;
           }
         case "no":
           {

@@ -18,7 +18,7 @@ export function ApproveApiKey(t0) {
   let t1;
   if ($[0] !== customApiKeyTruncated || $[1] !== onDone) {
     t1 = function onChange(value) {
-      bb2: switch (value) {
+      switch (value) {
         case "yes":
           {
             saveGlobalConfig(current_0 => ({
@@ -29,7 +29,7 @@ export function ApproveApiKey(t0) {
               }
             }));
             onDone(true);
-            break bb2;
+            break;
           }
         case "no":
           {

@@ -250,12 +250,12 @@ function ChordInterceptor(t0) {
       const contexts = [...handlerContexts, ...activeContexts, "Global"];
       const wasInChord = pendingChordRef.current !== null;
       const result = resolveKeyWithChordState(input, key, contexts, bindings, pendingChordRef.current);
-      bb23: switch (result.type) {
+      switch (result.type) {
         case "chord_started":
           {
             setPendingChord(result.pending);
             event.stopImmediatePropagation();
-            break bb23;
+            break;
           }
         case "match":
           {
@@ -275,19 +275,19 @@ function ChordInterceptor(t0) {
                 }
               }
             }
-            break bb23;
+            break;
           }
         case "chord_cancelled":
           {
             setPendingChord(null);
             event.stopImmediatePropagation();
-            break bb23;
+            break;
           }
         case "unbound":
           {
             setPendingChord(null);
             event.stopImmediatePropagation();
-            break bb23;
+            break;
           }
         case "none":
       }

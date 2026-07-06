@@ -621,22 +621,22 @@ function ReviewSessionDetail(t0) {
   let t4;
   if ($[15] !== goBackOrClose || $[16] !== handleClose || $[17] !== onDone || $[18] !== sessionUrl) {
     t4 = action => {
-      bb45: switch (action) {
+      switch (action) {
         case "open":
           {
             openBrowser(sessionUrl);
             onDone();
-            break bb45;
+            break;
           }
         case "stop":
           {
             setConfirmingStop(true);
-            break bb45;
+            break;
           }
         case "back":
           {
             goBackOrClose();
-            break bb45;
+            break;
           }
         case "dismiss":
           {

@@ -1,4 +1,3 @@
-// biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 /**
  * Ensure that any model codenames introduced here are also added to
  * scripts/excluded-strings.txt to avoid leaking them. Wrap any codename string

@@ -756,7 +756,6 @@ function computeDiffStatsBetweenMessages(messages: Message[], fromMessageId: UUI
         }
       }
     } catch {
-      continue;
     }
   }
   return {

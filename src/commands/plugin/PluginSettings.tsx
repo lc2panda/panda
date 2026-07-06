@@ -434,12 +434,12 @@ function ErrorsTabContent(t0) {
     const {
       action
     } = row;
-    bb77: switch (action.kind) {
+    switch (action.kind) {
       case "navigate":
         {
           setActiveTab(action.tab);
           setViewState(action.viewState);
-          break bb77;
+          break;
         }
       case "remove-extra-marketplace":
         {
@@ -459,7 +459,7 @@ function ErrorsTabContent(t0) {
           }));
           setActionMessage(`${figures.tick} Removed "${action.name}" from ${scopes} settings`);
           markPluginsChanged();
-          break bb77;
+          break;
         }
       case "remove-installed-marketplace":
         {
@@ -476,11 +476,11 @@ function ErrorsTabContent(t0) {
               setActionMessage(`Failed to remove "${action.name}": ${err instanceof Error ? err.message : String(err)}`);
             }
           })();
-          break bb77;
+          break;
         }
       case "managed-only":
         {
-          break bb77;
+          break;
         }
       case "none":
     }
@@ -782,27 +782,27 @@ export function PluginSettings(t0) {
       const tab = tabId as TabId;
       setActiveTab(tab);
       setError(null);
-      bb37: switch (tab) {
+      switch (tab) {
         case "discover":
           {
             setViewState({
               type: "discover-plugins"
             });
-            break bb37;
+            break;
           }
         case "installed":
           {
             setViewState({
               type: "manage-plugins"
             });
-            break bb37;
+            break;
           }
         case "marketplaces":
           {
             setViewState({
               type: "manage-marketplaces"
             });
-            break bb37;
+            break;
           }
         case "errors":
       }

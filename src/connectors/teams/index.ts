@@ -152,7 +152,7 @@ class TeamsConnector implements IMConnector {
   }
 
   // TODO(W9-T1·v2.26): 当前 W2 IM 只读模式未调用 graphPost — 留作未来 reply/forward 实现
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: reserved for write-side messaging APIs
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: retained for planned reply/forward Graph API support
   private async graphPost(path: string, body: any): Promise<any> {
     await this.ensureToken()
     const resp = await fetch(`${GRAPH_API}${path}`, {

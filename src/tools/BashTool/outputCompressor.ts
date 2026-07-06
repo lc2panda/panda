@@ -102,7 +102,6 @@ function compressGitStatus(stdout: string): string {
     // Keep untracked file entries (indented bare filenames under "Untracked files:")
     if (/^\t\S/.test(line)) {
       kept.push(line.trim())
-      continue
     }
     // Skip help text like "use git restore..." / "use git add..."
   }
@@ -331,7 +330,6 @@ function compressTestOutput(stdout: string): string {
         continue
       }
       kept.push(line)
-      continue
     }
     // Skip passing test lines
   }
@@ -392,7 +390,7 @@ function compressFind(stdout: string): string {
 
   const shown = groups.reduce((sum, g) => {
     const m = g.match(/(\d+) files/)
-    return sum + (m ? parseInt(m[1]) : 0)
+    return sum + (m ? parseInt(m[1], 10) : 0)
   }, 0)
 
   const result = [`${ls.length} files found:`]

@@ -186,16 +186,16 @@ export function It2SetupPrompt(t0) {
         description: "Skip teammate spawning for now"
       });
       return <Box flexDirection="column" gap={1}><Text>To use native iTerm2 split panes for teammates, you need the{" "}<Text bold={true}>it2</Text> CLI tool.</Text><Text dimColor={true}>This enables teammates to appear as split panes within your current window.</Text><Box marginTop={1}><Select options={options} onChange={value => {
-            bb61: switch (value) {
+            switch (value) {
               case "install":
                 {
                   handleInstall();
-                  break bb61;
+                  break;
                 }
               case "tmux":
                 {
                   handleUseTmux();
-                  break bb61;
+                  break;
                 }
               case "cancel":
                 {
@@ -226,16 +226,16 @@ export function It2SetupPrompt(t0) {
         description: "Skip teammate spawning for now"
       });
       return <Box flexDirection="column" gap={1}><Text color="error">Installation failed</Text>{error && <Text dimColor={true}>{error}</Text>}<Text dimColor={true}>You can try installing manually:{" "}{packageManager === "uvx" ? "uv tool install it2" : packageManager === "pipx" ? "pipx install it2" : "pip install --user it2"}</Text><Box marginTop={1}><Select options={options_0} onChange={value_0 => {
-            bb89: switch (value_0) {
+            switch (value_0) {
               case "retry":
                 {
                   handleInstall();
-                  break bb89;
+                  break;
                 }
               case "tmux":
                 {
                   handleUseTmux();
-                  break bb89;
+                  break;
                 }
               case "cancel":
                 {
@@ -273,7 +273,7 @@ export function It2SetupPrompt(t0) {
         description: "Skip teammate spawning for now"
       });
       return <Box flexDirection="column" gap={1}><Text color="error">Verification failed</Text>{error && <Text dimColor={true}>{error}</Text>}<Text>Make sure:</Text><Box flexDirection="column" paddingLeft={2}><Text>· Python API is enabled in iTerm2 preferences</Text><Text>· You may need to restart iTerm2 after enabling</Text></Box><Box marginTop={1}><Select options={options_1} onChange={value_1 => {
-            bb115: switch (value_1) {
+            switch (value_1) {
               case "retry":
                 {
                   setStep("verifying");
@@ -287,12 +287,12 @@ export function It2SetupPrompt(t0) {
                       setStep("failed");
                     }
                   });
-                  break bb115;
+                  break;
                 }
               case "tmux":
                 {
                   handleUseTmux();
-                  break bb115;
+                  break;
                 }
               case "cancel":
                 {

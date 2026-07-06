@@ -90,7 +90,6 @@ export function GlobalKeybindingHandlers({
   // Toggle transcript mode (ctrl+o). Two-way prompt ↔ transcript.
   // Brief view has its own dedicated toggle on ctrl+shift+b.
   const isBriefOnly = feature('KAIROS') || feature('KAIROS_BRIEF') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useAppState(s_0 => s_0.isBriefOnly) : false;
   const handleToggleTranscript = useCallback(() => {
     if (feature('KAIROS') || feature('KAIROS_BRIEF')) {
@@ -189,7 +188,6 @@ export function GlobalKeybindingHandlers({
     context: 'Global'
   });
   if (feature('KAIROS') || feature('KAIROS_BRIEF')) {
-    // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
     useKeybinding('app:toggleBrief', handleToggleBrief, {
       context: 'Global'
     });

@@ -77,16 +77,12 @@ export function useReplBridge(messages: Message[], setMessages: (action: React.S
     addNotification
   } = useNotifications();
   const replBridgeEnabled = feature('BRIDGE_MODE') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useAppState(s => s.replBridgeEnabled) : false;
   const replBridgeConnected = feature('BRIDGE_MODE') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useAppState(s_0 => s_0.replBridgeConnected) : false;
   const replBridgeOutboundOnly = feature('BRIDGE_MODE') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useAppState(s_1 => s_1.replBridgeOutboundOnly) : false;
   const replBridgeInitialName = feature('BRIDGE_MODE') ?
-  // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
   useAppState(s_2 => s_2.replBridgeInitialName) : undefined;
 
   // Initialize/teardown bridge when enabled state changes.

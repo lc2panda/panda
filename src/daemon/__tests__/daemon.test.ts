@@ -325,7 +325,7 @@ describe('daemonMain — 单例锁（start 双启动保护）', () => {
 
     let exitCode: number | undefined
     const origExit = process.exit.bind(process)
-    // @ts-ignore — override for test
+    // @ts-expect-error — override for test
     process.exit = (code?: number) => { exitCode = code; throw new Error('process.exit') }
 
     try {
@@ -333,7 +333,7 @@ describe('daemonMain — 单例锁（start 双启动保护）', () => {
     } catch {
       // expected
     } finally {
-      // @ts-ignore
+      // @ts-expect-error
       process.exit = origExit
     }
 
@@ -345,7 +345,7 @@ describe('daemonMain — unknown 子命令', () => {
   test('未知子命令调用 process.exit(1)', async () => {
     let exitCode: number | undefined
     const origExit = process.exit.bind(process)
-    // @ts-ignore
+    // @ts-expect-error
     process.exit = (code?: number) => { exitCode = code; throw new Error('process.exit') }
 
     try {
@@ -353,7 +353,7 @@ describe('daemonMain — unknown 子命令', () => {
     } catch {
       // expected
     } finally {
-      // @ts-ignore
+      // @ts-expect-error
       process.exit = origExit
     }
 
@@ -409,12 +409,12 @@ describe('D5-2 cleanupOrphanPtyHosts', () => {
 
     const killCalls: Array<[number, string]> = []
     const origKill = process.kill.bind(process)
-    // @ts-ignore
+    // @ts-expect-error
     process.kill = (pid: number, sig: string) => { killCalls.push([pid, sig]) }
     try {
       await cleanupOrphanPtyHosts()
     } finally {
-      // @ts-ignore
+      // @ts-expect-error
       process.kill = origKill
     }
     expect(killCalls).toHaveLength(0)
@@ -430,7 +430,7 @@ describe('D5-2 cleanupOrphanPtyHosts', () => {
 
     const killCalls: Array<[number, string]> = []
     const origKill = process.kill.bind(process)
-    // @ts-ignore
+    // @ts-expect-error
     process.kill = (pid: number, sig: string) => {
       killCalls.push([pid, sig])
       // 模拟进程收到信号后即死（让 Promise 及时 resolve）
@@ -439,7 +439,7 @@ describe('D5-2 cleanupOrphanPtyHosts', () => {
     try {
       await cleanupOrphanPtyHosts()
     } finally {
-      // @ts-ignore
+      // @ts-expect-error
       process.kill = origKill
     }
     expect(killCalls.some(([pid, sig]) => pid === 9876 && sig === 'SIGTERM')).toBe(true)
@@ -485,12 +485,12 @@ describe('D5-3 reapIdleBgSessions', () => {
 
     const killCalls: Array<[number, string]> = []
     const origKill = process.kill.bind(process)
-    // @ts-ignore
+    // @ts-expect-error
     process.kill = (pid: number, sig: string) => { killCalls.push([pid, sig]) }
     try {
       await reapIdleBgSessions()
     } finally {
-      // @ts-ignore
+      // @ts-expect-error
       process.kill = origKill
     }
     expect(killCalls).toHaveLength(0)
@@ -507,7 +507,7 @@ describe('D5-3 reapIdleBgSessions', () => {
 
     const killCalls: Array<[number, string]> = []
     const origKill = process.kill.bind(process)
-    // @ts-ignore
+    // @ts-expect-error
     process.kill = (pid: number, sig: string) => {
       killCalls.push([pid, sig])
       mockProcessRunning = false
@@ -515,7 +515,7 @@ describe('D5-3 reapIdleBgSessions', () => {
     try {
       await reapIdleBgSessions()
     } finally {
-      // @ts-ignore
+      // @ts-expect-error
       process.kill = origKill
     }
     expect(killCalls.some(([pid, sig]) => pid === 7777 && sig === 'SIGTERM')).toBe(true)
@@ -534,12 +534,12 @@ describe('D5-3 reapIdleBgSessions', () => {
 
     const killCalls: Array<[number, string]> = []
     const origKill = process.kill.bind(process)
-    // @ts-ignore
+    // @ts-expect-error
     process.kill = (pid: number, sig: string) => { killCalls.push([pid, sig]) }
     try {
       await reapIdleBgSessions()
     } finally {
-      // @ts-ignore
+      // @ts-expect-error
       process.kill = origKill
     }
     // 不应发 kill（进程已死）

@@ -52,7 +52,7 @@ export function FallbackPermissionRequest(t0) {
   let t3;
   if ($[5] !== onDone || $[6] !== onReject || $[7] !== toolUseConfirm) {
     t3 = (value, feedback) => {
-      bb8: switch (value) {
+      switch (value) {
         case "yes":
           {
             logUnaryEvent({
@@ -66,7 +66,7 @@ export function FallbackPermissionRequest(t0) {
             });
             toolUseConfirm.onAllow(toolUseConfirm.input, [], feedback);
             onDone();
-            break bb8;
+            break;
           }
         case "yes-dont-ask-again":
           {
@@ -88,7 +88,7 @@ export function FallbackPermissionRequest(t0) {
               destination: "localSettings"
             }]);
             onDone();
-            break bb8;
+            break;
           }
         case "no":
           {

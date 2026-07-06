@@ -119,13 +119,13 @@ export function WebFetchPermissionRequest(t0) {
   let t5;
   if ($[10] !== onDone || $[11] !== onReject || $[12] !== toolUseConfirm) {
     t5 = function onChange(newValue) {
-      bb8: switch (newValue) {
+      switch (newValue) {
         case "yes":
           {
             logUnaryPermissionEvent("tool_use_single", toolUseConfirm, "accept");
             toolUseConfirm.onAllow(toolUseConfirm.input, []);
             onDone();
-            break bb8;
+            break;
           }
         case "yes-dont-ask-again-domain":
           {
@@ -142,7 +142,7 @@ export function WebFetchPermissionRequest(t0) {
               destination: "localSettings"
             }]);
             onDone();
-            break bb8;
+            break;
           }
         case "no":
           {

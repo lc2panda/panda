@@ -39,19 +39,19 @@ export function MCPReconnect(t0) {
             return;
           }
           const result = await reconnectMcpServer(serverName);
-          bb43: switch (result.client.type) {
+          switch (result.client.type) {
             case "connected":
               {
                 setIsReconnecting(false);
                 onComplete(`Successfully reconnected to ${serverName}`);
-                break bb43;
+                break;
               }
             case "needs-auth":
               {
                 setError(`${serverName} requires authentication`);
                 setIsReconnecting(false);
                 onComplete(`${serverName} requires authentication. Use /mcp to authenticate.`);
-                break bb43;
+                break;
               }
             case "pending":
             case "failed":

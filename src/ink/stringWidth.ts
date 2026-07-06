@@ -10,7 +10,7 @@ function stripTerminalControls(str: string): string {
 
   str = stripAnsi(str)
   if (str.includes('\x1b')) {
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: ESC byte (0x1b) is intentional for ANSI cleaning
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape stripping requires ESC control character
     str = str.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
   }
   return str

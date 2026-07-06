@@ -364,8 +364,7 @@ export function splitSysPromptPrefix(
   }
 
   if (useGlobalCacheFeature) {
-    const boundaryIndex = systemPrompt.findIndex(
-      s => s === SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
+    const boundaryIndex = systemPrompt.indexOf(SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
     )
     if (boundaryIndex !== -1) {
       let attributionHeader: string | undefined
@@ -472,8 +471,7 @@ export function prependStaticContextToSystem(
   const block = entries.map(([k, v]) => `${k}: ${v}`).join('\n')
   if (!block) return [...systemPrompt]
 
-  const boundaryIndex = systemPrompt.findIndex(
-    s => s === SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
+  const boundaryIndex = systemPrompt.indexOf(SYSTEM_PROMPT_DYNAMIC_BOUNDARY,
   )
 
   if (boundaryIndex === -1) {

@@ -22,7 +22,7 @@ export function ColorPicker(t0) {
   const currentColor = t1 === undefined ? "automatic" : t1;
   let t2;
   if ($[0] !== currentColor) {
-    t2 = COLOR_OPTIONS.findIndex(opt => opt === currentColor);
+    t2 = COLOR_OPTIONS.indexOf(currentColor);
     $[0] = currentColor;
     $[1] = t2;
   } else {

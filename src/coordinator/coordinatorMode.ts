@@ -355,7 +355,7 @@ User:
   </task-notification>
 
 You:
-  Found the bug — null pointer in validate.ts:42. 
+  Found the bug — null pointer in validate.ts:42.
 
   ${SEND_MESSAGE_TOOL_NAME}({ to: "agent-a1b", message: "Fix the null pointer in src/auth/validate.ts:42. Add a null check before accessing user.id — if null, ... Commit and report the hash." })
 

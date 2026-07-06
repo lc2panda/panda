@@ -273,16 +273,16 @@ export function AddWorkspaceDirectory(t0) {
         return;
       }
       const selectionValue = value as RememberDirectoryOption;
-      bb64: switch (selectionValue) {
+      switch (selectionValue) {
         case "yes-session":
           {
             onAddDirectory(directoryPath, false);
-            break bb64;
+            break;
           }
         case "yes-remember":
           {
             onAddDirectory(directoryPath, true);
-            break bb64;
+            break;
           }
         case "no":
           {

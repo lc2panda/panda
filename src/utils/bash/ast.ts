@@ -250,7 +250,7 @@ const BRACE_EXPANSION_RE = /\{[^{}\s]*(,|\.\.)[^{}\s]*\}/
  * default IFS does not include CR, so tree-sitter and bash disagree on
  * word boundaries.
  */
-// eslint-disable-next-line no-control-regex
+// biome-ignore lint/suspicious/noControlCharactersInRegex: terminal/control sequence parsing requires control characters
 const CONTROL_CHAR_RE = /[\x00-\x08\x0B-\x1F\x7F]/
 
 /**
@@ -720,7 +720,6 @@ function collectCommands(
         child.type === 'select' ||
         child.type === ';'
       ) {
-        continue // structural tokens
       } else if (child.type === 'command_substitution') {
         // `for i in $(seq 1 3)` — inner cmd IS extracted and rule-checked.
         const err = collectCommandSubstitution(child, commands, varScope)
@@ -1792,7 +1791,6 @@ function walkVariableAssignment(
       // node. Without this case it falls through to walkArgument below
       // → tooComplex on unknown type `+=`.
       isAppend = child.type === '+='
-      continue
     } else if (child.type === 'command_substitution') {
       // $() as the variable's value. The output becomes a STRING stored in
       // the variable — it's NOT a positional argument (no path/flag concern).

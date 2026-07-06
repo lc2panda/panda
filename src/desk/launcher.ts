@@ -34,13 +34,13 @@ let _hintPrinted = false
 //   why: maybeSpawnOnDesk 可被多个钩子点调用；每次 4 个 existsSync sync stat
 //   累计 ~2-8ms（取决于盘 IO）。命中后无需再扫，未命中也无需再扫（path 不会
 //   在单进程生命周期内突然出现）。整轮 startup 节省 ~5ms 平均。
-let _launchCjsCache: string | null | undefined = undefined
+let _launchCjsCache: string | null | undefined
 
 // W11-T4 perf：companionOnDesk 配置读取缓存
 //   why: readCompanionOnDeskFlag 内部 require('../utils/config.js') 首次会触发
 //   config 模块树（~30ms）。虽然 maybeSpawnOnDesk 通常一进程只调一次，但 config
 //   require 缓存命中时仍有 jsonParse 开销；缓存判定结果省去重复函数调用栈。
-let _companionOnDeskCache: boolean | undefined = undefined
+let _companionOnDeskCache: boolean | undefined
 
 // W20-T2 perf：argv `--no-desk` 命中状态缓存
 //   why: process.argv.includes 是 O(n) 扫描；每次 startup 5000 iter 中重复扫

@@ -1,4 +1,3 @@
-// biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 /**
  * Shared event metadata enrichment for analytics systems
  *

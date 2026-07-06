@@ -198,7 +198,7 @@ describe('bg.ts — killHandler', () => {
   test('kill 指定 sessionId 前缀能找到 target', async () => {
     const killed: number[] = []
     const origKill = process.kill.bind(process)
-    // @ts-ignore — override for test
+    // @ts-expect-error — override for test
     process.kill = (pid: number, _sig: string) => {
       killed.push(pid)
     }
@@ -215,7 +215,7 @@ describe('bg.ts — killHandler', () => {
       await killHandler('11111111')
     } finally {
       cap.restore()
-      // @ts-ignore
+      // @ts-expect-error
       process.kill = origKill
     }
     expect(killed).toContain(12345)
@@ -227,7 +227,7 @@ describe('bg.ts — killHandler', () => {
     const cap = captureConsole()
     let exitCode: number | undefined
     const origExit = process.exit.bind(process)
-    // @ts-ignore
+    // @ts-expect-error
     process.exit = (code: number) => {
       exitCode = code
       throw new Error(`process.exit(${code})`)
@@ -238,7 +238,7 @@ describe('bg.ts — killHandler', () => {
       // expected throw from mocked process.exit
     } finally {
       cap.restore()
-      // @ts-ignore
+      // @ts-expect-error
       process.exit = origExit
     }
     expect(exitCode).toBe(1)
@@ -294,7 +294,7 @@ describe('bg.ts — attachHandler', () => {
 
     let exitCode: number | undefined
     const origExit = process.exit.bind(process)
-    // @ts-ignore
+    // @ts-expect-error
     process.exit = (code: number) => {
       exitCode = code
       throw new Error(`process.exit(${code})`)
@@ -308,7 +308,7 @@ describe('bg.ts — attachHandler', () => {
       // expected
     } finally {
       cap.restore()
-      // @ts-ignore
+      // @ts-expect-error
       process.exit = origExit
     }
     expect(exitCode).toBe(1)
@@ -339,7 +339,7 @@ describe('bg.ts — handleBgFlag', () => {
 
     let exitCode: number | undefined
     const origExit = process.exit.bind(process)
-    // @ts-ignore
+    // @ts-expect-error
     process.exit = (code: number) => {
       exitCode = code
       throw new Error(`exit(${code})`)
@@ -353,7 +353,7 @@ describe('bg.ts — handleBgFlag', () => {
       // expected
     } finally {
       cap.restore()
-      // @ts-ignore
+      // @ts-expect-error
       process.exit = origExit
     }
     expect(exitCode).toBe(1)
@@ -373,7 +373,7 @@ describe('bg.ts — handleBgFlag', () => {
 
     let exitCode: number | undefined
     const origExit = process.exit.bind(process)
-    // @ts-ignore
+    // @ts-expect-error
     process.exit = (code: number) => {
       exitCode = code
       throw new Error(`exit(${code})`)
@@ -387,7 +387,7 @@ describe('bg.ts — handleBgFlag', () => {
       // expected
     } finally {
       cap.restore()
-      // @ts-ignore
+      // @ts-expect-error
       process.exit = origExit
     }
     expect(exitCode).toBe(1)

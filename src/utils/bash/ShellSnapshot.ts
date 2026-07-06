@@ -421,6 +421,7 @@ export const createAndSaveSnapshot = async (
 
   logForDebugging(`Creating shell snapshot for ${shellType} (${binShell})`)
 
+  // biome-ignore lint/suspicious/noAsyncPromiseExecutor: snapshot setup performs async child-process preparation before resolving
   return new Promise(async resolve => {
     try {
       const configFile = getConfigFile(binShell)

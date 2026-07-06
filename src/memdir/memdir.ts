@@ -2005,8 +2005,8 @@ export function fsrsNextInterval(
 
   // 稳定度增长因子 SInc (FSRS-4 简化)
   const gradeMultipliers = [0.2, 0.8, 1.0, 1.3] // again/hard/good/easy
-  const SInc = gradeMultipliers[grade] * (1 + 11 * Math.pow(nextDifficulty, -0.5))
-    * Math.pow(stability, -0.2) * (Math.exp(0.05 * (1 - retrievability)) - 1)
+  const SInc = gradeMultipliers[grade] * (1 + 11 * nextDifficulty ** -0.5)
+    * stability ** -0.2 * (Math.exp(0.05 * (1 - retrievability)) - 1)
 
   let nextStability: number
   if (grade === 0) {

@@ -112,6 +112,6 @@ export function OutputLine(t0) {
  */
 export function stripUnderlineAnsi(content: string): string {
   return content.replace(
-  // eslint-disable-next-line no-control-regex
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: terminal/control sequence parsing requires control characters
   /\u001b\[([0-9]+;)*4(;[0-9]+)*m|\u001b\[4(;[0-9]+)*m|\u001b\[([0-9]+;)*4m/g, '');
 }

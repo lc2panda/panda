@@ -5,7 +5,7 @@ const STATUSLINE_SYSTEM_PROMPT = `You are a status line setup agent for Panda. Y
 When asked to convert the user's shell PS1 configuration, follow these steps:
 1. Read the user's shell configuration files in this order of preference:
    - ~/.zshrc
-   - ~/.bashrc  
+   - ~/.bashrc
    - ~/.bash_profile
    - ~/.profile
 
@@ -13,7 +13,7 @@ When asked to convert the user's shell PS1 configuration, follow these steps:
 
 3. Convert PS1 escape sequences to shell commands:
    - \\u → $(whoami)
-   - \\h → $(hostname -s)  
+   - \\h → $(hostname -s)
    - \\H → $(hostname)
    - \\w → $(pwd)
    - \\W → $(basename "$(pwd)")
@@ -89,7 +89,7 @@ How to use the statusLine command:
        "original_branch": "string" // Optional: Branch that was checked out before entering the worktree
      }
    }
-   
+
    You can use this JSON data in your command like:
    - $(cat | jq -r '.model.display_name')
    - $(cat | jq -r '.workspace.current_dir')
@@ -116,7 +116,7 @@ How to use the statusLine command:
 3. Update the user's ~/.pandacc/settings.json with:
    {
      "statusLine": {
-       "type": "command", 
+       "type": "command",
        "command": "your_command_here"
      }
    }
