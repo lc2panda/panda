@@ -102,9 +102,17 @@ const RISK_BY_TOOL: Record<string, ToolRiskLevel> = {
 export function inferRiskLevel(toolName: string, args?: unknown): ToolRiskLevel {
   const baseLevel = RISK_BY_TOOL[toolName] || 'low-write'
 
-  // Bash 升级检测：destructive 命令模式
+  // Bash 风险细化检测
   if (toolName === 'Bash' && typeof args === 'object' && args !== null) {
     const cmd = (args as { command?: string }).command || ''
+
+    // 1. 只读命令降级为 read-only
+    const readOnlyPattern = /^\s*(ls|cat|head|tail|grep|find|git\s+(status|log|diff|show|branch|tag)|npm\s+(list|ls|view|info|search)|echo|pwd|whoami|date|which|type|help|man|less|more|wc|env|printenv|set|history|hostname|uptime|df|du\s+-sh?|free|top\s+-bn1|ps\s+aux|netstat|curl\s+(-[sL]+\s+)?https?|wget\s+(-[qO-]+\s+)?https?|jq|yq|tee|sort|uniq|awk|sed\s+-n|tr|cut|basename|dirname|realpath|stat|file|xxd|hexdump|tree|bat)\b/i
+    if (readOnlyPattern.test(cmd.trim())) {
+      return 'read-only'
+    }
+
+    // 2. destructive 命令升级
     if (/\b(rm\s+-rf|git\s+reset\s+--hard|git\s+push\s+--force|sudo\s+rm|drop\s+table|drop\s+database|truncate|dd\s+if=|mkfs|fdisk)\b/i.test(cmd)) {
       return 'destructive'
     }

@@ -52,8 +52,28 @@ test('inferRiskLevel — Bash rm -rf 升级到 destructive', () => {
   expect(inferRiskLevel('Bash', { command: 'rm -rf /tmp/test' })).toBe('destructive')
 })
 
-test('inferRiskLevel — Bash ls 仍是 high-write', () => {
-  expect(inferRiskLevel('Bash', { command: 'ls -la' })).toBe('high-write')
+test('inferRiskLevel — Bash ls 降级为 read-only', () => {
+  expect(inferRiskLevel('Bash', { command: 'ls -la' })).toBe('read-only')
+})
+
+test('inferRiskLevel — Bash 常见只读命令', () => {
+  expect(inferRiskLevel('Bash', { command: 'cat README.md' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'git status' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'git log --oneline' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'npm list' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'grep -r pattern .' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'find . -name "*.ts"' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'echo "hello"' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'pwd' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'curl -sL https://example.com' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'jq . package.json' })).toBe('read-only')
+})
+
+test('inferRiskLevel — Bash 写入命令仍为 high-write', () => {
+  expect(inferRiskLevel('Bash', { command: 'npm install lodash' })).toBe('high-write')
+  expect(inferRiskLevel('Bash', { command: 'git commit -m "fix"' })).toBe('high-write')
+  expect(inferRiskLevel('Bash', { command: 'mkdir test' })).toBe('high-write')
+  expect(inferRiskLevel('Bash', { command: 'touch file.txt' })).toBe('high-write')
 })
 
 test('inferRiskLevel — Bash git reset --hard 升级 destructive', () => {
