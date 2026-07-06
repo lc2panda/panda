@@ -41,10 +41,15 @@ describe('bgSpawn — ensureTmuxAvailable', () => {
 
   afterEach(() => {
     delete process.env.PANDA_TEST_TMUX_AVAILABLE
+    delete process.env.PANDA_TEST_CAPTURE_BG_SPAWN
+    delete (globalThis as typeof globalThis & {
+      __pandaBgSpawnCalls?: Array<[string, string[], unknown]>
+    }).__pandaBgSpawnCalls
   })
 
   test('tmux 可用时返回 { ok: true }', async () => {
     mockTmuxAvailable = true
+    process.env.PANDA_TEST_TMUX_AVAILABLE = '1'
     const { ensureTmuxAvailable } = await importBgSpawn()
     const result = await ensureTmuxAvailable()
     expect(result.ok).toBe(true)
@@ -69,17 +74,13 @@ describe('bgSpawn — BG_TMUX_SESSION 常量', () => {
 
 describe('bgSpawn — CLAUDE_CODE_SESSION_KIND env 注入', () => {
   test('spawnBgSession 构造的 env 包含 CLAUDE_CODE_SESSION_KIND=bg', async () => {
-    // 捕获 execFileNoThrow 的调用参数来验证 env 注入
+    // 捕获 bgSpawn 测试钩子的调用参数来验证 env 注入
     const calls: Array<[string, string[], unknown]> = []
-    mock.module('../../utils/execFileNoThrow.js', () => ({
-      execFileNoThrow: async (file: string, args: string[], opts: unknown) => {
-        calls.push([file, args, opts])
-        return { stdout: '', stderr: '', code: 0 }
-      },
-    }))
-    mock.module('../../utils/swarm/backends/detection.js', () => ({
-      isTmuxAvailable: async () => true,
-    }))
+    ;(globalThis as typeof globalThis & {
+      __pandaBgSpawnCalls?: Array<[string, string[], unknown]>
+    }).__pandaBgSpawnCalls = calls
+    process.env.PANDA_TEST_CAPTURE_BG_SPAWN = '1'
+    process.env.PANDA_TEST_TMUX_AVAILABLE = '1'
 
     const { spawnBgSession } = await import('../bgSpawn.js')
     const testId = '11111111-2222-3333-4444-555555555555'
@@ -120,9 +121,8 @@ describe('bgSpawn — CLAUDE_CODE_SESSION_KIND env 注入', () => {
   })
 
   test('tmux 不可用时 spawnBgSession 返回 { ok: false }', async () => {
-    mock.module('../../utils/swarm/backends/detection.js', () => ({
-      isTmuxAvailable: async () => false,
-    }))
+    process.env.PANDA_TEST_TMUX_AVAILABLE = '0'
+    delete process.env.PANDA_TEST_CAPTURE_BG_SPAWN
     const { spawnBgSession } = await import('../bgSpawn.js')
     const result = await spawnBgSession([], 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee')
     expect(result.ok).toBe(false)

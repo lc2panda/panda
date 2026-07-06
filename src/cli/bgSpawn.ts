@@ -66,6 +66,7 @@ export async function ensureTmuxAvailable(): Promise<
 async function ensureTmuxSession(
   sessionName: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (process.env.PANDA_TEST_CAPTURE_BG_SPAWN === '1') return { ok: true }
   // 检测是否已存在
   const check = await execFileNoThrow(
     TMUX_COMMAND,
@@ -99,6 +100,17 @@ async function openTmuxWindow(
   windowName: string,
   command: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (process.env.PANDA_TEST_CAPTURE_BG_SPAWN === '1') {
+    const calls = (globalThis as typeof globalThis & {
+      __pandaBgSpawnCalls?: Array<[string, string[], unknown]>
+    }).__pandaBgSpawnCalls
+    calls?.push([
+      TMUX_COMMAND,
+      ['new-window', '-t', sessionName, '-n', windowName, command],
+      { timeout: 10000, useCwd: false },
+    ])
+    return { ok: true }
+  }
   const result = await execFileNoThrow(
     TMUX_COMMAND,
     ['new-window', '-t', sessionName, '-n', windowName, command],
