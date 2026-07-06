@@ -28,8 +28,9 @@ mock.module('../../../src/utils/swarm/constants.js', () => ({
 
 let mockTmuxAvailable = true
 
-// 动态 import 必须在 mock 之后
-import { ensureTmuxAvailable, BG_TMUX_SESSION } from '../bgSpawn.js'
+async function importBgSpawn() {
+  return await import('../bgSpawn.js')
+}
 
 describe('bgSpawn — ensureTmuxAvailable', () => {
   beforeEach(() => {
@@ -39,12 +40,14 @@ describe('bgSpawn — ensureTmuxAvailable', () => {
 
   test('tmux 可用时返回 { ok: true }', async () => {
     mockTmuxAvailable = true
+    const { ensureTmuxAvailable } = await importBgSpawn()
     const result = await ensureTmuxAvailable()
     expect(result.ok).toBe(true)
   })
 
   test('tmux 不可用时返回 { ok: false, error: ... }', async () => {
     mockTmuxAvailable = false
+    const { ensureTmuxAvailable } = await importBgSpawn()
     const result = await ensureTmuxAvailable()
     expect(result.ok).toBe(false)
     expect((result as { ok: false; error: string }).error).toContain('tmux')
@@ -52,7 +55,8 @@ describe('bgSpawn — ensureTmuxAvailable', () => {
 })
 
 describe('bgSpawn — BG_TMUX_SESSION 常量', () => {
-  test('claude-bg 常量值正确', () => {
+  test('claude-bg 常量值正确', async () => {
+    const { BG_TMUX_SESSION } = await importBgSpawn()
     expect(BG_TMUX_SESSION).toBe('claude-bg')
   })
 })

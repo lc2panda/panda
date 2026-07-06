@@ -9,9 +9,13 @@
 // [NEW-FILE:#20260426-MTX2-1] · 仅测试逻辑层与导出，不依赖 ink-testing-library
 
 import { test, expect } from 'bun:test'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { ROLE_LABEL, type TurnRole } from './turnRole.js'
 import { getRoleColor, getRoleDimColor } from './matrixPalette.js'
 import type { Message } from '../../types/message.js'
+
+const SRC_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 // 复刻 Messages.tsx 的 chromeKey 决策（保持公式同源；改一边必须同步另一边）
 // v3.8.1（2026-05-17）：worker key 包含 subAgentName，不同 sub-agent 之间触发 chrome 边界
@@ -152,7 +156,7 @@ test('波次2 — Comdr 问题 #2 修复路径（sub-agent UI 内部 chrome 边�
   // 检验路径：导入函数 → 检查源代码里有 isMatrixTheme + TurnHeader role="worker"
   // 这是为了在不依赖 ink 渲染器的情况下验证修复路径已落入文件。
   const fs = await import('node:fs')
-  const path = '/Users/panda/Downloads/cc-panda/src/tools/AgentTool/UI.tsx'
+  const path = resolve(SRC_ROOT, 'tools/AgentTool/UI.tsx')
   const source = fs.readFileSync(path, 'utf-8')
   // chrome 入口已注入
   expect(source).toContain('import { isMatrixTheme }')
@@ -166,7 +170,7 @@ test('波次2 — Comdr 问题 #2 修复路径（sub-agent UI 内部 chrome 边�
   expect(source).toMatch(/workerName=\{workerName/)
   // 主线 Messages.tsx roleChanged 已扩展
   const messagesSource = fs.readFileSync(
-    '/Users/panda/Downloads/cc-panda/src/components/Messages.tsx',
+    resolve(SRC_ROOT, 'components/Messages.tsx'),
     'utf-8',
   )
   expect(messagesSource).toContain('isSubAgent')
