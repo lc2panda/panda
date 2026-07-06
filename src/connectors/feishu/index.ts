@@ -439,8 +439,30 @@ class FeishuAPIConnector implements IMConnector {
   }
 
   async sendNotification(notification: PandaNotification): Promise<void> {
-    // 无配置的通知目标 chat_id，跳过发送
-    logForDebugging('[feishu-api] sendNotification: 无配置的通知目标 chat_id，跳过发送（不应发到 "default"）')
+    try {
+      const chatId = (this.config?.extra?.chatId as string) || ''
+      if (!chatId) {
+        logForDebugging('[feishu-api] sendNotification 跳过: 无配置的通知目标 chat_id')
+        return
+      }
+
+      const title = notification.title || 'Panda 通知'
+      const body = notification.body || ''
+      const content = `${title}\n\n${body}`
+
+      const payload = {
+        receive_id: chatId,
+        msg_type: 'text',
+        content: JSON.stringify({ text: content }),
+      }
+
+      const data = await this.apiPost('/im/v1/messages?receive_id_type=chat_id', payload)
+      if (data?.code !== 0) {
+        logForDebugging(`[feishu-api] sendNotification 失败: ${data?.msg || '未知错误'}`)
+      }
+    } catch (e) {
+      logForDebugging(`[feishu-api] sendNotification 异常: ${(e as Error).message}`)
+    }
   }
 }
 
