@@ -212,7 +212,7 @@ function installHello2ccScripts(): string {
 }
 
 function resolveHookCommand(command: string, scriptDir: string): string {
-  return command.replace(/\$\{CLAUDE_PLUGIN_ROOT\}\/scripts/g, scriptDir + '/scripts')
+  return command.replace(/\$\{CLAUDE_PLUGIN_ROOT\}\/scripts/g, join(scriptDir, 'scripts'))
 }
 
 function mergeHooksToSettings(scriptDir: string): void {

@@ -1,5 +1,6 @@
 import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs';
 import * as React from 'react';
+import { join } from 'path';
 import { extractTag } from 'src/utils/messages.js';
 import { FallbackToolUseErrorMessage } from '../../components/FallbackToolUseErrorMessage.js';
 import { FilePathLink } from '../../components/FilePathLink.js';
@@ -16,7 +17,7 @@ import type { Input, Output } from './FileReadTool.js';
  * Agent output files follow the pattern: {projectTempDir}/tasks/{taskId}.output
  */
 function getAgentOutputTaskId(filePath: string): string | null {
-  const prefix = `${getTaskOutputDir()}/`;
+  const prefix = join(getTaskOutputDir(), '') + '/';
   const suffix = '.output';
   if (filePath.startsWith(prefix) && filePath.endsWith(suffix)) {
     const taskId = filePath.slice(prefix.length, -suffix.length);

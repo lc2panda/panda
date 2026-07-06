@@ -12,6 +12,8 @@
  * can't auto-grant anything.
  */
 
+import { join } from 'path';
+
 /** Minimal shape — matches what `listInstalledApps` returns. */
 type InstalledAppLike = {
   readonly bundleId: string
@@ -112,9 +114,7 @@ const APP_NAME_MAX_COUNT = 50
 function isUserFacingPath(path: string, homeDir: string | undefined): boolean {
   if (PATH_ALLOWLIST.some(root => path.startsWith(root))) return true
   if (homeDir) {
-    const userApps = homeDir.endsWith('/')
-      ? `${homeDir}Applications/`
-      : `${homeDir}/Applications/`
+    const userApps = join(homeDir, 'Applications')
     if (path.startsWith(userApps)) return true
   }
   return false

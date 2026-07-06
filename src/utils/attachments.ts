@@ -44,7 +44,7 @@ import {
   getConditionalRulesForCwdLevelDirectory,
   type MemoryFileInfo,
 } from './claudemd.js'
-import { dirname, parse, relative, resolve } from 'path'
+import { dirname, join, parse, relative, resolve } from 'path'
 import { getCwd } from 'src/utils/cwd.js'
 import { getViewedTeammateTask } from '../state/selectors.js'
 import { logError } from './log.js'
@@ -3815,8 +3815,8 @@ function getTeamContextAttachment(messages: Message[]): Attachment[] {
   }
 
   const configDir = getClaudeConfigHomeDir()
-  const teamConfigPath = `${configDir}/teams/${teamName}/config.json`
-  const taskListPath = `${configDir}/tasks/${teamName}/`
+  const teamConfigPath = join(configDir, 'teams', teamName, 'config.json')
+  const taskListPath = join(configDir, 'tasks', teamName)
 
   return [
     {
