@@ -15,9 +15,9 @@ export const CLAUDE_3_7_SONNET_CONFIG = {
 
 export const CLAUDE_FABLE_5_CONFIG = {
   firstParty: 'claude-fable-5',
-  bedrock: 'us.anthropic.claude-3-7-sonnet-20250219-v1:0',
-  vertex: 'claude-3-7-sonnet@20250219',
-  foundry: 'claude-3-7-sonnet',
+  bedrock: 'anthropic.claude-fable-5',
+  vertex: 'claude-fable-5',
+  foundry: 'claude-fable-5',
 } as const satisfies ModelConfig
 
 export const CLAUDE_3_5_V2_SONNET_CONFIG = {
