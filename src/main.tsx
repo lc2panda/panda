@@ -1577,7 +1577,7 @@ async function run(): Promise<CommanderCommand> {
       // auto-unavailable, and by tengu_auto_mode_config opt-in carousel.
       if ((options as {
         enableAutoMode?: boolean;
-      }).enableAutoMode || permissionModeCli === 'auto' || permissionMode === 'auto' || !permissionModeCli && isDefaultPermissionModeAuto()) {
+      }).enableAutoMode || String(permissionModeCli) === 'auto' || String(permissionMode) === 'auto' || !permissionModeCli && isDefaultPermissionModeAuto()) {
         autoModeStateModule?.setAutoModeFlagCli(true);
       }
     }
@@ -3217,7 +3217,7 @@ async function run(): Promise<CommanderCommand> {
       // without TeamCreate. computeInitialTeamContext() is for tmux-spawned
       // teammates reading their own identity, not the assistant-mode leader.
       teamContext: (feature('KAIROS') ? assistantTeamContext ?? computeInitialTeamContext?.() : computeInitialTeamContext?.()) || undefined
-    };
+    } as unknown as AppState;
 
     // Add CLI initial prompt to history
     if (inputPrompt) {
@@ -4473,7 +4473,7 @@ async function run(): Promise<CommanderCommand> {
   // Plugin init command
   pluginCmd.command('init').description('Initialize a new plugin project · 初始化新插件项目').option('--name <name>', 'Plugin name').option('--type <type>', 'Plugin type: tool, hook, agent, mcp').option('--description <desc>', 'Plugin description').option('--author <author>', 'Plugin author').option('--output <path>', 'Output directory').option('--non-interactive', 'Skip interactive prompts').action(async (options: {
     name?: string;
-    type?: 'tool' | 'hook' | 'agent' | 'mcp';
+    type?: string;
     description?: string;
     author?: string;
     output?: string;

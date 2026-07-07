@@ -68,12 +68,16 @@ function awaySummaryMsg(text = 'recap text'): Message {
   } as unknown as Message
 }
 
+function importFresh<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>
+}
+
 describe('/recap command integration', () => {
   test('空 messages → onDone 提示，不调 setMessages', async () => {
     mock.module('../../services/awaySummary.js', () => ({
       generateAwaySummary: async () => 'should-not-be-called',
     }))
-    const { default: recap } = await import('./index.js?empty=1')
+    const { default: recap } = await importFresh<typeof import('./index.js')>('./index.js?empty=1')
     if (recap.type !== 'local-jsx') {
       throw new Error('recap must be local-jsx')
     }
@@ -99,7 +103,7 @@ describe('/recap command integration', () => {
         return 'fresh-summary'
       },
     }))
-    const { default: recap } = await import('./index.js?dup=1')
+    const { default: recap } = await importFresh<typeof import('./index.js')>('./index.js?dup=1')
     if (recap.type !== 'local-jsx') throw new Error('type mismatch')
     const mod = await recap.load()
     const messages: Message[] = [userMsg('hi'), awaySummaryMsg('old')]
@@ -119,7 +123,7 @@ describe('/recap command integration', () => {
       generateAwaySummary: async () =>
         'You were debugging X. Next: add cleanup.',
     }))
-    const { default: recap } = await import('./index.js?ok=1')
+    const { default: recap } = await importFresh<typeof import('./index.js')>('./index.js?ok=1')
     if (recap.type !== 'local-jsx') throw new Error('type mismatch')
     const mod = await recap.load()
     const messages: Message[] = [userMsg('please help debug')]
@@ -147,7 +151,7 @@ describe('/recap command integration', () => {
     mock.module('../../services/awaySummary.js', () => ({
       generateAwaySummary: async () => null,
     }))
-    const { default: recap } = await import('./index.js?null=1')
+    const { default: recap } = await importFresh<typeof import('./index.js')>('./index.js?null=1')
     if (recap.type !== 'local-jsx') throw new Error('type mismatch')
     const mod = await recap.load()
     const messages: Message[] = [userMsg('hi')]
@@ -170,7 +174,7 @@ describe('/recap command shape', () => {
     mock.module('../../services/awaySummary.js', () => ({
       generateAwaySummary: async () => 'x',
     }))
-    const { default: recap } = await import('./index.js?meta=1')
+    const { default: recap } = await importFresh<typeof import('./index.js')>('./index.js?meta=1')
     expect(recap.name).toBe('recap')
     expect(recap.type).toBe('local-jsx')
     expect(recap.description).toContain('summary')
@@ -188,7 +192,7 @@ describe('/recap regression — context.messages 是 messages 的唯一真源', 
     mock.module('../../services/awaySummary.js', () => ({
       generateAwaySummary: async () => 'a recap from real context.messages',
     }))
-    const { default: recap } = await import('./index.js?regression-runtime=1')
+    const { default: recap } = await importFresh<typeof import('./index.js')>('./index.js?regression-runtime=1')
     if (recap.type !== 'local-jsx') throw new Error('type mismatch')
     const mod = await recap.load()
 
@@ -225,7 +229,7 @@ describe('/recap regression — context.messages 是 messages 的唯一真源', 
     mock.module('../../services/awaySummary.js', () => ({
       generateAwaySummary: async () => 'should-not-be-called',
     }))
-    const { default: recap } = await import(
+    const { default: recap } = await importFresh<typeof import('./index.js')>(
       './index.js?regression-no-messages=1'
     )
     if (recap.type !== 'local-jsx') throw new Error('type mismatch')
@@ -262,7 +266,7 @@ describe('/recap 与自动版冲突防护', () => {
         return 'fresh'
       },
     }))
-    const { default: recap } = await import('./index.js?meta-user=1')
+    const { default: recap } = await importFresh<typeof import('./index.js')>('./index.js?meta-user=1')
     if (recap.type !== 'local-jsx') throw new Error('type mismatch')
     const mod = await recap.load()
     // 顺序：user → away_summary → meta-user（meta 不重置守卫，仍应判定"已存在"）
@@ -285,7 +289,7 @@ describe('/recap 与自动版冲突防护', () => {
     mock.module('../../services/awaySummary.js', () => ({
       generateAwaySummary: async () => 'second-recap',
     }))
-    const { default: recap } = await import('./index.js?new-turn=1')
+    const { default: recap } = await importFresh<typeof import('./index.js')>('./index.js?new-turn=1')
     if (recap.type !== 'local-jsx') throw new Error('type mismatch')
     const mod = await recap.load()
     const messages: Message[] = [

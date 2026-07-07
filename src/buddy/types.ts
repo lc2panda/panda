@@ -73,6 +73,7 @@ export const SPECIES = [
   mushroom,
   chonk,
 ] as const
+export type Species = (typeof SPECIES)[number]
 
 // PetState 12 态枚举（D1 P1-T1）— 优先级数值越大越高
 // 排序原则：异常/通知 > 系统操作 > 多任务并发 > 单任务 > 待机梯度

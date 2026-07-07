@@ -381,7 +381,7 @@ export function initSessionMemory(): void {
     if (process.env.USER_TYPE === 'ant') {
       logEvent('tengu_session_memory_init', {
         auto_compact_enabled: false,
-        reason: 'opt_in_disabled',
+        optInDisabled: true,
       })
     }
     return

@@ -56,13 +56,14 @@ function buildResult(
   compressed: string,
   original: string,
   strategy: string,
+  savingThreshold = SAVING_THRESHOLD,
 ): CompressionResult | null {
   const originalSize = original.length
   const compressedSize = compressed.length
   const savedPercent = originalSize > 0
     ? (originalSize - compressedSize) / originalSize
     : 0
-  if (savedPercent < SAVING_THRESHOLD) return null
+  if (savedPercent < savingThreshold) return null
   return { compressed, originalSize, compressedSize, savedPercent, strategy }
 }
 

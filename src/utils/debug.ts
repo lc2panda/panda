@@ -208,11 +208,12 @@ export async function flushDebugLogs(): Promise<void> {
 
 export function logForDebugging(
   message: string,
-  { level }: { level: DebugLogLevel } = {
+  { level }: { level?: DebugLogLevel } & Record<string, unknown> = {
     level: 'debug',
   },
 ): void {
-  if (LEVEL_ORDER[level] < LEVEL_ORDER[getMinDebugLogLevel()]) {
+  const debugLevel = level ?? 'debug'
+  if (LEVEL_ORDER[debugLevel] < LEVEL_ORDER[getMinDebugLogLevel()]) {
     return
   }
   if (!shouldLogDebugMessage(message)) {
@@ -224,7 +225,7 @@ export function logForDebugging(
     message = jsonStringify(message)
   }
   const timestamp = new Date().toISOString()
-  const output = `${timestamp} [${level.toUpperCase()}] ${message.trim()}\n`
+  const output = `${timestamp} [${debugLevel.toUpperCase()}] ${message.trim()}\n`
   if (isDebugToStdErr()) {
     writeToStderr(output)
     return

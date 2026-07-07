@@ -32,7 +32,7 @@ async function runRealHookChild(stdinJson: string): Promise<{ stdout: string; ex
       try {
         const received = readFileSync(outPath, 'utf-8')
         // attach to stdout for assertion convenience
-        resolve({ stdout: received, exitCode: code })
+        resolve({ stdout: received, exitCode: typeof code === 'number' ? code : 0 })
       } catch (e) {
         reject(e)
       } finally {

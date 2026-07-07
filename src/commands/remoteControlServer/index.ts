@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { feature } from 'bun:bundle'
 import type { Command } from '../../commands.js'
 import { isBridgeEnabled } from '../../bridge/bridgeEnabled.js'
@@ -28,9 +29,10 @@ const remoteControlServer = {
         onDone: import('../../types/command.js').LocalJSXCommandOnDone,
         context: import('../../types/command.js').LocalJSXCommandContext,
       ): Promise<React.ReactNode> {
-        const { getBridgeAccessToken } = await import(
-          '../../bridge/bridgeConfig.js'
-        )
+        const {
+          getBridgeAccessToken,
+          getBridgeBaseUrl,
+        } = await import('../../bridge/bridgeConfig.js')
 
         const token = getBridgeAccessToken()
         if (!token) {
@@ -41,20 +43,32 @@ const remoteControlServer = {
           return null
         }
 
-        const bridgeApi = await import('../../bridge/bridgeApi.js')
+        const { createBridgeApiClient } = await import('../../bridge/bridgeApi.js')
+        const bridgeApi = createBridgeApiClient({
+          baseUrl: getBridgeBaseUrl(),
+          getAccessToken: getBridgeAccessToken,
+          runnerVersion: MACRO.VERSION,
+        })
 
         const machineName =
           process.env.HOSTNAME || require('os').hostname() || 'unknown'
         const cwd = process.cwd()
 
         try {
-          const env = await bridgeApi.registerEnvironment({
+          const env = await bridgeApi.registerBridgeEnvironment({
             machineName,
             dir: cwd,
-            branch: undefined,
-            gitRepoUrl: undefined,
+            branch: '',
+            gitRepoUrl: null,
             maxSessions: 5,
-            workerType: 'daemon',
+            spawnMode: 'same-dir',
+            verbose: false,
+            sandbox: false,
+            bridgeId: randomUUID(),
+            workerType: 'claude_code_assistant',
+            environmentId: randomUUID(),
+            apiBaseUrl: getBridgeBaseUrl(),
+            sessionIngressUrl: getBridgeBaseUrl(),
           })
 
           onDone(

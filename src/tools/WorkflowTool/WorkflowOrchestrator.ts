@@ -235,7 +235,11 @@ export async function runWorkflowSteps(
         },
         context,
         // canUseTool: always allow (workflow already has permission)
-        () => Promise.resolve(true),
+        async () => ({
+          behavior: 'allow',
+          updatedInput: { prompt },
+          decisionReason: { type: 'mode', mode: 'default' },
+        }),
         parentMessage as never,
       )
       .then((result) => {

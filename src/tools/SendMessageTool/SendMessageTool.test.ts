@@ -90,7 +90,7 @@ test('to 为空 → 仍然返回 to must not be empty（其他校验未受影响
 
   expect(result.result).toBe(false)
   if (!result.result) {
-    expect(result.message).toBe('to must not be empty')
+    expect((result as { message: string }).message).toBe('to must not be empty')
   }
 })
 
@@ -104,7 +104,7 @@ test('to 含 @ → 仍然返回相应错误（其他校验未受影响）', asyn
 
   expect(result.result).toBe(false)
   if (!result.result) {
-    expect(result.message).toContain('bare teammate name')
+    expect((result as { message: string }).message).toContain('bare teammate name')
   }
 })
 
@@ -122,6 +122,6 @@ test('结构化 message (shutdown_response) 非 TEAM_LEAD → 拒绝（确认无
 
   expect(result.result).toBe(false)
   if (!result.result) {
-    expect(result.message).toContain('shutdown_response must be sent to')
+    expect((result as { message: string }).message).toContain('shutdown_response must be sent to')
   }
 })

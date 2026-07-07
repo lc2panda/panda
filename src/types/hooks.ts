@@ -333,6 +333,9 @@ export type HookResult = {
   continueOnBlock?: boolean
   /** [v2.1.141] Raw ANSI sequence to write to stderr (notification/title/bell). */
   terminalSequence?: string
+  sessionTitle?: string
+  suppressMessage?: boolean
+  replacementContent?: string
   permissionRequestResult?: PermissionRequestResult
   retry?: boolean
 }

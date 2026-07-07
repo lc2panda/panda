@@ -548,12 +548,11 @@ export async function executeAutoDreamStandalone(): Promise<void> {
   if (!runner) initAutoDream()
   if (!runner) return
 
-  const { getAppState, setAppState } = await import('../../bootstrap/state.js')
   const syntheticContext: REPLHookContext = {
     toolUseContext: {
-      getAppState,
-      setAppState,
-      setAppStateForTasks: setAppState,
+      getAppState: () => undefined,
+      setAppState: () => undefined,
+      setAppStateForTasks: () => undefined,
     } as unknown as REPLHookContext['toolUseContext'],
     messages: [],
   } as unknown as REPLHookContext

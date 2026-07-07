@@ -134,6 +134,8 @@ export type AppState = DeepImmutable<{
   replBridgeEnabled: boolean
   // Always-on bridge: true when activated via /remote-control command, false when config-driven
   replBridgeExplicit: boolean
+  // Always-on bridge: true while bridge runtime is started in this REPL
+  replBridgeActive: boolean
   // Outbound-only mode: forward events to CCR but reject inbound prompts/control
   replBridgeOutboundOnly: boolean
   // Always-on bridge: env registered + session created (= "Ready")
@@ -167,8 +169,21 @@ export type AppState = DeepImmutable<{
   viewingAgentTaskId?: string
   // Latest companion reaction from the friend observer (src/buddy/observer.ts)
   companionReaction?: string
+  // Companion visibility toggle controlled by /buddy
+  companionVisible?: boolean
   // Timestamp of last /buddy pet — CompanionSprite renders hearts while recent
   companionPetAt?: number
+  // Torch visibility toggle controlled by /torch
+  torchEnabled?: boolean
+  // Connected peer sessions discovered by the UDS inbox
+  connectedPeers?: Array<{
+    id: string
+    name?: string
+    cwd?: string
+    status?: string
+  }>
+  // Current working directory exposed to local command contexts
+  cwd?: string
   // TODO (ashwin): see if we can use utility-types DeepReadonly for this
   mcp: {
     clients: MCPServerConnection[]
@@ -326,19 +341,19 @@ export type AppState = DeepImmutable<{
     leadAgentId: string
     // Self-identity for swarm members (separate processes in tmux panes)
     // Note: This is different from toolUseContext.agentId which is for in-process subagents
-    selfAgentId?: string // Swarm member's own ID (same as leadAgentId for leaders)
-    selfAgentName?: string // Swarm member's name ('team-lead' for leaders)
-    isLeader?: boolean // True if this swarm member is the team leader
-    selfAgentColor?: string // Assigned color for UI (used by dynamically joined sessions)
+    selfAgentId?: string | undefined // Swarm member's own ID (same as leadAgentId for leaders)
+    selfAgentName?: string | undefined // Swarm member's name ('team-lead' for leaders)
+    isLeader?: boolean | undefined // True if this swarm member is the team leader
+    selfAgentColor?: string | undefined // Assigned color for UI (used by dynamically joined sessions)
     teammates: {
       [teammateId: string]: {
         name: string
-        agentType?: string
-        color?: string
+        agentType?: string | undefined
+        color?: string | undefined
         tmuxSessionName: string
         tmuxPaneId: string
         cwd: string
-        worktreePath?: string
+        worktreePath?: string | undefined
         spawnedAt: number
       }
     }
@@ -565,5 +580,5 @@ export function getDefaultAppState(): AppState {
     effortValue: undefined,
     activeOverlays: new Set<string>(),
     fastMode: false,
-  }
+  } as unknown as AppState
 }

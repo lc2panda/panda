@@ -511,7 +511,7 @@ export function createUserMessage({
     type: 'user',
     message: {
       role: 'user',
-      content: content || NO_CONTENT_MESSAGE, // Make sure we don't send empty messages
+      content: (content || NO_CONTENT_MESSAGE) as UserMessage['message']['content'], // Make sure we don't send empty messages
     },
     isMeta,
     isVisibleInTranscriptOnly,

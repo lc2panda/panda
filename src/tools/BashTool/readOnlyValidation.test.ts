@@ -7,8 +7,9 @@ import { checkReadOnlyConstraints } from './readOnlyValidation.js'
 
 function classify(command: string): 'allow' | 'passthrough' {
   const hasCd = /(^|[;&|])\s*cd\b/.test(command)
-  return checkReadOnlyConstraints({ command, description: 'matrix case' }, hasCd)
+  const behavior = checkReadOnlyConstraints({ command, description: 'matrix case' }, hasCd)
     .behavior
+  return behavior === 'allow' ? 'allow' : 'passthrough'
 }
 
 describe('Bash read-only risk matrix', () => {

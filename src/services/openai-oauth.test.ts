@@ -1,3 +1,7 @@
+
+function importFresh<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>
+}
 /**
  * Unit tests for the OpenAI OAuth transport helpers.
  *
@@ -40,7 +44,7 @@ test('postFormViaCurl parses stdout body + trailing http_code', async () => {
     },
   }))
 
-  const mod = await import('./openai-oauth.js?curl-happy=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?curl-happy=1')
   const { postFormViaCurl } = mod.__testing
 
   const res = await postFormViaCurl('https://auth.openai.com/oauth/token', 'k=v', 5000)
@@ -65,7 +69,7 @@ test('postFormViaCurl throws CurlNotAvailableError on ENOENT', async () => {
     },
   }))
 
-  const mod = await import('./openai-oauth.js?curl-enoent=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?curl-enoent=1')
   const { postFormViaCurl, CurlNotAvailableError } = mod.__testing
 
   let caught: unknown
@@ -93,7 +97,7 @@ test('postFormViaCurl leaves non-JSON body as raw string', async () => {
     },
   }))
 
-  const mod = await import('./openai-oauth.js?curl-textbody=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?curl-textbody=1')
   const { postFormViaCurl } = mod.__testing
 
   const res = await postFormViaCurl('https://auth.openai.com/oauth/token', 'k=v', 5000)
@@ -132,7 +136,7 @@ test('postFormViaAxiosWithCA reads CA file and attaches it via https.Agent', asy
   }))
 
   try {
-    const mod = await import('./openai-oauth.js?axios-ca=1')
+    const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?axios-ca=1')
     const { postFormViaAxiosWithCA } = mod.__testing
 
     const res = await postFormViaAxiosWithCA(

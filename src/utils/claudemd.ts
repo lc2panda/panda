@@ -798,7 +798,7 @@ export async function processMdRules({
     }
 
     const result: MemoryFileInfo[] = []
-    let entries: import('fs').Dirent[]
+    let entries: import('node:fs').Dirent[]
     try {
       entries = await fs.readdir(resolvedRulesDir)
     } catch (e: unknown) {

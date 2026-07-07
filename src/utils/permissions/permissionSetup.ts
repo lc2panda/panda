@@ -743,7 +743,7 @@ export function initialPermissionModeFromCLI({
   }
   if (settings.permissions?.defaultMode) {
     const settingsMode = normalizeExternalPermissionMode(
-      settings.permissions.defaultMode,
+      settings.permissions.defaultMode as Parameters<typeof normalizeExternalPermissionMode>[0],
     ) as PermissionMode
     // CCR only supports acceptEdits and plan — ignore other defaultModes from
     // settings (e.g. bypassPermissions would otherwise silently grant full

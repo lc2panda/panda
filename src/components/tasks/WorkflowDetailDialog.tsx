@@ -11,6 +11,7 @@ import { useElapsedTime } from '../../hooks/useElapsedTime.js';
 import type { KeyboardEvent } from '../../ink/events/keyboard-event.js';
 import { Box, Text, useTheme } from '../../ink.js';
 import { useKeybindings } from '../../keybindings/useKeybinding.js';
+import type { CommandResultDisplay } from '../../types/command.js';
 import type { LocalWorkflowTaskState, WorkflowAgentState, WorkflowAgentStatus } from '../../tasks/LocalWorkflowTask/LocalWorkflowTask.js';
 import { Byline } from '../design-system/Byline.js';
 import { Dialog } from '../design-system/Dialog.js';
@@ -22,7 +23,7 @@ import { KeyboardShortcutHint } from '../design-system/KeyboardShortcutHint.js';
 
 type Props = {
   workflow: DeepImmutable<LocalWorkflowTaskState>;
-  onDone: (result?: string, options?: { display?: 'system' | 'none' }) => void;
+  onDone: (result?: string, options?: { display?: CommandResultDisplay | 'none' }) => void;
   /** 真接线：caller 已绑定 killWorkflowTask(id, setAppState) */
   onKill?: () => void;
   /** 真接线：caller 已绑定 skipWorkflowAgent(id, agentId, setAppState) */

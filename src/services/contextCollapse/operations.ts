@@ -51,7 +51,7 @@ export function estimateTokens(message: Message): number {
   if (Array.isArray(content)) {
     let total = 0
     for (const block of content) {
-      const b = block as Record<string, unknown>
+      const b = block as unknown as Record<string, unknown>
       if (b.type === 'image' && b.source && typeof (b.source as any).data === 'string') {
         // base64 图片块：用更宽松的系数
         total += Math.ceil(((b.source as any).data as string).length / 6)
@@ -200,7 +200,7 @@ function assessMessageRisk(msg: Message): number {
   // 检查是否包含工具操作
   if (Array.isArray(content)) {
     for (const block of content) {
-      const b = block as Record<string, unknown>
+      const b = block as unknown as Record<string, unknown>
       if (b.type === 'tool_use') {
         const name = (b.name as string) || ''
         // 文件编辑工具的结果可能仍被后续需要
@@ -244,7 +244,7 @@ function findToolNameForResult(msg: Message, toolUseId: string): string | null {
   const content = msg.message?.content
   if (!Array.isArray(content)) return null
   for (const block of content) {
-    const b = block as Record<string, unknown>
+    const b = block as unknown as Record<string, unknown>
     if (b.type === 'tool_use' && b.id === toolUseId && typeof b.name === 'string') {
       return b.name
     }
@@ -270,7 +270,7 @@ export function generateLocalSummary(messages: readonly Message[]): string {
 
     if (msg.type === 'assistant' && Array.isArray(content)) {
       for (const block of content) {
-        const b = block as Record<string, unknown>
+        const b = block as unknown as Record<string, unknown>
         if (b.type === 'tool_use') {
           const name = b.name as string || 'unknown'
           const input = b.input as Record<string, unknown> | undefined

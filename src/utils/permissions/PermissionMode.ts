@@ -123,7 +123,7 @@ function getModeConfig(mode: PermissionMode): PermissionModeConfig {
 
 export function toExternalPermissionMode(
   mode: PermissionMode,
-): ExternalPermissionMode {
+): CanonicalExternalPermissionMode {
   return getModeConfig(mode).external
 }
 

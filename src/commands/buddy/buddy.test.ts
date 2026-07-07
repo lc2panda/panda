@@ -90,9 +90,13 @@ async function runBuddy(args: string): Promise<{
 
 // ─── argumentHint 守护 ───────────────────────────────────────────────────────
 
+function importFresh<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>
+}
+
 describe('argumentHint 同步 13 子命令（D4 9 + Phase 0 P0-T5 +2 + W16-T2 +1 + W18-T4 +1）', () => {
   test('argumentHint 含全部 13 子命令（W18-T4 追加 leaderboard）', async () => {
-    const mod = await import('./index.js?hint=1')
+    const mod = await importFresh<typeof import('./index.js')>('./index.js?hint=1')
     const cmd = mod.default
     // why D4 9 + Phase 0 P0-T5 + W16-T2 + W18-T4：旧 9 byte-equal 在前；
     //   stats / milestones / desk / leaderboard 追加在末尾
@@ -495,23 +499,23 @@ describe('/buddy desk（W16-T2 新增）', () => {
 
 describe('formatUptime（W16-T2 纯函数）', () => {
   test('0ms → "0s"', async () => {
-    const mod = await import('./index.js?fmt=1')
+    const mod = await importFresh<typeof import('./index.js')>('./index.js?fmt=1')
     expect(mod.formatUptime(0)).toBe('0s')
     expect(mod.formatUptime(-1)).toBe('0s')
     expect(mod.formatUptime(Number.NaN)).toBe('0s')
   })
   test('< 60s → 只显示秒', async () => {
-    const mod = await import('./index.js?fmt=2')
+    const mod = await importFresh<typeof import('./index.js')>('./index.js?fmt=2')
     expect(mod.formatUptime(34_000)).toBe('34s')
     expect(mod.formatUptime(59_999)).toBe('59s')
   })
   test('< 1h → "Xm YYs"', async () => {
-    const mod = await import('./index.js?fmt=3')
+    const mod = await importFresh<typeof import('./index.js')>('./index.js?fmt=3')
     expect(mod.formatUptime(754_000)).toBe('12m 34s')
     expect(mod.formatUptime(60_000)).toBe('1m 00s')
   })
   test('≥ 1h → "Xh YYm ZZs"', async () => {
-    const mod = await import('./index.js?fmt=4')
+    const mod = await importFresh<typeof import('./index.js')>('./index.js?fmt=4')
     expect(mod.formatUptime(2 * 3_600_000 + 14 * 60_000 + 6_000)).toBe(
       '2h 14m 06s',
     )
@@ -665,7 +669,7 @@ describe('/buddy leaderboard（W18-T4 占位）', () => {
 
 describe('statsViz 纯函数（W18-T4）', () => {
   test('renderFineBar — 0% / 50% / 100% 边界', async () => {
-    const { renderFineBar } = await import('./statsViz.js?viz=1')
+    const { renderFineBar } = await importFresh<typeof import('./statsViz.js')>('./statsViz.js?viz=1')
     // 0% → 全 ░
     expect(renderFineBar(0, 10)).toBe('░░░░░░░░░░')
     // 100% → 全 █
@@ -677,7 +681,7 @@ describe('statsViz 纯函数（W18-T4）', () => {
   })
 
   test('renderFineBar — 1/8 精度（精细 block）', async () => {
-    const { renderFineBar } = await import('./statsViz.js?viz=2')
+    const { renderFineBar } = await importFresh<typeof import('./statsViz.js')>('./statsViz.js?viz=2')
     // pct=65 width=10 → 65% × 80 eighths = 52 → 6 full + 4/8 = ▌
     const bar = renderFineBar(65, 10)
     // 必出现 1 个中间 1/8 块字符（▏▎▍▌▋▊▉ 之一）
@@ -685,7 +689,7 @@ describe('statsViz 纯函数（W18-T4）', () => {
   })
 
   test('renderStreakFire — 边界行为', async () => {
-    const { renderStreakFire } = await import('./statsViz.js?viz=3')
+    const { renderStreakFire } = await importFresh<typeof import('./statsViz.js')>('./statsViz.js?viz=3')
     expect(renderStreakFire(0)).toBe('(no streak yet)')
     expect(renderStreakFire(1)).toBe('🔥 1 day')
     expect(renderStreakFire(7)).toContain('🔥🔥🔥🔥🔥🔥🔥')
@@ -697,7 +701,7 @@ describe('statsViz 纯函数（W18-T4）', () => {
   })
 
   test('renderDailyBars — 全 0 → 全最低块；混合 → 归一化', async () => {
-    const { renderDailyBars } = await import('./statsViz.js?viz=4')
+    const { renderDailyBars } = await importFresh<typeof import('./statsViz.js')>('./statsViz.js?viz=4')
     expect(renderDailyBars([0, 0, 0])).toBe('▁▁▁')
     // max=100 → 100 映射到 █；0 映射到 ▁；中间 50 映射到中部
     const bars = renderDailyBars([0, 50, 100])
@@ -707,7 +711,7 @@ describe('statsViz 纯函数（W18-T4）', () => {
   })
 
   test('buildLocalLeaderboard — 包含 You + 递进目标', async () => {
-    const { buildLocalLeaderboard } = await import('./statsViz.js?viz=5')
+    const { buildLocalLeaderboard } = await importFresh<typeof import('./statsViz.js')>('./statsViz.js?viz=5')
     const rows = buildLocalLeaderboard(13, 4800, lv => lv * 1000, 60)
     expect(rows.length).toBeGreaterThanOrEqual(2)
     expect(rows.find(r => r.you)?.level).toBe(13)
@@ -717,7 +721,7 @@ describe('statsViz 纯函数（W18-T4）', () => {
   })
 
   test('aggregateDailyXp — history 事件按 +08:00 日历桶归集', async () => {
-    const { aggregateDailyXp } = await import('./statsViz.js?viz=6')
+    const { aggregateDailyXp } = await importFresh<typeof import('./statsViz.js')>('./statsViz.js?viz=6')
     // 固定 now 为 SG 时区 2026-04-20 12:00:00 +08:00 = UTC 2026-04-20 04:00:00
     // why 固定：避免 CI 跑在 UTC 时 "now=凌晨5点 UTC" 恰好在 SG 日历日边界左右
     const now = Date.UTC(2026, 3, 20, 4, 0, 0) // Apr 20 04:00 UTC = Apr 20 12:00 +08:00
@@ -739,7 +743,7 @@ describe('statsViz 纯函数（W18-T4）', () => {
 
   // W22-T2：renderMiniPetStatus — desk 状态指示
   test('renderMiniPetStatus — desk running → 隐藏提示', async () => {
-    const { renderMiniPetStatus } = await import('./statsViz.js?viz=mini1')
+    const { renderMiniPetStatus } = await importFresh<typeof import('./statsViz.js')>('./statsViz.js?viz=mini1')
     const out = renderMiniPetStatus('(o.o)', true)
     expect(out).toContain('(o.o)')
     expect(out).toContain('hidden in status line')
@@ -747,7 +751,7 @@ describe('statsViz 纯函数（W18-T4）', () => {
   })
 
   test('renderMiniPetStatus — desk not running → 可见提示', async () => {
-    const { renderMiniPetStatus } = await import('./statsViz.js?viz=mini2')
+    const { renderMiniPetStatus } = await importFresh<typeof import('./statsViz.js')>('./statsViz.js?viz=mini2')
     const out = renderMiniPetStatus('(>w<)', false)
     expect(out).toContain('(>w<)')
     expect(out).toContain('visible in status line')

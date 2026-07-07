@@ -202,23 +202,26 @@ export async function trackDatadogEvent(
     }
 
     // Normalize MCP tool names to "mcp" for cardinality reduction
+    const toolName = allData.toolName
     if (
-      typeof allData.toolName === 'string' &&
-      allData.toolName.startsWith('mcp__')
+      typeof toolName === 'string' &&
+      String(toolName).startsWith('mcp__')
     ) {
       allData.toolName = 'mcp'
     }
 
     // Normalize model names for cardinality reduction (external users only)
-    if (process.env.USER_TYPE !== 'ant' && typeof allData.model === 'string') {
-      const shortName = getCanonicalName(allData.model.replace(/\[1m]$/i, ''))
+    const modelName = allData.model
+    if (process.env.USER_TYPE !== 'ant' && typeof modelName === 'string') {
+      const shortName = getCanonicalName(String(modelName).replace(/\[1m]$/i, ''))
       allData.model = shortName in MODEL_COSTS ? shortName : 'other'
     }
 
     // Truncate dev version to base + date (remove timestamp and sha for cardinality reduction)
     // e.g. "2.0.53-dev.20251124.t173302.sha526cc6a" -> "2.0.53-dev.20251124"
-    if (typeof allData.version === 'string') {
-      allData.version = allData.version.replace(
+    const version = allData.version
+    if (typeof version === 'string') {
+      allData.version = String(version).replace(
         /^(\d+\.\d+\.\d+-dev\.\d{8})\.t\d+\.sha[a-f0-9]+$/,
         '$1',
       )

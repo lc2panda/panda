@@ -124,7 +124,7 @@ describe('runWorkflowSteps — no-agent-tool path', () => {
         return { data: { result: 'done' } }
       },
     }
-    ;(context.options as { tools: unknown[] }).tools = [mockAgentTool]
+    ;(context.options as unknown as { tools: unknown[] }).tools = [mockAgentTool]
 
     const def: WorkflowDefinition = {
       name: 'agent-spawn',

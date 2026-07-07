@@ -273,7 +273,7 @@ export async function startNodeRelay(
   })
 
   return new Promise((resolve, reject) => {
-    server.once('error', reject)
+    ;(server as unknown as { once(event: 'error', listener: (err: Error) => void): void }).once('error', reject)
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address()
       if (addr === null || typeof addr === 'string') {

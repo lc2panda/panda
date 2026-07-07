@@ -37,7 +37,7 @@ const browserKnowledgeCards: SmartCronTask = {
     logForDebugging('[knowledgeScenarios] browser-knowledge-cards: scanning browser history')
     try {
       const { readBrowserHistory } = await import('../../memdir/memdir.js')
-      const entries = await readBrowserHistory(7)
+      const entries = await readBrowserHistory(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
 
       if (!entries || entries.length === 0) {
         logForDebugging('[knowledgeScenarios] browser-knowledge-cards: 无浏览历史')

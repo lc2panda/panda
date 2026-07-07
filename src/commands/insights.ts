@@ -1,6 +1,6 @@
 import { execFileSync } from 'child_process'
 import { diffLines } from 'diff'
-import { constants as fsConstants, type Dirent } from 'fs'
+import { constants as fsConstants, type Dirent } from 'node:fs'
 import {
   copyFile,
   mkdir,

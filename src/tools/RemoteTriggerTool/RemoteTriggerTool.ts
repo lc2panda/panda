@@ -80,7 +80,7 @@ export const RemoteTriggerTool = buildTool({
   async prompt() {
     return PROMPT
   },
-  validateInput(input: Input) {
+  async validateInput(input: Input) {
     const { action, trigger_id, body } = input
     if ((action === 'get' || action === 'update' || action === 'run') && !trigger_id) {
       return {

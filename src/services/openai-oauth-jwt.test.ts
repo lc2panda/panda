@@ -1,3 +1,7 @@
+
+function importFresh<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>
+}
 /**
  * 阶段 1 单元测试 — JWT 解析 + refresh_token 轮换 + 并发锁
  *
@@ -35,14 +39,14 @@ function makeJwt(payload: Record<string, unknown>): string {
 // ─── decodeJwtPayload / extractAccountId / extractEmail ──────────────────────
 
 test('decodeJwtPayload 解合法 JWT 中段', async () => {
-  const mod = await import('./openai-oauth.js?jwt-decode=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?jwt-decode=1')
   const jwt = makeJwt({ foo: 'bar', n: 42 })
   const payload = mod.decodeJwtPayload(jwt)
   expect(payload).toEqual({ foo: 'bar', n: 42 })
 })
 
 test('decodeJwtPayload 非法输入返回 null', async () => {
-  const mod = await import('./openai-oauth.js?jwt-decode-null=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?jwt-decode-null=1')
   expect(mod.decodeJwtPayload('')).toBeNull()
   expect(mod.decodeJwtPayload('not-a-jwt')).toBeNull()
   expect(mod.decodeJwtPayload('a.b')).toBeNull()
@@ -50,7 +54,7 @@ test('decodeJwtPayload 非法输入返回 null', async () => {
 })
 
 test('extractAccountId 读 namespaced claim (URL 形式)', async () => {
-  const mod = await import('./openai-oauth.js?jwt-acc=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?jwt-acc=1')
   const jwt = makeJwt({
     'https://api.openai.com/auth': {
       chatgpt_account_id: 'acct-abc123',
@@ -61,7 +65,7 @@ test('extractAccountId 读 namespaced claim (URL 形式)', async () => {
 })
 
 test('extractAccountId 不存在 claim 时返回 null', async () => {
-  const mod = await import('./openai-oauth.js?jwt-acc-null=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?jwt-acc-null=1')
   expect(mod.extractAccountId(makeJwt({ other: 'x' }))).toBeNull()
   expect(
     mod.extractAccountId(
@@ -71,7 +75,7 @@ test('extractAccountId 不存在 claim 时返回 null', async () => {
 })
 
 test('extractEmail 读 email claim', async () => {
-  const mod = await import('./openai-oauth.js?jwt-email=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?jwt-email=1')
   const jwt = makeJwt({ email: 'commander@example.com' })
   expect(mod.extractEmail(jwt)).toBe('commander@example.com')
 })
@@ -79,7 +83,7 @@ test('extractEmail 读 email claim', async () => {
 // ─── 作战线 N: extractPlanType ──────────────────────────────────────────────
 
 test('extractPlanType 读 namespaced claim 的 chatgpt_plan_type', async () => {
-  const mod = await import('./openai-oauth.js?jwt-plan=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?jwt-plan=1')
   const jwt = makeJwt({
     'https://api.openai.com/auth': {
       chatgpt_account_id: 'acct-x',
@@ -90,7 +94,7 @@ test('extractPlanType 读 namespaced claim 的 chatgpt_plan_type', async () => {
 })
 
 test('extractPlanType 无 claim 时返回 null', async () => {
-  const mod = await import('./openai-oauth.js?jwt-plan-null=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?jwt-plan-null=1')
   expect(mod.extractPlanType(makeJwt({ foo: 'bar' }))).toBeNull()
   expect(
     mod.extractPlanType(
@@ -140,7 +144,7 @@ test('refreshOpenAIAccessToken 返回新 bundle 并保留轮换 rt', async () =>
       expires_in: 1800,
     },
   }))
-  const mod = await import('./openai-oauth.js?refresh-ok=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?refresh-ok=1')
   const bundle = await mod.refreshOpenAIAccessToken('rt-old')
   expect(bundle.accessToken).toBe('at-new')
   expect(bundle.refreshToken).toBe('rt-rotated')
@@ -162,7 +166,7 @@ test('refreshOpenAIAccessToken 服务端未返回新 rt 时兜底回旧的', asy
       expires_in: 1800,
     },
   }))
-  const mod = await import('./openai-oauth.js?refresh-no-rotate=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?refresh-no-rotate=1')
   const bundle = await mod.refreshOpenAIAccessToken('rt-keep')
   expect(bundle.refreshToken).toBe('rt-keep')
 })
@@ -172,7 +176,7 @@ test('refreshOpenAIAccessToken 失败时抛出带 status 的错误', async () =>
     status: 401,
     data: { error: 'invalid_grant' },
   }))
-  const mod = await import('./openai-oauth.js?refresh-fail=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?refresh-fail=1')
   let caught: unknown
   try {
     await mod.refreshOpenAIAccessToken('rt-bad')
@@ -184,7 +188,7 @@ test('refreshOpenAIAccessToken 失败时抛出带 status 的错误', async () =>
 })
 
 test('refreshOpenAIAccessToken 空 rt 立刻抛错', async () => {
-  const mod = await import('./openai-oauth.js?refresh-empty=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?refresh-empty=1')
   let caught: unknown
   try {
     await mod.refreshOpenAIAccessToken('')
@@ -227,7 +231,7 @@ test('refreshOpenAIAccessToken 并发锁合并同时请求', async () => {
       },
     },
   }))
-  const mod = await import('./openai-oauth.js?refresh-lock=1')
+  const mod = await importFresh<typeof import('./openai-oauth.js')>('./openai-oauth.js?refresh-lock=1')
   // 两路同时发起
   const [b1, b2] = await Promise.all([
     mod.refreshOpenAIAccessToken('rt-concurrent'),

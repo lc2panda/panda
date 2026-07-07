@@ -29,10 +29,10 @@ import type { ImageDimensions } from '../utils/imageResizer.js'
 import { isModifierPressed, prewarmModifiers } from '../utils/modifiers.js'
 import { useDoublePress } from './useDoublePress.js'
 
-type MaybeCursor = undefined | Cursor
-type InputHandler = (input: string) => MaybeCursor
-type InputMapper = (input: string) => MaybeCursor
-const NOOP_HANDLER: InputHandler = () => {}
+type MaybeCursor = false | Cursor
+type InputHandler = (input: string) => MaybeCursor | undefined
+type InputMapper = (input: string) => MaybeCursor | undefined
+const NOOP_HANDLER: InputHandler = () => false
 
 export function getCoalescedEnterBody(input: string): string | null {
   const ending = input.endsWith('\r\n') ? '\r\n' : input.endsWith('\r') ? '\r' : input.endsWith('\n') ? '\n' : ''
@@ -46,7 +46,7 @@ export function getCoalescedEnterBody(input: string): string | null {
 function mapInput(input_map: Array<[string, InputHandler]>): InputMapper {
   const map = new Map(input_map)
   return function (input: string): MaybeCursor {
-    return (map.get(input) ?? NOOP_HANDLER)(input)
+    return (map.get(input) ?? NOOP_HANDLER)(input) || false
   }
 }
 
@@ -265,7 +265,10 @@ export function useTextInput({
   const handleCtrl = mapInput([
     ['a', () => cursor.startOfLine()],
     ['b', () => cursor.left()],
-    ['c', handleCtrlC],
+    ['c', () => {
+      handleCtrlC()
+      return false
+    }],
     ['d', handleCtrlD],
     ['e', () => cursor.endOfLine()],
     ['f', () => cursor.right()],

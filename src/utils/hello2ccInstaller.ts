@@ -227,7 +227,7 @@ function mergeHooksToSettings(scriptDir: string): void {
   const newHooks: Record<string, unknown[]> = {}
 
   for (const [eventName, entries] of Object.entries(HELLO2CC_HOOKS)) {
-    const resolved = (entries as Array<{ matcher: string; hooks: Array<{ type: string; command: string; timeout: number }> }>).map(entry => ({
+    const resolved = (entries as unknown as Array<{ matcher: string; hooks: Array<{ type: string; command: string; timeout: number }> }>).map(entry => ({
       ...entry,
       hooks: entry.hooks.map(h => ({
         ...h,

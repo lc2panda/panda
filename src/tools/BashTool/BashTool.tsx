@@ -856,7 +856,7 @@ export const BashTool = buildTool({
         if (!persistedOutputPath && compressionResult.savedPercent > 0.3) {
           try {
             await ensureToolResultsDir();
-            const taskId = result.outputTaskId || toolUseId || `compress-${Date.now()}`;
+            const taskId = result.outputTaskId || toolUseContext.toolUseId || `compress-${Date.now()}`;
             const dest = getToolResultPath(taskId, false);
             const { writeFile } = await import('fs/promises');
             await writeFile(dest, compressedStdout, 'utf-8');

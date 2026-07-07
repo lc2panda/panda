@@ -2530,8 +2530,8 @@ async function chatgptRequestViaCurl(
       stdout.once('end', () => resolve())
       stdout.once('error', err => reject(err))
     })
-    const exitCode: number = await new Promise(resolve => {
-      child.once('close', code => resolve(code ?? 0))
+    const exitCode: number = await new Promise<number>(resolve => {
+      child.once('close', code => resolve(typeof code === 'number' ? code : 0))
     })
     if (exitCode !== 0 && tailLen === 0) {
       throw new Error(
@@ -2743,6 +2743,7 @@ export async function fetchAvailableCodexModels(
       url: CODEX_MODELS_URL,
       method: 'GET',
       headers,
+      body: undefined,
       streaming: false,
       // 列表接口快端点 —— 30s 足够（默认 600s 太长）
       timeoutMs: 30_000,

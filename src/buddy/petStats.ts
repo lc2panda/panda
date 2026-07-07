@@ -90,7 +90,7 @@ export const HISTORY_MAX_LEN = 200
 //   3) writer 仍写 v1（version=1, 不含 seasons）—— 保证 byte-equal 与旧二进制兼容
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type CompanionStatsV2 = CompanionStatsV1 & {
+export type CompanionStatsV2 = Omit<CompanionStatsV1, 'version'> & {
   version: 2
   seasons: Record<SeasonBucket, number>
 }

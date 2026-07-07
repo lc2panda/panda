@@ -73,7 +73,7 @@ export type PermissionRuleSource =
  */
 export type PermissionRuleValue = {
   toolName: string
-  ruleContent?: string
+  ruleContent?: string | undefined
 }
 
 /**
@@ -124,7 +124,7 @@ export type PermissionUpdate =
   | {
       type: 'setMode'
       destination: PermissionUpdateDestination
-      mode: CanonicalExternalPermissionMode
+      mode: InternalPermissionMode
     }
   | {
       type: 'addDirectories'
@@ -191,6 +191,8 @@ export type PermissionAllowDecision<
   decisionReason?: PermissionDecisionReason
   toolUseID?: string
   acceptFeedback?: string
+  message?: string
+  suggestions?: PermissionUpdate[]
   contentBlocks?: ContentBlockParam[]
 }
 
@@ -242,6 +244,8 @@ export type PermissionAskDecision<
 export type PermissionDenyDecision = {
   behavior: 'deny'
   message: string
+  reason?: string
+  suggestions?: PermissionUpdate[]
   decisionReason: PermissionDecisionReason
   toolUseID?: string
 }
@@ -286,7 +290,7 @@ export type PermissionDecisionReason =
     }
   | {
       type: 'mode'
-      mode: PermissionMode
+      mode: InternalPermissionMode
     }
   | {
       type: 'subcommandResults'

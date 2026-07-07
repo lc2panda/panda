@@ -1,4 +1,4 @@
-import type { Dirent, Stats } from 'fs'
+import type { Dirent, Stats } from 'node:fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import * as path from 'path'
 import { z } from 'zod/v4'

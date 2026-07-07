@@ -2205,7 +2205,7 @@ async function* queryModel(
             // Ensure partialMessage.usage is never undefined so downstream
             // code that reads usage.input_tokens won't crash.
             if (partialMessage && !partialMessage.usage) {
-              ;(partialMessage as { usage: typeof EMPTY_USAGE }).usage = EMPTY_USAGE
+              ;(partialMessage as unknown as { usage: typeof EMPTY_USAGE }).usage = EMPTY_USAGE
             }
             ttftMs = Date.now() - start
             usage = updateUsage(usage, part.message?.usage)
@@ -3148,7 +3148,11 @@ export function cleanupStream(
  */
 export function updateUsage(
   usage: Readonly<NonNullableUsage>,
-  partUsage: BetaMessageDeltaUsage | undefined,
+  partUsage:
+    | BetaMessageDeltaUsage
+    | BetaUsage
+    | (Partial<BetaMessageDeltaUsage> & Record<string, unknown>)
+    | undefined,
 ): NonNullableUsage {
   if (!partUsage) {
     return { ...usage }
@@ -3228,7 +3232,7 @@ export function updateUsage(
           : (() => {
               // 顶层为 0 且第三方也无值时，从 nested cache_creation breakdown 求和回填
               // 对齐上游 2.1.150：API 仅经 nested breakdown 报 cache writes 时避免报 0
-              const nested = partUsage.cache_creation
+              const nested = (partUsage as BetaUsage).cache_creation
               const nestedSum =
                 nested != null
                   ? ((nested.ephemeral_1h_input_tokens ?? 0) +
@@ -3371,8 +3375,8 @@ export const MAX_CACHE_CONTROL_MARKERS = 4
  * 不统计 messages 内的 marker — 那部分由 addCacheBreakpoints 自己管理。
  */
 export function countExistingCacheControlMarkers(
-  systemBlocks: readonly { cache_control?: unknown }[] | undefined,
-  tools: readonly { cache_control?: unknown }[] | undefined,
+  systemBlocks: readonly unknown[] | undefined,
+  tools: readonly unknown[] | undefined,
 ): number {
   let count = 0
   if (systemBlocks) {
@@ -3500,7 +3504,7 @@ export function addCacheBreakpoints(
       logEvent('tengu_cache_marker_budget_exhausted', {
         occupiedMarkerCount,
         messagesLength: messages.length,
-        degradedTo: 'none',
+        degradedToNone: true,
       })
     } else if (slotsAvailableForMessages === 1 && secondaryIdx >= 0) {
       // 砍 secondary，保 primary
@@ -3508,7 +3512,7 @@ export function addCacheBreakpoints(
       logEvent('tengu_cache_marker_budget_shrunk', {
         occupiedMarkerCount,
         messagesLength: messages.length,
-        degradedTo: 'primary_only',
+        degradedToPrimaryOnly: true,
       })
     }
   }

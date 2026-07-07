@@ -171,9 +171,10 @@ export interface MessageQuery {
 // ─── Connector 配置 ───
 
 export interface ConnectorConfig {
-  enabled: boolean
+  enabled?: boolean
+  platform?: ConnectorPlatform
   mode: ConnectorMode
-  permissions: ConnectorCapability[]
+  permissions?: ConnectorCapability[]
 
   // MCP 模式配置
   mcpCommand?: string       // MCP Server 启动命令
@@ -206,10 +207,10 @@ export interface ConnectorConfig {
 // ─── Panda 通知类型（与 sense.ts 对齐） ───
 
 export interface PandaNotification {
-  type: 'info' | 'warning' | 'action'
+  type?: 'info' | 'warning' | 'action'
   title: string
   body: string
-  channel: 'statusLine' | 'inline' | 'system' | 'all'
+  channel?: 'statusLine' | 'inline' | 'system' | 'all'
 }
 
 // ─── IMConnector 主接口 ───

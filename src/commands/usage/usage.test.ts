@@ -16,6 +16,10 @@ import costCmd from '../cost/index.js'
 import statsCmd from '../stats/index.js'
 import usageCmd from './index.js'
 
+function importFresh<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>
+}
+
 describe('parseDefaultTab — args 解析', () => {
   test('undefined / 空字符串 → Usage', () => {
     expect(parseDefaultTab(undefined)).toBe('Usage')
@@ -89,7 +93,7 @@ describe('thin shim 调度', () => {
       parseDefaultTab: () => 'Cost',
       UnifiedUsage: () => null,
     }))
-    const costMod = await import('./../cost/cost.js?cost-shim=1')
+    const costMod = await importFresh<typeof import('./../cost/cost.js')>('./../cost/cost.js?cost-shim=1')
     const fakeOnDone = (() => {}) as any
     const fakeCtx = { foo: 'bar' } as any
     await costMod.call(fakeOnDone, fakeCtx, '')
@@ -110,7 +114,7 @@ describe('thin shim 调度', () => {
       parseDefaultTab: () => 'Stats',
       UnifiedUsage: () => null,
     }))
-    const statsMod = await import('./../stats/stats.js?stats-shim=1')
+    const statsMod = await importFresh<typeof import('./../stats/stats.js')>('./../stats/stats.js?stats-shim=1')
     await statsMod.call((() => {}) as any, {} as any, '')
     expect(receivedArgs).toBe('stats')
     mock.restore()

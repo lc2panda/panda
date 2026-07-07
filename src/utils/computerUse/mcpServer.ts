@@ -1,4 +1,4 @@
-import type { CuCallToolResult } from '@ant/computer-use-mcp'
+import type { CuCallToolResult, InstalledApp } from '@ant/computer-use-mcp'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
@@ -29,7 +29,7 @@ const APP_ENUM_TIMEOUT_MS = 1000
  */
 async function tryGetInstalledAppNames(): Promise<string[] | undefined> {
   const adapter = getComputerUseHostAdapter()
-  const enumP = adapter.executor.listInstalledApps()
+  const enumP = (adapter.executor as unknown as { listInstalledApps(): Promise<InstalledApp[]> }).listInstalledApps()
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeoutP = new Promise<undefined>(resolve => {
     timer = setTimeout(resolve, APP_ENUM_TIMEOUT_MS, undefined)

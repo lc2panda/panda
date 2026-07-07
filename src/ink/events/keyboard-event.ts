@@ -12,8 +12,11 @@ import { TerminalEvent } from './terminal-event.js'
 export class KeyboardEvent extends TerminalEvent {
   readonly key: string
   readonly ctrl: boolean
+  readonly ctrlKey: boolean
   readonly shift: boolean
+  readonly shiftKey: boolean
   readonly meta: boolean
+  readonly metaKey: boolean
   readonly superKey: boolean
   readonly fn: boolean
 
@@ -22,8 +25,11 @@ export class KeyboardEvent extends TerminalEvent {
 
     this.key = keyFromParsed(parsedKey)
     this.ctrl = parsedKey.ctrl
+    this.ctrlKey = parsedKey.ctrl
     this.shift = parsedKey.shift
+    this.shiftKey = parsedKey.shift
     this.meta = parsedKey.meta || parsedKey.option
+    this.metaKey = this.meta
     this.superKey = parsedKey.super
     this.fn = parsedKey.fn
   }

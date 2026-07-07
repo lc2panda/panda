@@ -349,7 +349,7 @@ export async function* runAgent({
       modelPreferences: agentDefinition.modelPreferences as Record<string, unknown> | undefined,
       modelPreset: agentDefinition.modelPreset,
       agentType: agentDefinition.agentType,
-      name: agentDefinition.name,
+      name: agentDefinition.agentType,
     },
   )
 

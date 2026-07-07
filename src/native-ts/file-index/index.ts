@@ -46,6 +46,7 @@ export class FileIndex {
   private charBits: Int32Array = new Int32Array(0)
   private pathLens: Uint16Array = new Uint16Array(0)
   private topLevelCache: SearchResult[] | null = null
+  private readyCount = 0
 
   /**
    * Load paths from an array of strings.
@@ -200,9 +201,9 @@ export class FileIndex {
     const topK: { path: string; fuzzScore: number }[] = []
     let threshold = -Infinity
 
-    const { paths, lowerPaths, charBits, pathLens, readyCount } = this
+    const { paths, lowerPaths, charBits, pathLens } = this
 
-    outer: for (let i = 0; i < readyCount; i++) {
+    outer: for (let i = 0; i < this.readyCount; i++) {
       // O(1) bitmap reject: path must contain every letter in the needle
       if ((charBits[i]! & needleBitmap) !== needleBitmap) continue
 

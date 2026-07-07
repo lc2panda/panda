@@ -7,7 +7,7 @@
  * initialization or pulling in expensive dependency chains.
  */
 
-import type { Dirent } from 'fs'
+import type { Dirent } from 'node:fs'
 import { readdir, stat } from 'fs/promises'
 import { basename, join } from 'path'
 import { getWorktreePathsPortable } from './getWorktreePathsPortable.js'

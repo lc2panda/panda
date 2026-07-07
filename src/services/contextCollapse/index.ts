@@ -106,7 +106,10 @@ export const applyCollapsesIfNeeded: (
   const totalTokens = estimateTotalTokens(messages)
   let contextWindow: number
   try {
-    const model = getRuntimeMainLoopModel({})
+    const model = getRuntimeMainLoopModel({
+      permissionMode: 'default',
+      mainLoopModel: '',
+    })
     contextWindow = getContextWindowForModel(model, getSdkBetas())
   } catch {
     contextWindow = 200_000 // fallback：无法获取模型信息时使用保守默认值

@@ -71,7 +71,10 @@ test('sendNotification — 正常发送消息', async () => {
   await connector.sendNotification(notification)
 
   expect(mockApiPost).toHaveBeenCalledTimes(1)
-  const [path, payload] = mockApiPost.mock.calls[0]
+  const [path, payload] = mockApiPost.mock.calls[0] as unknown as [
+    string,
+    { receive_id: string; msg_type: string; content: string },
+  ]
 
   expect(path).toContain('/im/v1/messages')
   expect(path).toContain('receive_id_type=chat_id')

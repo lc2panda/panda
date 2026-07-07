@@ -43,7 +43,7 @@ function makeWorkflowState(overrides: Partial<LocalWorkflowTaskState> = {}): Loc
       { stepId: 'step-5', agentTaskId: 'agent-e', status: 'completed' },
     ],
     ...overrides,
-  };
+  } as LocalWorkflowTaskState;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ describe('killWorkflowTask', () => {
     // task가 존재하지 않는 id로 호출 → prev 그대로 반환
     const setAppState: SetAppState = (fn) => {
       const prev = { tasks: { 'wf-1': state } };
-      const next = (fn as (p: typeof prev) => typeof prev)(prev);
+      const next = (fn as unknown as (p: typeof prev) => typeof prev)(prev);
       resultState = next.tasks['wf-1'] as LocalWorkflowTaskState;
     };
 

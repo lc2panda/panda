@@ -621,12 +621,15 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
               const { setWorkingMemory } = await import(
                 '../assistant/workingMemory.js'
               )
-              setWorkingMemory(`calendar-upcoming-${evt.title.slice(0, 20)}`, {
-                title: evt.title,
-                startDate: evt.startDate,
-                location: evt.location,
-                minutesBefore: Math.round(minutesBefore),
-              })
+              setWorkingMemory(
+                `calendar-upcoming-${evt.title.slice(0, 20)}`,
+                JSON.stringify({
+                  title: evt.title,
+                  startDate: evt.startDate,
+                  location: evt.location,
+                  minutesBefore: Math.round(minutesBefore),
+                }),
+              )
             } catch {}
 
             logForDebugging(

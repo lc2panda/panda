@@ -34,14 +34,19 @@ test('assistantStatus load() returns a call function that fires onDone', async (
   expect(typeof loaded.call).toBe('function')
 
   let doneArg: string | undefined
-  let doneOpts: { display?: string } | undefined
-  const onDone = (result?: string, opts?: { display?: string }) => {
+  let doneOpts: Parameters<typeof loaded.call>[0] extends (
+    result?: string,
+    opts?: infer Opts,
+  ) => unknown
+    ? Opts
+    : never
+  const onDone: Parameters<typeof loaded.call>[0] = (result, opts) => {
     doneArg = result
     doneOpts = opts
   }
   // Minimal context stub — the call() path does not actually touch it.
   const context = {} as Parameters<typeof loaded.call>[1]
-  const result = await loaded.call(onDone, context, '')
+  const result = await loaded.call(onDone, context)
   expect(result).toBeNull()
   expect(typeof doneArg).toBe('string')
   expect(doneArg).toContain('超级助手')

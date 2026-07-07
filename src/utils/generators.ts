@@ -38,7 +38,7 @@ export async function* all<A>(
       .next()
       .then(({ done, value }) => ({
         done,
-        value,
+        value: value as A | undefined,
         generator,
         promise,
       }))

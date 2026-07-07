@@ -32,7 +32,7 @@ function makeParsed(cmdNames: string[]): ParsedPowerShellCommand {
         },
       ],
     })),
-  }
+  } as unknown as ParsedPowerShellCommand
 }
 
 // ── 1. isCwdChangingCmdlet：无空格 cd 变体识别 ─────────────────────────────────

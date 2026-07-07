@@ -112,7 +112,7 @@ function computeRequestSummary(
     typeof system === 'string'
       ? system.length
       : Array.isArray(system)
-        ? (system as Array<unknown>).reduce(
+        ? (system as Array<unknown>).reduce<number>(
             (n, b) => n + ((b as { text?: string }).text?.length ?? 0),
             0,
           )

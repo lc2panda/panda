@@ -55,7 +55,7 @@ export function collapseRepetitiveMessages(
         result.push({
           ...msg,
           message: {
-            ...msg.message,
+            ...(msg.message as object),
             content: [
               {
                 type: 'text' as const,

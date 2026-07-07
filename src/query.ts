@@ -1448,10 +1448,15 @@ async function* queryLoop(
 
       // 进化写回：成功的 turn 结束后，记录工具调用摘要用于经验沉淀
       if (hasSuccessfulToolCalls(assistantMessages) && turnCount > 3) {
-        const toolNames = assistantMessages
-          .flatMap(m => (m.message?.content ?? [])
-            .filter((b: any) => b.type === 'tool_use')
-            .map((b: any) => b.name))
+        const toolNames = assistantMessages.flatMap(m => {
+          const content = m.message?.content
+          if (!Array.isArray(content)) return []
+          return content.flatMap(block =>
+            block.type === 'tool_use' && 'name' in block
+              ? [String(block.name)]
+              : [],
+          )
+        })
         logForDebugging(`[EvolutionWriteback] Turn ${turnCount}: successful tools [${toolNames.join(', ')}] — candidate for patterns/scars`)
       }
 
@@ -1953,7 +1958,11 @@ async function* queryLoop(
           ...params,
           messages: finalMessages,
           maxTurns: 1,
-          canUseTool: () => false,
+          canUseTool: async () => ({
+            behavior: 'deny',
+            message: 'Tool execution disabled for final summary pass',
+            decisionReason: { type: 'mode', mode: 'default' },
+          }),
           toolUseContext: {
             ...updatedToolUseContext,
             options: {

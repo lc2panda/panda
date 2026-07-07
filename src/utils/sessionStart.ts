@@ -159,7 +159,7 @@ export async function processSessionStartHooks(
       logForDebugging(
         `SessionStart hook set sessionTitle: "${hookResult.sessionTitle}"`,
       )
-      await saveCustomTitle(sessionId, hookResult.sessionTitle, undefined, 'auto')
+      await saveCustomTitle(sessionId as `${string}-${string}-${string}-${string}-${string}`, hookResult.sessionTitle, undefined, 'auto')
     }
   }
 

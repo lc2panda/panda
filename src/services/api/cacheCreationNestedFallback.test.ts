@@ -30,7 +30,7 @@ describe('updateUsage — cache_creation_input_tokens nested breakdown 回填', 
         ephemeral_5m_input_tokens: 500,   // nested 5m 有值
       },
     }
-    const result = updateUsage(EMPTY_USAGE, deltaUsage)
+    const result = updateUsage(EMPTY_USAGE, deltaUsage as unknown as Parameters<typeof updateUsage>[1])
     // 期望：17000 + 500 = 17500（从 nested 回填）
     expect(result.cache_creation_input_tokens).toBe(17500)
   })
@@ -47,7 +47,7 @@ describe('updateUsage — cache_creation_input_tokens nested breakdown 回填', 
         ephemeral_5m_input_tokens: 999,
       },
     }
-    const result = updateUsage(EMPTY_USAGE, deltaUsage)
+    const result = updateUsage(EMPTY_USAGE, deltaUsage as unknown as Parameters<typeof updateUsage>[1])
     // 期望：顶层值优先，不被 nested 覆盖
     expect(result.cache_creation_input_tokens).toBe(12345)
   })

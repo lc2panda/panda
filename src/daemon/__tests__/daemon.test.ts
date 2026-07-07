@@ -325,7 +325,6 @@ describe('daemonMain — 单例锁（start 双启动保护）', () => {
 
     let exitCode: number | undefined
     const origExit = process.exit.bind(process)
-    // @ts-expect-error — override for test
     process.exit = (code?: number) => { exitCode = code; throw new Error('process.exit') }
 
     try {
@@ -333,8 +332,7 @@ describe('daemonMain — 单例锁（start 双启动保护）', () => {
     } catch {
       // expected
     } finally {
-      // @ts-expect-error
-      process.exit = origExit
+        process.exit = origExit
     }
 
     expect(exitCode).toBe(1)
@@ -345,7 +343,6 @@ describe('daemonMain — unknown 子命令', () => {
   test('未知子命令调用 process.exit(1)', async () => {
     let exitCode: number | undefined
     const origExit = process.exit.bind(process)
-    // @ts-expect-error
     process.exit = (code?: number) => { exitCode = code; throw new Error('process.exit') }
 
     try {
@@ -353,8 +350,7 @@ describe('daemonMain — unknown 子命令', () => {
     } catch {
       // expected
     } finally {
-      // @ts-expect-error
-      process.exit = origExit
+        process.exit = origExit
     }
 
     expect(exitCode).toBe(1)
@@ -409,13 +405,11 @@ describe('D5-2 cleanupOrphanPtyHosts', () => {
 
     const killCalls: Array<[number, string]> = []
     const origKill = process.kill.bind(process)
-    // @ts-expect-error
-    process.kill = (pid: number, sig: string) => { killCalls.push([pid, sig]) }
+    process.kill = (pid: number, sig?: string | number) => { killCalls.push([pid, String(sig)]); return true as const }
     try {
       await cleanupOrphanPtyHosts()
     } finally {
-      // @ts-expect-error
-      process.kill = origKill
+        process.kill = origKill
     }
     expect(killCalls).toHaveLength(0)
   })
@@ -430,17 +424,16 @@ describe('D5-2 cleanupOrphanPtyHosts', () => {
 
     const killCalls: Array<[number, string]> = []
     const origKill = process.kill.bind(process)
-    // @ts-expect-error
-    process.kill = (pid: number, sig: string) => {
-      killCalls.push([pid, sig])
+    process.kill = (pid: number, sig?: string | number) => {
+      killCalls.push([pid, String(sig)])
       // 模拟进程收到信号后即死（让 Promise 及时 resolve）
       mockProcessRunning = false
+      return true as const
     }
     try {
       await cleanupOrphanPtyHosts()
     } finally {
-      // @ts-expect-error
-      process.kill = origKill
+        process.kill = origKill
     }
     expect(killCalls.some(([pid, sig]) => pid === 9876 && sig === 'SIGTERM')).toBe(true)
   })
@@ -485,13 +478,11 @@ describe('D5-3 reapIdleBgSessions', () => {
 
     const killCalls: Array<[number, string]> = []
     const origKill = process.kill.bind(process)
-    // @ts-expect-error
-    process.kill = (pid: number, sig: string) => { killCalls.push([pid, sig]) }
+    process.kill = (pid: number, sig?: string | number) => { killCalls.push([pid, String(sig)]); return true as const }
     try {
       await reapIdleBgSessions()
     } finally {
-      // @ts-expect-error
-      process.kill = origKill
+        process.kill = origKill
     }
     expect(killCalls).toHaveLength(0)
   })
@@ -507,16 +498,15 @@ describe('D5-3 reapIdleBgSessions', () => {
 
     const killCalls: Array<[number, string]> = []
     const origKill = process.kill.bind(process)
-    // @ts-expect-error
-    process.kill = (pid: number, sig: string) => {
-      killCalls.push([pid, sig])
+    process.kill = (pid: number, sig?: string | number) => {
+      killCalls.push([pid, String(sig)])
       mockProcessRunning = false
+      return true as const
     }
     try {
       await reapIdleBgSessions()
     } finally {
-      // @ts-expect-error
-      process.kill = origKill
+        process.kill = origKill
     }
     expect(killCalls.some(([pid, sig]) => pid === 7777 && sig === 'SIGTERM')).toBe(true)
     // PID 文件应被删除
@@ -534,13 +524,11 @@ describe('D5-3 reapIdleBgSessions', () => {
 
     const killCalls: Array<[number, string]> = []
     const origKill = process.kill.bind(process)
-    // @ts-expect-error
-    process.kill = (pid: number, sig: string) => { killCalls.push([pid, sig]) }
+    process.kill = (pid: number, sig?: string | number) => { killCalls.push([pid, String(sig)]); return true as const }
     try {
       await reapIdleBgSessions()
     } finally {
-      // @ts-expect-error
-      process.kill = origKill
+        process.kill = origKill
     }
     // 不应发 kill（进程已死）
     expect(killCalls.filter(([pid]) => pid === 8888)).toHaveLength(0)

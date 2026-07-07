@@ -90,3 +90,24 @@ declare module '*.css' {
   const content: string
   export default content
 }
+
+declare module 'node:child_process' {
+  interface ChildProcessWithoutNullStreams {
+    on(event: string | symbol, listener: (...args: unknown[]) => void): this
+    once(event: string | symbol, listener: (...args: unknown[]) => void): this
+  }
+}
+
+declare module 'node:http' {
+  interface Server {
+    once(event: string | symbol, listener: (...args: unknown[]) => void): this
+    removeAllListeners(event?: string | symbol): this
+  }
+}
+
+declare module 'http' {
+  interface Server {
+    once(event: string | symbol, listener: (...args: unknown[]) => void): this
+    removeAllListeners(event?: string | symbol): this
+  }
+}

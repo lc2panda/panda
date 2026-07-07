@@ -99,11 +99,11 @@ const imUnreadDigest: SmartCronTask = {
       // 写入工作记忆
       try {
         const { setWorkingMemory } = await import('../../assistant/workingMemory.js')
-        setWorkingMemory('im-unread-digest', {
+        setWorkingMemory('im-unread-digest', JSON.stringify({
           totalUnread: unread.total, totalMention: unread.mentionTotal,
           platforms: platformSummaries,
           fetchedAt: Date.now(),
-        })
+        }))
       } catch { /* 静默 */ }
 
       logForDebugging(`[imScenarios] im-unread-digest: ${unread.total} 未读, ${unread.mentionTotal} @me`)
@@ -401,9 +401,9 @@ const imReversePush: SmartCronTask = {
       try {
         const { setWorkingMemory } = await import('../../assistant/workingMemory.js')
         if (remaining.length > 0) {
-          setWorkingMemory('im-reverse-push-queue', remaining)
+          setWorkingMemory('im-reverse-push-queue', JSON.stringify(remaining))
         } else {
-          setWorkingMemory('im-reverse-push-queue', null)
+          setWorkingMemory('im-reverse-push-queue', '')
         }
       } catch { /* 静默 */ }
 

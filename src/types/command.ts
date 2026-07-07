@@ -203,8 +203,17 @@ export type CommandBase = {
   kind?: 'workflow' // Distinguishes workflow-backed commands (badged in autocomplete)
   immediate?: boolean // If true, command executes immediately without waiting for a stop point (bypasses queue)
   isSensitive?: boolean // If true, args are redacted from the conversation history
+  /** User-facing argument hint displayed in command help. */
+  argDescription?: string
+  /** Skill-style prompt resolver used by registry-backed commands. */
+  getPromptForCommand?: (
+    args: string,
+    context: ToolUseContext,
+  ) => Promise<ContentBlockParam[]>
+  /** Progress text shown while an asynchronous command is running. */
+  progressMessage?: string
   /** Defaults to `name`. Only override when the displayed name differs (e.g. plugin prefix stripping). */
-  userFacingName?: () => string
+  userFacingName?: (() => string) | ((input: string) => string)
 }
 
 export type Command = CommandBase &
@@ -212,7 +221,7 @@ export type Command = CommandBase &
 
 /** Resolves the user-visible name, falling back to `cmd.name` when not overridden. */
 export function getCommandName(cmd: CommandBase): string {
-  return cmd.userFacingName?.() ?? cmd.name
+  return cmd.userFacingName?.('') ?? cmd.name
 }
 
 /** Resolves whether the command is enabled, defaulting to true. */

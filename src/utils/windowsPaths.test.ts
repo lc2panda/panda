@@ -58,7 +58,8 @@ describe('windowsPaths Git Bash fallback', () => {
     findGitBashPath()
 
     expect(exitSpy).toHaveBeenCalledWith(1)
-    expect(errorSpy.mock.calls[0]?.[0]).toContain('PowerShell/cmd startup can continue')
-    expect(errorSpy.mock.calls[0]?.[0]).toContain('CLAUDE_CODE_GIT_BASH_PATH')
+    const errorCalls = errorSpy.mock.calls as unknown as Array<[unknown]>
+    expect(String(errorCalls[0]?.[0])).toContain('PowerShell/cmd startup can continue')
+    expect(String(errorCalls[0]?.[0])).toContain('CLAUDE_CODE_GIT_BASH_PATH')
   })
 })

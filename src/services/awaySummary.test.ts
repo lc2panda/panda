@@ -15,9 +15,13 @@ afterEach(() => {
   mock.restore()
 })
 
+function importFresh<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>
+}
+
 describe('generateAwaySummary — /recap 复用前提', () => {
   test('空 messages 返回 null，不发起 API 调用', async () => {
-    const mod = await import('./awaySummary.js?empty=1')
+    const mod = await importFresh<typeof import('./awaySummary.js')>('./awaySummary.js?empty=1')
     const ctrl = new AbortController()
     const result = await mod.generateAwaySummary([], ctrl.signal)
     expect(result).toBeNull()
@@ -36,7 +40,7 @@ describe('generateAwaySummary — /recap 复用前提', () => {
     mock.module('./SessionMemory/sessionMemoryUtils.js', () => ({
       getSessionMemoryContent: async () => null,
     }))
-    const mod = await import('./awaySummary.js?abort=1')
+    const mod = await importFresh<typeof import('./awaySummary.js')>('./awaySummary.js?abort=1')
     const ctrl = new AbortController()
     ctrl.abort()
     const messages: Message[] = [
@@ -110,7 +114,7 @@ describe('generateAwaySummary — /recap 复用前提', () => {
       asSystemPrompt: (x: any) => x,
     }))
 
-    const mod = await import('./awaySummary.js?normal=1')
+    const mod = await importFresh<typeof import('./awaySummary.js')>('./awaySummary.js?normal=1')
     const messages: Message[] = Array.from({ length: 30 }, (_, i) => ({
       type: 'user',
       message: {

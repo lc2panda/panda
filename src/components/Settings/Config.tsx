@@ -775,7 +775,7 @@ export function Config({
     type: 'enum' as const,
     onChange(value: string) {
       const workflowSize = value as 'small' | 'medium' | 'large';
-      updateSettingsForSource(settingsData?.source ?? 'user', {
+      updateSettingsForSource('userSettings', {
         ...settingsData,
         workflowSize
       });

@@ -41,7 +41,7 @@ function parsePermissionUpdates(raw: unknown): PermissionUpdate[] {
   for (const entry of raw) {
     const result = schema.safeParse(entry)
     if (result.success) {
-      valid.push(result.data)
+      valid.push(result.data as unknown as PermissionUpdate)
     } else {
       logForDebugging(
         `[SwarmPermissionPoller] Dropping malformed permissionUpdate entry: ${result.error.message}`,

@@ -199,7 +199,8 @@ export async function* handleStopHooks(
           sessionStartTime: (() => { try { const { getSessionStartTime } = require('../bootstrap/state.js'); return getSessionStartTime?.() || Date.now() } catch { return Date.now() } })()
         }).then(suggestions => {
           if (suggestions.length > 0 && toolUseContext.appendSystemMessage) {
-            toolUseContext.appendSystemMessage(formatSuggestionsAsSystemMessage(suggestions))
+            const appendSystemMessage = toolUseContext.appendSystemMessage as (message: string) => void
+            appendSystemMessage(formatSuggestionsAsSystemMessage(suggestions))
           }
         }).catch(e => logForDebugging(`[memory] proactiveSuggestions error: ${(e as Error).message}`))
       } catch {}

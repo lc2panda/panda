@@ -360,6 +360,12 @@ export interface HookResult {
   initialUserMessage?: string
   updatedInput?: Record<string, unknown>
   updatedMCPToolOutput?: unknown
+  updatedToolOutput?: unknown
+  continueOnBlock?: boolean
+  terminalSequence?: string
+  sessionTitle?: string
+  suppressMessage?: boolean
+  replacementContent?: string
   permissionRequestResult?: PermissionRequestResult
   elicitationResponse?: ElicitationResponse
   watchPaths?: string[]
@@ -382,6 +388,9 @@ export type AggregatedHookResult = {
   sessionTitle?: string
   updatedInput?: Record<string, unknown>
   updatedMCPToolOutput?: unknown
+  updatedToolOutput?: unknown
+  continueOnBlock?: boolean
+  terminalSequence?: string
   permissionRequestResult?: PermissionRequestResult
   watchPaths?: string[]
   elicitationResponse?: ElicitationResponse
@@ -791,7 +800,7 @@ function processHookJSONOutput({
           'sessionTitle' in json.hookSpecificOutput &&
           json.hookSpecificOutput.sessionTitle
         ) {
-          result.sessionTitle = json.hookSpecificOutput.sessionTitle
+          result.sessionTitle = String(json.hookSpecificOutput.sessionTitle)
         }
         break
       case 'Setup':
@@ -2809,9 +2818,9 @@ async function* executeHooks({
         // Emit a synthetic response event so observability tooling sees mcp_tool hooks.
         if (mcpResult.message?.type === 'attachment') {
           const att = mcpResult.message.attachment
-          const stdout = ('stdout' in att && att.stdout) || ''
-          const stderr = ('stderr' in att && att.stderr) || ''
-          const exitCode = 'exitCode' in att ? att.exitCode : 0
+          const stdout = String(('stdout' in att && att.stdout) || '')
+          const stderr = String(('stderr' in att && att.stderr) || '')
+          const exitCode = 'exitCode' in att && typeof att.exitCode === 'number' ? att.exitCode : 0
           emitHookResponse({
             hookId,
             hookName,

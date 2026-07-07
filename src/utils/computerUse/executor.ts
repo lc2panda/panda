@@ -259,7 +259,7 @@ async function animatedMove(
 export function createCliExecutor(opts: {
   getMouseAnimationEnabled: () => boolean
   getHideBeforeActionEnabled: () => boolean
-}): ComputerExecutor {
+}): ComputerExecutor & Record<string, unknown> {
   if (process.platform !== 'darwin') {
     throw new Error(
       `createCliExecutor called on ${process.platform}. Computer control is macOS-only.`,
@@ -294,8 +294,8 @@ export function createCliExecutor(opts: {
   return {
     capabilities: {
       ...CLI_CU_CAPABILITIES,
-      hostBundleId: CLI_HOST_BUNDLE_ID,
-    },
+      hostBundleId: CLI_HOST_BUNDLE_ID as unknown as boolean,
+    } as unknown as Record<string, boolean>,
 
     // ── Pre-action sequence (hide + defocus) ────────────────────────────
 

@@ -404,7 +404,7 @@ export function preflightModelCheck(
 
   if (minimumCapabilities) {
     for (const [key, minValue] of Object.entries(minimumCapabilities)) {
-      const actual = (model.capabilities as Record<string, unknown>)[key]
+      const actual = (model.capabilities as unknown as Record<string, unknown>)[key]
       if (typeof actual === 'number' && typeof minValue === 'number' && actual < minValue) {
         return { ok: false, reason: `${key}: required ${minValue}, got ${actual}` }
       }

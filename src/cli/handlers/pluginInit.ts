@@ -13,7 +13,7 @@ import { existsSync } from 'fs'
 
 interface PluginInitOptions {
   name?: string
-  type?: 'tool' | 'hook' | 'agent' | 'mcp'
+  type?: string
   description?: string
   author?: string
   output?: string
@@ -61,13 +61,17 @@ export async function pluginInitHandler(options: PluginInitOptions) {
       pluginType = PLUGIN_TYPES[typeIndex]?.value || 'tool'
     }
     pluginType = pluginType || 'tool'
+    if (!PLUGIN_TYPES.some(({ value }) => value === pluginType)) {
+      pluginType = 'tool'
+    }
+    const canonicalPluginType = pluginType as (typeof PLUGIN_TYPES)[number]['value']
 
     // 描述
     let description = options.description
     if (!description && !options.nonInteractive) {
       description = await question('? 描述 (可选): ')
     }
-    description = description?.trim() || `A ${pluginType} plugin for Panda`
+    description = description?.trim() || `A ${canonicalPluginType} plugin for Panda`
 
     // 作者
     let author = options.author
@@ -107,7 +111,7 @@ export async function pluginInitHandler(options: PluginInitOptions) {
         build: 'tsc',
         watch: 'tsc --watch',
       },
-      keywords: ['panda-plugin', pluginType],
+      keywords: ['panda-plugin', canonicalPluginType],
       author,
       license: 'MIT',
       devDependencies: {
@@ -147,11 +151,11 @@ export async function pluginInitHandler(options: PluginInitOptions) {
     )
 
     // 生成插件代码
-    const pluginCode = generatePluginCode(pluginName, pluginType, description)
+    const pluginCode = generatePluginCode(pluginName, canonicalPluginType, description)
     await writeFile(join(outputDir, 'src', 'index.ts'), pluginCode)
 
     // 生成 README.md
-    const readme = generateReadme(pluginName, pluginType, description)
+    const readme = generateReadme(pluginName, canonicalPluginType, description)
     await writeFile(join(outputDir, 'README.md'), readme)
 
     // 完成

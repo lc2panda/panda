@@ -22,13 +22,18 @@ export type BgSpawnOptions = {
   tmuxSession?: string
 }
 
-export type BgSpawnResult = {
-  ok: boolean
-  /** 若 ok，子进程 PID（tmux 启动时 = tmux 本身的 PID，不是 REPL 进程 PID） */
-  pid?: number
-  /** 若 !ok，错误描述 */
-  error?: string
-}
+export type BgSpawnResult =
+  | {
+      ok: true
+      /** 若 ok，子进程 PID（tmux 启动时 = tmux 本身的 PID，不是 REPL 进程 PID） */
+      pid?: number
+      error?: undefined
+    }
+  | {
+      ok: false
+      /** 若 !ok，错误描述 */
+      error: string
+    }
 
 /** tmux session name 用于 bg sessions */
 export const BG_TMUX_SESSION = 'claude-bg'
@@ -43,7 +48,7 @@ type BgSpawnTestGlobal = typeof globalThis & {
  * 检测 tmux 是否可用（封装 detection.ts，供 bg.ts/daemon.ts 复用）。
  */
 export async function ensureTmuxAvailable(): Promise<
-  { ok: true } | { ok: false; error: string }
+  { ok: true; error?: undefined } | { ok: false; error: string }
 > {
   const testTmuxAvailable = (globalThis as BgSpawnTestGlobal).__pandaTestTmuxAvailable
   if (testTmuxAvailable === true || process.env.PANDA_TEST_TMUX_AVAILABLE === '1') return { ok: true }
@@ -226,7 +231,10 @@ export async function listBgTmuxWindows(
  */
 export async function attachToTmuxSession(
   target: string,
-): Promise<{ ok: boolean; code: number; error?: string }> {
+): Promise<
+  | { ok: true; code: number; error?: undefined }
+  | { ok: false; code: number; error?: string }
+> {
   return new Promise(resolve => {
     const p = spawn(TMUX_COMMAND, ['attach-session', '-t', target], {
       stdio: 'inherit',

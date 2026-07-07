@@ -15,6 +15,7 @@ import { clearMcpClientConfig, clearServerTokensFromLocalStorage, getMcpClientCo
 import { connectToServer, getMcpServerConnectionBatchSize } from '../../services/mcp/client.js';
 import { addMcpConfig, getAllMcpConfigs, getMcpConfigByName, getMcpConfigsByScope, removeMcpConfig } from '../../services/mcp/config.js';
 import type { ConfigScope, ScopedMcpServerConfig } from '../../services/mcp/types.js';
+import { McpServerConfigSchema } from '../../services/mcp/types.js';
 import { describeMcpConfigFilePath, ensureConfigScope, getScopeLabel } from '../../services/mcp/utils.js';
 import { AppStateProvider } from '../../state/AppState.js';
 import { getCurrentProjectConfig, getGlobalConfig, saveCurrentProjectConfig } from '../../utils/config.js';
@@ -78,8 +79,11 @@ export async function mcpRemoveHandler(name: string, options: {
   const serverBeforeRemoval = getMcpConfigByName(name);
   const cleanupSecureStorage = () => {
     if (serverBeforeRemoval && (serverBeforeRemoval.type === 'sse' || serverBeforeRemoval.type === 'http')) {
-      clearServerTokensFromLocalStorage(name, serverBeforeRemoval);
-      clearMcpClientConfig(name, serverBeforeRemoval);
+      const server = McpServerConfigSchema().parse(serverBeforeRemoval);
+      if (server.type === 'sse' || server.type === 'http') {
+        clearServerTokensFromLocalStorage(name, server);
+        clearMcpClientConfig(name, server);
+      }
     }
   };
   try {
