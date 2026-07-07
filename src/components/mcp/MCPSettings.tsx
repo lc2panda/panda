@@ -18,6 +18,9 @@ type Props = {
     display?: CommandResultDisplay;
   }) => void;
 };
+export function shouldWaitForMcpServerInfo(serverCount: number, clientCount: number): boolean {
+  return serverCount === 0 && clientCount > 0;
+}
 export function MCPSettings(t0) {
   const $ = _c(66);
   const {
@@ -143,8 +146,7 @@ export function MCPSettings(t0) {
   let t8;
   if ($[10] !== agentMcpServers.length || $[11] !== filteredClients.length || $[12] !== onComplete || $[13] !== servers.length) {
     t7 = () => {
-      if (servers.length === 0 && filteredClients.length > 0) {
-        onComplete("MCP servers are configured but none connected. Please run /doctor for diagnostics, then check `panda mcp list`.");
+      if (shouldWaitForMcpServerInfo(servers.length, filteredClients.length)) {
         return;
       }
       if (servers.length === 0 && agentMcpServers.length === 0) {

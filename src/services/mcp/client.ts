@@ -392,10 +392,12 @@ export function getEffectiveLocalMcpCwd(config: ScopedMcpServerConfig): string |
     return undefined
   }
 
-  // Transport cwd and CLAUDE_PROJECT_DIR are both getOriginalCwd(); use the
-  // same project cwd for locking so servers launched in one project are
-  // serialized consistently regardless of plugin env/args decoration.
-  return getOriginalCwd()
+  // Lock local MCP startup by the actual server working directory when present,
+  // or by plugin root for plugin MCP. This keeps the EEXIST protection for one
+  // shared root without serializing unrelated local servers across all projects.
+  const serverCwd = 'cwd' in config && typeof config.cwd === 'string' ? config.cwd : undefined
+  const pluginRoot = 'env' in config && config.env ? config.env.CLAUDE_PLUGIN_ROOT : undefined
+  return serverCwd ?? pluginRoot ?? getOriginalCwd()
 }
 
 export function enqueueMcpStartupByCwd<T>(

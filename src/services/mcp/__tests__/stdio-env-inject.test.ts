@@ -98,7 +98,21 @@ describe('Stdio MCP server env 注入 (Wave3-E2)', () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
     )
   })
-  test('effective cwd lock 与 transport cwd / CLAUDE_PROJECT_DIR 使用同一项目目录', () => {
+  test('effective cwd lock 优先使用显式 server cwd', () => {
+    const effectiveCwd = getEffectiveLocalMcpCwd({
+      type: 'stdio',
+      command: 'node',
+      args: ['server.js'],
+      cwd: '/server/cwd',
+      env: {
+        CLAUDE_PLUGIN_ROOT: '/plugin/root',
+      },
+    } as any)
+
+    expect(effectiveCwd).toBe('/server/cwd')
+  })
+
+  test('effective cwd lock 对 plugin MCP 使用 plugin root', () => {
     const effectiveCwd = getEffectiveLocalMcpCwd({
       type: 'stdio',
       command: 'node',
@@ -108,8 +122,7 @@ describe('Stdio MCP server env 注入 (Wave3-E2)', () => {
       },
     } as any)
 
-    // transport cwd 与 CLAUDE_PROJECT_DIR 均来自 getOriginalCwd()，lock 分组不可再按插件 root/args cwd 偏移。
-    expect(effectiveCwd).toBe(process.cwd())
+    expect(effectiveCwd).toBe('/plugin/root')
   })
 
   test('同 cwd stdio/sdk 串行，不同 cwd 可并发', async () => {
