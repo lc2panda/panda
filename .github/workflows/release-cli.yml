@@ -104,10 +104,16 @@ jobs:
               "${TARBALL}"
           fi
 
-      # npm publish 到 GitHub Packages；版本若已存在会报错（重复 tag 触发场景）→ || true 容错避免 CI 失败
-      # prepublishOnly 会再跑一次 bun run build，幂等无副作用
+      # npm publish 到 GitHub Packages；版本若已存在才允许补发/重跑跳过。
+      # prepublishOnly 会再跑一次 bun run build，幂等无副作用。
+      # 其他发布失败（权限、网络、registry）必须让 workflow 失败，避免 Release 成功但 Packages 未更新。
       - name: Publish to GitHub Packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          npm publish || echo "npm publish 失败（多为版本已存在，属补发/重跑预期）— 已容错跳过，请人工核对 GitHub Packages"
+          if npm view "@lc2panda/panda-code@${RELEASE_VERSION}" version >/dev/null 2>&1; then
+            echo "@lc2panda/panda-code@${RELEASE_VERSION} 已存在于 GitHub Packages，跳过重复 publish"
+          else
+            npm publish
+          fi

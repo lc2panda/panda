@@ -2,9 +2,26 @@
 // Output: 验证通知消息正确调用飞书 API
 // Pos: connectors/feishu/ 单元测试，守护飞书通知功能不回归
 
-import { test, expect, mock, spyOn } from 'bun:test'
+import { test, expect, mock, spyOn, beforeEach, afterEach } from 'bun:test'
 import { createFeishuConnector } from './index.js'
 import type { PandaNotification } from '../types.js'
+
+const originalFetch = globalThis.fetch
+
+beforeEach(() => {
+  globalThis.fetch = mock(async () => new Response(JSON.stringify({
+    code: 0,
+    tenant_access_token: 'tenant_access_token_test',
+    expire: 7200,
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })) as any
+})
+
+afterEach(() => {
+  globalThis.fetch = originalFetch
+})
 
 test('sendNotification — 无 chatId 配置时跳过', async () => {
   const connector = createFeishuConnector({
