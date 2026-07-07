@@ -8,11 +8,11 @@
   "author": "lc2panda",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lc2panda/panda-code.git"
+    "url": "git+https://github.com/lc2panda/panda.git"
   },
-  "homepage": "https://github.com/lc2panda/panda-code#readme",
+  "homepage": "https://github.com/lc2panda/panda#readme",
   "bugs": {
-    "url": "https://github.com/lc2panda/panda-code/issues"
+    "url": "https://github.com/lc2panda/panda/issues"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
