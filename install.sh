@@ -72,8 +72,14 @@ if [ -n "$TGZ_URL" ]; then
   TGZ_PATH="$TMPDIR_DL/panda-code.tgz"
   info "下载 tarball ..."
   curl -fsSL "$TGZ_URL" -o "$TGZ_PATH"
-  info "全局安装：npm install -g <tgz> ..."
-  npm install -g "$TGZ_PATH"
+  NPM_MAJOR="$(npm --version | cut -d. -f1)"
+  if [ "${NPM_MAJOR:-0}" -ge 11 ]; then
+    info "全局安装：npm install -g --allow-scripts=${NPM_PKG} <tgz> ..."
+    npm install -g --allow-scripts="$NPM_PKG" "$TGZ_PATH"
+  else
+    info "全局安装：npm install -g <tgz> ..."
+    npm install -g "$TGZ_PATH"
+  fi
 else
   warn "未在 latest release 找到 .tgz 资产。"
   warn "回退方案：从 GitHub Packages 安装（需要 GitHub token 配置 ~/.npmrc）："
