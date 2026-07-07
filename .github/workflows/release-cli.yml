@@ -16,7 +16,7 @@
 # Token 用法说明：
 #   - GH_TOKEN env 由 GitHub Actions 自动注入 secrets.GITHUB_TOKEN（无需手动配 Secrets）
 #   - contents:write → gh release create 发 GitHub Release
-#   - GH_PACKAGES_TOKEN repo secret → npm publish 发 GitHub Packages
+#   - packages:write → npm publish 发 GitHub Packages
 #
 # 回滚：删除本文件即回滚到纯手动发版流程；已发布的 Release/Packages 不受影响。
 
@@ -109,7 +109,7 @@ jobs:
       # 其他发布失败（权限、网络、registry）必须让 workflow 失败，避免 Release 成功但 Packages 未更新。
       - name: Publish to GitHub Packages
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           if npm view "@lc2panda/panda-code@${RELEASE_VERSION}" version >/dev/null 2>&1; then
