@@ -1,3 +1,6 @@
+// Input: 复制文本、tmux/SSH/平台环境与终端 OSC52 能力
+// Output: OSC52 序列、tmux buffer 写入与本地剪贴板命令
+// Pos: Windows PowerShell 中文剪贴板敏感点，修改后需同步 OSC 测试
 /**
  * OSC (Operating System Command) Types and Parser
  */
@@ -169,10 +172,14 @@ let linuxCopy: 'wl-copy' | 'xclip' | 'xsel' | null | undefined
  * Fire-and-forget: failures are silent since OSC 52 may have succeeded.
  */
 export function getWindowsClipboardCommands(text: string): Array<{ command: string; args: string[]; input: string }> {
-  const powershellScript = 'Set-Clipboard -Value ([Console]::In.ReadToEnd())'
+  const textBase64 = Buffer.from(text, 'utf8').toString('base64')
+  const powershellScript = `$text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${textBase64}')); Set-Clipboard -Value $text`
+  const encodedCommand = Buffer.from(powershellScript, 'utf16le').toString('base64')
+  const powershellArgs = ['-NoProfile', '-NonInteractive', '-EncodedCommand', encodedCommand]
   const commands = [
-    { command: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', powershellScript], input: text },
-    { command: 'powershell', args: ['-NoProfile', '-NonInteractive', '-Command', powershellScript], input: text },
+    { command: 'pwsh', args: powershellArgs, input: '' },
+    { command: 'powershell.exe', args: powershellArgs, input: '' },
+    { command: 'powershell', args: powershellArgs, input: '' },
   ]
 
   if ([...text].every(char => char.charCodeAt(0) <= 0x7f)) {

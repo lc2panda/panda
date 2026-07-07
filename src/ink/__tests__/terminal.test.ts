@@ -1,3 +1,6 @@
+// Input: mocked terminal environment variables
+// Output: terminal color/detection assertions
+// Pos: Windows/SSH/Termius rendering regression guard
 /**
  * Unit tests for terminal environment detection (terminal.ts)
  * Covers SSH client detection, color downgrade logic, and ANSI parsing
@@ -51,19 +54,22 @@ describe('Termius Environment Detection', () => {
   })
 
   describe('shouldUseDegradedColors()', () => {
-    it('should detect Termius via TERMIUS_VERSION on any runtime OS', async () => {
+    it('should not downgrade solely because TERMIUS_VERSION is set', async () => {
       process.env.TERMIUS_VERSION = '8.5.0'
+      process.env.COLORTERM = 'truecolor'
       delete process.env.MOBAXTERM_VERSION
       delete process.env.SSH_CLIENT
       delete process.env.SSH_CONNECTION
       delete require.cache[require.resolve('../terminal.js')]
       const { shouldUseDegradedColors } = await import('../terminal.js')
-      expect(shouldUseDegradedColors()).toBe(true)
+      expect(shouldUseDegradedColors()).toBe(false)
     })
 
-    it('should allow PANDA_FORCE_TRUECOLOR to bypass Termius downgrade', async () => {
+    it('should allow PANDA_FORCE_TRUECOLOR to bypass weak TERM downgrade', async () => {
       process.env.PANDA_FORCE_TRUECOLOR = '1'
+      process.env.TERM = 'vt100'
       process.env.TERMIUS_VERSION = '8.5.0'
+      delete process.env.COLORTERM
       delete require.cache[require.resolve('../terminal.js')]
       const { shouldUseDegradedColors } = await import('../terminal.js')
       expect(shouldUseDegradedColors()).toBe(false)
@@ -88,7 +94,7 @@ describe('Termius Environment Detection', () => {
       expect(shouldUseDegradedColors()).toBe(false)
     })
 
-    it('should downgrade SSH xterm-256color without COLORTERM on any runtime OS', async () => {
+    it('should not downgrade SSH xterm-256color without COLORTERM', async () => {
       process.env.SSH_CLIENT = '10.0.0.5 54321 22'
       process.env.TERM = 'xterm-256color'
       delete process.env.COLORTERM
@@ -96,7 +102,7 @@ describe('Termius Environment Detection', () => {
       delete process.env.MOBAXTERM_VERSION
       delete require.cache[require.resolve('../terminal.js')]
       const { shouldUseDegradedColors } = await import('../terminal.js')
-      expect(shouldUseDegradedColors()).toBe(true)
+      expect(shouldUseDegradedColors()).toBe(false)
     })
 
     it('should not downgrade SSH xterm-256color when COLORTERM=truecolor', async () => {
@@ -109,6 +115,30 @@ describe('Termius Environment Detection', () => {
       delete require.cache[require.resolve('../terminal.js')]
       const { shouldUseDegradedColors } = await import('../terminal.js')
       expect(shouldUseDegradedColors()).toBe(false)
+    })
+
+    it('should not downgrade SSH/Termius when COLORTERM=truecolor', async () => {
+      process.env.SSH_CONNECTION = '10.0.0.5 54321 10.0.0.10 22'
+      process.env.TERMIUS_VERSION = '9.0.0'
+      process.env.TERM = 'xterm-256color'
+      process.env.COLORTERM = 'truecolor'
+      delete process.env.SSH_CLIENT
+      delete process.env.MOBAXTERM_VERSION
+      delete require.cache[require.resolve('../terminal.js')]
+      const { shouldUseDegradedColors } = await import('../terminal.js')
+      expect(shouldUseDegradedColors()).toBe(false)
+    })
+
+    it('should downgrade only for clearly weak TERM without truecolor or 256color', async () => {
+      process.env.SSH_CONNECTION = '10.0.0.5 54321 10.0.0.10 22'
+      process.env.TERM = 'vt100'
+      delete process.env.COLORTERM
+      delete process.env.SSH_CLIENT
+      delete process.env.TERMIUS_VERSION
+      delete process.env.MOBAXTERM_VERSION
+      delete require.cache[require.resolve('../terminal.js')]
+      const { shouldUseDegradedColors } = await import('../terminal.js')
+      expect(shouldUseDegradedColors()).toBe(true)
     })
 
     it('should return false for native terminals without SSH env', async () => {
@@ -145,7 +175,9 @@ describe('Windows clipboard command selection', () => {
     const { getWindowsClipboardCommands } = await import('../termio/osc.js')
     const commands = getWindowsClipboardCommands('中文👋\n第二行')
 
-    expect(commands[0]?.command).toBe('powershell.exe')
+    expect(commands[0]?.command).toBe('pwsh')
+    expect(commands[1]?.command).toBe('powershell.exe')
+    expect(commands[0]?.args).toContain('-EncodedCommand')
     expect(commands.some(command => command.command === 'clip')).toBe(false)
   })
 
@@ -153,7 +185,9 @@ describe('Windows clipboard command selection', () => {
     const { getWindowsClipboardCommands } = await import('../termio/osc.js')
     const commands = getWindowsClipboardCommands('plain ascii\nsecond line')
 
-    expect(commands[0]?.command).toBe('powershell.exe')
+    expect(commands[0]?.command).toBe('pwsh')
+    expect(commands[1]?.command).toBe('powershell.exe')
+    expect(commands[0]?.args).toContain('-EncodedCommand')
     expect(commands.at(-1)?.command).toBe('clip')
   })
 })

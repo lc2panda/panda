@@ -1,3 +1,6 @@
+// Input: 终端环境变量、TTY 能力与颜色强制开关
+// Output: 终端能力判断、颜色降级决策与渲染写入辅助
+// Pos: Windows/SSH/Termius 渲染兼容敏感点，修改后需同步终端测试
 import { coerce } from 'semver'
 import type { Writable } from 'stream'
 import { env } from '../utils/env.js'
@@ -158,14 +161,10 @@ export function isTermius(): boolean {
 }
 
 /** Checks if the terminal requires downgraded color support (True Color -> 256-color).
- *  Targets Windows SSH clients with incomplete True Color rendering:
- *  - Termius (TERMIUS_VERSION or SSH_CLIENT pattern)
- *  - Generic SSH terminals (SSH_CLIENT/SSH_CONNECTION, except MobaXterm)
- *  - PuTTY (heuristic: TERM=xterm-256color without COLORTERM)
- *
- *  Excludes:
- *  - MobaXterm (MOBAXTERM_VERSION) — supports True Color
- *  - Native terminals on macOS/Linux
+ *  package-v2.1.88 baseline trusted standard terminal declarations instead of
+ *  treating connection transport as display capability. Keep that contract here:
+ *  explicit Panda switches win first, then COLORTERM/TERM capability claims,
+ *  and SSH/Termius traces alone never force downgrade.
  *
  *  @returns true if color downgrade is required, false otherwise
  */
@@ -173,20 +172,15 @@ export function shouldUseDegradedColors(): boolean {
   if (process.env.PANDA_FORCE_TRUECOLOR === '1') return false
   if (process.env.PANDA_FORCE_ANSI256 === '1') return true
 
-  // MobaXterm supports True Color — exclude it unless explicitly forced above.
-  if (process.env.MOBAXTERM_VERSION) return false
-
-  // Explicit Termius detection (also applies when running over SSH on Linux/macOS).
-  if (process.env.TERMIUS_VERSION) return true
-
   const colorterm = process.env.COLORTERM?.toLowerCase()
-  const hasTrueColor = colorterm === 'truecolor' || colorterm === '24bit'
-  const isSshSession = Boolean(process.env.SSH_CLIENT || process.env.SSH_CONNECTION)
-  const isXterm256 = process.env.TERM === 'xterm-256color'
+  if (colorterm === 'truecolor' || colorterm === '24bit') return false
 
-  // Windows SSH clients often forward only TERM=xterm-256color, not COLORTERM.
-  // In that case prefer stable ANSI 256 colors to broken True Color rendering.
-  if (isSshSession && isXterm256 && !hasTrueColor) return true
+  const term = process.env.TERM?.toLowerCase() ?? ''
+  if (term.includes('256color')) return false
+
+  // Only downgrade on clearly weak declarations. SSH_CLIENT/SSH_CONNECTION,
+  // TERMIUS_VERSION, and other client traces do not prove weak rendering.
+  if (!colorterm && term !== '' && !term.includes('256color')) return true
 
   return false
 }

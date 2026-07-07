@@ -1,11 +1,30 @@
-// Input: 模拟 stdin chunk 包含多个 keys + Enter（SSH/tmux coalesce/paste-with-newline/fast-typing）
-// Output: 验证 useTextInput.handleEnter 通过 cursor.text (rebound) 提交最新值
-// Pos: Worker Y P0 — useTextInput stale closure 修复回归保护
+// Input: coalesced terminal input batches and fake submit callbacks
+// Output: race regression assertions for useTextInput Enter handling
+// Pos: Windows/SSH/tmux first-send regression guard
 
 import { describe, expect, test } from 'bun:test'
 import { Cursor } from '../utils/Cursor.js'
+import { getCoalescedEnterBody } from './useTextInput.js'
 
 describe('useTextInput Worker Y P0: stale closure on coalesced Enter', () => {
+  test('coalesced Enter parser accepts first-send CR/LF/CRLF and Chinese input', () => {
+    expect(getCoalescedEnterBody('hi\r')).toBe('hi')
+    expect(getCoalescedEnterBody('hi\n')).toBe('hi')
+    expect(getCoalescedEnterBody('hi\r\n')).toBe('hi')
+    expect(getCoalescedEnterBody('你好\r')).toBe('你好')
+  })
+
+  test('coalesced Enter parser rejects empty Enter, escaped Enter, and multi-line paste', () => {
+    expect(getCoalescedEnterBody('\r')).toBeNull()
+    expect(getCoalescedEnterBody('\n')).toBeNull()
+    expect(getCoalescedEnterBody('\r\n')).toBeNull()
+    expect(getCoalescedEnterBody('hi\\\r')).toBeNull()
+    expect(getCoalescedEnterBody('a\rb')).toBeNull()
+    expect(getCoalescedEnterBody('a\r\nb')).toBeNull()
+    expect(getCoalescedEnterBody('a\rb\r')).toBeNull()
+    expect(getCoalescedEnterBody('a\r\nb\r\n')).toBeNull()
+  })
+
   test('typeof window === undefined in Bun → useEventCallback uses useEffect (async)', () => {
     // Root cause precondition: usehooks-ts useIsomorphicLayoutEffect falls
     // back to useEffect when typeof window === 'undefined' (Bun has no DOM

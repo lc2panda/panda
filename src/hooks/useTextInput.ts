@@ -1,3 +1,6 @@
+// Input: terminal keypress batches、cursor state、history callbacks
+// Output: text input state transitions and submit/change callbacks
+// Pos: Windows/SSH/tmux 首次发送竞态敏感点，修改后需同步 race 测试
 import { useRef } from 'react'
 import { isInputModeCharacter } from 'src/components/PromptInput/inputModes.js'
 import { useNotifications } from 'src/context/notifications.js'
@@ -30,6 +33,16 @@ type MaybeCursor = undefined | Cursor
 type InputHandler = (input: string) => MaybeCursor
 type InputMapper = (input: string) => MaybeCursor
 const NOOP_HANDLER: InputHandler = () => {}
+
+export function getCoalescedEnterBody(input: string): string | null {
+  const ending = input.endsWith('\r\n') ? '\r\n' : input.endsWith('\r') ? '\r' : input.endsWith('\n') ? '\n' : ''
+  if (!ending || input.length <= ending.length) return null
+  const body = input.slice(0, -ending.length)
+  if (body.endsWith('\\')) return null
+  if (/[\r\n]/.test(body)) return null
+  return body
+}
+
 function mapInput(input_map: Array<[string, InputHandler]>): InputMapper {
   const map = new Map(input_map)
   return function (input: string): MaybeCursor {
@@ -122,6 +135,10 @@ export function useTextInput({
   // value via JavaScript closure semantics on a `let` variable.
   const latestValueRef = useRef(originalValue)
   const latestOffsetRef = useRef(offset)
+  const submittedValueRef = useRef<string | null>(null)
+  if (submittedValueRef.current !== null && originalValue !== submittedValueRef.current) {
+    submittedValueRef.current = null
+  }
   latestValueRef.current = originalValue
   latestOffsetRef.current = offset
   // eslint-disable-next-line prefer-const — re-assigned at onInput entry to
@@ -268,6 +285,12 @@ export function useTextInput({
     ['y', handleYankPop],
   ])
 
+  function submitOnce(value: string) {
+    if (submittedValueRef.current === value) return
+    submittedValueRef.current = value
+    onSubmit?.(value)
+  }
+
   function handleEnter(key: Key) {
     if (
       multiline &&
@@ -299,7 +322,7 @@ export function useTextInput({
         `[useTextInput.handleEnter] stale closure caught: originalValue.len=${originalValue.length} cursor.text.len=${cursor.text.length} — submitting live cursor.text`,
       )
     }
-    onSubmit?.(cursor.text)
+    submitOnce(cursor.text)
   }
 
   function upOrHistoryUp() {
@@ -424,19 +447,13 @@ export function useTextInput({
             case input === '\x1b[F' || input === '\x1b[4~':
               return cursor.endOfLine()
             default: {
-              // Trailing \r after text is SSH-coalesced Enter ("o\r") —
-              // strip it so the Enter isn't inserted as content. Lone \r
-              // here is Alt+Enter leaking through (META_KEY_CODE_RE doesn't
-              // match \x1b\r) — leave it for the \r→\n below. Embedded \r
-              // is multi-line paste from a terminal without bracketed
-              // paste — convert to \n. Backslash+\r is a stale VS Code
-              // Shift+Enter binding (pre-#8991 /terminal-setup wrote
-              // args.text "\\\r\n" to keybindings.json); keep the \r so
-              // it becomes \n below (anthropics/claude-code#31316).
-              const text = stripAnsi(input)
-                // eslint-disable-next-line custom-rules/no-lookbehind-regex -- .replace(re, str) on 1-2 char keystrokes: no-match returns same string (Object.is), regex never runs
-                .replace(/(?<=[^\\\r\n])\r$/, '')
-                .replace(/\r/g, '\n')
+              // Trailing Enter after text can arrive in the same SSH/tmux batch
+              // ("o\r", "o\n", "o\r\n"). Strip only the final Enter for
+              // that single-line batch so it can be submitted below instead of
+              // inserted as content. Embedded CR/LF remains multi-line paste.
+              // Backslash+Enter keeps the multi-line semantic.
+              const coalescedEnterBody = getCoalescedEnterBody(input)
+              const text = stripAnsi(coalescedEnterBody ?? input).replace(/\r\n|\r/g, '\n')
               if (cursor.isAtStart() && isInputModeCharacter(input)) {
                 return cursor.insert(text).left()
               }
@@ -547,20 +564,13 @@ export function useTextInput({
         }
         setOffset(nextCursor.offset)
       }
-      // SSH-coalesced Enter: on slow links, "o" + Enter can arrive as one
-      // chunk "o\r". parseKeypress only matches s === '\r', so it hit the
-      // default handler above (which stripped the trailing \r). Text with
-      // exactly one trailing \r is coalesced Enter; lone \r is Alt+Enter
-      // (newline); embedded \r is multi-line paste.
-      if (
-        filteredInput.length > 1 &&
-        filteredInput.endsWith('\r') &&
-        !filteredInput.slice(0, -1).includes('\r') &&
-        // Backslash+CR is a stale VS Code Shift+Enter binding, not
-        // coalesced Enter. See default handler above.
-        filteredInput[filteredInput.length - 2] !== '\\'
-      ) {
-        onSubmit?.(nextCursor.text)
+      // SSH/tmux coalesced Enter: on slow links, text + Enter can arrive as one
+      // chunk ("o\r", "o\n", or "o\r\n"). parseKeypress only matches lone
+      // return, so those batches hit the default handler above. Submit only
+      // single-line batches; embedded newlines remain paste, and backslash+Enter
+      // keeps multi-line semantics.
+      if (getCoalescedEnterBody(filteredInput) !== null) {
+        submitOnce(nextCursor.text)
       }
     }
   }
