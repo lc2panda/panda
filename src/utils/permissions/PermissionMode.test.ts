@@ -5,6 +5,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
   EXTERNAL_PERMISSION_MODES,
+  externalPermissionModeSchema,
+  canonicalExternalPermissionModeSchema,
   permissionModeTitle,
   normalizeExternalPermissionMode,
   permissionModeFromString,
@@ -32,5 +34,13 @@ describe('permission mode manual compatibility', () => {
 
   test('shows upstream visible manual label for default mode', () => {
     expect(permissionModeTitle('default')).toBe('Manual')
+  })
+
+  test('accepts manual only at external boundary, not canonical boundary', () => {
+    expect(externalPermissionModeSchema().safeParse('manual').success).toBe(true)
+    expect(canonicalExternalPermissionModeSchema().safeParse('manual').success).toBe(
+      false,
+    )
+    expect(permissionModeFromString('unknown-mode')).toBe('default')
   })
 })

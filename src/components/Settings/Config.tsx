@@ -776,7 +776,6 @@ export function Config({
     onChange(value: string) {
       const workflowSize = value as 'small' | 'medium' | 'large';
       updateSettingsForSource('userSettings', {
-        ...settingsData,
         workflowSize
       });
       setSettingsData(prev => ({

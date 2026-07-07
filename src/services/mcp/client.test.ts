@@ -100,4 +100,15 @@ describe('McpServerConfigSchema', () => {
       url: 'wss://example.com/ws',
     }).success).toBe(true)
   })
+
+  test('stdio 配置缺少 command 时拒绝初始化输入', () => {
+    const result = McpServerConfigSchema().safeParse({
+      type: 'stdio',
+      args: ['--version'],
+    })
+
+    expect(result.success).toBe(false)
+    const issueText = JSON.stringify(result.error?.issues)
+    expect(issueText).toContain('command')
+  })
 })

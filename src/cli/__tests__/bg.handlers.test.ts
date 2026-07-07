@@ -27,9 +27,17 @@ let mockEnsureTmuxResult: { ok: true } | { ok: false; error: string } = {
 }
 let mockAttachResult = { ok: true, code: 0 }
 let mockListWindows: string[] = ['0:bg-11111111', '1:bg-22222222']
+let mockSpawnCalls: Array<[string[], string | undefined, unknown]> = []
 
 mock.module('../bgSpawn.js', () => ({
-  spawnBgSession: async () => mockSpawnResult,
+  spawnBgSession: async (
+    args?: string[],
+    sessionId?: string,
+    opts?: unknown,
+  ) => {
+    mockSpawnCalls.push([args ?? [], sessionId, opts])
+    return mockSpawnResult
+  },
   ensureTmuxAvailable: async () => mockEnsureTmuxResult,
   attachToTmuxSession: async () => mockAttachResult,
   listBgTmuxWindows: async () => mockListWindows,
@@ -404,7 +412,7 @@ describe('bg.ts — handleBgFlag', () => {
     const { handleBgFlag } = await import('../bg.js')
     const cap = captureConsole()
     try {
-      await handleBgFlag(['--bg', '--model', 'claude-opus-4-7'])
+      await handleBgFlag(['--bg', '--model', 'test-model'])
     } finally {
       cap.restore()
     }
@@ -414,7 +422,31 @@ describe('bg.ts — handleBgFlag', () => {
     expect(args).not.toContain('--bg')
     expect(args).not.toContain('--background')
     expect(args).toContain('--model')
-    expect(args).toContain('claude-opus-4-7')
+    expect(args).toContain('test-model')
+  })
+
+  test('--background 也按 canonical bg flag 过滤', async () => {
+    const spawnCalls: string[][] = []
+    mock.module('../bgSpawn.js', () => ({
+      ensureTmuxAvailable: async () => ({ ok: true }),
+      spawnBgSession: async (extraArgs: string[]) => {
+        spawnCalls.push(extraArgs)
+        return { ok: true }
+      },
+      listBgTmuxWindows: async () => [],
+      BG_TMUX_SESSION: 'claude-bg',
+      attachToTmuxSession: async () => ({ ok: true, code: 0 }),
+    }))
+
+    const { handleBgFlag } = await import('../bg.js')
+    const cap = captureConsole()
+    try {
+      await handleBgFlag(['--background', '--print'])
+    } finally {
+      cap.restore()
+    }
+
+    expect(spawnCalls[0]).toEqual(['--print'])
   })
 
   afterEach(async () => {
