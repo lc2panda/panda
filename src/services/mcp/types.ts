@@ -136,6 +136,20 @@ export const McpClaudeAIProxyServerConfigSchema = lazySchema(() =>
   }),
 )
 
+const McpMissingUrlTypeConfigSchema = lazySchema(() =>
+  z
+    .object({
+      url: z.string(),
+      type: z.undefined().optional(),
+    })
+    .passthrough()
+    .refine(() => false, {
+      message:
+        'MCP server configs with a url must specify type: "sse" | "http" | "ws"',
+      path: ['type'],
+    }),
+)
+
 export const McpServerConfigSchema = lazySchema(() =>
   z.union([
     McpStdioServerConfigSchema(),
@@ -146,6 +160,7 @@ export const McpServerConfigSchema = lazySchema(() =>
     McpWebSocketServerConfigSchema(),
     McpSdkServerConfigSchema(),
     McpClaudeAIProxyServerConfigSchema(),
+    McpMissingUrlTypeConfigSchema(),
   ]),
 )
 

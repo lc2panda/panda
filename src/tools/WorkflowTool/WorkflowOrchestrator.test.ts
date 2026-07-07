@@ -114,6 +114,32 @@ describe('runWorkflowSteps — no-agent-tool path', () => {
     expect(result.stepsCompleted).toBe(1)
   })
 
+  test('AgentTool spawn receives dynamic workflow size advisory prompt', async () => {
+    const { context } = makeMockContext()
+    const calls: Array<Record<string, unknown>> = []
+    const mockAgentTool = {
+      name: 'Agent',
+      async call(input: Record<string, unknown>) {
+        calls.push(input)
+        return { data: { result: 'done' } }
+      },
+    }
+    ;(context.options as { tools: unknown[] }).tools = [mockAgentTool]
+
+    const def: WorkflowDefinition = {
+      name: 'agent-spawn',
+      description: 'Agent spawn test',
+      steps: [{ id: 's1', label: 'S1', prompt: 'Do S1' }],
+    }
+
+    const result = await runWorkflowSteps('wf-agent-size', def, {}, context)
+
+    expect(result.status).toBe('completed')
+    expect(calls).toHaveLength(1)
+    expect(String(calls[0]?.prompt)).toContain('Dynamic workflow size guideline:')
+    expect(String(calls[0]?.prompt)).toContain('advisory planning signal')
+  })
+
   test('workflow with 0 steps returns completed with stepsTotal=0', async () => {
     const { context } = makeMockContext()
     const def: WorkflowDefinition = {

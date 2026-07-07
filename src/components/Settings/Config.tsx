@@ -104,6 +104,8 @@ export function Config({
   const initialOutputStyle = React.useRef(currentOutputStyle);
   const [currentLanguage, setCurrentLanguage] = useState<string | undefined>(settingsData?.language);
   const initialLanguage = React.useRef(currentLanguage);
+  const [currentWorkflowSize, setCurrentWorkflowSize] = useState<'small' | 'medium' | 'large'>(settingsData?.workflowSize ?? 'medium');
+  const initialWorkflowSize = React.useRef(currentWorkflowSize);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isSearchMode, setIsSearchMode] = useState(true);
@@ -766,6 +768,31 @@ export function Config({
     type: 'managedEnum' as const,
     onChange: () => {} // handled by LanguagePicker submenu
   }, {
+    id: 'workflowSize',
+    label: 'Dynamic workflow size',
+    value: currentWorkflowSize,
+    options: ['small', 'medium', 'large'],
+    type: 'enum' as const,
+    onChange(value: string) {
+      const workflowSize = value as 'small' | 'medium' | 'large';
+      updateSettingsForSource(settingsData?.source ?? 'user', {
+        ...settingsData,
+        workflowSize
+      });
+      setSettingsData(prev => ({
+        ...prev,
+        workflowSize
+      }));
+      setCurrentWorkflowSize(workflowSize);
+      setChanges(prev => ({
+        ...prev,
+        'Dynamic workflow size': workflowSize
+      }));
+      logEvent('tengu_workflow_size_setting_changed', {
+        value: workflowSize as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS
+      });
+    }
+  }, {
     id: 'editorMode',
     label: 'Editor mode',
     // Convert 'emacs' to 'normal' for backward compatibility
@@ -1123,6 +1150,9 @@ export function Config({
     }
     if (currentLanguage !== initialLanguage.current) {
       formattedChanges.push(`Set response language to ${chalk.bold(currentLanguage ?? 'Default (English)')}`);
+    }
+    if (currentWorkflowSize !== initialWorkflowSize.current) {
+      formattedChanges.push(`Set dynamic workflow size to ${chalk.bold(currentWorkflowSize)}`);
     }
     if (globalConfig.editorMode !== initialConfig.current.editorMode) {
       formattedChanges.push(`Set editor mode to ${chalk.bold(globalConfig.editorMode || 'emacs')}`);

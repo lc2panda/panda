@@ -16,6 +16,11 @@ import {
   type ToolUseContext,
 } from '../../Tool.js'
 import { AGENT_TOOL_NAME } from '../AgentTool/constants.js'
+import {
+  logEvent,
+  type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+} from '../../services/analytics/index.js'
+import { getInitialSettings } from '../../utils/settings/settings.js'
 import type { WorkflowDefinition, WorkflowStep } from './createWorkflowCommand.js'
 import type {
   WorkflowAgentState,
@@ -47,6 +52,11 @@ function interpolatePrompt(prompt: string, args: Record<string, unknown>): strin
     const val = args[key]
     return val != null ? String(val) : `{{${key}}}`
   })
+}
+
+function getWorkflowSizeInstruction(): string {
+  const workflowSize = getInitialSettings().workflowSize ?? 'medium'
+  return `\n\nDynamic workflow size guideline: ${workflowSize}. Treat this as an advisory planning signal for task scope, batching, and coordination overhead; do not enforce it as a hard cap.`
 }
 
 /** Resolve explicit or implicit dependency set for a step */
@@ -180,9 +190,16 @@ export async function runWorkflowSteps(
 
   // Helper: spawn one step as a background agent via AgentTool
   function spawnStep(step: WorkflowStep): Promise<{ status: WorkflowAgentStatus; summary: string }> {
-    const prompt = interpolatePrompt(step.prompt, args)
+    const prompt = interpolatePrompt(step.prompt, args) + getWorkflowSizeInstruction()
     const agentTaskId = generateTaskId('local_agent')
     spawnedAgentIds.set(step.id, agentTaskId)
+
+    logEvent('tengu_workflow_agent_spawned', {
+      'workflow.run_id':
+        workflowId as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      'workflow.name':
+        definition.name as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+    })
 
     // Update placeholder agentTaskId in state
     effectiveSetAppState((prev) => {

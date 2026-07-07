@@ -423,6 +423,13 @@ async function loadSkillsFromSkillsDir(
     return []
   }
 
+  entries.sort((a, b) => {
+    const aSymlink = a.isSymbolicLink()
+    const bSymlink = b.isSymbolicLink()
+    if (aSymlink !== bSymlink) return aSymlink ? 1 : -1
+    return a.name.localeCompare(b.name)
+  })
+
   const results = await Promise.all(
     entries.map(async (entry): Promise<SkillWithPath | null> => {
       try {

@@ -1,7 +1,12 @@
-// Input: none (unit test)
-// Output: Bun test assertions on BUNDLED_SKILL_INDEX invariants
-// Pos: bundled skills Progressive Disclosure 索引层单元测试
+// Input: bundled index, filesystem skill dirs, and skill file requests
+// Output: Bun test assertions on skill registry and loadSkillsDir invariants
+// Pos: bundled/dynamic skill loading and duplicate suppression guard
+import { mkdtemp, mkdir, symlink, writeFile } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { test, expect } from 'bun:test'
+import { getSkillDirCommands } from './loadSkillsDir.js'
+import { getManagedFilePath } from '../utils/settings/managedPath.js'
 import {
   BUNDLED_SKILL_INDEX,
   getSkillDescription,
@@ -9,6 +14,46 @@ import {
   listSkillIndex,
   loadSkillFile,
 } from './registry.js'
+
+test('loadSkillsDir 去重 smoke：同路径 symlink 只加载一次，managed+dynamic 混合加载', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'panda-skills-'))
+  const realSkill = join(root, 'skills', 'shared')
+  const sameNameOtherSource = join(root, 'skills', 'shared-other')
+  const managedSkill = join(root, 'managed', '.pandacc', 'skills', 'managed-only')
+  await mkdir(realSkill, { recursive: true })
+  await mkdir(sameNameOtherSource, { recursive: true })
+  await mkdir(managedSkill, { recursive: true })
+  await writeFile(join(realSkill, 'SKILL.md'), '---\ndescription: User shared skill\n---\n# Shared\n')
+  await writeFile(join(sameNameOtherSource, 'SKILL.md'), '---\nname: shared\ndescription: Same name different source\n---\n# Shared other\n')
+  await writeFile(join(managedSkill, 'SKILL.md'), '---\ndescription: Managed only skill\n---\n# Managed\n')
+  await symlink(realSkill, join(root, 'skills', 'shared-link'))
+
+  const previousConfigDir = process.env.PANDA_CONFIG_DIR
+  const previousUserType = process.env.USER_TYPE
+  const previousManagedPath = process.env.CLAUDE_CODE_MANAGED_SETTINGS_PATH
+  process.env.PANDA_CONFIG_DIR = root
+  process.env.USER_TYPE = 'ant'
+  process.env.CLAUDE_CODE_MANAGED_SETTINGS_PATH = join(root, 'managed')
+  getManagedFilePath.cache.clear()
+  getSkillDirCommands.cache.clear()
+  try {
+    const commands = await getSkillDirCommands(root)
+    const skillCommands = commands.filter(command => command.type === 'prompt')
+    expect(skillCommands.filter(command => command.name === 'shared')).toHaveLength(1)
+    expect(skillCommands.some(command => command.name === 'shared-link')).toBe(false)
+    expect(skillCommands.some(command => command.name === 'shared-other')).toBe(true)
+    expect(skillCommands.some(command => command.name === 'managed-only')).toBe(true)
+  } finally {
+    if (previousConfigDir === undefined) delete process.env.PANDA_CONFIG_DIR
+    else process.env.PANDA_CONFIG_DIR = previousConfigDir
+    if (previousUserType === undefined) delete process.env.USER_TYPE
+    else process.env.USER_TYPE = previousUserType
+    if (previousManagedPath === undefined) delete process.env.CLAUDE_CODE_MANAGED_SETTINGS_PATH
+    else process.env.CLAUDE_CODE_MANAGED_SETTINGS_PATH = previousManagedPath
+    getManagedFilePath.cache.clear()
+    getSkillDirCommands.cache.clear()
+  }
+})
 
 test('BUNDLED_SKILL_INDEX 包含至少 1 项', () => {
   expect(BUNDLED_SKILL_INDEX.length).toBeGreaterThan(0)
