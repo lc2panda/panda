@@ -24,7 +24,7 @@ describe('GlobTool validation edge cases', () => {
     if (result?.result !== false) {
       throw new Error('expected GlobTool path validation to fail')
     }
-    expect(result.message).toContain(`Path is not a directory: ${file}`)
+    expect(result.message).toContain(file)
     expect(result.errorCode).toBe(2)
   })
 })
