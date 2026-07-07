@@ -19,13 +19,6 @@
 
 export const GOAL_CONDITION_MAX_LENGTH = 4000
 
-/**
- * Default safety bound: clear an active goal after this many turns even if the
- * evaluator never returns met=true. Prevents the runaway-loop failure mode where
- * an under-specified condition keeps Claude generating forever.
- */
-export const GOAL_MAX_TURNS_DEFAULT = 50
-
 export type GoalState = {
   /** User-supplied condition string (≤ 4000 chars) */
   condition: string
@@ -41,8 +34,6 @@ export type GoalState = {
   lastMet: boolean | null
   /** Cumulative output tokens consumed across turns under this goal */
   tokens: number
-  /** Soft cap; once turns ≥ maxTurns the goal is force-cleared with a warning */
-  maxTurns: number
 }
 
 let current: GoalState | null = null
@@ -68,7 +59,6 @@ export function isGoalActive(): boolean {
 
 export function setGoal(
   condition: string,
-  opts?: { maxTurns?: number },
 ): GoalState {
   const trimmed = condition.trim()
   if (trimmed.length === 0) {
@@ -86,7 +76,6 @@ export function setGoal(
     lastReason: null,
     lastMet: null,
     tokens: 0,
-    maxTurns: opts?.maxTurns ?? GOAL_MAX_TURNS_DEFAULT,
   }
   notify()
   return current
@@ -184,9 +173,6 @@ export type GoalMarkerPayload = {
    *  but we keep this in the payload for diagnostics + future "elapsed since
    *  original set" display modes. */
   setAtMs: number
-  /** Mirrors GoalState.maxTurns at marker time so resume honors the user's
-   *  original safety cap (if they tuned it via future /goal --max-turns flag). */
-  maxTurns: number
 }
 
 /**
@@ -228,10 +214,6 @@ export function findActiveGoalMarker(
         return {
           condition: (p.condition as string).trim(),
           setAtMs: typeof p.setAtMs === 'number' ? p.setAtMs : Date.now(),
-          maxTurns:
-            typeof p.maxTurns === 'number' && p.maxTurns > 0
-              ? p.maxTurns
-              : GOAL_MAX_TURNS_DEFAULT,
         }
       }
     }
@@ -265,7 +247,6 @@ export function restoreFromMarker(
     lastReason: null,
     lastMet: null,
     tokens: 0,
-    maxTurns: payload.maxTurns,
   }
   notify()
   return current

@@ -152,9 +152,8 @@ describe('/goal admin-policy gate', () => {
   })
 
   test('set path triggers first turn via shouldQuery + metaMessages kickoff', async () => {
-    // Regression: Comdr reported turns 0/50 stuck after `/goal foo`. Root cause:
-    // goal.ts called onDone() without shouldQuery → processSlashCommand defaults
-    // to shouldQuery=false → handlePromptSubmit.onQuery skips dispatch.
+    // Regression: goal.ts must call onDone() with shouldQuery so
+    // processSlashCommand dispatches the first turn after setting a goal.
     // Brand: message says "Panda will continue working", not "Claude".
     mock.module('../../utils/settings/settings.js', () => ({
       getSettingsForSource: () => undefined,

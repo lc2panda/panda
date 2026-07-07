@@ -45,7 +45,7 @@ export function GoalIndicator(): React.ReactNode {
 
   const preview = getGoalConditionPreview(60)
   const elapsed = getGoalElapsedDisplay()
-  const meta = `turns ${goal.turns}/${goal.maxTurns} · ${elapsed}`
+  const meta = `turns ${goal.turns} · ${elapsed}`
 
   return (
     <Box flexDirection="column" paddingLeft={1}>

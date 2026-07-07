@@ -596,59 +596,47 @@ export async function* handleStopHooks(
       (querySource === 'repl_main_thread' || querySource === 'sdk')
     ) {
       try {
-        // Soft cap: prevent runaway loops on under-specified conditions.
-        if (activeGoal.turns >= activeGoal.maxTurns) {
-          logForDebugging(
-            `[goal-eval] turn cap reached (${activeGoal.turns}/${activeGoal.maxTurns}) — auto-clearing`,
-          )
+        const evalMessages = [...messagesForQuery, ...assistantMessages]
+        const result = await evaluateGoal(
+          activeGoal.condition,
+          evalMessages,
+          toolUseContext.abortController.signal,
+        )
+        if (result === null) {
+          // Evaluator failed (API error, parse error, abort). Treat as
+          // "not yet met" but DON'T inject a continue nudge — that would
+          // turn an evaluator outage into a runaway loop. Just record the
+          // turn and let query loop return completed.
+          recordGoalTurn({ met: false, reason: 'evaluator unavailable' })
+          logForDebugging('[goal-eval] null result — turn recorded, no nudge')
+        } else if (result.met) {
+          recordGoalTurn({ met: true, reason: result.reason })
           clearGoal()
           yield createSystemMessage(
-            `Goal auto-cleared after ${activeGoal.turns} turns (max ${activeGoal.maxTurns} reached without met=true). Last reason: ${activeGoal.lastReason ?? 'n/a'}.`,
-            'warning',
+            `Goal completed: ${result.reason}`,
+            'info',
           )
+          logForDebugging(`[goal-eval] met=true — cleared. reason=${result.reason}`)
         } else {
-          const evalMessages = [...messagesForQuery, ...assistantMessages]
-          const result = await evaluateGoal(
-            activeGoal.condition,
-            evalMessages,
-            toolUseContext.abortController.signal,
+          const updated = recordGoalTurn({
+            met: false,
+            reason: result.reason,
+          })
+          // Inject a meta user message so query loop continues. isMeta=true
+          // hides it from the rendered transcript while still feeding it to
+          // the model on the next turn. Mirrors how stop-hook blocking
+          // errors flow through query.ts (L1438) — caller receives this in
+          // blockingErrors[] and rebuilds State for next iteration.
+          const nudge = createUserMessage({
+            content: `[goal-system] The active goal is not yet met. Evaluator reason: ${result.reason}. Continue working toward: "${activeGoal.condition}". (Use /goal clear to abandon.)`,
+            isMeta: true,
+          })
+          logForDebugging(
+            `[goal-eval] met=false reason=${result.reason} — nudging continue (turn ${updated?.turns ?? '?'})`,
           )
-          if (result === null) {
-            // Evaluator failed (API error, parse error, abort). Treat as
-            // "not yet met" but DON'T inject a continue nudge — that would
-            // turn an evaluator outage into a runaway loop. Just record the
-            // turn and let query loop return completed.
-            recordGoalTurn({ met: false, reason: 'evaluator unavailable' })
-            logForDebugging('[goal-eval] null result — turn recorded, no nudge')
-          } else if (result.met) {
-            recordGoalTurn({ met: true, reason: result.reason })
-            clearGoal()
-            yield createSystemMessage(
-              `Goal completed: ${result.reason}`,
-              'info',
-            )
-            logForDebugging(`[goal-eval] met=true — cleared. reason=${result.reason}`)
-          } else {
-            const updated = recordGoalTurn({
-              met: false,
-              reason: result.reason,
-            })
-            // Inject a meta user message so query loop continues. isMeta=true
-            // hides it from the rendered transcript while still feeding it to
-            // the model on the next turn. Mirrors how stop-hook blocking
-            // errors flow through query.ts (L1438) — caller receives this in
-            // blockingErrors[] and rebuilds State for next iteration.
-            const nudge = createUserMessage({
-              content: `[goal-system] The active goal is not yet met. Evaluator reason: ${result.reason}. Continue working toward: "${activeGoal.condition}". (Use /goal clear to abandon.)`,
-              isMeta: true,
-            })
-            logForDebugging(
-              `[goal-eval] met=false reason=${result.reason} — nudging continue (turn ${updated?.turns ?? '?'}/${activeGoal.maxTurns})`,
-            )
-            return {
-              blockingErrors: [nudge],
-              preventContinuation: false,
-            }
+          return {
+            blockingErrors: [nudge],
+            preventContinuation: false,
           }
         }
       } catch (err) {

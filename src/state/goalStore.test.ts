@@ -15,7 +15,6 @@ import {
   findActiveGoalMarker,
   GOAL_CONDITION_MAX_LENGTH,
   GOAL_MARKER_SUBTYPE,
-  GOAL_MAX_TURNS_DEFAULT,
   getGoal,
   getGoalConditionPreview,
   getGoalElapsedDisplay,
@@ -43,7 +42,6 @@ describe('goalStore', () => {
     expect(g.tokens).toBe(0)
     expect(g.lastReason).toBeNull()
     expect(g.lastMet).toBeNull()
-    expect(g.maxTurns).toBe(GOAL_MAX_TURNS_DEFAULT)
     expect(isGoalActive()).toBe(true)
   })
 
@@ -205,7 +203,6 @@ describe('goalStore — restoreFromMarker', () => {
     ])
     expect(r).not.toBeNull()
     expect(r?.condition).toBe('second')
-    expect(r?.maxTurns).toBe(30)
     expect(r?.turns).toBe(0) // turn baseline reset
     expect(r?.tokens).toBe(0) // token baseline reset
     expect(r?.lastMet).toBeNull() // last-eval reset
@@ -250,17 +247,18 @@ describe('goalStore — restoreFromMarker', () => {
     expect(marker?.condition).toBe('the goal')
   })
 
-  it('uses default maxTurns when marker omits or zero', () => {
+  it('ignores legacy maxTurns in restored markers', () => {
     const r = restoreFromMarker([
       {
         type: 'system',
         subtype: GOAL_MARKER_SUBTYPE,
         goalMarker: {
           action: 'set',
-          payload: { condition: 'no max', setAtMs: 1 },
+          payload: { condition: 'legacy max', setAtMs: 1, maxTurns: 50 },
         },
       },
     ])
-    expect(r?.maxTurns).toBe(GOAL_MAX_TURNS_DEFAULT)
+    expect(r?.condition).toBe('legacy max')
+    expect(r).not.toHaveProperty('maxTurns')
   })
 })

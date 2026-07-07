@@ -47,7 +47,7 @@ function buildStatusMessage(): string {
   const lines: string[] = []
   lines.push(`◎ /goal active — ${getGoalConditionPreview(80)}`)
   lines.push(
-    `   turns=${g.turns} · tokens=${g.tokens} · elapsed=${elapsed} · max-turns=${g.maxTurns}`,
+    `   turns=${g.turns} · tokens=${g.tokens} · elapsed=${elapsed}`,
   )
   if (g.lastReason) {
     const verdict = g.lastMet ? 'met' : 'not met'
@@ -182,7 +182,6 @@ export async function call(
     const marker = buildGoalMarkerMessage('set', {
       condition: next.condition,
       setAtMs: next.setAtMs,
-      maxTurns: next.maxTurns,
     })
     context.setMessages?.(prevMsgs => [...prevMsgs, marker as Message])
     // shouldQuery: true triggers the first agent turn immediately after `/goal`
@@ -193,12 +192,12 @@ export async function call(
     // payload gives the model an explicit kickoff prompt — mirrors /brief and
     // /thinkback's pattern of injecting a model-visible <system-reminder>.
     onDone(
-      `${verb}: "${preview}" — Panda will continue working until the evaluator agrees this is met (or ${next.maxTurns} turns elapse).`,
+      `${verb}: "${preview}" — Panda will continue working until the evaluator agrees this is met or you clear the goal.`,
       {
         display: 'system',
         shouldQuery: true,
         metaMessages: [
-          `<system-reminder>\nA session goal has been set: "${next.condition}"\n\nStart working toward this goal now. The evaluator will check progress after each turn and end the session when the goal is met (or after ${next.maxTurns} turns).\n</system-reminder>`,
+          `<system-reminder>\nA session goal has been set: "${next.condition}"\n\nStart working toward this goal now. The evaluator will check progress after each turn and end the session when the goal is met.\n</system-reminder>`,
         ],
       },
     )
