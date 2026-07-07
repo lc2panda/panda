@@ -426,7 +426,7 @@ function logAPISuccess({
   preNormalizedModel: string
   messageCount: number
   messageTokens: number
-  usage: Usage
+  usage: Usage | undefined
   durationMs: number
   durationMsIncludingRetries: number
   attempt: number
@@ -459,6 +459,7 @@ function logAPISuccess({
     lastCompletion !== null ? now - lastCompletion : undefined
 
   const invocation = consumeInvokingRequestId()
+  const safeUsage = usage ?? EMPTY_USAGE
 
   logEvent('tengu_api_success', {
     model: model as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -477,10 +478,10 @@ function logAPISuccess({
       : {}),
     messageCount,
     messageTokens,
-    inputTokens: usage.input_tokens ?? 0,
-    outputTokens: usage.output_tokens ?? 0,
-    cachedInputTokens: usage.cache_read_input_tokens ?? 0,
-    uncachedInputTokens: usage.cache_creation_input_tokens ?? 0,
+    inputTokens: safeUsage.input_tokens ?? 0,
+    outputTokens: safeUsage.output_tokens ?? 0,
+    cachedInputTokens: safeUsage.cache_read_input_tokens ?? 0,
+    uncachedInputTokens: safeUsage.cache_creation_input_tokens ?? 0,
     durationMs: durationMs,
     durationMsIncludingRetries: durationMsIncludingRetries,
     attempt: attempt,
@@ -556,11 +557,11 @@ function logAPISuccess({
     // because the field is intentionally not on NonNullableUsage (excluded from
     // external builds). Set by updateUsage() when cache editing is active.
     ...(feature('CACHED_MICROCOMPACT') &&
-    ((usage as unknown as { cache_deleted_input_tokens?: number })
+    ((safeUsage as unknown as { cache_deleted_input_tokens?: number })
       .cache_deleted_input_tokens ?? 0) > 0
       ? {
           cacheDeletedInputTokens: (
-            usage as unknown as { cache_deleted_input_tokens: number }
+            safeUsage as unknown as { cache_deleted_input_tokens: number }
           ).cache_deleted_input_tokens,
         }
       : {}),
@@ -610,7 +611,7 @@ export function logAPISuccessAndDuration({
   start: number
   startIncludingRetries: number
   ttftMs: number | null
-  usage: NonNullableUsage
+  usage: NonNullableUsage | undefined
   attempt: number
   messageCount: number
   messageTokens: number
@@ -687,6 +688,7 @@ export function logAPISuccessAndDuration({
 
   const durationMs = Date.now() - start
   const durationMsIncludingRetries = Date.now() - startIncludingRetries
+  const safeUsage = usage ?? EMPTY_USAGE
   addToTotalDurationState(durationMsIncludingRetries, durationMs)
 
   logAPISuccess({
@@ -694,7 +696,7 @@ export function logAPISuccessAndDuration({
     preNormalizedModel,
     messageCount,
     messageTokens,
-    usage: usage as unknown as Usage,
+    usage: safeUsage as unknown as Usage,
     durationMs,
     durationMsIncludingRetries,
     attempt,
@@ -719,10 +721,10 @@ export function logAPISuccessAndDuration({
   // Log API request event for OTLP
   void logOTelEvent('api_request', {
     model,
-    input_tokens: String(usage.input_tokens ?? 0),
-    output_tokens: String(usage.output_tokens ?? 0),
-    cache_read_tokens: String(usage.cache_read_input_tokens ?? 0),
-    cache_creation_tokens: String(usage.cache_creation_input_tokens ?? 0),
+    input_tokens: String(safeUsage.input_tokens ?? 0),
+    output_tokens: String(safeUsage.output_tokens ?? 0),
+    cache_read_tokens: String(safeUsage.cache_read_input_tokens ?? 0),
+    cache_creation_tokens: String(safeUsage.cache_creation_input_tokens ?? 0),
     cost_usd: String(costUSD),
     duration_ms: String(durationMs),
     speed: fastMode ? 'fast' : 'normal',
@@ -771,10 +773,10 @@ export function logAPISuccessAndDuration({
   // Pass the span to correctly match responses to requests when beta tracing is enabled
   endLLMRequestSpan(llmSpan, {
     success: true,
-    inputTokens: usage.input_tokens ?? 0,
-    outputTokens: usage.output_tokens ?? 0,
-    cacheReadTokens: usage.cache_read_input_tokens ?? 0,
-    cacheCreationTokens: usage.cache_creation_input_tokens ?? 0,
+    inputTokens: safeUsage.input_tokens ?? 0,
+    outputTokens: safeUsage.output_tokens ?? 0,
+    cacheReadTokens: safeUsage.cache_read_input_tokens ?? 0,
+    cacheCreationTokens: safeUsage.cache_creation_input_tokens ?? 0,
     attempt,
     modelOutput,
     thinkingOutput,

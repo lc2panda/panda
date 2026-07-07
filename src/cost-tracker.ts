@@ -42,6 +42,7 @@ import {
   getModelMaxOutputTokens,
 } from './utils/context.js'
 import { recordTokenUsageSignal } from './buddy/petXPSignals.js'
+import { EMPTY_USAGE } from './services/api/emptyUsage.js'
 import { isFastModeEnabled } from './utils/fastMode.js'
 import { formatDuration, formatNumber } from './utils/format.js'
 import type { FpsMetrics } from './utils/fpsTracker.js'
@@ -250,9 +251,10 @@ function round(number: number, precision: number): number {
 
 function addToTotalModelUsage(
   cost: number,
-  usage: Usage,
+  usage: Usage | undefined,
   model: string,
 ): ModelUsage {
+  const safeUsage = usage ?? EMPTY_USAGE
   const modelUsage = getUsageForModel(model) ?? {
     inputTokens: 0,
     outputTokens: 0,
@@ -264,12 +266,12 @@ function addToTotalModelUsage(
     maxOutputTokens: 0,
   }
 
-  modelUsage.inputTokens += usage.input_tokens ?? 0
-  modelUsage.outputTokens += usage.output_tokens ?? 0
-  modelUsage.cacheReadInputTokens += usage.cache_read_input_tokens ?? 0
-  modelUsage.cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0
+  modelUsage.inputTokens += safeUsage.input_tokens ?? 0
+  modelUsage.outputTokens += safeUsage.output_tokens ?? 0
+  modelUsage.cacheReadInputTokens += safeUsage.cache_read_input_tokens ?? 0
+  modelUsage.cacheCreationInputTokens += safeUsage.cache_creation_input_tokens ?? 0
   modelUsage.webSearchRequests +=
-    usage.server_tool_use?.web_search_requests ?? 0
+    safeUsage.server_tool_use?.web_search_requests ?? 0
   modelUsage.costUSD += cost
   modelUsage.contextWindow = getContextWindowForModel(model, getSdkBetas())
   modelUsage.maxOutputTokens = getModelMaxOutputTokens(model).default
@@ -278,31 +280,32 @@ function addToTotalModelUsage(
 
 export function addToTotalSessionCost(
   cost: number,
-  usage: Usage,
+  usage: Usage | undefined,
   model: string,
 ): number {
-  const modelUsage = addToTotalModelUsage(cost, usage, model)
+  const safeUsage = usage ?? EMPTY_USAGE
+  const modelUsage = addToTotalModelUsage(cost, safeUsage, model)
   addToTotalCostState(cost, modelUsage, model)
 
   const attrs =
-    isFastModeEnabled() && usage.speed === 'fast'
+    isFastModeEnabled() && safeUsage.speed === 'fast'
       ? { model, speed: 'fast' }
       : { model }
 
   getCostCounter()?.add(cost, attrs)
-  getTokenCounter()?.add(usage.input_tokens ?? 0, { ...attrs, type: 'input' })
-  getTokenCounter()?.add(usage.output_tokens ?? 0, { ...attrs, type: 'output' })
-  getTokenCounter()?.add(usage.cache_read_input_tokens ?? 0, {
+  getTokenCounter()?.add(safeUsage.input_tokens ?? 0, { ...attrs, type: 'input' })
+  getTokenCounter()?.add(safeUsage.output_tokens ?? 0, { ...attrs, type: 'output' })
+  getTokenCounter()?.add(safeUsage.cache_read_input_tokens ?? 0, {
     ...attrs,
     type: 'cacheRead',
   })
-  getTokenCounter()?.add(usage.cache_creation_input_tokens ?? 0, {
+  getTokenCounter()?.add(safeUsage.cache_creation_input_tokens ?? 0, {
     ...attrs,
     type: 'cacheCreation',
   })
 
   let totalCost = cost
-  for (const advisorUsage of getAdvisorUsage(usage)) {
+  for (const advisorUsage of getAdvisorUsage(safeUsage)) {
     const advisorCost = calculateUSDCost(advisorUsage.model, advisorUsage)
     logEvent('tengu_advisor_tool_token_usage', {
       advisor_model:
@@ -324,7 +327,7 @@ export function addToTotalSessionCost(
   // why here: 所有 provider（Anthropic claude.ts + OpenAI 经 adapter 回主路径 + vcr.ts
   // replay）都过 addToTotalSessionCost — 唯一统一汇聚点。fire-and-forget；信号失败
   // 不影响主路径（recordTokenUsageSignal 内部已 try/catch + feature gate）。
-  recordTokenUsageSignal(usage)
+  recordTokenUsageSignal(safeUsage)
 
   return totalCost
 }

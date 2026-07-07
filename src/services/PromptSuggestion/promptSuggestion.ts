@@ -244,10 +244,10 @@ export function getParentCacheSuppressReason(
   if (!lastAssistantMessage) return null
 
   const usage = lastAssistantMessage.message.usage
-  const inputTokens = usage.input_tokens ?? 0
-  const cacheWriteTokens = usage.cache_creation_input_tokens ?? 0
+  const inputTokens = usage?.input_tokens ?? 0
+  const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0
   // The fork re-processes the parent's output (never cached) plus its own prompt.
-  const outputTokens = usage.output_tokens ?? 0
+  const outputTokens = usage?.output_tokens ?? 0
 
   return (inputTokens as number) + (cacheWriteTokens as number) + (outputTokens as number) >
     MAX_PARENT_UNCACHED_TOKENS

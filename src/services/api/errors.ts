@@ -83,6 +83,16 @@ export function startsWithApiErrorPrefix(text: string): boolean {
   )
 }
 export const PROMPT_TOO_LONG_ERROR_MESSAGE = 'Prompt is too long'
+const PROMPT_TOO_LONG_MESSAGE_PATTERNS = [
+  PROMPT_TOO_LONG_ERROR_MESSAGE.toLowerCase(),
+  'context window is full',
+  'reduce conversation history, system prompt, or tools',
+]
+
+function isPromptTooLongText(text: string): boolean {
+  const lower = text.toLowerCase()
+  return PROMPT_TOO_LONG_MESSAGE_PATTERNS.some(pattern => lower.includes(pattern))
+}
 
 export function isPromptTooLongMessage(msg: AssistantMessage): boolean {
   if (!msg.isApiErrorMessage) {
@@ -93,9 +103,7 @@ export function isPromptTooLongMessage(msg: AssistantMessage): boolean {
     return false
   }
   return content.some(
-    block =>
-      block.type === 'text' &&
-      block.text.startsWith(PROMPT_TOO_LONG_ERROR_MESSAGE),
+    block => block.type === 'text' && isPromptTooLongText(block.text),
   )
 }
 
@@ -596,12 +604,8 @@ export function getAssistantMessageFromError(
     })
   }
 
-  // Handle prompt too long errors (Vertex returns 413, direct API returns 400)
-  // Use case-insensitive check since Vertex returns "Prompt is too long" (capitalized)
-  if (
-    error instanceof Error &&
-    error.message.toLowerCase().includes('prompt is too long')
-  ) {
+  // Handle prompt/context too long errors (Vertex returns 413, direct API returns 400)
+  if (error instanceof Error && isPromptTooLongText(error.message)) {
     // Content stays generic (UI matches on exact string). The raw error with
     // token counts goes into errorDetails — reactive compact's retry loop
     // parses the gap from there via getPromptTooLongTokenGap.
