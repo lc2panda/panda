@@ -92,25 +92,37 @@ function findExecutable(executable: string): string | null {
  */
 export function setShellIfWindows(): void {
   if (getPlatform() === 'windows') {
-    const gitBashPath = findGitBashPath()
-    process.env.SHELL = gitBashPath
-    logForDebugging(`Using bash path: "${gitBashPath}"`)
+    const gitBashPath = resolveGitBashPath()
+    if (gitBashPath) {
+      process.env.SHELL = gitBashPath
+      logForDebugging(`Using bash path: "${gitBashPath}"`)
+      return
+    }
+
+    logForDebugging(
+      'Git Bash was not found; leaving SHELL unchanged so PowerShell/cmd startup can continue. Bash commands and bash hooks still require Git Bash.',
+      { level: 'warn' },
+    )
   }
 }
 
+function getGitBashMissingMessage(): string {
+  return 'Panda could not find Git Bash on Windows. PowerShell/cmd startup can continue, but Bash commands and bash hooks require Git Bash. Install Git for Windows (https://git-scm.com/downloads/win) or set CLAUDE_CODE_GIT_BASH_PATH=C:\\Program Files\\Git\\bin\\bash.exe.'
+}
+
 /**
- * Find the path where `bash.exe` included with git-bash exists, exiting the process if not found.
+ * Find the path where `bash.exe` included with git-bash exists. Returns null when missing.
  */
-export const findGitBashPath = memoize((): string => {
+export const resolveGitBashPath = memoize((): string | null => {
   if (process.env.CLAUDE_CODE_GIT_BASH_PATH) {
     if (checkPathExists(process.env.CLAUDE_CODE_GIT_BASH_PATH)) {
       return process.env.CLAUDE_CODE_GIT_BASH_PATH
     }
-    console.error(
+    logForDebugging(
       `Panda was unable to find CLAUDE_CODE_GIT_BASH_PATH path "${process.env.CLAUDE_CODE_GIT_BASH_PATH}"`,
+      { level: 'warn' },
     )
-    // eslint-disable-next-line custom-rules/no-process-exit
-    process.exit(1)
+    return null
   }
 
   const gitPath = findExecutable('git')
@@ -121,9 +133,19 @@ export const findGitBashPath = memoize((): string => {
     }
   }
 
-  console.error(
-    'Panda on Windows requires git-bash (https://git-scm.com/downloads/win). If installed but not in PATH, set environment variable pointing to your bash.exe, similar to: CLAUDE_CODE_GIT_BASH_PATH=C:\\Program Files\\Git\\bin\\bash.exe',
-  )
+  return null
+})
+
+/**
+ * Find the path where `bash.exe` included with git-bash exists, exiting the process if not found.
+ */
+export const findGitBashPath = memoize((): string => {
+  const gitBashPath = resolveGitBashPath()
+  if (gitBashPath) {
+    return gitBashPath
+  }
+
+  console.error(getGitBashMissingMessage())
   // eslint-disable-next-line custom-rules/no-process-exit
   process.exit(1)
 })

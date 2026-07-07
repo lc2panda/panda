@@ -117,6 +117,75 @@ describe('Termius Environment Detection', () => {
       expect(shouldUseDegradedColors()).toBe(false)
     })
 
+    it('should keep truecolor for Termius 9.x over SSH when declared', async () => {
+      process.env.TERMIUS_VERSION = '9.14.0'
+      process.env.SSH_CONNECTION = '10.0.0.5 54321 10.0.0.10 22'
+      process.env.TERM = 'xterm-256color'
+      process.env.COLORTERM = '24bit'
+      delete process.env.SSH_CLIENT
+      delete process.env.MOBAXTERM_VERSION
+      delete process.env.XSHELL_VERSION
+      delete require.cache[require.resolve('../terminal.js')]
+      const { shouldUseDegradedColors } = await import('../terminal.js')
+      expect(shouldUseDegradedColors()).toBe(false)
+    })
+
+    it('should keep 256-color for MobaXterm SSH without truecolor', async () => {
+      process.env.MOBAXTERM_VERSION = '24.1'
+      process.env.SSH_CLIENT = '192.168.1.100 12345 22'
+      process.env.TERM = 'xterm-256color'
+      delete process.env.COLORTERM
+      delete process.env.TERMIUS_VERSION
+      delete process.env.XSHELL_VERSION
+      delete require.cache[require.resolve('../terminal.js')]
+      const { shouldUseDegradedColors } = await import('../terminal.js')
+      expect(shouldUseDegradedColors()).toBe(false)
+    })
+
+    it('should keep 256-color for Xshell SSH without truecolor', async () => {
+      process.env.XSHELL_VERSION = '8.0'
+      process.env.SSH_CLIENT = '192.168.1.101 12345 22'
+      process.env.TERM = 'xterm-256color'
+      delete process.env.COLORTERM
+      delete process.env.TERMIUS_VERSION
+      delete process.env.MOBAXTERM_VERSION
+      delete require.cache[require.resolve('../terminal.js')]
+      const { shouldUseDegradedColors } = await import('../terminal.js')
+      expect(shouldUseDegradedColors()).toBe(false)
+    })
+
+    it('should prioritize PANDA_FORCE_TRUECOLOR over PANDA_FORCE_ANSI256', async () => {
+      process.env.PANDA_FORCE_TRUECOLOR = '1'
+      process.env.PANDA_FORCE_ANSI256 = '1'
+      process.env.TERM = 'vt100'
+      delete process.env.COLORTERM
+      delete require.cache[require.resolve('../terminal.js')]
+      const { shouldUseDegradedColors } = await import('../terminal.js')
+      expect(shouldUseDegradedColors()).toBe(false)
+    })
+
+    it('should force ANSI 256 downgrade even when truecolor is declared', async () => {
+      process.env.PANDA_FORCE_ANSI256 = '1'
+      process.env.COLORTERM = '24bit'
+      process.env.TERM = 'xterm-256color'
+      delete process.env.PANDA_FORCE_TRUECOLOR
+      delete require.cache[require.resolve('../terminal.js')]
+      const { shouldUseDegradedColors } = await import('../terminal.js')
+      expect(shouldUseDegradedColors()).toBe(true)
+    })
+
+    it('should downgrade ambiguous Termius weak TERM without color capability', async () => {
+      process.env.TERMIUS_VERSION = '9.14.0'
+      process.env.SSH_CLIENT = '10.0.0.5 54321 22'
+      process.env.TERM = 'xterm'
+      delete process.env.COLORTERM
+      delete process.env.MOBAXTERM_VERSION
+      delete process.env.XSHELL_VERSION
+      delete require.cache[require.resolve('../terminal.js')]
+      const { shouldUseDegradedColors } = await import('../terminal.js')
+      expect(shouldUseDegradedColors()).toBe(true)
+    })
+
     it('should not downgrade SSH/Termius when COLORTERM=truecolor', async () => {
       process.env.SSH_CONNECTION = '10.0.0.5 54321 10.0.0.10 22'
       process.env.TERMIUS_VERSION = '9.0.0'

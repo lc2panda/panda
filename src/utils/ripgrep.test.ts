@@ -99,18 +99,22 @@ describe('ripgrep platform compatibility', () => {
       expect(typeof rgPath).toBe('string')
     })
 
-    it('should fallback to system rg when vendored binary does not exist', async () => {
+    it('should fallback to system rg and expose status when repo-local vendor/ripgrep is absent', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux', writable: true, configurable: true })
-      Object.defineProperty(process, 'arch', { value: 'mips', writable: true, configurable: true }) // Unsupported arch
+      Object.defineProperty(process, 'arch', { value: 'x64', writable: true, configurable: true })
+      Object.defineProperty(process, 'execPath', { value: '/tmp/panda-no-vendor/bin/node', writable: true, configurable: true })
       process.env.USE_BUILTIN_RIPGREP = '1'
 
       delete require.cache[require.resolve('./ripgrep.js')]
-      const { ripgrepCommand } = await import('./ripgrep.js')
+      const { ripgrepCommand, getRipgrepStatus } = await import('./ripgrep.js')
 
-      const { rgPath } = ripgrepCommand()
+      const { rgPath, rgArgs } = ripgrepCommand()
+      const status = getRipgrepStatus()
 
-      // Should fallback to 'rg' when vendored binary doesn't exist
       expect(rgPath).toBe('rg')
+      expect(rgArgs).toEqual([])
+      expect(status.mode).toBe('system')
+      expect(status.path).toBe('rg')
     })
   })
 

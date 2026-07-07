@@ -1196,10 +1196,8 @@ async function execCommandHook(
   //
   // The Git Bash hard-exit in findGitBashPath() is still in place for
   // bash hooks. PowerShell hooks never call it, so a Windows user with
-  // only pwsh and shell: 'powershell' on every hook could in theory run
-  // without Git Bash — but init.ts still calls setShellIfWindows() on
-  // startup, which will exit first. Relaxing that is phase 1 of the
-  // design's implementation order (separate PR).
+  // only pwsh and shell: 'powershell' on every hook can start without
+  // Git Bash; bash hooks still fail with a clear install diagnostic.
   let child: ChildProcessWithoutNullStreams
   if (isArgsForm) {
     // [v2.1.139] Exec-form: argv[0] is the executable, rest are passed verbatim.
