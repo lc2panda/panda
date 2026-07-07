@@ -387,7 +387,39 @@ export function clearMcpAuthCache(): void {
  * @param command 原始命令（如 "node" / "python" / "npx"）
  * @returns 解析后的命令（如 "node.exe" / "npx.cmd"）
  */
-function resolveWindowsCommand(command: string): string {
+export function getEffectiveLocalMcpCwd(config: ScopedMcpServerConfig): string | undefined {
+  if (!isLocalMcpServer(config)) {
+    return undefined
+  }
+
+  // Transport cwd and CLAUDE_PROJECT_DIR are both getOriginalCwd(); use the
+  // same project cwd for locking so servers launched in one project are
+  // serialized consistently regardless of plugin env/args decoration.
+  return getOriginalCwd()
+}
+
+export function enqueueMcpStartupByCwd<T>(
+  cwdLocks: Map<string, Promise<void>>,
+  cwd: string | undefined,
+  start: () => Promise<T>,
+): Promise<T> {
+  if (!cwd) {
+    return start()
+  }
+
+  const prev = cwdLocks.get(cwd) ?? Promise.resolve()
+  const current = prev.then(start, start)
+  cwdLocks.set(
+    cwd,
+    current.then(
+      () => undefined,
+      () => undefined,
+    ),
+  )
+  return current
+}
+
+export function resolveWindowsCommand(command: string): string {
   // 已经是绝对路径且包含扩展名，直接返回
   if (isAbsolute(command) && extname(command)) {
     return command
@@ -2495,31 +2527,11 @@ export async function getMcpToolsCommandsAndResources(
   )
 
   // --- Per-cwd mutex for local servers ---
-  // When multiple stdio servers share the same working directory (cwd),
-  // concurrent `bun install` in that directory can clash on symlink creation
-  // in node_modules/.bin/ (EEXIST). We serialize startup for servers that
-  // share a cwd while keeping different-cwd servers fully concurrent.
-  // The effective cwd is derived from CLAUDE_PLUGIN_ROOT in the server's env,
-  // falling back to --cwd args, then to process.cwd().
+  // When multiple stdio/sdk servers share the same transport working directory,
+  // concurrent package-manager startup in that directory can clash on symlink
+  // creation in node_modules/.bin/ (EEXIST). Serialize startup for the same
+  // effective cwd while keeping different cwd groups concurrent.
   const cwdLocks = new Map<string, Promise<void>>()
-
-  function getEffectiveCwd(config: ScopedMcpServerConfig): string {
-    if (config.type === 'stdio' || !config.type) {
-      const stdioConfig = config as McpStdioServerConfig
-      // 1. Check env CLAUDE_PLUGIN_ROOT
-      if (stdioConfig.env?.CLAUDE_PLUGIN_ROOT) {
-        return stdioConfig.env.CLAUDE_PLUGIN_ROOT
-      }
-      // 2. Check --cwd arg
-      const args = stdioConfig.args ?? []
-      const cwdIdx = args.indexOf('--cwd')
-      if (cwdIdx !== -1 && cwdIdx + 1 < args.length) {
-        return args[cwdIdx + 1]
-      }
-    }
-    // 3. Fallback to current process cwd
-    return process.cwd()
-  }
 
   const serverStats = {
     totalServers,
@@ -2641,17 +2653,10 @@ export async function getMcpToolsCommandsAndResources(
   const processLocalServer = async (
     entry: [string, ScopedMcpServerConfig],
   ): Promise<void> => {
-    const cwd = getEffectiveCwd(entry[1])
+    const cwd = getEffectiveLocalMcpCwd(entry[1])
     // Chain this server's startup after any prior server with the same cwd.
     // Different cwds run concurrently (independent promise chains).
-    const prev = cwdLocks.get(cwd) ?? Promise.resolve()
-    const current = prev.then(
-      () => processServer(entry),
-      // If a prior server in the chain failed, still start this one
-      () => processServer(entry),
-    )
-    cwdLocks.set(cwd, current)
-    return current
+    return enqueueMcpStartupByCwd(cwdLocks, cwd, () => processServer(entry))
   }
 
   // Process both groups concurrently, each with their own concurrency limits:

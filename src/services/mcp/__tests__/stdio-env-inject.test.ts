@@ -3,6 +3,7 @@
 // Pos: v2.1.154 Wave3-E2 — Stdio MCP server env 注入单元测试
 
 import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test'
+import { enqueueMcpStartupByCwd, getEffectiveLocalMcpCwd } from '../client.js'
 
 // ---------- 辅助：构造 stdio MCP env 对象（与 client.ts:963-980 逻辑镜像） ----------
 
@@ -96,6 +97,55 @@ describe('Stdio MCP server env 注入 (Wave3-E2)', () => {
     expect(env.CLAUDE_CODE_SESSION_ID).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
     )
+  })
+  test('effective cwd lock 与 transport cwd / CLAUDE_PROJECT_DIR 使用同一项目目录', () => {
+    const effectiveCwd = getEffectiveLocalMcpCwd({
+      type: 'stdio',
+      command: 'node',
+      args: ['server.js', '--cwd', '/plugin/internal'],
+      env: {
+        CLAUDE_PLUGIN_ROOT: '/plugin/root',
+      },
+    } as any)
+
+    // transport cwd 与 CLAUDE_PROJECT_DIR 均来自 getOriginalCwd()，lock 分组不可再按插件 root/args cwd 偏移。
+    expect(effectiveCwd).toBe(process.cwd())
+  })
+
+  test('同 cwd stdio/sdk 串行，不同 cwd 可并发', async () => {
+    const locks = new Map<string, Promise<void>>()
+    const events: string[] = []
+    let releaseSameCwd: (() => void) | undefined
+    let sameCwdRunning = false
+
+    const firstSameCwd = enqueueMcpStartupByCwd(locks, '/same', async () => {
+      sameCwdRunning = true
+      events.push('same-1-start')
+      await new Promise<void>(resolve => {
+        releaseSameCwd = resolve
+      })
+      events.push('same-1-end')
+    })
+    const secondSameCwd = enqueueMcpStartupByCwd(locks, '/same', async () => {
+      events.push('same-2-start')
+    })
+    const differentCwd = enqueueMcpStartupByCwd(locks, '/other', async () => {
+      events.push('other-start')
+    })
+
+    await Promise.resolve()
+    expect(sameCwdRunning).toBe(true)
+    await differentCwd
+    expect(events).toEqual(['same-1-start', 'other-start'])
+
+    releaseSameCwd?.()
+    await Promise.all([firstSameCwd, secondSameCwd])
+    expect(events).toEqual([
+      'same-1-start',
+      'other-start',
+      'same-1-end',
+      'same-2-start',
+    ])
   })
 })
 

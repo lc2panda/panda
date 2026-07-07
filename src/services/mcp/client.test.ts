@@ -1,54 +1,10 @@
-// Input: none (direct unit test of resolveWindowsCommand)
-// Output: bun:test assertions on Windows command resolution
-// Pos: guard MCP stdio server launch on Windows platform
+// Input: MCP command names and server config objects
+// Output: bun:test assertions on Windows command resolution and config parsing
+// Pos: guard MCP stdio launch and transport config validation
 
 import { test, expect, describe } from 'bun:test'
-import { basename, dirname, extname, isAbsolute, join } from 'node:path'
-
-// 从 client.ts 提取 resolveWindowsCommand 函数用于测试
-// 保持与源代码完全一致
-function resolveWindowsCommand(command: string): string {
-  // 已经是绝对路径且包含扩展名，直接返回
-  if (isAbsolute(command) && extname(command)) {
-    return command
-  }
-
-  // 已包含扩展名（相对路径），直接返回
-  if (extname(command)) {
-    return command
-  }
-
-  // npm/npx/yarn/pnpm 是 .cmd 脚本（非 .exe）
-  const cmdScripts = ['npm', 'npx', 'yarn', 'pnpm']
-
-  // 其他常见 CLI 工具追加 .exe
-  const exeCommands = [
-    'node',
-    'python',
-    'python3',
-    'py',
-    'deno',
-    'bun',
-    'docker',
-    'podman',
-  ]
-
-  const baseName = basename(command)
-  const dir = dirname(command)
-
-  if (cmdScripts.includes(baseName)) {
-    // npm/npx/yarn/pnpm → .cmd（cross-spawn 会自动处理 .cmd 脚本）
-    return dir === '.' ? `${baseName}.cmd` : join(dir, `${baseName}.cmd`)
-  }
-
-  if (exeCommands.includes(baseName)) {
-    // node/python 等 → .exe
-    return dir === '.' ? `${baseName}.exe` : join(dir, `${baseName}.exe`)
-  }
-
-  // 其他命令：假设用户知道自己在做什么，返回原值
-  return command
-}
+import { resolveWindowsCommand } from './client.js'
+import { McpServerConfigSchema } from './types.js'
 
 describe('resolveWindowsCommand', () => {
   test('npx 添加 .cmd 后缀', () => {
@@ -67,12 +23,10 @@ describe('resolveWindowsCommand', () => {
     expect(resolveWindowsCommand('pnpm')).toBe('pnpm.cmd')
   })
 
-  test('node 添加 .exe 后缀', () => {
-    expect(resolveWindowsCommand('node')).toBe('node.exe')
-  })
-
-  test('python 添加 .exe 后缀', () => {
-    expect(resolveWindowsCommand('python')).toBe('python.exe')
+  test('node/python/deno/bun/docker/podman 添加 .exe 后缀', () => {
+    for (const command of ['node', 'python', 'python3', 'py', 'deno', 'bun', 'docker', 'podman']) {
+      expect(resolveWindowsCommand(command)).toBe(`${command}.exe`)
+    }
   })
 
   test('已有扩展名的命令不修改', () => {
@@ -116,5 +70,34 @@ describe('resolveWindowsCommand', () => {
   test('边界情况：空字符串和点开头', () => {
     expect(resolveWindowsCommand('')).toBe('')
     expect(resolveWindowsCommand('.')).toBe('.')
+  })
+})
+
+describe('McpServerConfigSchema', () => {
+  test('url 配置缺少 type 时给出明确 transport 提示', () => {
+    const result = McpServerConfigSchema().safeParse({
+      url: 'https://example.com/mcp',
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.error?.issues.some(issue =>
+      issue.path.join('.') === 'type' &&
+      issue.message.includes('type: "sse" | "http" | "ws"'),
+    )).toBe(true)
+  })
+
+  test('有效 url transport 配置行为保持不变', () => {
+    expect(McpServerConfigSchema().safeParse({
+      type: 'http',
+      url: 'https://example.com/mcp',
+    }).success).toBe(true)
+    expect(McpServerConfigSchema().safeParse({
+      type: 'sse',
+      url: 'https://example.com/sse',
+    }).success).toBe(true)
+    expect(McpServerConfigSchema().safeParse({
+      type: 'ws',
+      url: 'wss://example.com/ws',
+    }).success).toBe(true)
   })
 })
