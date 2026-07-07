@@ -9,6 +9,7 @@ import { feature } from 'bun:bundle';
 if (typeof globalThis.MACRO === "undefined") {
     (globalThis as any).MACRO = {
         VERSION: "0.0.0-dev",
+        UPSTREAM_CLAUDE_CODE_VERSION: "2.1.202",
         BUILD_TIME: new Date().toISOString(),
         FEEDBACK_CHANNEL: "",
         ISSUES_EXPLAINER: "",

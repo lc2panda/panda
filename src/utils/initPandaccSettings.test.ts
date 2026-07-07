@@ -45,14 +45,14 @@ describe('initDefaultPandaccSettings', () => {
     }
   })
 
-  test('settings.json 不存在 → 创建并写入全部 17 项 env + 顶层 SETTINGS_DEFAULTS', () => {
+  test('settings.json 不存在 → 创建并写入全部 16 项 env + 顶层 SETTINGS_DEFAULTS', () => {
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
     expect(result.newlyAddedKeys.length).toBe(
       Object.keys(PANDA_DEFAULTS).length,
     )
-    // v2.25.53+: 17 项（v2.21.5 移除 PANDA_CONFIG_DIR；后续未增减）
-    expect(result.newlyAddedKeys.length).toBe(17)
+    // v2.30.5+: 16 项（不再默认写入 PANDA_THEME）
+    expect(result.newlyAddedKeys.length).toBe(16)
     expect(result.newlyAddedTopLevelKeys.length).toBe(
       Object.keys(SETTINGS_DEFAULTS).length,
     )
@@ -155,7 +155,7 @@ describe('initDefaultPandaccSettings', () => {
 
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
-    // v2.25.53+: 17 - 2 = 15 项（PANDA_THEME / PANDA_FORCE_CACHE_STRATEGY 已存在）
+    // v2.30.5+: 16 - 1 = 15 项（PANDA_FORCE_CACHE_STRATEGY 已存在；PANDA_THEME 不再是默认项）
     expect(result.newlyAddedKeys.length).toBe(15)
     expect(result.newlyAddedKeys).not.toContain('PANDA_THEME')
     expect(result.newlyAddedKeys).not.toContain('PANDA_FORCE_CACHE_STRATEGY')
@@ -208,12 +208,12 @@ describe('initDefaultPandaccSettings', () => {
 
     const result = initDefaultPandaccSettings({ silent: true })
     expect(result.skipped).toBe(false)
-    expect(result.newlyAddedKeys.length).toBe(17)
+    expect(result.newlyAddedKeys.length).toBe(16)
     expect(result.newlyAddedTopLevelKeys.length).toBe(
       Object.keys(SETTINGS_DEFAULTS).length,
     )
     const written = JSON.parse(readFileSync(path, 'utf-8'))
-    expect(written.env.PANDA_THEME).toBe('matrix')
+    expect(written.env.PANDA_THEME).toBeUndefined()
     expect(written.enableModelRouting).toBe(false)
   })
 
@@ -239,7 +239,8 @@ describe('initDefaultPandaccSettings', () => {
     expect(written.env.PANDA_FORK_TIMEOUT_MS).toBe('0')
     // 其他保持的字段验证（防止误改）
     expect(written.env.PANDA_AGENT_MAX_TURNS).toBe('200')
-    expect(written.env.PANDA_THEME).toBe('matrix')
+    // v2.30.5：默认不再注入 PANDA_THEME，显式 env/config 仍可启用 Matrix
+    expect(written.env.PANDA_THEME).toBeUndefined()
   })
 
   test('v2.27.x Bug G migration：已落盘的 PANDA_AGENT_TIMEOUT_MS=600000 → 0', () => {

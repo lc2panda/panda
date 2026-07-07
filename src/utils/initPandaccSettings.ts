@@ -30,7 +30,6 @@ export const PANDA_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // 新用户首次启动不应自动开 debug。已开 debug 的老用户不会被强制改回（migration
   // 区只迁移 timeout，不动 PANDA_DEBUG，见下方 migration 注释）。
   PANDA_DEBUG: '0',
-  PANDA_THEME: 'matrix',
   PANDA_MODEL_ROUTING: '1',
   PANDA_CONTEXT_COLLAPSE: '1',
   PANDA_AGENT_MAX_TURNS: '200',

@@ -17,7 +17,7 @@ import { getClaudeCodeUserAgent } from './userAgent.js'
 // WARNING: We rely on `claude-cli` in the user agent for log filtering.
 // Please do NOT change this without making sure that logging also gets updated!
 export function getUserAgent(): string {
-  return `claude-code/${MACRO.VERSION} (external, cli)`
+  return `${getClaudeCodeUserAgent()} (external, cli)`
 }
 
 export function getMCPUserAgent(): string {
@@ -32,7 +32,7 @@ export function getMCPUserAgent(): string {
     parts.push(`client-app/${process.env.CLAUDE_AGENT_SDK_CLIENT_APP}`)
   }
   const suffix = parts.length > 0 ? ` (${parts.join(', ')})` : ''
-  return `claude-code/${MACRO.VERSION}${suffix}`
+  return `${getClaudeCodeUserAgent()}${suffix}`
 }
 
 // User-Agent for WebFetch requests to arbitrary sites. `Claude-User` is

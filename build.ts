@@ -14,13 +14,16 @@ const outdir = "dist";
 
 // Read package.json for MACRO injection
 const pkg = JSON.parse(await Bun.file("package.json").text());
+const upstreamClaudeCodeVersion = pkg.upstreamClaudeCodeVersion ?? "2.1.202";
 const PANDA_MACROS = {
     VERSION: pkg.version, // Sync with package.json version
+    UPSTREAM_CLAUDE_CODE_VERSION: upstreamClaudeCodeVersion,
     PACKAGE_URL: pkg.name,
     NATIVE_PACKAGE_URL: pkg.name,
 };
 
 const LEGACY_VERSION_FALLBACKS = ["2.1.120", "2.1.142"];
+const LEGACY_UPSTREAM_VERSION_FALLBACKS = ["2.30.4"];
 
 // Feature flags to enable in production builds.
 // When a flag is in this set, `feature('FLAG')` is replaced with `true`;
@@ -172,6 +175,7 @@ const featureFlagPlugin: BunPlugin = {
             // Replace MACRO defaults in cli.tsx with build-time values from package.json
             if (hasMacro) {
                 code = code.replace(/VERSION: "[^"]+"/, `VERSION: "${PANDA_MACROS.VERSION}"`);
+                code = code.replace(/UPSTREAM_CLAUDE_CODE_VERSION: "[^"]+"/, `UPSTREAM_CLAUDE_CODE_VERSION: "${PANDA_MACROS.UPSTREAM_CLAUDE_CODE_VERSION}"`);
                 code = code.replace(/PACKAGE_URL: "[^"]*"/, `PACKAGE_URL: "${PANDA_MACROS.PACKAGE_URL}"`);
                 code = code.replace(/NATIVE_PACKAGE_URL: "[^"]*"/, `NATIVE_PACKAGE_URL: "${PANDA_MACROS.NATIVE_PACKAGE_URL}"`);
             }
@@ -248,6 +252,14 @@ if (cliContent.startsWith("#!/usr/bin/env bun")) {
 const staleFallback = LEGACY_VERSION_FALLBACKS.find((version) => cliContent.includes(`VERSION: "${version}"`));
 if (staleFallback) {
     console.error(`Build failed: stale MACRO.VERSION fallback ${staleFallback} remained in dist/cli.js`);
+    process.exit(1);
+}
+
+const staleUpstreamFallback = LEGACY_UPSTREAM_VERSION_FALLBACKS.find((version) =>
+    cliContent.includes(`UPSTREAM_CLAUDE_CODE_VERSION: "${version}"`),
+);
+if (staleUpstreamFallback) {
+    console.error(`Build failed: stale MACRO.UPSTREAM_CLAUDE_CODE_VERSION fallback ${staleUpstreamFallback} remained in dist/cli.js`);
     process.exit(1);
 }
 

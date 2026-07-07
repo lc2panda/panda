@@ -1269,7 +1269,7 @@ v2.21.8（commit 281293a）修了 5 个导致缓存命中率长期 <5% 的前缀
 | BigQuery 拦截        | `doExport` 默认拦截，不向 `api.anthropic.com/api/claude_code/metrics` 发送数据（由同一环境变量控制） | 自动  |
 | 1P Event Logger 脱敏 | userId/email/org 替换为固定脱敏值（`cc4all@gmail.com`）                       | 自动  |
 | GrowthBook 脱敏      | 用户属性 id/deviceID/sessionId 替换为固定值，移除 org/account/email              | 自动  |
-| UA 规范化             | 精简为 `claude-code/{version}`，不泄露设备信息                                 | 自动  |
+| UA 规范化             | 精简为 `claude-code/{upstreamClaudeCodeVersion}`，版本取 Claude Code upstream baseline（当前 `2.1.202`），不使用 Panda package version，不泄露设备信息 | 自动  |
 | 独立存储               | `~/.pandacc/` 独立空间，不与原版 claude 混用                                   | 自动  |
 | OAuth              | 隐私模式下不额外请求 Profile                                                  | 自动  |
 

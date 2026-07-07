@@ -1,4 +1,5 @@
 import type { Command, LocalCommandCall } from '../types/command.js'
+import { getUserAgent } from '../utils/http.js'
 import { isThirdPartyProvider } from '../utils/model/providers.js'
 import { isPrivacyEnhancedMode } from '../utils/privacyMode.js'
 
@@ -16,7 +17,7 @@ const call: LocalCommandCall = async () => {
     `Datadog: ${blocked}`,
     `BigQuery Metrics: ${blocked}`,
     `1P Event Logging: ${blocked}`,
-    `User-Agent: ${privacyOn ? `PandaCode/${MACRO.VERSION}` : `claude-code/${MACRO.VERSION} (external, cli)`}`,
+    `User-Agent: ${privacyOn ? `PandaCode/${MACRO.VERSION}` : getUserAgent()}`,
     `Storage: ~/.pandacc/`,
     '',
     privacyOn ? '' : 'Tip: set privacyEnhanced: true in config to enable privacy mode on Anthropic channel',

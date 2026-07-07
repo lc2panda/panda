@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { shouldIncludeFirstPartyOnlyBetas } from './betas.js'
+import { getMCPUserAgent, getUserAgent, getWebFetchUserAgent } from './http.js'
+import { getClaudeCodeUserAgent } from './userAgent.js'
 
 /**
  * B-2 — shouldIncludeFirstPartyOnlyBetas third-party relay guard.
@@ -79,5 +81,29 @@ describe('B-2 — shouldIncludeFirstPartyOnlyBetas (third-party base_url guard)'
   test('regression: official base_url still true after third-party in same suite', () => {
     process.env.ANTHROPIC_BASE_URL = 'https://api.anthropic.com'
     expect(shouldIncludeFirstPartyOnlyBetas()).toBe(true)
+  })
+})
+
+describe('UA — upstream Claude Code version split', () => {
+  beforeEach(() => {
+    ;(globalThis as any).MACRO = {
+      VERSION: '2.30.4',
+      UPSTREAM_CLAUDE_CODE_VERSION: '2.1.202',
+    }
+  })
+
+  test('Claude Code UA 使用 upstream baseline version，不使用 Panda package version', () => {
+    expect(MACRO.VERSION).toBe('2.30.4')
+    expect(MACRO.UPSTREAM_CLAUDE_CODE_VERSION).toBe('2.1.202')
+    expect(getClaudeCodeUserAgent()).toBe('claude-code/2.1.202')
+    expect(getClaudeCodeUserAgent()).not.toContain(MACRO.VERSION)
+  })
+
+  test('HTTP/MCP/WebFetch UA 保留 suffix，但 claude-code 版本使用 upstream baseline', () => {
+    process.env.CLAUDE_CODE_ENTRYPOINT = 'external'
+    expect(getUserAgent()).toBe('claude-code/2.1.202 (external, cli)')
+    expect(getMCPUserAgent()).toBe('claude-code/2.1.202 (external)')
+    expect(getWebFetchUserAgent()).toContain('claude-code/2.1.202')
+    expect(getWebFetchUserAgent()).not.toContain(MACRO.VERSION)
   })
 })
