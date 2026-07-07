@@ -13,7 +13,7 @@ import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/messages.mjs
 // Permission Modes
 // ============================================================================
 
-export const EXTERNAL_PERMISSION_MODES = [
+export const CANONICAL_EXTERNAL_PERMISSION_MODES = [
   'acceptEdits',
   'bypassPermissions',
   'default',
@@ -21,6 +21,13 @@ export const EXTERNAL_PERMISSION_MODES = [
   'plan',
 ] as const
 
+export const EXTERNAL_PERMISSION_MODES = [
+  ...CANONICAL_EXTERNAL_PERMISSION_MODES,
+  'manual',
+] as const
+
+export type CanonicalExternalPermissionMode =
+  (typeof CANONICAL_EXTERNAL_PERMISSION_MODES)[number]
 export type ExternalPermissionMode = (typeof EXTERNAL_PERMISSION_MODES)[number]
 
 // Exhaustive mode union for typechecking. The user-addressable runtime set
@@ -117,7 +124,7 @@ export type PermissionUpdate =
   | {
       type: 'setMode'
       destination: PermissionUpdateDestination
-      mode: ExternalPermissionMode
+      mode: CanonicalExternalPermissionMode
     }
   | {
       type: 'addDirectories'

@@ -65,7 +65,7 @@ export const PermissionsSchema = lazySchema(() =>
       defaultMode: z
         .enum(
           feature('TRANSCRIPT_CLASSIFIER')
-            ? PERMISSION_MODES
+            ? [...PERMISSION_MODES, 'manual']
             : EXTERNAL_PERMISSION_MODES,
         )
         .optional()
@@ -736,6 +736,12 @@ export const SettingsSchema = lazySchema(() =>
         .optional()
         .describe(
           'Preferred language for Claude responses and voice dictation (e.g., "japanese", "spanish")',
+        ),
+      workflowSize: z
+        .enum(['small', 'medium', 'large'])
+        .optional()
+        .describe(
+          'Advisory workflow size guideline used when spawning workflow agents',
         ),
       skipWebFetchPreflight: z
         .boolean()

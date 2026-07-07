@@ -3,7 +3,9 @@ import z from 'zod/v4'
 import { PAUSE_ICON } from '../../constants/figures.js'
 // Types extracted to src/types/permissions.ts to break import cycles
 import {
+  CANONICAL_EXTERNAL_PERMISSION_MODES,
   EXTERNAL_PERMISSION_MODES,
+  type CanonicalExternalPermissionMode,
   type ExternalPermissionMode,
   PERMISSION_MODES,
   type PermissionMode,
@@ -12,16 +14,27 @@ import { lazySchema } from '../lazySchema.js'
 
 // Re-export for backwards compatibility
 export {
+  CANONICAL_EXTERNAL_PERMISSION_MODES,
   EXTERNAL_PERMISSION_MODES,
   PERMISSION_MODES,
+  type CanonicalExternalPermissionMode,
   type ExternalPermissionMode,
   type PermissionMode,
 }
 
 export const permissionModeSchema = lazySchema(() => z.enum(PERMISSION_MODES))
+export const canonicalExternalPermissionModeSchema = lazySchema(() =>
+  z.enum(CANONICAL_EXTERNAL_PERMISSION_MODES),
+)
 export const externalPermissionModeSchema = lazySchema(() =>
   z.enum(EXTERNAL_PERMISSION_MODES),
 )
+
+export function normalizeExternalPermissionMode(
+  mode: ExternalPermissionMode,
+): CanonicalExternalPermissionMode {
+  return mode === 'manual' ? 'default' : mode
+}
 
 type ModeColorKey =
   | 'text'
@@ -36,15 +49,15 @@ type PermissionModeConfig = {
   shortTitle: string
   symbol: string
   color: ModeColorKey
-  external: ExternalPermissionMode
+  external: CanonicalExternalPermissionMode
 }
 
 const PERMISSION_MODE_CONFIG: Partial<
   Record<PermissionMode, PermissionModeConfig>
 > = {
   default: {
-    title: 'Default',
-    shortTitle: 'Default',
+    title: 'Manual',
+    shortTitle: 'Manual',
     symbol: '',
     color: 'text',
     external: 'default',
@@ -84,7 +97,7 @@ const PERMISSION_MODE_CONFIG: Partial<
           shortTitle: 'Auto',
           symbol: '⏵⏵',
           color: 'warning' as ModeColorKey,
-          external: 'default' as ExternalPermissionMode,
+          external: 'default' as CanonicalExternalPermissionMode,
         },
       }
     : {}),
@@ -115,6 +128,9 @@ export function toExternalPermissionMode(
 }
 
 export function permissionModeFromString(str: string): PermissionMode {
+  if (str === 'manual') {
+    return 'default'
+  }
   return (PERMISSION_MODES as readonly string[]).includes(str)
     ? (str as PermissionMode)
     : 'default'
