@@ -828,28 +828,41 @@ panda config  # 更新 API Key
 
 ---
 
-## 完整配置示例
+## 完整配置示例（settings.json 配置时去掉 // 示例说明）
+
+> **⚠️ 重要提示**  
+> 以下示例包含 `//` 行内注释，用于说明参数含义。  
+> **JSON 标准不支持注释**，实际配置 `settings.json` 时**必须删除所有 `//` 及其后的注释文字**。  
+> 
+> **快速去注释方法**：  
+> ```bash
+> # 方式 1：使用 jq 自动去注释并格式化
+> cat settings-with-comments.json | grep -v '//' | jq . > ~/.pandacc/settings.json
+> 
+> # 方式 2：使用编辑器（VS Code）
+> # 选中所有内容 → Ctrl+/ (Windows) / Cmd+/ (Mac) → 删除注释行
+> ```
 
 ### 基础配置（使用内建别名）
 
 ```json
 {
-  "enableModelRouting": true,
-  "activeRoutingPreset": "cost-saving",
-  "routingPresets": {
-    "cost-saving": {
-      "description": "成本优化 · 使用快速/便宜模型",
-      "defaultModel": "haiku-latest",
-      "agentOverrides": {
-        "Explore": "haiku-latest",
-        "Plan": "sonnet-latest",
-        "architecture-reviewer": "sonnet-latest",
-        "code-generator": "sonnet-latest"
+  "enableModelRouting": true,              // 启用模型路由（必需，否则配置不生效）
+  "activeRoutingPreset": "cost-saving",    // 激活的预设名称（与下方 routingPresets 中的 key 对应）
+  "routingPresets": {                      // 路由预设集合（可定义多个预设）
+    "cost-saving": {                       // 预设名称（用户自定义，如 cost-saving/quality/custom）
+      "description": "成本优化 · 使用快速/便宜模型",  // 预设描述（可选，用于文档化）
+      "defaultModel": "haiku-latest",      // 默认模型别名（当 agent 未在 agentOverrides 中指定时使用）
+      "agentOverrides": {                  // Agent 类型 → 模型别名映射（覆盖默认模型）
+        "Explore": "haiku-latest",         // Explore agent 使用 haiku-latest（快速探索）
+        "Plan": "sonnet-latest",           // Plan agent 使用 sonnet-latest（平衡规划）
+        "architecture-reviewer": "sonnet-latest",  // 架构审查 agent
+        "code-generator": "sonnet-latest"  // 代码生成 agent
       },
-      "globalWeights": {
-        "costEfficiency": 3.0,
-        "speed": 2.0,
-        "reasoning": 0.5
+      "globalWeights": {                   // 全局能力权重（0-5 评分，影响任务路由 Priority 7）
+        "costEfficiency": 3.0,             // 成本效率权重（值越高，越倾向选择便宜模型）
+        "speed": 2.0,                      // 响应速度权重（值越高，越倾向选择快速模型）
+        "reasoning": 0.5                   // 推理能力权重（值越高，越倾向选择强推理模型）
       }
     }
   }
@@ -860,22 +873,22 @@ panda config  # 更新 API Key
 
 ```json
 {
-  "enableModelRouting": true,
-  "activeRoutingPreset": "my-custom",
+  "enableModelRouting": true,              // 启用模型路由
+  "activeRoutingPreset": "my-custom",      // 激活自定义预设
   "routingPresets": {
-    "my-custom": {
-      "description": "我的自定义预设",
-      "defaultModel": "sonnet-latest",
-      "agentOverrides": {
-        "Explore": "haiku-latest",
-        "Plan": "sonnet-latest",
-        "architecture-reviewer": "opus-latest",
-        "my-custom-agent": "best-reasoning"
+    "my-custom": {                         // 自定义预设名称
+      "description": "我的自定义预设",       // 预设描述
+      "defaultModel": "sonnet-latest",     // 默认模型（未指定时的后备选项）
+      "agentOverrides": {                  // Agent 路由映射
+        "Explore": "haiku-latest",         // 探索任务用快速模型
+        "Plan": "sonnet-latest",           // 规划任务用平衡模型
+        "architecture-reviewer": "opus-latest",  // 架构审查用最强模型
+        "my-custom-agent": "best-reasoning"  // 自定义 agent（需先在 .pandacc/agents/ 中定义）
       },
-      "globalWeights": {
-        "reasoning": 2.0,
-        "coding": 2.0,
-        "costEfficiency": 1.0
+      "globalWeights": {                   // 能力权重配置
+        "reasoning": 2.0,                  // 推理能力权重（适用于复杂决策场景）
+        "coding": 2.0,                     // 编码能力权重（适用于代码生成场景）
+        "costEfficiency": 1.0              // 成本权重降低（优先质量而非成本）
       }
     }
   }
@@ -886,57 +899,57 @@ panda config  # 更新 API Key
 
 ```json
 {
-  "enableModelRouting": true,
-  "activeRoutingPreset": "multi-provider",
-  "modelRegistry": {
-    "deepseek-v4-pro": {
-      "provider": "thirdParty",
-      "endpoint": {
-        "baseURL": "https://api.deepseek.com/v1",
-        "apiKeyEnv": "DEEPSEEK_API_KEY"
+  "enableModelRouting": true,              // 启用模型路由
+  "activeRoutingPreset": "multi-provider", // 激活多供应商预设
+  "modelRegistry": {                       // 第三方模型注册表（扩展内建模型列表）
+    "deepseek-v4-pro": {                   // 第三方模型别名（用户自定义，可在 agentOverrides 中引用）
+      "provider": "thirdParty",            // 供应商类型（firstParty=Claude 官方 | thirdParty=第三方）
+      "endpoint": {                        // API 端点配置
+        "baseURL": "https://api.deepseek.com/v1",  // API 基础 URL
+        "apiKeyEnv": "DEEPSEEK_API_KEY"    // 环境变量名（存储 API Key，不要硬编码！）
       },
-      "modelId": "deepseek-chat",
-      "displayName": "DeepSeek V4 Pro",
-      "capabilities": {
-        "vision": false,
-        "toolUse": true,
-        "reasoning": 90,
-        "coding": 92,
-        "speed": 85,
-        "costEfficiency": 90
+      "modelId": "deepseek-chat",          // 实际模型 ID（发送给 API 的标识符）
+      "displayName": "DeepSeek V4 Pro",    // 显示名称（可选，用于 UI 展示）
+      "capabilities": {                    // 模型能力评分（用于路由决策）
+        "vision": false,                   // 视觉能力（true=支持图像输入）
+        "toolUse": true,                   // 工具调用能力（true=支持 function calling）
+        "reasoning": 90,                   // 推理能力评分（0-100）
+        "coding": 92,                      // 编码能力评分（0-100）
+        "speed": 85,                       // 响应速度评分（0-100，值越高越快）
+        "costEfficiency": 90               // 成本效率评分（0-100，值越高越便宜）
       },
-      "maxContextTokens": 64000,
-      "inputCostPer1M": 0.27,
-      "outputCostPer1M": 1.10
+      "maxContextTokens": 64000,           // 最大上下文长度（token 数）
+      "inputCostPer1M": 0.27,              // 输入成本（美元/百万 token，用于成本跟踪）
+      "outputCostPer1M": 1.10              // 输出成本（美元/百万 token）
     },
-    "glm-5.2": {
+    "glm-5.2": {                           // 另一个第三方模型（智谱 AI）
       "provider": "thirdParty",
       "endpoint": {
         "baseURL": "https://open.bigmodel.cn/api/paas/v4",
-        "apiKeyEnv": "GLM_API_KEY"
+        "apiKeyEnv": "GLM_API_KEY"         // 智谱 GLM API Key 环境变量
       },
-      "modelId": "glm-4-plus",
+      "modelId": "glm-4-plus",             // 实际模型 ID
       "displayName": "智谱 GLM-5.2",
       "capabilities": {
-        "vision": true,
+        "vision": true,                    // 支持视觉输入
         "toolUse": true,
         "reasoning": 88,
         "coding": 85,
         "speed": 90,
         "costEfficiency": 92
       },
-      "maxContextTokens": 128000,
+      "maxContextTokens": 128000,          // 支持 128K 上下文
       "inputCostPer1M": 0.50,
       "outputCostPer1M": 0.50
     }
   },
   "routingPresets": {
-    "multi-provider": {
-      "defaultModel": "sonnet-latest",
+    "multi-provider": {                    // 多供应商预设
+      "defaultModel": "sonnet-latest",     // 默认使用 Claude Sonnet
       "agentOverrides": {
-        "Explore": "deepseek-v4-pro",
-        "Plan": "glm-5.2",
-        "architecture-reviewer": "fable-5"
+        "Explore": "deepseek-v4-pro",      // 探索任务使用 DeepSeek（成本优化）
+        "Plan": "glm-5.2",                 // 规划任务使用 GLM（平衡能力）
+        "architecture-reviewer": "fable-5"  // 架构审查使用 Claude Fable（最强推理）
       }
     }
   }
