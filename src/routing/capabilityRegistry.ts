@@ -61,6 +61,22 @@ function makeBuiltinProfiles(): Record<string, BuiltinProfile> {
       inputCostPer1M: 15.0,
       outputCostPer1M: 75.0,
     },
+    'opus-4-8': {
+      tier: 'opus' as ModelTier,
+      provider: 'firstParty' as ModelProvider,
+      resolveModelId: () => getModelStrings().opus47 ?? 'claude-opus-4-7',
+      capabilities: {
+        vision: true, toolUse: true, extendedContext: true, megaContext: true,
+        streaming: true, thinking: true, structuredOutput: true, codeExecution: false,
+        reasoning: 99, coding: 96, speed: 28, costEfficiency: 12,
+        instruction: 96, creativity: 93, multilingual: 92,
+      },
+      isAvailable: async () => true,
+      displayName: 'Claude Opus 4.8',
+      maxContextTokens: 200_000,
+      inputCostPer1M: 18.0,
+      outputCostPer1M: 90.0,
+    },
     'sonnet-latest': {
       tier: 'sonnet' as ModelTier,
       provider: 'firstParty' as ModelProvider,
@@ -76,6 +92,22 @@ function makeBuiltinProfiles(): Record<string, BuiltinProfile> {
       maxContextTokens: 200_000,
       inputCostPer1M: 3.0,
       outputCostPer1M: 15.0,
+    },
+    'sonnet-5': {
+      tier: 'sonnet' as ModelTier,
+      provider: 'firstParty' as ModelProvider,
+      resolveModelId: () => getModelStrings().sonnet50 ?? 'claude-sonnet-5-20250514',
+      capabilities: {
+        vision: true, toolUse: true, extendedContext: true, megaContext: true,
+        streaming: true, thinking: true, structuredOutput: true, codeExecution: false,
+        reasoning: 90, coding: 94, speed: 65, costEfficiency: 55,
+        instruction: 92, creativity: 88, multilingual: 90,
+      },
+      isAvailable: async () => true,
+      displayName: 'Claude Sonnet 5',
+      maxContextTokens: 200_000,
+      inputCostPer1M: 4.5,
+      outputCostPer1M: 22.0,
     },
     'haiku-latest': {
       tier: 'haiku' as ModelTier,
@@ -93,6 +125,38 @@ function makeBuiltinProfiles(): Record<string, BuiltinProfile> {
       inputCostPer1M: 0.80,
       outputCostPer1M: 4.0,
     },
+    'haiku-4-5': {
+      tier: 'haiku' as ModelTier,
+      provider: 'firstParty' as ModelProvider,
+      resolveModelId: () => getModelStrings().haiku45 ?? 'claude-haiku-4-5-20251001',
+      capabilities: {
+        vision: true, toolUse: true, extendedContext: true, megaContext: false,
+        streaming: true, thinking: false, structuredOutput: true, codeExecution: false,
+        reasoning: 55, coding: 60, speed: 95, costEfficiency: 95,
+        instruction: 72, creativity: 55, multilingual: 70,
+      },
+      isAvailable: async () => true,
+      displayName: 'Claude Haiku 4.5',
+      maxContextTokens: 200_000,
+      inputCostPer1M: 0.80,
+      outputCostPer1M: 4.0,
+    },
+    'fable-5': {
+      tier: 'opus' as ModelTier,
+      provider: 'firstParty' as ModelProvider,
+      resolveModelId: () => getModelStrings().fable5 ?? 'claude-fable-5',
+      capabilities: {
+        vision: true, toolUse: true, extendedContext: true, megaContext: true,
+        streaming: true, thinking: true, structuredOutput: true, codeExecution: false,
+        reasoning: 100, coding: 93, speed: 35, costEfficiency: 20,
+        instruction: 97, creativity: 90, multilingual: 88,
+      },
+      isAvailable: async () => true,
+      displayName: 'Claude Fable 5 (推理专用)',
+      maxContextTokens: 200_000,
+      inputCostPer1M: 20.0,
+      outputCostPer1M: 100.0,
+    },
   }
 }
 
@@ -107,14 +171,19 @@ function makeBuiltinProfiles(): Record<string, BuiltinProfile> {
  * Design ref: monitor/multi-model-agent-routing-design.md §2.4
  */
 const DEFAULT_SEMANTIC_ALIASES: Record<string, string> = {
-  'best-reasoning': 'opus-latest',
-  'best-code': 'opus-latest',
-  'best-creative': 'opus-latest',
-  'best-multilingual': 'opus-latest',
+  'best-reasoning': 'fable-5', // Fable-5 是最强推理模型
+  'best-code': 'sonnet-5', // Sonnet-5 是最强编码模型
+  'best-creative': 'opus-4-8',
+  'best-multilingual': 'sonnet-5',
   'fast': 'haiku-latest',
   'cheap': 'haiku-latest',
   'balanced': 'sonnet-latest',
   'default': 'sonnet-latest',
+  // Version-specific aliases
+  'fable-latest': 'fable-5',
+  'sonnet-5-latest': 'sonnet-5',
+  'haiku-4-5-latest': 'haiku-4-5',
+  'opus-4-8-latest': 'opus-4-8',
 }
 
 // ─────────────────────────────────────────────────────────────
