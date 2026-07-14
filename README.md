@@ -889,30 +889,54 @@ panda config  # 更新 API Key
   "enableModelRouting": true,
   "activeRoutingPreset": "multi-provider",
   "modelRegistry": {
-    "gemini-pro": {
+    "deepseek-v4-pro": {
       "provider": "thirdParty",
       "endpoint": {
-        "baseURL": "https://generativelanguage.googleapis.com/v1beta",
-        "apiKeyEnv": "GEMINI_API_KEY"
+        "baseURL": "https://api.deepseek.com/v1",
+        "apiKeyEnv": "DEEPSEEK_API_KEY"
       },
-      "modelId": "gemini-1.5-pro",
+      "modelId": "deepseek-chat",
+      "displayName": "DeepSeek V4 Pro",
+      "capabilities": {
+        "vision": false,
+        "toolUse": true,
+        "reasoning": 90,
+        "coding": 92,
+        "speed": 85,
+        "costEfficiency": 90
+      },
+      "maxContextTokens": 64000,
+      "inputCostPer1M": 0.27,
+      "outputCostPer1M": 1.10
+    },
+    "glm-5.2": {
+      "provider": "thirdParty",
+      "endpoint": {
+        "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+        "apiKeyEnv": "GLM_API_KEY"
+      },
+      "modelId": "glm-4-plus",
+      "displayName": "智谱 GLM-5.2",
       "capabilities": {
         "vision": true,
         "toolUse": true,
-        "reasoning": 85,
-        "coding": 80,
+        "reasoning": 88,
+        "coding": 85,
         "speed": 90,
-        "costEfficiency": 95
-      }
+        "costEfficiency": 92
+      },
+      "maxContextTokens": 128000,
+      "inputCostPer1M": 0.50,
+      "outputCostPer1M": 0.50
     }
   },
   "routingPresets": {
     "multi-provider": {
       "defaultModel": "sonnet-latest",
       "agentOverrides": {
-        "Explore": "gemini-pro",
-        "Plan": "sonnet-latest",
-        "architecture-reviewer": "opus-latest"
+        "Explore": "deepseek-v4-pro",
+        "Plan": "glm-5.2",
+        "architecture-reviewer": "fable-5"
       }
     }
   }
@@ -938,11 +962,17 @@ panda config  # 更新 API Key
 
 | 别名 | 映射模型 | 说明 |
 |------|---------|------|
-| `opus-latest` | claude-opus-4-20250514 | 最强推理能力 |
-| `sonnet-latest` | claude-sonnet-4-20250514 | 平衡性能与成本 |
-| `haiku-latest` | claude-haiku-4-20250514 | 最快最便宜 |
-| `best-reasoning` | opus-latest | 语义别名（最强推理） |
-| `best-code` | sonnet-latest | 语义别名（最强编码） |
+| `opus-latest` | claude-opus-4-6 | Opus 最新版本 |
+| `opus-4-8` | claude-opus-4-7 | Opus 4.8（更强推理） |
+| `sonnet-latest` | claude-sonnet-4-6 | Sonnet 最新版本 |
+| `sonnet-5` | claude-sonnet-5 | Sonnet 5（最强编码） |
+| `haiku-latest` | claude-haiku-4-5 | Haiku 最新版本 |
+| `haiku-4-5` | claude-haiku-4-5-20251001 | Haiku 4.5 完整版本号 |
+| `fable-5` | claude-fable-5 | Fable 5（最强推理专用） |
+| `best-reasoning` | fable-5 | 语义别名（最强推理） |
+| `best-code` | sonnet-5 | 语义别名（最强编码） |
+| `best-creative` | opus-4-8 | 语义别名（最强创意） |
+| `best-multilingual` | sonnet-5 | 语义别名（最强多语言） |
 | `fast` | haiku-latest | 语义别名（最快） |
 | `cheap` | haiku-latest | 语义别名（最便宜） |
 | `balanced` | sonnet-latest | 语义别名（平衡） |
