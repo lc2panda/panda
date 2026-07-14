@@ -1742,8 +1742,26 @@ npm i -g @lc2panda/panda-code@latest --registry=https://npm.pkg.github.com
 - **条件**: 🔒 需要 Claude.ai 订阅
 
 #### `/advisor`
-- **用法**: `/advisor [model_name]`
-- **说明**: 配置顾问模型（辅助主模型决策）
+- **用法**: `/advisor [question | status | model_name | off]`
+- **说明**: 智能顾问 — 技术决策分析与多方案对比（需配置 advisorModel）
+- **功能**:
+  - **配置管理**:
+    - `/advisor` 或 `/advisor status` — 显示当前配置的顾问模型
+    - `/advisor claude-opus-4-6` — 设置顾问模型
+    - `/advisor off` — 禁用顾问功能
+  - **决策分析**:
+    - `/advisor 如何选择数据库？PostgreSQL 还是 MongoDB？` — 触发技术决策分析
+    - 生成 ≥3 个方案的量化对比（对齐度/收益/风险/成本）
+    - 5 Phase 结构化分析（问题澄清 → 方案生成 → 对比矩阵 → 决策建议 → 延伸资源）
+- **配置示例**:
+  ```json
+  {
+    "settings": {
+      "advisorModel": "claude-opus-4-6"
+    }
+  }
+  ```
+- **适用场景**: 架构决策、技术选型、方案对比、风险评估、复杂问题分析
 
 #### `/torch`
 - **用法**: `/torch`
