@@ -7,15 +7,19 @@
 //    - /advisor            → 显示当前配置
 //    - /advisor opus       → 设置顾问模型
 //    - /advisor off        → 禁用顾问
-// 2. 推理执行模式（生成分析 prompt）：
-//    - /advisor 如何选择数据库？ → 触发技术决策分析
+// 2. 推理执行模式（真实 advisor API 调用）：
+//    - /advisor 如何选择数据库？ → 调用 advisorHelper 进行深度分析
 //
 // 配置持久化对齐：
 // - 读取路径：getAppState().advisorModel (来自 settings.advisorModel)
 // - 示例配置：{ "advisorModel": "claude-opus-4-6" }
 // - 未配置时友好提示配置方式，不静默失败
 
+import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/messages.mjs'
+import type { ToolUseContext } from '../../Tool.js'
+import type { Message } from '../../types/message.js'
 import { registerBundledSkill } from '../bundledSkills.js'
+import { callAdvisorForSkill, isAdvisorAvailableForSkill } from '../utils/advisorHelper.js'
 
 /**
  * 判断 args 是否为配置命令（而非问题描述）
@@ -54,105 +58,132 @@ function buildConfigPrompt(args: string): string {
 }
 
 /**
- * 构建推理执行 prompt（技术决策分析）
+ * 执行顾问查询（推理模式）
+ * 调用 advisorHelper 真实使用 advisor 模型
  */
-function buildAnalysisPrompt(question: string, context: {
-  advisorModel?: string
-  mainModel?: string
-}): string {
-  const sections: string[] = []
+async function executeAdvisorQuery(
+  question: string,
+  context: ToolUseContext
+): Promise<ContentBlockParam[]> {
+  const appState = context.getAppState()
+  const advisorModel = appState.advisorModel
 
-  sections.push(`# 智能顾问 — 技术决策分析
+  // 配置检查
+  if (!advisorModel) {
+    return [{
+      type: 'text',
+      text: `⚠️ **顾问模型未配置**
 
-**问题**：${question}
-
-你的任务是以高级技术顾问的身份，提供深度、结构化的技术决策分析。`)
-
-  // 配置状态提示
-  if (!context.advisorModel) {
-    sections.push(`## ⚠️ 配置提示
-
-当前未配置 advisorModel。建议先配置顾问模型以启用服务端 advisor 工具：
+请先设置顾问模型以启用真实 advisor 调用：
 
 \`\`\`bash
 /advisor claude-opus-4-6
 \`\`\`
 
-配置后，主循环模型（${context.mainModel || '当前模型'}）可以在需要时自动调用 advisor 工具获得更强的推理支持。
-
-**本次分析将继续进行**，但不会使用服务端 advisor 工具。`)
-  } else {
-    sections.push(`## ℹ️ 配置状态
-
-- 当前 advisorModel: \`${context.advisorModel}\`
-- 主循环模型: \`${context.mainModel || '未知'}\`
-
-注：本 skill 基于 prompt 模式分析，不直接调用服务端 advisor 工具（该工具仅在主循环中自动触发）。`)
+或使用其他支持的模型（opus/sonnet/haiku 系列）。`
+    }]
   }
 
-  sections.push(`## Phase 1: 问题澄清与边界定义
+  // 可用性检查
+  if (!isAdvisorAvailableForSkill()) {
+    return [{
+      type: 'text',
+      text: `⚠️ **Advisor 功能未启用**
 
-- 识别问题的核心维度（性能/成本/可维护性/团队能力/时间约束等）
-- 列出关键约束条件
-- 明确决策的影响范围和时间跨度
-- 如果问题描述不够具体，列出需要澄清的关键信息点`)
+需要配置 advisorModel 并确保 API 访问正常。
+当前配置：\`${advisorModel}\`
 
-  sections.push(`## Phase 2: 方案生成（至少 3 个）
+如果问题持续，请检查：
+- API Key 是否有效（运行 \`panda config\` 验证）
+- 是否有网络连接
+- 模型名称是否正确`
+    }]
+  }
 
-为每个方案提供：
-1. **方案名称**（清晰简洁）
-2. **核心思路**（2-3 句话）
-3. **技术栈**（具体工具/框架/服务）
-4. **适用场景**（什么情况下这是最优解）
-5. **关键优势**（3-5 点，量化数据优先）
-6. **主要风险**（技术债/运维成本/团队学习曲线等）
-7. **实施成本**（时间/人力/资金的粗略估算）
+  try {
+    // 调用 advisorHelper 真实实现
+    const result = await callAdvisorForSkill({
+      messages: context.messages as Message[],
+      workingDirectory: context.cwd || process.cwd(),
+      apiKey: context.options?.apiKey || '',
+      toolUseContext: context
+    }, {
+      prompt: question,
+      advisorModel,
+      contextMessageLimit: 10  // 限制上下文长度，控制成本
+    })
 
-覆盖不同的技术路线（如：自建 vs 托管服务，SQL vs NoSQL，单体 vs 微服务等）。`)
+    return [{
+      type: 'text',
+      text: result,
+      cache_control: { type: 'ephemeral' }  // 启用 prompt caching
+    }]
 
-  sections.push(`## Phase 3: 多维度对比矩阵
+  } catch (error) {
+    // 错误分级处理
+    const errorMessage = error instanceof Error ? error.message : String(error)
 
-构建对比表格（Markdown table），维度至少包含：
-- 初始成本
-- 运维复杂度
-- 可扩展性
-- 性能表现
-- 生态成熟度
-- 团队熟悉度
-- 长期 TCO（Total Cost of Ownership）
+    if (errorMessage.includes('429')) {
+      return [{
+        type: 'text',
+        text: `⚠️ **API 限流**
 
-使用评分（1-5 分）或明确的量化指标（QPS、延迟、成本/月等）。`)
+请求过于频繁，请稍后重试（建议等待 1-2 分钟）。
 
-  sections.push(`## Phase 4: 决策建议
+如果频繁遇到此问题，可以：
+- 减少 advisor 调用频率
+- 检查 API 配额使用情况
+- 考虑升级 API 套餐`
+      }]
+    }
 
-基于前述分析，给出：
-1. **推荐方案**（Top 1 或 Top 2）及推荐理由
-2. **不推荐方案**及排除原因
-3. **决策树**（如果 X 条件成立选 A，否则选 B）
-4. **验证计划**（如何快速验证选择是否正确，如 PoC 方案、关键指标）
-5. **回滚预案**（如果选择失败，如何以最小代价切换）`)
+    if (errorMessage.includes('401') || errorMessage.includes('API Key') || errorMessage.includes('authentication')) {
+      return [{
+        type: 'text',
+        text: `❌ **认证失败**
 
-  sections.push(`## Phase 5: 延伸资源
+API Key 无效或已过期。
 
-- 官方文档链接（优先级最高）
-- 权威对比文章或白皮书
-- 真实案例研究（类似规模/场景的公司选型经验）
-- 社区讨论（GitHub Issues、Stack Overflow 高票回答等）
+**修复方法**：
+1. 运行 \`panda config\` 更新 API Key
+2. 确认 Key 权限包含 Messages API 访问
+3. 检查 Key 是否已被撤销
 
-**格式要求**：
-- 使用中文输出
-- 结构清晰，分段明确
-- 优先使用表格、列表等结构化格式
-- 量化数据优先于主观描述
-- 明确标注假设和不确定性
+当前 advisor 模型：\`${advisorModel}\``
+      }]
+    }
 
-**禁止**：
-- 模糊的"根据情况而定"式建议
-- 没有证据支撑的绝对化断言
-- 忽略成本/风险的单一维度推荐
-- 过时的技术栈推荐（需注明调研时间）`)
+    if (errorMessage.includes('400') || errorMessage.includes('invalid_request')) {
+      return [{
+        type: 'text',
+        text: `❌ **请求格式错误**
 
-  return sections.join('\n\n')
+${errorMessage}
+
+可能原因：
+- 问题描述包含不支持的字符
+- 上下文过长（当前限制：10 条消息）
+- 模型不支持当前请求格式
+
+请尝试简化问题描述或清空上下文后重试。`
+      }]
+    }
+
+    // 通用错误
+    return [{
+      type: 'text',
+      text: `❌ **Advisor 执行失败**
+
+${errorMessage}
+
+**调试信息**：
+- Advisor 模型：\`${advisorModel}\`
+- 工作目录：\`${context.cwd || process.cwd()}\`
+- 上下文消息数：${context.messages.length}
+
+如果问题持续，请提供上述信息寻求支持。`
+    }]
+  }
 }
 
 export function registerAdvisorSkill(): void {
@@ -169,17 +200,8 @@ export function registerAdvisorSkill(): void {
         return [{ type: 'text', text: buildConfigPrompt(rawArgs) }]
       }
 
-      // 模式 2：推理执行模式（技术决策分析）
-      const appState = context.getAppState()
-      const advisorModel = appState.advisorModel
-      const mainModel = appState.mainLoopModel
-
-      const prompt = buildAnalysisPrompt(rawArgs, {
-        advisorModel,
-        mainModel,
-      })
-
-      return [{ type: 'text', text: prompt }]
+      // 模式 2：推理执行模式（真实 advisor API 调用）
+      return executeAdvisorQuery(rawArgs, context)
     },
   })
 }
