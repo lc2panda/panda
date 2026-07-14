@@ -4140,6 +4140,12 @@ async function run(): Promise<CommanderCommand> {
     } = await import('./cli/handlers/mcp.js');
     await mcpResetChoicesHandler();
   });
+  mcp.command('doctor').description('Check MCP configuration health · 检查 MCP 配置健康状态').action(async () => {
+    const {
+      mcpDoctorHandler
+    } = await import('./cli/handlers/mcp.js');
+    await mcpDoctorHandler();
+  });
 
   // claude server
   if (feature('DIRECT_CONNECT')) {
