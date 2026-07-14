@@ -1267,8 +1267,68 @@ export const connectToServer = memoize(
         )
       } catch (error) {
         const elapsed = Date.now() - connectStartTime
-        // SSE-specific error logging
-        if (serverRef.type === 'sse' && error instanceof Error) {
+        // stdio-specific error logging (Windows diagnostics)
+        if (
+          (serverRef.type === 'stdio' || !serverRef.type) &&
+          error instanceof Error
+        ) {
+          const stdioRef = serverRef as ScopedStdioMcpServerConfig
+          const errorObj = error as Error & {
+            code?: string
+            errno?: string | number
+            syscall?: string
+            path?: string
+          }
+
+          logMCPDebug(
+            name,
+            `stdio Connection failed after ${elapsed}ms: ${jsonStringify({
+              command: stdioRef.command,
+              args: stdioRef.args,
+              error: error.message,
+              errorType: error.constructor.name,
+              code: errorObj.code,
+              errno: errorObj.errno,
+              syscall: errorObj.syscall,
+              platform: process.platform,
+            })}`,
+          )
+          logMCPError(name, error)
+
+          // Windows-specific diagnostics
+          if (process.platform === 'win32') {
+            const diagnostics = [
+              `Windows MCP 启动失败诊断 [${name}]:`,
+              `  命令: ${stdioRef.command} ${stdioRef.args?.join(' ') || ''}`,
+              `  错误: ${error.message}`,
+            ]
+
+            if (errorObj.code === 'ENOENT') {
+              diagnostics.push(
+                `  原因: 命令未找到（${stdioRef.command}）`,
+                `  建议:`,
+                `    1. 确认 Node.js 和 npm 已正确安装: node --version && npm --version`,
+                `    2. 检查环境变量 PATH 包含 npm 全局目录`,
+                `    3. 尝试手动运行: ${stdioRef.command} ${stdioRef.args?.join(' ') || ''}`,
+                `    4. 如果是 npx 命令，确保 npx.cmd 在 PATH 中`,
+              )
+            } else if (errorObj.code === 'EACCES' || errorObj.errno === -4048) {
+              diagnostics.push(
+                `  原因: 权限不足`,
+                `  建议: 以管理员身份运行 PowerShell 或 CMD`,
+              )
+            } else {
+              diagnostics.push(
+                `  建议:`,
+                `    1. 检查命令路径是否正确`,
+                `    2. 查看完整日志: 设置环境变量 DEBUG=mcp:*`,
+                `    3. 验证 MCP 服务器包是否已安装`,
+              )
+            }
+
+            logMCPError(name, diagnostics.join('\n'))
+          }
+        } else if (serverRef.type === 'sse' && error instanceof Error) {
           logMCPDebug(
             name,
             `SSE Connection failed after ${elapsed}ms: ${jsonStringify({
@@ -1362,6 +1422,29 @@ export const connectToServer = memoize(
       logForDebugging(
         `[MCP] Server "${name}" connected with subscribe=${!!capabilities?.resources?.subscribe}`,
       )
+
+      // Pre-fetch tools list to avoid race condition where API calls happen before tools are ready
+      // This is especially important on Windows where MCP servers may start slower
+      if (capabilities?.tools) {
+        try {
+          const prefetchStartTime = Date.now()
+          const toolsList = await client.request(
+            { method: 'tools/list' },
+            ListToolsResultSchema,
+          )
+          const prefetchElapsed = Date.now() - prefetchStartTime
+          logMCPDebug(
+            name,
+            `Pre-fetched ${toolsList.tools.length} tools in ${prefetchElapsed}ms`,
+          )
+        } catch (error) {
+          // Non-fatal: tools will be fetched on-demand via fetchToolsForClient
+          logMCPDebug(
+            name,
+            `Tools pre-fetch failed (will retry on-demand): ${errorMessage(error)}`,
+          )
+        }
+      }
 
       // Register default elicitation handler that returns cancel during the
       // window before registerElicitationHandler overwrites it in
