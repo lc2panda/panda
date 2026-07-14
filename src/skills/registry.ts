@@ -258,6 +258,12 @@ export const BUNDLED_SKILL_INDEX: readonly BundledSkillMeta[] = [
     ),
   },
   {
+    name: 'advisor',
+    description:
+      'Smart advisor — technical decision analysis and multi-option comparison · 智能顾问 — 技术决策分析与多方案对比',
+    load: makeLoader('advisor', './bundled/advisor.js', 'registerAdvisorSkill'),
+  },
+  {
     name: 'dream',
     description:
       'Run a memory consolidation pass — synthesize recent learnings into durable memories · 运行记忆整合',

@@ -20,6 +20,7 @@ import { registerLearnSkill } from './learn.js'
 import { registerVerifySkill } from './verify.js'
 import { registerWriteSkill } from './write.js'
 import { registerWechatQuerySkill } from './wechatQuery.js'
+import { registerAdvisorSkill } from './advisor.js'
 
 /**
  * Initialize all bundled skills.
@@ -50,6 +51,7 @@ export function initBundledSkills(): void {
   registerCaptureSkill()
   registerLearnSkill()
   registerWechatQuerySkill()
+  registerAdvisorSkill()
   // Panda: /dream skill available unconditionally — memory consolidation
   // should be accessible to all users, not just KAIROS mode.
   {
