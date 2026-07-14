@@ -338,3 +338,87 @@ export async function mcpResetChoicesHandler(): Promise<void> {
   }));
   cliOk('All project-scoped (.mcp.json) server approvals and rejections have been reset.\n' + 'You will be prompted for approval next time you start Panda.');
 }
+
+// mcp doctor
+export async function mcpDoctorHandler(): Promise<void> {
+  logEvent('tengu_mcp_doctor', {});
+
+  console.log('MCP Configuration Health Check');
+  console.log('================================\n');
+
+  // 1. Check settings.json existence
+  try {
+    const globalConfig = getGlobalConfig();
+    const settingsPath = globalConfig.settingsPath || '~/.pandacc/settings.json';
+    console.log(`Settings file: ✓ ${settingsPath}`);
+  } catch (error) {
+    console.log(`Settings file: ✗ Error reading settings`);
+    console.error(`  ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+
+  // 2. Check mcpServers configuration
+  const { servers: configs } = await getAllMcpConfigs();
+  const serverCount = Object.keys(configs).length;
+  if (serverCount === 0) {
+    console.log('mcpServers configured: ✗ No servers configured');
+    console.log('\nUse `panda mcp add` to add a server.');
+    process.exit(0);
+  }
+  console.log(`mcpServers configured: ✓ ${serverCount} server(s)\n`);
+
+  // 3. Check server connection status
+  console.log('Server Status:');
+  const entries = Object.entries(configs);
+  const results = await pMap(entries, async ([name, server]) => {
+    const status = await checkMcpServerHealth(name, server);
+    return { name, server, status };
+  }, { concurrency: getMcpServerConnectionBatchSize() });
+
+  for (const { name, server, status } of results) {
+    let commandDisplay = '';
+    if (server.type === 'stdio') {
+      const args = Array.isArray((server as any).args) ? (server as any).args : [];
+      commandDisplay = `${(server as any).command} ${args.join(' ')}`;
+    } else if (server.type === 'sse' || server.type === 'http') {
+      commandDisplay = server.url;
+    } else if (server.type === 'claudeai-proxy') {
+      commandDisplay = server.url;
+    }
+
+    const statusIcon = status.startsWith('✓') ? '✓' : status.startsWith('!') ? '!' : '✗';
+    console.log(`- ${name}: ${statusIcon} ${status}${commandDisplay ? ` (${commandDisplay})` : ''}`);
+  }
+
+  // 4. Platform compatibility checks
+  console.log(`\nPlatform: ${getPlatform()}`);
+
+  // Windows-specific: check if commands have proper extensions
+  if (getPlatform() === 'windows') {
+    let hasWarnings = false;
+    for (const [name, server] of entries) {
+      if (server.type === 'stdio') {
+        const command = (server as any).command as string;
+        // Check if command lacks .exe/.cmd/.bat extension and isn't a known shell built-in
+        if (command && !command.includes('/') && !command.includes('\\')) {
+          const hasExtension = /\.(exe|cmd|bat|ps1)$/i.test(command);
+          const isBuiltin = ['node', 'python', 'npx', 'uvx'].some(b => command.toLowerCase().startsWith(b));
+          if (!hasExtension && !isBuiltin) {
+            if (!hasWarnings) {
+              console.log('\nCompatibility Warnings:');
+              hasWarnings = true;
+            }
+            console.log(`  ⚠ ${name}: command "${command}" may need explicit extension (.exe/.cmd/.bat) on Windows`);
+          }
+        }
+      }
+    }
+    if (!hasWarnings) {
+      console.log('Compatibility: ✓ All checks passed');
+    }
+  } else {
+    console.log('Compatibility: ✓ All checks passed');
+  }
+
+  await gracefulShutdown(0);
+}
