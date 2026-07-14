@@ -54,7 +54,7 @@ import { seedEarlyInput, stopCapturingEarlyInput } from './utils/earlyInput.js';
 import { getInitialEffortSetting, parseEffortValue } from './utils/effort.js';
 import { getInitialFastModeSetting, isFastModeEnabled, prefetchFastModeStatus, resolveFastModeStatusFromCache } from './utils/fastMode.js';
 import { applyConfigEnvironmentVariables } from './utils/managedEnv.js';
-import { isZh } from './utils/i18n.js';
+import { isZh, t } from './utils/i18n.js';
 import { createSystemMessage, createUserMessage } from './utils/messages.js';
 import { getPlatform } from './utils/platform.js';
 import { getBaseRenderOptions } from './utils/renderOptions.js';
@@ -1727,7 +1727,7 @@ async function run(): Promise<CommanderCommand> {
         });
         logForDebugging(`[Panda in Chrome] Error: ${error}`);
         logError(error);
-        console.error(`Error: Failed to run with Panda in Chrome.`);
+        console.error(t(`Error: Failed to run with Panda in Chrome.`, `错误：无法启动 Panda in Chrome。`));
         process.exit(1);
       }
     } else if (autoEnableClaudeInChrome) {
@@ -1986,18 +1986,18 @@ async function run(): Promise<CommanderCommand> {
     // NOTE: We do NOT call prefetchAllMcpResources here - that's deferred until after trust dialog
 
     if (inputFormat && inputFormat !== 'text' && inputFormat !== 'stream-json') {
-      console.error(`Error: Invalid input format "${inputFormat}".`);
+      console.error(t(`Error: Invalid input format "${inputFormat}".`, `错误：无效的输入格式 "${inputFormat}"。`));
       process.exit(1);
     }
     if (inputFormat === 'stream-json' && outputFormat !== 'stream-json') {
-      console.error(`Error: --input-format=stream-json requires output-format=stream-json.`);
+      console.error(t(`Error: --input-format=stream-json requires output-format=stream-json.`, `错误：--input-format=stream-json 需要配合 output-format=stream-json。`));
       process.exit(1);
     }
 
     // Validate sdkUrl is only used with appropriate formats (formats are auto-set above)
     if (sdkUrl) {
       if (inputFormat !== 'stream-json' || outputFormat !== 'stream-json') {
-        console.error(`Error: --sdk-url requires both --input-format=stream-json and --output-format=stream-json.`);
+        console.error(t(`Error: --sdk-url requires both --input-format=stream-json and --output-format=stream-json.`, `错误：--sdk-url 需要同时设置 --input-format=stream-json 和 --output-format=stream-json。`));
         process.exit(1);
       }
     }
@@ -2005,7 +2005,7 @@ async function run(): Promise<CommanderCommand> {
     // Validate replayUserMessages is only used with stream-json formats
     if (options.replayUserMessages) {
       if (inputFormat !== 'stream-json' || outputFormat !== 'stream-json') {
-        console.error(`Error: --replay-user-messages requires both --input-format=stream-json and --output-format=stream-json.`);
+        console.error(t(`Error: --replay-user-messages requires both --input-format=stream-json and --output-format=stream-json.`, `错误：--replay-user-messages 需要同时设置 --input-format=stream-json 和 --output-format=stream-json。`));
         process.exit(1);
       }
     }
@@ -2013,7 +2013,7 @@ async function run(): Promise<CommanderCommand> {
     // Validate includePartialMessages is only used with print mode and stream-json output
     if (effectiveIncludePartialMessages) {
       if (!isNonInteractiveSession || outputFormat !== 'stream-json') {
-        writeToStderr(`Error: --include-partial-messages requires --print and --output-format=stream-json.`);
+        writeToStderr(t(`Error: --include-partial-messages requires --print and --output-format=stream-json.`, `错误：--include-partial-messages 需要同时使用 --print 和 --output-format=stream-json。`));
         process.exit(1);
       }
     }
@@ -4906,18 +4906,18 @@ async function run(): Promise<CommanderCommand> {
         process.exit(0);
       }
       if (index.length === 0) {
-        process.stdout.write('No bundled skills registered.\n');
+        process.stdout.write(t('No bundled skills registered.\n', '未注册任何内置技能。\n'));
         process.exit(0);
       }
       const maxNameLen = index.reduce((m, s) => Math.max(m, s.name.length), 0);
-      process.stdout.write(`Bundled skills (${index.length}):\n`);
+      process.stdout.write(t(`Bundled skills (${index.length}):\n`, `内置技能 (${index.length})：\n`));
       for (const skill of index) {
         const padded = skill.name.padEnd(maxNameLen, ' ');
         process.stdout.write(`  ${padded}  ${skill.description}\n`);
       }
       process.exit(0);
     } catch (err) {
-      process.stderr.write(`Failed to list skills: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.stderr.write(t(`Failed to list skills: ${err instanceof Error ? err.message : String(err)}\n`, `技能列表获取失败：${err instanceof Error ? err.message : String(err)}\n`));
       process.exit(1);
     }
   });
