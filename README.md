@@ -245,8 +245,12 @@ panda auth login
 // ~/.pandacc/settings.json
 {
   "enableModelRouting": true,          // Multi-Model Agent Routing
-  "routingPresets": {                   // 路由预设
-    "cost-saving": { "agentModelMap": { "Explore": "haiku", "Plan": "sonnet" } }
+  "activeRoutingPreset": "cost-saving", // 活动路由预设（v2.1.92+）
+  "routingPresets": {                   // 路由预设（v2.1.92+ 使用 agentOverrides）
+    "cost-saving": { 
+      "defaultModel": "haiku-latest",
+      "agentOverrides": { "Explore": "haiku-latest", "Plan": "sonnet-latest" } 
+    }
   },
   "privacyEnhanced": true,             // 隐私增强模式（非 Anthropic 渠道自动启用）
   "autoMemoryEnabled": true,            // 自动记忆系统
@@ -676,7 +680,8 @@ panda
 
 > 完整手册请查看 [第 8 章 命令使用手册](#8-命令使用手册)
 
-### 🧠 /advisor 智能顾问
+<details>
+<summary>🧠 /advisor 智能顾问</summary>
 
 智能决策分析工具，调用更强大的顾问模型提供多方案对比与技术决策建议。
 
@@ -777,6 +782,361 @@ advisor 提供结构化分析：
 panda config  # 更新 API Key
 ```
 
+</details>
+
+---
+
+<details>
+<summary>⚙️ routingPresets 模型路由配置</summary>
+
+多模型智能路由系统，根据 agent 类型自动选择最优模型，支持成本优化、性能优先等多种预设策略。
+
+---
+
+## 快速开始
+
+### 1. 启用模型路由
+
+编辑 `~/.pandacc/settings.json`：
+
+```json
+{
+  "enableModelRouting": true,
+  "activeRoutingPreset": "cost-saving"
+}
+```
+
+### 2. 使用内建预设
+
+| Preset 名称 | 说明 | 默认模型 | 适用场景 |
+|------------|------|---------|---------|
+| `quality` | 性能优先 | opus-latest | 复杂架构决策、深度分析 |
+| `cost-saving` | 成本优化 | haiku-latest | 日常开发、快速迭代 |
+| `balanced` | 平衡模式 | sonnet-latest | 通用场景 |
+| `multi-provider` | 多供应商 | 混合 | 容错/负载均衡 |
+
+```bash
+# 切换预设
+/routing preset cost-saving
+
+# 查看当前配置
+/routing status
+
+# 测试路由决策（干跑）
+/routing test Explore "analyze this code"
+```
+
+---
+
+## 完整配置示例
+
+### 基础配置（使用内建别名）
+
+```json
+{
+  "enableModelRouting": true,
+  "activeRoutingPreset": "cost-saving",
+  "routingPresets": {
+    "cost-saving": {
+      "description": "成本优化 · 使用快速/便宜模型",
+      "defaultModel": "haiku-latest",
+      "agentOverrides": {
+        "Explore": "haiku-latest",
+        "Plan": "sonnet-latest",
+        "architecture-reviewer": "sonnet-latest",
+        "code-generator": "sonnet-latest"
+      },
+      "globalWeights": {
+        "costEfficiency": 3.0,
+        "speed": 2.0,
+        "reasoning": 0.5
+      }
+    }
+  }
+}
+```
+
+### 高级配置（自定义 agent 路由）
+
+```json
+{
+  "enableModelRouting": true,
+  "activeRoutingPreset": "my-custom",
+  "routingPresets": {
+    "my-custom": {
+      "description": "我的自定义预设",
+      "defaultModel": "sonnet-latest",
+      "agentOverrides": {
+        "Explore": "haiku-latest",
+        "Plan": "sonnet-latest",
+        "architecture-reviewer": "opus-latest",
+        "my-custom-agent": "best-reasoning"
+      },
+      "globalWeights": {
+        "reasoning": 2.0,
+        "coding": 2.0,
+        "costEfficiency": 1.0
+      }
+    }
+  }
+}
+```
+
+### 多供应商配置（注册第三方模型）
+
+```json
+{
+  "enableModelRouting": true,
+  "activeRoutingPreset": "multi-provider",
+  "modelRegistry": {
+    "gemini-pro": {
+      "provider": "thirdParty",
+      "endpoint": {
+        "baseURL": "https://generativelanguage.googleapis.com/v1beta",
+        "apiKeyEnv": "GEMINI_API_KEY"
+      },
+      "modelId": "gemini-1.5-pro",
+      "capabilities": {
+        "vision": true,
+        "toolUse": true,
+        "reasoning": 85,
+        "coding": 80,
+        "speed": 90,
+        "costEfficiency": 95
+      }
+    }
+  },
+  "routingPresets": {
+    "multi-provider": {
+      "defaultModel": "sonnet-latest",
+      "agentOverrides": {
+        "Explore": "gemini-pro",
+        "Plan": "sonnet-latest",
+        "architecture-reviewer": "opus-latest"
+      }
+    }
+  }
+}
+```
+
+---
+
+## 配置字段说明
+
+### RoutingPreset 结构
+
+| 字段 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `description` | string | 否 | 人类可读的预设描述 |
+| `defaultModel` | string | 是 | 默认模型别名 |
+| `agentOverrides` | Record<string, string> | 否 | agent 类型 → 模型别名映射 |
+| `globalWeights` | Partial<ModelCapabilities> | 否 | 全局能力权重（0-5） |
+
+### 支持的模型别名
+
+#### 内建别名（第一方模型）
+
+| 别名 | 映射模型 | 说明 |
+|------|---------|------|
+| `opus-latest` | claude-opus-4-20250514 | 最强推理能力 |
+| `sonnet-latest` | claude-sonnet-4-20250514 | 平衡性能与成本 |
+| `haiku-latest` | claude-haiku-4-20250514 | 最快最便宜 |
+| `best-reasoning` | opus-latest | 语义别名（最强推理） |
+| `best-code` | sonnet-latest | 语义别名（最强编码） |
+| `fast` | haiku-latest | 语义别名（最快） |
+| `cheap` | haiku-latest | 语义别名（最便宜） |
+| `balanced` | sonnet-latest | 语义别名（平衡） |
+| `default` | sonnet-latest | 默认模型 |
+
+#### 自定义别名
+
+通过 `modelRegistry` 注册第三方模型后，可使用自定义别名。
+
+### 能力权重 (globalWeights)
+
+| 能力维度 | 范围 | 说明 |
+|---------|------|------|
+| `reasoning` | 0-5 | 推理能力权重 |
+| `coding` | 0-5 | 编码能力权重 |
+| `speed` | 0-5 | 响应速度权重 |
+| `costEfficiency` | 0-5 | 成本效率权重 |
+| `vision` | 0-5 | 视觉理解权重 |
+| `toolUse` | 0-5 | 工具使用权重 |
+
+权重用于任务路由（Priority 7），影响自动模型选择。
+
+---
+
+## 路由优先级链（8 层）
+
+```
+Priority 1: agent.model 为完整模型 ID → 直接透传
+Priority 2: Tool 调用覆盖
+Priority 3: 最低能力要求过滤
+Priority 4: agentOverrides[agentType]  ⬅️ routingPresets 生效点
+Priority 5: agent 首选别名
+Priority 6: agent.model 别名解析
+Priority 7: 任务路由（复杂度 → 能力匹配）
+Priority 8: 继承父模型
+```
+
+**示例**：
+
+- 如果 agent 启动时显式指定 `model: "claude-opus-4-20250514"`，则跳过所有路由逻辑（Priority 1）
+- 如果仅指定 `agentType: "Explore"`，且 `agentOverrides` 中有 `"Explore": "haiku-latest"`，则使用 haiku-latest（Priority 4）
+- 如果 `agentOverrides` 中无该 agent，则使用 `defaultModel`（Priority 8）
+
+---
+
+## CLI 命令速查
+
+| 命令 | 功能 |
+|------|------|
+| `/routing status` | 查看当前路由配置、活动预设、已注册模型 |
+| `/routing preset <name>` | 切换预设（quality/cost-saving/balanced/multi-provider） |
+| `/routing test <agent> <prompt>` | 干跑路由决策测试（不实际执行） |
+
+---
+
+## 配置文件位置
+
+| 位置 | 优先级 | 说明 |
+|------|--------|------|
+| `<project>/.pandacc/settings.json` | 高 | 项目级配置 |
+| `~/.pandacc/settings.json` | 中 | 用户全局配置 |
+| `<policy_dir>/managed-settings.json` | 低 | 管理策略配置 |
+
+---
+
+## 迁移指南（v2.1.91- → v2.1.92+）
+
+### ⚠️ Breaking Change
+
+**旧格式（已废弃）**：
+```json
+{
+  "routingPresets": {
+    "cost-saving": {
+      "agentModelMap": { "Explore": "haiku" }
+    }
+  }
+}
+```
+
+**新格式（当前）**：
+```json
+{
+  "enableModelRouting": true,
+  "activeRoutingPreset": "cost-saving",
+  "routingPresets": {
+    "cost-saving": {
+      "defaultModel": "haiku-latest",
+      "agentOverrides": { "Explore": "haiku-latest" }
+    }
+  }
+}
+```
+
+### 自动迁移脚本
+
+```bash
+# 1. 备份配置
+cp ~/.pandacc/settings.json ~/.pandacc/settings.json.backup
+
+# 2. 替换字段名
+sed -i '' 's/"agentModelMap"/"agentOverrides"/g' ~/.pandacc/settings.json
+
+# 3. 更新模型别名（示例：haiku/sonnet/opus → haiku-latest/sonnet-latest/opus-latest）
+sed -i '' 's/"haiku"/"haiku-latest"/g' ~/.pandacc/settings.json
+sed -i '' 's/"sonnet"/"sonnet-latest"/g' ~/.pandacc/settings.json
+sed -i '' 's/"opus"/"opus-latest"/g' ~/.pandacc/settings.json
+
+# 4. 验证 JSON 合法性
+cat ~/.pandacc/settings.json | jq . > /dev/null && echo "✓ Valid JSON" || echo "✗ Invalid JSON"
+```
+
+---
+
+## 故障排查
+
+### 配置未生效
+
+**症状**：设置了 `routingPresets`，但 agent 仍使用默认模型
+
+**检查清单**：
+
+1. ✅ `enableModelRouting: true` 已设置？
+2. ✅ `activeRoutingPreset` 指向正确的 preset 名称？
+3. ✅ `agentOverrides` 中的 agent 名称匹配？
+4. ✅ 模型别名是否合法？（使用 `/routing status` 查看已注册模型）
+
+**验证方法**：
+
+```bash
+# 查看路由状态
+/routing status
+
+# 测试路由决策
+/routing test Explore "test prompt"
+```
+
+### 模型别名无效
+
+**症状**：提示 "Unknown model alias: xxx"
+
+**原因**：别名不在以下任一清单中：
+
+1. 内建别名（opus-latest/sonnet-latest/haiku-latest/...）
+2. modelRegistry 中注册的自定义模型
+3. 完整模型 ID（如 claude-opus-4-20250514）
+
+**解决方案**：
+
+- 使用内建别名（推荐）
+- 或在 `modelRegistry` 中注册第三方模型
+
+### 循环别名引用
+
+**症状**：启动时提示 "Circular alias detected: A → B → A"
+
+**原因**：`modelRegistry` 中的 `modelId` 互相引用形成循环
+
+**解决方案**：确保别名链最终指向完整模型 ID，不形成环
+
+---
+
+## 适用场景
+
+### ✅ 推荐使用
+
+- **成本优化**：不同 agent 使用不同等级模型（Explore 用 haiku，Plan 用 sonnet）
+- **性能分级**：简单任务用快速模型，复杂任务用强力模型
+- **多供应商容错**：主供应商故障时自动切换备用模型
+- **能力匹配**：根据任务复杂度自动选择合适模型（任务路由）
+
+### ❌ 不推荐使用
+
+- **单一模型场景**：全局使用同一模型时，直接配置 `model` 字段更简单
+- **微优化**：每个 agent 精确到 0.01% 成本差异的过度配置
+
+---
+
+## 注意事项
+
+1. **Agent 名称匹配**：`agentOverrides` 的 key 必须匹配 agent 定义中的 `name` 字段
+   - 内建 agent: `Explore`, `Plan`, `triage`, `architecture-reviewer`, `code-generator`
+   - 自定义 agent: `.pandacc/agents/<name>.md` frontmatter 中的 `name`
+
+2. **配置生效时机**：配置在启动时加载，修改后需**重启 REPL** 生效
+
+3. **模型别名优先级**：完整模型 ID > preset 映射 > 任务路由 > 继承父模型
+
+4. **第三方模型 API Key**：通过环境变量提供（如 `GEMINI_API_KEY`），不要硬编码在配置文件中
+
+---
+
+</details>
+
 ---
 
 ### 2.1 核心命令速查表
@@ -851,9 +1211,11 @@ panda config  # 更新 API Key
 ```json
 {
   "enableModelRouting": true,
+  "activeRoutingPreset": "cost-saving",
   "routingPresets": {
     "cost-saving": {
-      "agentModelMap": { "Explore": "haiku", "Plan": "sonnet" }
+      "defaultModel": "haiku-latest",
+      "agentOverrides": { "Explore": "haiku-latest", "Plan": "sonnet-latest" }
     }
   }
 }
@@ -861,7 +1223,7 @@ panda config  # 更新 API Key
 
 **环境变量启用**：`PANDA_MODEL_ROUTING=1 panda`
 
-> 详见 [第 8 章 命令使用手册](#8-命令使用手册) Multi-Model Routing 章节
+> 详见 [⚙️ routingPresets 模型路由配置](#⚙️-routingpresets-模型路由配置) 完整章节
 
 ### 2.5 快捷键
 
