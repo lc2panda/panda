@@ -1130,16 +1130,11 @@ export const connectToServer = memoize(
         logMCPDebug(name, `In-process Computer Use MCP server started`)
       } else if ((serverRef as ScopedMcpServerConfig).type === 'stdio' || !(serverRef as ScopedMcpServerConfig).type) {
         const stdioRef = serverRef as McpStdioServerConfig
-        let finalCommand =
+        const finalCommand =
           process.env.CLAUDE_CODE_SHELL_PREFIX || stdioRef.command
         const finalArgs = process.env.CLAUDE_CODE_SHELL_PREFIX
           ? [[stdioRef.command, ...stdioRef.args].join(' ')]
           : stdioRef.args
-
-        // Windows 平台下自动解析命令
-        if (process.platform === 'win32' && !process.env.CLAUDE_CODE_SHELL_PREFIX) {
-          finalCommand = resolveWindowsCommand(finalCommand)
-        }
 
         transport = new StdioClientTransport({
           command: finalCommand,
