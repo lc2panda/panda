@@ -1249,6 +1249,31 @@ export const connectToServer = memoize(
         }
       }
 
+      // Windows spawn wrapper: force shell:true for stdio transport to inherit network context.
+      // Root cause: MCP SDK hardcodes `shell: false`, breaking Windows child process network.
+      // Baseline: Cline forces `shell: true` on Windows + full env inheritance.
+      // Implementation: monkey-patch cross-spawn before transport.start(), restore after connect.
+      let originalSpawn: any
+      if (process.platform === 'win32' && (serverRef.type === 'stdio' || !serverRef.type)) {
+        try {
+          const crossSpawn = require('cross-spawn')
+          originalSpawn = crossSpawn.spawn
+          crossSpawn.spawn = function (command: string, args?: any, options?: any) {
+            const patchedOptions = {
+              ...options,
+              shell: true, // Force shell mode for Windows network context inheritance
+            }
+            logMCPDebug(
+              name,
+              `[Windows] Patched spawn call: command=${command}, shell=true`,
+            )
+            return originalSpawn.call(this, command, args, patchedOptions)
+          }
+        } catch (err) {
+          logMCPDebug(name, `[Windows] Failed to patch cross-spawn: ${err}`)
+        }
+      }
+
       const connectPromise = client.connect(transport)
       const timeoutPromise = new Promise<never>((_, reject) => {
         const timeoutId = setTimeout(() => {
@@ -1416,6 +1441,17 @@ export const connectToServer = memoize(
           logMCPError(name, `Server stderr: ${stderrOutput}`)
         }
         throw error
+      } finally {
+        // Restore original spawn after connection attempt (success or failure)
+        if (originalSpawn) {
+          try {
+            const crossSpawn = require('cross-spawn')
+            crossSpawn.spawn = originalSpawn
+            logMCPDebug(name, `[Windows] Restored original cross-spawn`)
+          } catch (err) {
+            logMCPDebug(name, `[Windows] Failed to restore cross-spawn: ${err}`)
+          }
+        }
       }
 
       const capabilities = client.getServerCapabilities()
