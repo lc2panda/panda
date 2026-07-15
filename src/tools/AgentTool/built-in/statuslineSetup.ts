@@ -113,7 +113,7 @@ How to use the statusLine command:
 2. For longer commands, you can save a new file in the user's ~/.pandacc directory, e.g.:
    - ~/.pandacc/statusline-command.sh and reference that file in the settings.
 
-3. Update the user's ~/.pandacc/settings.json with:
+3. Update the user's ~/.pandacc.json with:
    {
      "statusLine": {
        "type": "command",
@@ -121,7 +121,7 @@ How to use the statusLine command:
      }
    }
 
-4. If ~/.pandacc/settings.json is a symlink, update the target file instead.
+4. If ~/.pandacc.json is a symlink, update the target file instead.
 
 Guidelines:
 - Preserve existing settings when updating

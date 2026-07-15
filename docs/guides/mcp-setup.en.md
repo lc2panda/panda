@@ -10,14 +10,14 @@ Panda configuration file paths vary by operating system:
 
 | Operating System | Configuration File Path |
 |-----------------|------------------------|
-| **Windows** | `%USERPROFILE%\.pandacc\settings.json` |
-| **macOS** | `~/.pandacc/settings.json` |
-| **Linux** | `~/.pandacc/settings.json` |
+| **Windows** | `%USERPROFILE%\.pandacc.json` |
+| **macOS** | `~/.pandacc.json` |
+| **Linux** | `~/.pandacc.json` |
 
 **Example absolute paths**:
-- Windows: `C:\Users\YourName\.pandacc\settings.json`
-- macOS: `/Users/YourName/.pandacc/settings.json`
-- Linux: `/home/YourName/.pandacc/settings.json`
+- Windows: `C:\Users\YourName\.pandacc.json`
+- macOS: `/Users/YourName/.pandacc.json`
+- Linux: `/home/YourName/.pandacc.json`
 
 ---
 
@@ -194,7 +194,7 @@ uvx --version
 uvx cdp-bridge@latest
 
 # Check configuration file syntax
-cat ~/.pandacc/settings.json | python -m json.tool
+cat ~/.pandacc.json | python -m json.tool
 ```
 
 ### Issue 2: Browser extension cannot connect

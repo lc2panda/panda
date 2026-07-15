@@ -4146,6 +4146,15 @@ async function run(): Promise<CommanderCommand> {
     } = await import('./cli/handlers/mcp.js');
     await mcpDoctorHandler();
   });
+  mcp.command('install [names...]').description('Auto-install MCP servers from presets · 自动安装预置的 MCP 服务器').option('--force', 'Force overwrite existing configuration').option('--args <args>', 'Additional arguments to pass to the MCP server').action(async (names: string[], options: {
+    force?: boolean;
+    args?: string;
+  }) => {
+    const {
+      mcpInstallHandler
+    } = await import('./cli/handlers/mcp.js');
+    await mcpInstallHandler(names, options);
+  });
 
   // claude server
   if (feature('DIRECT_CONNECT')) {

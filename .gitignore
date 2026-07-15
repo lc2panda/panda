@@ -15,6 +15,7 @@ coverage
 package-v2.1.88
 monitor
 docs
+!docs/guides/
 data
 /plugins/
 PC命令使用手册.md

@@ -29,6 +29,7 @@ import { UrlInstaller } from '../../cli/mcp/installers/urlInstaller.js'
 import { GitHubInstaller } from '../../cli/mcp/installers/githubInstaller.js'
 import type { BaseInstaller } from '../../cli/mcp/installers/base.js'
 import { getGlobalConfig } from '../../utils/config.js'
+import { getGlobalClaudeFile } from '../../utils/env.js'
 import { readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 import os from 'os'
@@ -235,7 +236,7 @@ async function addMcpServerToSettings(
   force?: boolean
 ): Promise<void> {
   const globalConfig = getGlobalConfig()
-  const settingsPath = globalConfig.settingsPath || path.join(os.homedir(), '.pandacc', 'settings.json')
+  const settingsPath = globalConfig.settingsPath || getGlobalClaudeFile()
 
   let settings: any = {}
   try {
@@ -298,7 +299,7 @@ function formatPreviewMessage(preview: McpInstallPreview): string {
 **操作**：
 
 1. 下载并配置 ${preview.name}
-2. 添加到 \`~/.pandacc/settings.json\`
+2. 添加到 \`~/.pandacc.json\`
 3. 测试连接
 
 **确认**：回复 "yes" 或 "确认" 继续安装，回复 "no" 或 "取消" 中止。`

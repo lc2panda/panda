@@ -131,10 +131,16 @@ export const init = memoize(async (): Promise<void> => {
     const initResult = initDefaultPandaccSettings({ silent: true })
     const envCount = initResult.newlyAddedKeys.length
     const topCount = initResult.newlyAddedTopLevelKeys.length
-    if (envCount > 0 || topCount > 0) {
+    // 仅首次初始化（新增字段 > 5）或文件修复时提示，正常补齐静默
+    if (envCount + topCount >= 5) {
       // eslint-disable-next-line no-console
-      console.error(
-        `[Panda] 已补齐 settings.json 缺失默认项：${envCount} 项 env + ${topCount} 项顶层 settings（不覆盖已有配置）`,
+      console.log(
+        `[Panda] 初始化配置文件：${envCount} 项 env + ${topCount} 项 settings`,
+      )
+    } else if (process.env.DEBUG?.includes('panda') && (envCount > 0 || topCount > 0)) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[Panda] 补齐配置项：${envCount} 项 env + ${topCount} 项 settings`,
       )
     }
   } catch {
