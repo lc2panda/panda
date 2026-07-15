@@ -178,10 +178,10 @@ export function initDefaultPandaccSettings(options?: {
   // Migration: PANDA_AGENT_MAX_TURNS '10' → '200' (v2.21+)
   // The old default of 10 caused agent output truncation for complex tasks.
   // See runAgent.ts:814-819 comments for context.
-  let migrated = false
+  const migratedKeys: string[] = []
   if (mergedEnv.PANDA_AGENT_MAX_TURNS === '10') {
     mergedEnv.PANDA_AGENT_MAX_TURNS = '200'
-    migrated = true
+    migratedKeys.push('PANDA_AGENT_MAX_TURNS')
   }
   // Migration v2.27.x Bug G：反转 v2.25.53 迁移。
   // 已落盘的 '600000'（由 v2.25.53 migration 强制写入）还原为 '0'，恢复 v2.20.9
@@ -189,15 +189,15 @@ export function initDefaultPandaccSettings(options?: {
   // 不触碰 PANDA_DEBUG：用户可能故意开诊断模式，强制改 '0' 会丢失场景。
   if (mergedEnv.PANDA_AGENT_TIMEOUT_MS === '600000') {
     mergedEnv.PANDA_AGENT_TIMEOUT_MS = '0'
-    migrated = true
+    migratedKeys.push('PANDA_AGENT_TIMEOUT_MS')
   }
   if (mergedEnv.PANDA_FORK_TIMEOUT_MS === '600000') {
     mergedEnv.PANDA_FORK_TIMEOUT_MS = '0'
-    migrated = true
+    migratedKeys.push('PANDA_FORK_TIMEOUT_MS')
   }
 
   // 幂等：env / 顶层都无变化且无迁移，直接 return
-  if (newlyAddedKeys.length === 0 && newlyAddedTopLevelKeys.length === 0 && !migrated) {
+  if (newlyAddedKeys.length === 0 && newlyAddedTopLevelKeys.length === 0 && migratedKeys.length === 0) {
     return { newlyAddedKeys: [], newlyAddedTopLevelKeys: [], skipped: false }
   }
 

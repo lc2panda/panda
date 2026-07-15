@@ -15,7 +15,105 @@
 
 **Panda** 是一个本地优先、隐私安全的 AI 伙伴 CLI：编码助手 + 智能助理 + 系统感知 + 生活管理一体。支持 Anthropic / DeepSeek / Kimi / Qwen / MiniMax / GLM / 火山引擎 / OpenAI 多 Provider，并提供图形化桌面端 **Panda Desk Chat**。
 
-🚀 **快速上手**：[一行命令安装](#方式一推荐--一行零门槛安装) → [升级](#114-升级与更新) → [桌面端 Panda Desk Chat](#111-panda-desk-chat-ui-桌面端--下载安装与升级)。完整能力清单与版本演进见文末「[更新历史](#更新历史)」。
+🚀 **快速上手**：[一行命令安装](#方式一推荐--一行零门槛安装) → [升级](#114-升级与更新) → [桌面端 Panda Desk Chat](#111-panda-desk-chat-ui-桌面端--下载安装与升级) → [MCP 配置](#mcp-server-configuration)。完整能力清单与版本演进见文末「[更新历史](#更新历史)」。
+
+## MCP Server Configuration
+
+Panda CLI 支持 Model Context Protocol (MCP)，可扩展浏览器自动化、文档集成等能力。
+
+### 自动安装（推荐）
+
+使用内置 `panda mcp install` 命令：
+
+```bash
+# 安装单个 MCP 服务器
+panda mcp install cdp-bridge
+
+# 批量安装多个服务器
+panda mcp install cdp-bridge lark-mcp wps-office
+
+# 强制覆盖已有配置
+panda mcp install cdp-bridge --force
+```
+
+**可用的 MCP 服务器**：
+- **cdp-bridge**: Chrome DevTools Protocol 浏览器自动化
+- **lark-mcp**: 飞书/Lark 集成
+- **wps-office**: WPS Office 集成
+- **github**: GitHub 仓库集成
+- **filesystem**: 本地文件系统访问
+
+### 手动安装
+
+如果你偏好手动配置：
+
+**1. 安装依赖**
+
+对于 `uvx`（cdp-bridge 需要）：
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (PowerShell)
+irm https://astral.sh/uv/install.ps1 | iex
+```
+
+对于 `npx`（大多数其他服务器需要）：
+- 从 https://nodejs.org 安装 Node.js
+
+**2. 编辑配置文件**
+
+打开 `~/.pandacc.json` 并添加：
+
+```json
+{
+  "mcpServers": {
+    "cdp-bridge": {
+      "command": "uvx",
+      "args": ["cdp-bridge@latest"]
+    },
+    "lark-mcp": {
+      "command": "npx",
+      "args": ["-y", "@larksuite/lark-mcp"]
+    }
+  }
+}
+```
+
+**3. 验证安装**
+
+```bash
+panda mcp doctor
+```
+
+预期输出：
+```
+✓ Configuration file found: ~/.pandacc.json
+✓ 2 MCP servers configured
+
+Checking MCP servers...
+✓ cdp-bridge         - Connected
+✓ lark-mcp          - Connected
+
+Summary: 2 connected, 0 missing dependencies, 0 failed
+```
+
+### 故障排查
+
+**问题**：`uvx: command not found`  
+**解决**：安装 `uv` 并重启终端（见上方步骤 1）
+
+**问题**：`Connection failed` 或 `Connection timeout`  
+**解决**：运行 `panda mcp doctor` 诊断问题
+
+**问题**：服务器已配置  
+**解决**：使用 `--force` 标志覆盖：`panda mcp install cdp-bridge --force`
+
+**详细 MCP 配置指南**：
+- [English Guide](docs/guides/mcp-setup.en.md)
+- [中文指南](docs/guides/mcp-setup.md)
+
+---
 
 ## 1. 安装与配置
 
@@ -237,12 +335,12 @@ panda auth login
 #### 工作流与 daemon 目录（v2.27.8）
 
 - **工作流定义**：放在 `~/.pandacc/workflows/`（用户级）或 `<project>/.pandacc/workflows/`（项目级），仅识别 `.json` 文件。详见命令手册「v2.27.8 新能力 · 工作流引擎」。
-- **daemon**：无 settings.json 配置项，不随 REPL 自动拉起；需显式 `panda daemon start` 启动，PID 文件位于 `~/.pandacc/daemon.pid`、工作目录 `~/.pandacc/daemon/`。
+- **daemon**：不随 REPL 自动拉起；需显式 `panda daemon start` 启动，PID 文件位于 `~/.pandacc/daemon.pid`、工作目录 `~/.pandacc/daemon/`。
 
-#### settings.json — 全局设置
+#### ~/.pandacc.json — 全局设置
 
 ```jsonc
-// ~/.pandacc/settings.json
+// ~/.pandacc.json
 {
   "enableModelRouting": true,          // Multi-Model Agent Routing
   "activeRoutingPreset": "cost-saving", // 活动路由预设（v2.1.92+）
@@ -273,7 +371,7 @@ panda auth login
 ```
 环境变量 HTTPS_PROXY / HTTP_PROXY / NO_PROXY
     ↓ 未设置
-settings.json 的 "proxy" 字段
+~/.pandacc.json 的 "proxy" 字段
     ↓ 未设置
 Windows PAC 自动检测（系统代理脚本）
     ↓ 未命中
@@ -594,7 +692,7 @@ panda 启动最早期会把 `proxy` 注入 `process.env.HTTPS_PROXY / HTTP_PROXY
 | `PANDA_PROVIDER` | v2.21.16 — 设为 `openai` 启用 OpenAI provider（由 `panda auth login` 自动写入，手动设置仅用于调试） |
 | `OPENAI_API_KEY` | v2.21.16 — OpenAI **API key 模式**（`mode: 'api_key'`）使用，走 `api.openai.com/v1`；**ChatGPT backend 模式**（v2.21.24 默认）不需要此 env |
 | `OPENAI_BASE_URL` | v2.21.16 — OpenAI 兼容端点 base URL，默认 `https://api.openai.com/v1`（自建代理 / Azure OpenAI 兼容层时覆盖；仅对 API key 模式生效） |
-| `HTTPS_PROXY` | v2.21.24 — HTTPS 流量代理（标准 env，优先级最高，覆盖 settings.json `proxy` 字段） |
+| `HTTPS_PROXY` | v2.21.24 — HTTPS 流量代理（标准 env，优先级最高，覆盖 ~/.pandacc.json `proxy` 字段） |
 | `HTTP_PROXY` | v2.21.24 — HTTP 流量代理（同上） |
 | `NO_PROXY` | v2.21.24 — 代理排除列表（逗号分隔，如 `localhost,127.0.0.1,*.internal`） |
 
@@ -640,8 +738,8 @@ export NO_PROXY=localhost,127.0.0.1,*.internal
 panda auth login            # 选 OpenAI → OAuth → ↑↓ 选模型 → 完成
 panda                       # 直接对话，走 chatgpt.com/backend-api/codex/responses
 
-# 方式 B：写入 settings.json（持久化，全用户全 panda 实例生效）
-# 在 ~/.pandacc/settings.json 加：  "proxy": "http://127.0.0.1:7897"
+# 方式 B：写入配置文件（持久化，全用户全 panda 实例生效）
+# 在 ~/.pandacc.json 加：  "proxy": "http://127.0.0.1:7897"
 
 # 方式 C：MITM 自签证书绕过（科学上网工具拦截 TLS 时）
 export PANDA_OAUTH_CA_FILE=/path/to/mitmproxy-ca-cert.pem
@@ -658,7 +756,7 @@ panda
 
 | 现象 | 原因 | 解决方案 |
 |---|---|---|
-| OpenAI 登录后对话报 `unknown certificate verification error` | Bun runtime 不读系统 CA store，遇到科学上网工具的 MITM 证书无法验证 | 在 `~/.pandacc/settings.json` 加 `"proxy": "http://127.0.0.1:7897"`（端口改成你工具的实际混合端口）；或导出 MITM 根证书，设 `PANDA_OAUTH_CA_FILE=<path>` |
+| OpenAI 登录后对话报 `unknown certificate verification error` | Bun runtime 不读系统 CA store，遇到科学上网工具的 MITM 证书无法验证 | 在 `~/.pandacc.json` 加 `"proxy": "http://127.0.0.1:7897"`（端口改成你工具的实际混合端口）；或导出 MITM 根证书，设 `PANDA_OAUTH_CA_FILE=<path>` |
 | `/model gpt-5-codex` 报 `not supported when using Codex with a ChatGPT account` | `gpt-5-codex` 仅 ChatGPT Plus / Pro 账户可用，Free 账户被服务端拒绝 | 改用 `/model gpt-5.4-mini`（Free 可用）；或升级订阅后设 `PANDA_CODEX_ALLOW_CODEX_MODEL=1` 显式解锁 |
 | `curl` 报 `Proxy CONNECT aborted` | Windows PAC 给的代理 URL 是远端标识符（如 `proxy.company.com:8080`）而非本地入口 | 手动设 `HTTPS_PROXY=http://127.0.0.1:7897`（指向本地 Clash / V2Ray / sing-box 的混合端口） |
 | OAuth 回调 `localhost:1455` 永远不返回 | 浏览器走代理把 `localhost` 也代理出去了 | 设 `NO_PROXY=localhost,127.0.0.1`，或把代理工具的"绕过本地地址"打开 |
@@ -797,7 +895,7 @@ panda config  # 更新 API Key
 
 ### 1. 启用模型路由
 
-编辑 `~/.pandacc/settings.json`：
+编辑 `~/.pandacc.json`：
 
 ```json
 {
@@ -828,16 +926,16 @@ panda config  # 更新 API Key
 
 ---
 
-## 完整配置示例（settings.json 配置时去掉 // 示例说明）
+## 完整配置示例（配置文件去掉 // 示例说明）
 
 > **⚠️ 重要提示**  
 > 以下示例包含 `//` 行内注释，用于说明参数含义。  
-> **JSON 标准不支持注释**，实际配置 `settings.json` 时**必须删除所有 `//` 及其后的注释文字**。  
+> **JSON 标准不支持注释**，实际配置时**必须删除所有 `//` 及其后的注释文字**。  
 > 
 > **快速去注释方法**：  
 > ```bash
 > # 方式 1：使用 jq 自动去注释并格式化
-> cat settings-with-comments.json | grep -v '//' | jq . > ~/.pandacc/settings.json
+> cat settings-with-comments.json | grep -v '//' | jq . > ~/.pandacc.json
 > 
 > # 方式 2：使用编辑器（VS Code）
 > # 选中所有内容 → Ctrl+/ (Windows) / Cmd+/ (Mac) → 删除注释行
@@ -1046,7 +1144,7 @@ Priority 8: 继承父模型
 | 位置 | 优先级 | 说明 |
 |------|--------|------|
 | `<project>/.pandacc/settings.json` | 高 | 项目级配置 |
-| `~/.pandacc/settings.json` | 中 | 用户全局配置 |
+| `~/.pandacc.json` | 中 | 用户全局配置 |
 | `<policy_dir>/managed-settings.json` | 低 | 管理策略配置 |
 
 ---
@@ -1084,18 +1182,18 @@ Priority 8: 继承父模型
 
 ```bash
 # 1. 备份配置
-cp ~/.pandacc/settings.json ~/.pandacc/settings.json.backup
+cp ~/.pandacc.json ~/.pandacc.json.backup
 
 # 2. 替换字段名
-sed -i '' 's/"agentModelMap"/"agentOverrides"/g' ~/.pandacc/settings.json
+sed -i '' 's/"agentModelMap"/"agentOverrides"/g' ~/.pandacc.json
 
 # 3. 更新模型别名（示例：haiku/sonnet/opus → haiku-latest/sonnet-latest/opus-latest）
-sed -i '' 's/"haiku"/"haiku-latest"/g' ~/.pandacc/settings.json
-sed -i '' 's/"sonnet"/"sonnet-latest"/g' ~/.pandacc/settings.json
-sed -i '' 's/"opus"/"opus-latest"/g' ~/.pandacc/settings.json
+sed -i '' 's/"haiku"/"haiku-latest"/g' ~/.pandacc.json
+sed -i '' 's/"sonnet"/"sonnet-latest"/g' ~/.pandacc.json
+sed -i '' 's/"opus"/"opus-latest"/g' ~/.pandacc.json
 
 # 4. 验证 JSON 合法性
-cat ~/.pandacc/settings.json | jq . > /dev/null && echo "✓ Valid JSON" || echo "✗ Invalid JSON"
+cat ~/.pandacc.json | jq . > /dev/null && echo "✓ Valid JSON" || echo "✗ Invalid JSON"
 ```
 
 ---
@@ -1249,7 +1347,7 @@ cat ~/.pandacc/settings.json | jq . > /dev/null && echo "✓ Valid JSON" || echo
 - 路由决策历史：`/routing status` 显示最近 5 条决策
 - Format Alignment：OpenAI↔Anthropic 格式转换层（预留）
 
-**配置示例**（`settings.json`）：
+**配置示例**（`~/.pandacc.json`）：
 
 ```json
 {
@@ -1680,7 +1778,7 @@ EOF
 # 环境变量
 PANDA_CONTEXT_COLLAPSE=1 panda
 
-# 或 settings.json（feature flag CONTEXT_COLLAPSE 已启用）
+# 或在 ~/.pandacc.json 中启用（feature flag CONTEXT_COLLAPSE 已启用）
 ```
 
 **工作原理**：
@@ -2658,7 +2756,6 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 - **PID 文件**: `~/.pandacc/daemon.pid`
 - **工作目录**: `~/.pandacc/daemon/`
 - **单例锁**：已运行时再 `start` 会报 `Daemon already running (pid=...). Use "panda daemon stop" first.`。
-- **无 settings.json 配置项**，不随 REPL 自动拉起，需显式 `panda daemon start`。
 - **稳定性**：陈旧锁自动清理、孤儿 pty-host 清理、worker 崩溃自动 respawn。
 
 #### 2.3 后台任务面板（`/tasks`）
@@ -2686,7 +2783,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 - **Worker**: 具有完整工具权限的通用 worker
 
 #### Multi-Model Agent Routing
-- **启用**: `PANDA_MODEL_ROUTING=1` 或 settings.json `enableModelRouting: true`
+- **启用**: `PANDA_MODEL_ROUTING=1` 或 `~/.pandacc.json` 中 `enableModelRouting: true`
 - **说明**: 不同 agent 使用不同模型，按能力路由，版本无关
 - **命令**: `/routing [status|preset <name>|test <agent> <prompt>]`
   - `/routing status` — 查看路由配置和已注册模型
@@ -2703,7 +2800,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
   - `triage` — 快速分类（maxTurns=3）
 - **技巧**:
   - Agent .md frontmatter 支持 `modelPreferences` 和 `modelPreset`
-  - 第三方模型通过 settings.json `modelRegistry` 注册
+  - 第三方模型通过 `~/.pandacc.json` 中 `modelRegistry` 注册
   - 自定义别名通过 `customModelAliases` 配置
   - 路由默认关闭（`enableModelRouting: false`），不影响现有行为
 
@@ -2897,7 +2994,7 @@ v2.5 新增跨平台 IM 连接器，支持 6 个主流通讯平台：
 | 配置不确定 | `/doctor` 诊断 |
 | Read/Grep 结果被折叠 | `PANDA_NO_AUTO_COLLAPSE=1` |
 | 安全限制阻碍研究 | `PANDA_SECURITY_RESEARCH=1` |
-| **Desk Chat 启动后服务商为空** | 打开“设置 → 服务商”查看 CLI 快照；优先检查 `~/.pandacc/settings.json` 的 `env.ANTHROPIC_*`、`~/.pandacc.json` 的 `thirdPartyProvider`，或重新运行 `panda auth login` |
+| **Desk Chat 启动后服务商为空** | 打开”设置 → 服务商”查看 CLI 快照；优先检查 `~/.pandacc.json` 的 `env.ANTHROPIC_*` 或 `thirdPartyProvider`，或重新运行 `panda auth login` |
 | **Desk Chat 发送后停在 Thinking...** | 升级到含 stream error 回传的版本；若仍复现，看 DevTools / 主进程日志中的 `panda:chat:stream:error`，通常是认证、模型或 CLI 子进程退出导致 |
 | **历史桌宠问题** | `panda-on-desk` 已降级为 v2.25.x 历史归档，不再作为当前桌面端入口；历史资料见 `packages/panda-on-desk/STATUS.md` |
 

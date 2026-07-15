@@ -10,14 +10,14 @@
 
 | 操作系统 | 配置文件路径 |
 |---------|-------------|
-| **Windows** | `%USERPROFILE%\.pandacc\settings.json` |
-| **macOS** | `~/.pandacc/settings.json` |
-| **Linux** | `~/.pandacc/settings.json` |
+| **Windows** | `%USERPROFILE%\.pandacc.json` |
+| **macOS** | `~/.pandacc.json` |
+| **Linux** | `~/.pandacc.json` |
 
 **实际路径示例**：
-- Windows: `C:\Users\YourName\.pandacc\settings.json`
-- macOS: `/Users/YourName/.pandacc/settings.json`
-- Linux: `/home/YourName/.pandacc/settings.json`
+- Windows: `C:\Users\YourName\.pandacc.json`
+- macOS: `/Users/YourName/.pandacc.json`
+- Linux: `/home/YourName/.pandacc.json`
 
 ---
 
@@ -194,7 +194,7 @@ uvx --version
 uvx cdp-bridge@latest
 
 # 检查配置文件语法
-cat ~/.pandacc/settings.json | python -m json.tool
+cat ~/.pandacc.json | python -m json.tool
 ```
 
 ### 问题 2：浏览器扩展无法连接

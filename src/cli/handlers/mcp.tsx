@@ -7,6 +7,8 @@ import { stat } from 'fs/promises';
 import pMap from 'p-map';
 import { cwd } from 'process';
 import React from 'react';
+import { execFileNoThrow } from '../../utils/execFileNoThrow.js';
+import { getPlatform } from '../../utils/platform.js';
 import { MCPServerDesktopImportDialog } from '../../components/MCPServerDesktopImportDialog.js';
 import { render } from '../../ink.js';
 import { KeybindingSetup } from '../../keybindings/KeybindingProviderSetup.js';
@@ -18,12 +20,200 @@ import type { ConfigScope, ScopedMcpServerConfig } from '../../services/mcp/type
 import { McpServerConfigSchema } from '../../services/mcp/types.js';
 import { describeMcpConfigFilePath, ensureConfigScope, getScopeLabel } from '../../services/mcp/utils.js';
 import { AppStateProvider } from '../../state/AppState.js';
-import { getCurrentProjectConfig, getGlobalConfig, saveCurrentProjectConfig } from '../../utils/config.js';
+import { getCurrentProjectConfig, getGlobalConfig, saveCurrentProjectConfig, saveGlobalConfig } from '../../utils/config.js';
+import { env } from '../../utils/env.js';
 import { isFsInaccessible } from '../../utils/errors.js';
 import { gracefulShutdown } from '../../utils/gracefulShutdown.js';
 import { safeParseJSON } from '../../utils/json.js';
-import { getPlatform } from '../../utils/platform.js';
 import { cliError, cliOk } from '../exit.js';
+/**
+ * 检查命令是否存在于系统 PATH
+ */
+async function commandExists(command: string): Promise<boolean> {
+  try {
+    const checkCmd = getPlatform() === 'windows' ? 'where' : 'which';
+    const result = await execFileNoThrow(checkCmd, [command]);
+    return result.code === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 获取依赖的安装指令
+ */
+function getDependencyInstallGuide(dep: string): string {
+  if (dep === 'uvx') {
+    const platform = getPlatform();
+    if (platform === 'windows') {
+      return 'irm https://astral.sh/uv/install.ps1 | iex';
+    }
+    return 'curl -LsSf https://astral.sh/uv/install.sh | sh';
+  }
+
+  if (dep === 'npx') {
+    return 'npm install -g npm\n    (or install Node.js from https://nodejs.org)';
+  }
+
+  return `Check the documentation for installing '${dep}'`;
+}
+
+/**
+ * MCP 服务器预置配置
+ */
+const MCP_PRESETS: Record<string, {
+  command: string;
+  args: string[];
+  description: string;
+  requireDependency: 'uvx' | 'npx' | 'none';
+}> = {
+  'cdp-bridge': {
+    command: 'uvx',
+    args: ['cdp-bridge@latest'],
+    description: 'Chrome DevTools Protocol Bridge for browser automation',
+    requireDependency: 'uvx'
+  },
+  'lark-mcp': {
+    command: 'npx',
+    args: ['-y', '@larksuite/lark-mcp'],
+    description: 'Lark/Feishu integration',
+    requireDependency: 'npx'
+  },
+  'wps-office': {
+    command: 'npx',
+    args: ['-y', 'wps-office-mcp'],
+    description: 'WPS Office integration',
+    requireDependency: 'npx'
+  },
+  'github': {
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-github'],
+    description: 'GitHub repository integration',
+    requireDependency: 'npx'
+  },
+  'filesystem': {
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-filesystem'],
+    description: 'Local filesystem access',
+    requireDependency: 'npx'
+  },
+  'puppeteer': {
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-puppeteer'],
+    description: 'Browser automation with Puppeteer',
+    requireDependency: 'npx'
+  },
+  'postgres': {
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-postgres'],
+    description: 'PostgreSQL database integration',
+    requireDependency: 'npx'
+  },
+  'sqlite': {
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-sqlite'],
+    description: 'SQLite database integration',
+    requireDependency: 'npx'
+  }
+};
+
+/**
+ * 检查依赖是否已安装
+ */
+async function checkDependency(dep: 'uvx' | 'npx'): Promise<{
+  installed: boolean;
+  path?: string;
+  installCommand: string;
+}> {
+  const platform = env.platform;
+  const cmd = platform === 'win32' ? 'where' : 'which';
+
+  try {
+    const result = await execFileNoThrow(cmd, [dep], { timeout: 5000 });
+    if (result.code === 0) {
+      const path = result.stdout.trim().split('\n')[0];
+      return {
+        installed: true,
+        path,
+        installCommand: getDependencyInstallGuide(dep)
+      };
+    } else {
+      return {
+        installed: false,
+        installCommand: getDependencyInstallGuide(dep)
+      };
+    }
+  } catch (_error) {
+    return {
+      installed: false,
+      installCommand: getDependencyInstallGuide(dep)
+    };
+  }
+}
+
+/**
+ * 添加 MCP 服务器配置到配置文件
+ */
+async function addMcpServerToSettings(
+  name: string,
+  config: { command: string; args: string[] },
+  options?: { force?: boolean }
+): Promise<{ success: boolean; overwritten: boolean }> {
+  const globalConfig = getGlobalConfig();
+  const mcpServers = globalConfig.mcpServers || {};
+
+  // 检查是否已存在
+  const exists = name in mcpServers;
+  if (exists && !options?.force) {
+    // 需要用户确认
+    const readline = await import('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    const answer = await new Promise<string>((resolve) => {
+      rl.question(`${name} already configured. Overwrite? (y/N): `, resolve);
+    });
+    rl.close();
+
+    if (answer.toLowerCase() !== 'y' && answer.toLowerCase() !== 'yes') {
+      return { success: false, overwritten: false };
+    }
+  }
+
+  // 写入配置
+  mcpServers[name] = {
+    type: 'stdio',
+    ...config
+  };
+
+  saveGlobalConfig(current => ({
+    ...current,
+    mcpServers
+  }));
+
+  return { success: true, overwritten: exists };
+}
+
+/**
+ * 验证 MCP 连接
+ */
+async function verifyMcpConnection(name: string): Promise<boolean> {
+  try {
+    const globalConfig = getGlobalConfig();
+    const server = globalConfig.mcpServers?.[name];
+    if (!server) {
+      return false;
+    }
+
+    const result = await connectToServer(name, server as ScopedMcpServerConfig);
+    return result.type === 'connected';
+  } catch (_error) {
+    return false;
+  }
+}
+
 async function checkMcpServerHealth(name: string, server: ScopedMcpServerConfig): Promise<string> {
   try {
     const result = await connectToServer(name, server);
@@ -346,10 +536,10 @@ export async function mcpDoctorHandler(): Promise<void> {
   console.log('MCP Configuration Health Check');
   console.log('================================\n');
 
-  // 1. Check settings.json existence
+  // 1. Check settings file existence
   try {
     const globalConfig = getGlobalConfig();
-    const settingsPath = globalConfig.settingsPath || '~/.pandacc/settings.json';
+    const settingsPath = globalConfig.settingsPath || '~/.pandacc.json';
     console.log(`Settings file: ✓ ${settingsPath}`);
   } catch (error) {
     console.log(`Settings file: ✗ Error reading settings`);
@@ -371,11 +561,56 @@ export async function mcpDoctorHandler(): Promise<void> {
   console.log('Server Status:');
   const entries = Object.entries(configs);
   const results = await pMap(entries, async ([name, server]) => {
+    // Check command dependency first (for stdio servers)
+    if (server.type === 'stdio') {
+      const command = (server as any).command as string;
+      if (command) {
+        // Extract base command (remove path if present)
+        const baseCommand = command.split(/[/\\]/).pop() || command;
+        const commandAvailable = await commandExists(baseCommand);
+
+        if (!commandAvailable) {
+          return {
+            name,
+            server,
+            status: 'dependency_missing',
+            command: baseCommand
+          };
+        }
+      }
+    }
+
+    // Proceed with health check if dependency exists
     const status = await checkMcpServerHealth(name, server);
     return { name, server, status };
   }, { concurrency: getMcpServerConnectionBatchSize() });
 
-  for (const { name, server, status } of results) {
+  // Separate results by status type
+  const connectedCount = results.filter(r => typeof r.status === 'string' && r.status.startsWith('✓')).length;
+  const depMissingCount = results.filter(r => r.status === 'dependency_missing').length;
+  const failedCount = results.length - connectedCount - depMissingCount;
+
+  for (const result of results) {
+    const { name, server, status } = result;
+
+    // Handle dependency missing case
+    if (status === 'dependency_missing' && 'command' in result) {
+      const cmd = (result as any).command;
+      console.log(`- ${name}: ✗ Command '${cmd}' not found\n`);
+      console.log(`  This server requires '${cmd}' to run.\n`);
+      console.log(`  To install ${cmd}:`);
+
+      const installGuide = getDependencyInstallGuide(cmd);
+      const lines = installGuide.split('\n');
+      for (const line of lines) {
+        console.log(`    ${line}`);
+      }
+
+      console.log(`\n  After installation, restart your terminal and run 'panda mcp doctor' again.\n`);
+      continue;
+    }
+
+    // Handle normal status display
     let commandDisplay = '';
     if (server.type === 'stdio') {
       const args = Array.isArray((server as any).args) ? (server as any).args : [];
@@ -386,8 +621,14 @@ export async function mcpDoctorHandler(): Promise<void> {
       commandDisplay = server.url;
     }
 
-    const statusIcon = status.startsWith('✓') ? '✓' : status.startsWith('!') ? '!' : '✗';
-    console.log(`- ${name}: ${statusIcon} ${status}${commandDisplay ? ` (${commandDisplay})` : ''}`);
+    const statusStr = typeof status === 'string' ? status : '✗ Unknown';
+    const statusIcon = statusStr.startsWith('✓') ? '✓' : statusStr.startsWith('!') ? '!' : '✗';
+    console.log(`- ${name}: ${statusIcon} ${statusStr}${commandDisplay ? ` (${commandDisplay})` : ''}`);
+  }
+
+  // Summary
+  if (depMissingCount > 0 || failedCount > 0) {
+    console.log(`\nSummary: ${connectedCount} connected, ${depMissingCount} missing dependencies, ${failedCount} failed\n`);
   }
 
   // 4. Platform compatibility checks
@@ -421,4 +662,141 @@ export async function mcpDoctorHandler(): Promise<void> {
   }
 
   await gracefulShutdown(0);
+}
+
+// mcp install (auto-install MCP servers)
+export async function mcpInstallHandler(
+  names: string[],
+  options?: { args?: string; force?: boolean }
+): Promise<void> {
+  if (names.length === 0) {
+    console.log('Available MCP servers:\n');
+    for (const [name, preset] of Object.entries(MCP_PRESETS)) {
+      console.log(`  ${name.padEnd(20)} - ${preset.description}`);
+    }
+    console.log('\nUsage: panda mcp install <name> [--force]');
+    console.log('Example: panda mcp install cdp-bridge');
+    console.log('\n通用包安装示例:');
+    console.log('  panda mcp install @larksuite/lark-mcp      # npm 包');
+    console.log('  panda mcp install npm:package-name         # 显式指定 npm');
+    console.log('  panda mcp install pypi:package-name        # PyPI 包');
+    console.log('  panda mcp install github:user/repo         # GitHub 仓库');
+    console.log('  panda mcp install https://example.com/mcp  # URL 下载');
+    await gracefulShutdown(0);
+    return;
+  }
+
+  let installedCount = 0;
+  let failedCount = 0;
+
+  for (const name of names) {
+    console.log(`\nInstalling ${name}...`);
+
+    // 1. 检查是否为预置配置
+    const preset = MCP_PRESETS[name];
+    if (!preset) {
+      // 尝试通用包管理器
+      console.log(`  未找到预置配置，尝试通用安装...`);
+      const success = await installGenericMcpPackage(name, options);
+      if (success) {
+        installedCount++;
+      } else {
+        failedCount++;
+      }
+      continue;
+    }
+
+    console.log(`  Description: ${preset.description}`);
+
+    // 2. 检查依赖
+    if (preset.requireDependency !== 'none') {
+      const depCheck = await checkDependency(preset.requireDependency);
+      if (!depCheck.installed) {
+        console.log(`✗ ${preset.requireDependency} not found`);
+        console.log(`\nTo install ${preset.requireDependency}:`);
+        const lines = depCheck.installCommand.split('\n');
+        for (const line of lines) {
+          console.log(`  ${line}`);
+        }
+        console.log(`\nAfter installation, run 'panda mcp install ${name}' again.`);
+        failedCount++;
+        continue;
+      }
+      console.log(`✓ Checking ${preset.requireDependency}... found at ${depCheck.path}`);
+    }
+
+    // 3. 写入配置
+    try {
+      const result = await addMcpServerToSettings(
+        name,
+        {
+          command: preset.command,
+          args: options?.args ? [...preset.args, options.args] : preset.args
+        },
+        { force: options?.force }
+      );
+
+      if (!result.success) {
+        console.log(`✗ Installation cancelled by user`);
+        failedCount++;
+        continue;
+      }
+
+      if (result.overwritten) {
+        console.log(`✓ Updated ${name} in ~/.pandacc.json`);
+      } else {
+        console.log(`✓ Added ${name} to ~/.pandacc.json`);
+      }
+    } catch (error) {
+      console.log(`✗ Failed to write configuration: ${(error as Error).message}`);
+      failedCount++;
+      continue;
+    }
+
+    // 4. 验证连接
+    console.log(`  Testing connection...`);
+    const connected = await verifyMcpConnection(name);
+    if (connected) {
+      console.log(`✓ Connection test passed`);
+      console.log(`✓ ${name} installed successfully!`);
+      installedCount++;
+    } else {
+      console.log(`⚠ ${name} configured, but connection test failed`);
+      console.log(`  Run 'panda mcp doctor' for details`);
+      installedCount++;
+    }
+  }
+
+  // 总结
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`Summary: ${installedCount} installed, ${failedCount} failed`);
+  if (installedCount > 0) {
+    console.log(`\nRun 'panda mcp doctor' to verify all MCP servers.`);
+  }
+  console.log('');
+
+  await gracefulShutdown(0);
+}
+
+/**
+ * 通用 MCP 包安装（npm, pypi, github, url 等）
+ */
+async function installGenericMcpPackage(
+  source: string,
+  options?: { force?: boolean; args?: string }
+): Promise<boolean> {
+  try {
+    const { handleMcpInstall } = await import('./mcpInstall.js');
+    await handleMcpInstall([source], {
+      force: options?.force,
+      scope: 'user'
+    });
+    return true;
+  } catch (error: any) {
+    console.log(`✗ 通用安装失败: ${error.message}`);
+    if (process.env.DEBUG) {
+      console.log(`  堆栈: ${error.stack}`);
+    }
+    return false;
+  }
 }

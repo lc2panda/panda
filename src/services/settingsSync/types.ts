@@ -59,7 +59,7 @@ export type SettingsSyncUploadResult = {
  * Keys used for sync entries
  */
 export const SYNC_KEYS = {
-  USER_SETTINGS: '~/.pandacc/settings.json',
+  USER_SETTINGS: '~/.pandacc.json',
   USER_MEMORY: '~/.pandacc/CLAUDE.md',
   projectSettings: (projectId: string) =>
     `projects/${projectId}/.pandacc/settings.local.json`,
