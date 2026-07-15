@@ -1425,6 +1425,22 @@ export const AgentTool = buildTool({
     };
   },
   mapToolResultToToolResultBlockParam(data, toolUseID) {
+    // Defense: type guard to ensure this is AgentTool's output
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      !('status' in data) ||
+      typeof data.status !== 'string'
+    ) {
+      // Not AgentTool output - should not happen, but handle gracefully
+      console.warn('[AgentTool] mapToolResultToToolResultBlockParam called with non-AgentTool data:', data);
+      return {
+        tool_use_id: toolUseID,
+        type: 'tool_result',
+        content: typeof data === 'string' ? data : JSON.stringify(data),
+      };
+    }
+
     // Multi-agent spawn result
     const internalData = data as InternalOutput;
     if (typeof internalData === 'object' && internalData !== null && 'status' in internalData && internalData.status === 'teammate_spawned') {
