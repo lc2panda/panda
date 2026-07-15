@@ -41,6 +41,9 @@ package-v2.1.*/
 # Build artifacts (tarballs)
 *.tgz
 
+# Test artifacts
+mcp-test-logs/
+
 # Local dev files
 .claude/
 CLAUDE1.md
