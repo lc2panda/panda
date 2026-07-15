@@ -2,6 +2,7 @@
 // Output: 已连接 / 待重连 / 失败 / 需鉴权的 MCPServerConnection + 其 tool/command/resource 列表
 // Pos: services/mcp/ 中心枢纽，所有 MCP 连接 & 调用 & 工具同步都从此进/出
 // 一旦此处的连接/工具行为发生变化，请同步更新本头部注释，以及所属文件夹 README。
+
 import { feature } from 'bun:bundle'
 import type {
   Base64ImageSource,
@@ -320,6 +321,103 @@ import { basename, dirname, extname, isAbsolute, join } from 'path'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
+
+type SpawnFn = typeof import('cross-spawn').spawn
+
+// ---------------------------------------------------------------------------
+// Windows spawn singleton patch (refcounted)
+// ---------------------------------------------------------------------------
+// 背景：MCP SDK 在 stdio transport 上硬编码 `shell: false`，导致 Windows 子进程
+// 无法继承网络上下文（Cline 的 Windows baseline 强制 `shell: true` + 全环境继承）。
+// 修复：在 win32 上对 `cross-spawn` 做 monkey-patch，注入 `shell: true`。
+//
+// 并发安全：原本的 patch/restore 是 per-call 的，会被 `processBatched(...)` 的
+// 并发连接踩踏——最先完成的连接在 finally 里恢复原始 spawn，其他正在 spawn 的
+// 连接就拿不到 shell:true，随机失败。因此改为「进程级单例 + 引用计数」：
+//   - refCount === 0 时第一个调用方安装 patch，保存 original；
+//   - 后续调用方仅 refCount++；
+//   - 最后一个 release 调用方才把 original 还原。
+// 非 win32 直接返回 no-op release。
+// 可被测试覆盖：通过 `__resetWin32SpawnPatchForTests()` 强制重置（仅测试使用）。
+let globalOriginalSpawn: SpawnFn | null = null
+let patchRefCount = 0
+
+/**
+ * Acquire a process-wide Windows `cross-spawn` patch that injects `shell: true`.
+ * Returns a release function; the patch is only removed when the last holder releases.
+ *
+ * Non-win32 platforms return a no-op release.
+ */
+export function acquireWin32SpawnPatch(name: string): () => void {
+  if (process.platform !== 'win32') {
+    return () => {}
+  }
+  if (patchRefCount === 0) {
+    try {
+      const crossSpawn = require('cross-spawn')
+      globalOriginalSpawn = crossSpawn.spawn as SpawnFn
+      crossSpawn.spawn = function (command: string, args?: any, options?: any) {
+        const patchedOptions = {
+          ...options,
+          shell: true, // Force shell mode for Windows network context inheritance
+        }
+        logMCPDebug(
+          name,
+          `[Windows] Patched spawn call: command=${command}, shell=true`,
+        )
+        return globalOriginalSpawn!.call(this, command, args, patchedOptions)
+      } as SpawnFn
+      logMCPDebug(name, `[Windows] Installed cross-spawn patch (refcount=1)`)
+    } catch (err) {
+      logMCPDebug(name, `[Windows] Failed to patch cross-spawn: ${err}`)
+      // Leave refCount at 0 so subsequent acquires can retry.
+      return () => {}
+    }
+  } else {
+    logMCPDebug(
+      name,
+      `[Windows] Reusing cross-spawn patch (refcount=${patchRefCount + 1})`,
+    )
+  }
+  patchRefCount++
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    patchRefCount--
+    if (patchRefCount <= 0) {
+      patchRefCount = 0
+      if (globalOriginalSpawn) {
+        try {
+          const crossSpawn = require('cross-spawn')
+          crossSpawn.spawn = globalOriginalSpawn as SpawnFn
+          logMCPDebug(name, `[Windows] Restored original cross-spawn`)
+        } catch (err) {
+          logMCPDebug(name, `[Windows] Failed to restore cross-spawn: ${err}`)
+        }
+        globalOriginalSpawn = null
+      }
+    }
+  }
+}
+
+/**
+ * Test-only: force-reset the singleton patch state. Production code must NEVER
+ * call this. Used by unit tests to simulate concurrent acquire/release under
+ * different platform/runtime conditions.
+ */
+export function __resetWin32SpawnPatchForTests(): void {
+  if (globalOriginalSpawn) {
+    try {
+      const crossSpawn = require('cross-spawn')
+      crossSpawn.spawn = globalOriginalSpawn as SpawnFn
+    } catch {
+      // ignore
+    }
+  }
+  globalOriginalSpawn = null
+  patchRefCount = 0
+}
 
 const MCP_AUTH_CACHE_TTL_MS = 15 * 60 * 1000 // 15 min
 
@@ -1252,27 +1350,14 @@ export const connectToServer = memoize(
       // Windows spawn wrapper: force shell:true for stdio transport to inherit network context.
       // Root cause: MCP SDK hardcodes `shell: false`, breaking Windows child process network.
       // Baseline: Cline forces `shell: true` on Windows + full env inheritance.
-      // Implementation: monkey-patch cross-spawn before transport.start(), restore after connect.
-      let originalSpawn: any
-      if (process.platform === 'win32' && (serverRef.type === 'stdio' || !serverRef.type)) {
-        try {
-          const crossSpawn = require('cross-spawn')
-          originalSpawn = crossSpawn.spawn
-          crossSpawn.spawn = function (command: string, args?: any, options?: any) {
-            const patchedOptions = {
-              ...options,
-              shell: true, // Force shell mode for Windows network context inheritance
-            }
-            logMCPDebug(
-              name,
-              `[Windows] Patched spawn call: command=${command}, shell=true`,
-            )
-            return originalSpawn.call(this, command, args, patchedOptions)
-          }
-        } catch (err) {
-          logMCPDebug(name, `[Windows] Failed to patch cross-spawn: ${err}`)
-        }
-      }
+      // Implementation: refcounted singleton patch via acquireWin32SpawnPatch().
+      //   Concurrency-safe: multiple concurrent stdio connects share one patch;
+      //   the patch is only removed when the last holder releases.
+      const releaseWin32SpawnPatch =
+        process.platform === 'win32' &&
+        (serverRef.type === 'stdio' || !serverRef.type)
+          ? acquireWin32SpawnPatch(name)
+          : () => {}
 
       const connectPromise = client.connect(transport)
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -1442,16 +1527,9 @@ export const connectToServer = memoize(
         }
         throw error
       } finally {
-        // Restore original spawn after connection attempt (success or failure)
-        if (originalSpawn) {
-          try {
-            const crossSpawn = require('cross-spawn')
-            crossSpawn.spawn = originalSpawn
-            logMCPDebug(name, `[Windows] Restored original cross-spawn`)
-          } catch (err) {
-            logMCPDebug(name, `[Windows] Failed to restore cross-spawn: ${err}`)
-          }
-        }
+        // Release the Windows cross-spawn patch. Refcounted singleton ensures
+        // concurrent connects keep the patch active until the LAST holder releases.
+        releaseWin32SpawnPatch()
       }
 
       const capabilities = client.getServerCapabilities()
@@ -2025,10 +2103,18 @@ export async function ensureConnectedClient(
 
   const connectedClient = await connectToServer(client.name, client.config)
   if (connectedClient.type !== 'connected') {
-    throw new TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS(
-      `MCP server "${client.name}" is not connected`,
-      'MCP server not connected',
-    )
+    // Evict failed result from memoize cache and retry once. This prevents
+    // permanently cached failures (e.g., from win32 spawn patch race condition)
+    // from blocking all subsequent worker reconnect attempts.
+    connectToServer.cache.delete(getServerCacheKey(client.name, client.config))
+    const retryResult = await connectToServer(client.name, client.config)
+    if (retryResult.type !== 'connected') {
+      throw new TelemetrySafeError_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS(
+        `MCP server "${client.name}" is not connected`,
+        'MCP server not connected',
+      )
+    }
+    return retryResult
   }
   return connectedClient
 }
@@ -3727,7 +3813,7 @@ export async function setupSdkMcpClients(
       )
 
       try {
-        // Connect the client
+        // Connect the client (SdkControlClientTransport is in-process, no spawn/shell needed)
         await client.connect(transport)
 
         // Get capabilities from the server
