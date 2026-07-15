@@ -77,10 +77,18 @@ export const MCPTool = buildTool({
     }
   },
   mapToolResultToToolResultBlockParam(content, toolUseID) {
+    // Defense: handle both direct content and wrapped {data, mcpMeta} structure
+    let contentToReturn = content
+
+    // If content is wrapped in {data: ...} structure (from call method), unwrap it
+    if (content && typeof content === 'object' && 'data' in content && !Array.isArray(content)) {
+      contentToReturn = content.data
+    }
+
     return {
       tool_use_id: toolUseID,
       type: 'tool_result',
-      content,
+      content: contentToReturn,
     }
   },
 } satisfies ToolDef<InputSchema, Output>)
