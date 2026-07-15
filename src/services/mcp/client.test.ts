@@ -3,10 +3,14 @@
 // Pos: guard MCP stdio launch and transport config validation
 
 import { test, expect, describe } from 'bun:test'
-import { resolveWindowsCommand } from './client.js'
+// import { resolveWindowsCommand } from './client.js'  // Removed - cross-spawn handles automatically
 import { McpServerConfigSchema } from './types.js'
 
-describe('resolveWindowsCommand', () => {
+// resolveWindowsCommand 已移除：cross-spawn 自动处理 Windows 命令扩展名
+// 手动追加 .cmd/.exe 会破坏 cross-spawn 的自动机制，导致 Windows MCP 全部失败
+// 参考：WINDOWS-MCP-ROOT-CAUSE.md
+/*
+describe.skip('resolveWindowsCommand (deprecated)', () => {
   test('npx 添加 .cmd 后缀', () => {
     expect(resolveWindowsCommand('npx')).toBe('npx.cmd')
   })
@@ -72,6 +76,7 @@ describe('resolveWindowsCommand', () => {
     expect(resolveWindowsCommand('.')).toBe('.')
   })
 })
+*/
 
 describe('McpServerConfigSchema', () => {
   test('url 配置缺少 type 时给出明确 transport 提示', () => {
