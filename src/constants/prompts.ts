@@ -365,6 +365,10 @@ function getSessionSpecificGuidanceSection(
     getIsNonInteractiveSession()
       ? null
       : `If you need the user to run a shell command themselves (e.g., an interactive login like \`gcloud auth login\`), suggest they type \`! <command>\` in the prompt — the \`!\` prefix runs the command in this session so its output lands directly in the conversation.`,
+    // MCP server installation guidance — critical for disambiguating user intent
+    hasSkills
+      ? `When users mention installing MCP servers, use the mcp-install skill. Clear triggers include "安装 MCP 服务器 <name>", "install MCP server <name>", or "/mcp install <name>". For ambiguous cases like "安装 <package-name>" without "MCP" context, ask for clarification: "您是要安装 MCP 服务器吗？" before proceeding. This prevents confusion with directory paths or other installation types.`
+      : null,
     // isForkSubagentEnabled() reads getIsNonInteractiveSession() — must be
     // post-boundary or it fragments the static prefix on session type.
     hasAgentTool ? getAgentToolSection() : null,
