@@ -400,7 +400,25 @@ async function executeMcpInstall(
 export function registerMcpInstallSkill(): void {
   registerBundledSkill({
     name: 'mcp-install',
-    description: '在对话中安装 MCP 服务器（支持 npm/pypi/url/github）',
+    description: `Install MCP (Model Context Protocol) servers for Panda CLI.
+
+**Trigger keywords**: "安装 MCP", "install MCP", "添加 MCP 服务器", "MCP 服务器", "MCP server"
+
+**Examples**:
+- "安装 MCP 服务器 cdp-bridge"
+- "帮我安装 MCP: @larksuite/lark-mcp"
+- "添加 MCP 服务器 filesystem"
+- "install MCP server cdp-bridge"
+
+**Supported sources**:
+- npm packages: @scope/package or package-name
+- PyPI packages: package-name
+- GitHub repos: github:user/repo
+- URLs: https://example.com/server
+
+**Important**: This installs MCP servers for Panda CLI, NOT Claude Code or file directories.
+
+在对话中安装 MCP 服务器（支持 npm/pypi/url/github）`,
     userInvocable: true,
     argumentHint: '<source> [--name <custom-name>] [--force]',
     async getPromptForCommand(args, context) {
