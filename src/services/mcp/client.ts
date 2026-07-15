@@ -432,10 +432,38 @@ export function resolveWindowsCommand(command: string): string {
     return command
   }
 
-  // npm/npx/yarn/pnpm 是 .cmd 脚本（非 .exe）
-  const cmdScripts = ['npm', 'npx', 'yarn', 'pnpm']
+  // Windows 下通过包管理器安装的 .cmd 脚本
+  // 这些命令在 Windows 上是批处理脚本，需要添加 .cmd 扩展名才能正确执行
+  const cmdScripts = [
+    // Node.js ecosystem
+    'npm',
+    'npx',
+    'yarn',
+    'pnpm',
 
-  // 其他常见 CLI 工具追加 .exe
+    // Python ecosystem
+    'uv',
+    'uvx',
+    'pip',
+    'pipx',
+    'poetry',
+    'pdm',
+
+    // Ruby ecosystem
+    'gem',
+    'bundle',
+
+    // Rust ecosystem
+    'cargo',
+
+    // Other build tools
+    'gradle',
+    'mvn',
+    'make',
+    'cmake',
+  ]
+
+  // Windows 下的 .exe 可执行文件
   const exeCommands = [
     'node',
     'python',
@@ -445,6 +473,9 @@ export function resolveWindowsCommand(command: string): string {
     'bun',
     'docker',
     'podman',
+    'go',
+    'java',
+    'dotnet',
   ]
 
   const baseName = basename(command)
