@@ -3,6 +3,9 @@
   "version": "2.32.0-beta.6",
   "upstreamClaudeCodeVersion": "2.1.202",
   "description": "AI terminal assistant — multi-provider, privacy-first, cross-platform",
+  "_changelog": {
+    "v2.32.0-beta.7": "Windows MCP stdio transport 修复验证版本 — 强制 shell:true 匹配 Cline 基线 | 需要 Windows 用户启用 DEBUG=mcp:* 环境变量测试 cdp-bridge | 验证点: 日志中应出现 '[Windows] Patched spawn call'"
+  },
   "main": "dist/cli.js",
   "type": "module",
   "author": "lc2panda",
