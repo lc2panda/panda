@@ -57,3 +57,19 @@ WINDOWS_*.md
 FABLE*.md
 UPSTREAM_*.md
 .git-rewrite/
+
+# Local test and investigation files
+AI_CODING_*.md
+WINDOWS-*-ROOT-CAUSE.md
+WINDOWS-TEST-*.md
+WINDOWS-FIX-*.md
+WINDOWS-VERIFICATION-*.md
+WINDOWS-QUICKREF.txt
+test-*.sh
+test-*.ps1
+test-*.bat
+test-*.cmd
+test-*.js
+windows-mcp-test-config.json
+cdp-bridge-investigation-report.md
+src/tools/MCPTool/MCPTool.integration.test.md
