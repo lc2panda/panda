@@ -74,6 +74,9 @@ export function NativeAutoUpdater({
     if (isUpdatingRef.current) {
       return;
     }
+    if (process.env.PANDA_SKIP_UPDATE_CHECK === '1') {
+      return;
+    }
     if (("production" as string) === 'test' || ("production" as string) === 'development') {
       logForDebugging('NativeAutoUpdater: Skipping update check in test/dev environment');
       return;
@@ -152,13 +155,14 @@ export function NativeAutoUpdater({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onAutoUpdaterResult, channel]);
 
-  // Initial check
+  // Initial check (delayed 30 seconds)
   useEffect(() => {
-    void checkForUpdates();
+    const timer = setTimeout(() => void checkForUpdates(), 30000);
+    return () => clearTimeout(timer);
   }, [checkForUpdates]);
 
-  // Check every 30 minutes
-  useInterval(checkForUpdates, 30 * 60 * 1000);
+  // Check every 3 hours
+  useInterval(checkForUpdates, 3 * 60 * 60 * 1000);
   const hasUpdateResult = !!autoUpdaterResult?.version;
   const hasVersionInfo = !!versions.current && !!versions.latest;
   // Show the component when:

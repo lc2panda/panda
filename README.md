@@ -1114,6 +1114,33 @@ Priority 8: 继承父模型
 
 ---
 
+## 环境变量
+
+### CI/自动化场景
+
+- **`PANDA_SKIP_UPDATE_CHECK=1`** - 跳过自动更新检查，适用于 CI/CD 管道或自动化脚本场景
+
+  ```bash
+  # 示例：在 CI 环境中使用
+  PANDA_SKIP_UPDATE_CHECK=1 panda doctor
+  
+  # GitHub Actions
+  env:
+    PANDA_SKIP_UPDATE_CHECK: "1"
+  
+  # GitLab CI
+  variables:
+    PANDA_SKIP_UPDATE_CHECK: "1"
+  ```
+
+  **适用场景**：
+  - CI/CD 流水线中运行 `panda` 命令
+  - 自动化测试脚本
+  - Docker 容器内执行（固定版本镜像）
+  - 离线环境或受限网络环境
+
+---
+
 ## 迁移指南（v2.1.91- → v2.1.92+）
 
 ### ⚠️ Breaking Change

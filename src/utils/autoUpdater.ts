@@ -68,6 +68,9 @@ export type MaxVersionConfig = {
  * This approach keeps version comparison logic simple while maintaining traceability via the SHA.
  */
 export async function assertMinVersion(): Promise<void> {
+  if (process.env.PANDA_SKIP_UPDATE_CHECK === '1') {
+    return
+  }
   if (process.env.NODE_ENV === 'test') {
     return
   }

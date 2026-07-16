@@ -28,6 +28,9 @@ export function PackageManagerAutoUpdater(t0) {
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
     t1 = async () => {
       false || false;
+      if (process.env.PANDA_SKIP_UPDATE_CHECK === '1') {
+        return;
+      }
       if (isAutoUpdaterDisabled()) {
         return;
       }
@@ -59,7 +62,8 @@ export function PackageManagerAutoUpdater(t0) {
   let t3;
   if ($[1] === Symbol.for("react.memo_cache_sentinel")) {
     t2 = () => {
-      checkForUpdates();
+      const timer = setTimeout(() => checkForUpdates(), 30000);
+      return () => clearTimeout(timer);
     };
     t3 = [checkForUpdates];
     $[1] = t2;
@@ -69,7 +73,7 @@ export function PackageManagerAutoUpdater(t0) {
     t3 = $[2];
   }
   React.useEffect(t2, t3);
-  useInterval(checkForUpdates, 1800000);
+  useInterval(checkForUpdates, 3 * 60 * 60 * 1000);
   if (!updateAvailable) {
     return null;
   }
