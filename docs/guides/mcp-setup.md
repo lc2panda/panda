@@ -164,6 +164,17 @@ Available MCP servers:
 
 ---
 
+**注意（v2.32.0+ 用户）**
+
+如果您使用 Panda v2.32.0 或更高版本，Windows 平台已自动兼容 stdio transport：
+- 无需手动配置 `shell: true`
+- 环境变量自动传递（`PATH`、`NODE_OPTIONS` 等）
+- 竞态启动问题已修复（共享 cwd 序列化启动）
+
+如遇问题，优先使用 `panda mcp doctor` 诊断。
+
+---
+
 ## 5. 常见问题排查
 
 ### 问题 1：Tool reference not found

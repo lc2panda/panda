@@ -19,51 +19,28 @@
 
 ## MCP Server Configuration
 
-Panda CLI 支持 Model Context Protocol (MCP)，可扩展浏览器自动化、文档集成等能力。
+Panda CLI 支持 **Model Context Protocol (MCP)**，可扩展浏览器自动化、文档集成等能力。
 
-### 自动安装（推荐）
+### 快速开始
 
-使用内置 `panda mcp install` 命令：
+**方式 1：对话式安装**（最简单）
 
-```bash
-# 安装单个 MCP 服务器
-panda mcp install cdp-bridge
-
-# 批量安装多个服务器
-panda mcp install cdp-bridge lark-mcp wps-office
-
-# 强制覆盖已有配置
-panda mcp install cdp-bridge --force
+直接在对话中提及 MCP 服务器，AI 会自动触发安装：
+```
+帮我安装 cdp-bridge MCP 服务器
 ```
 
-**可用的 MCP 服务器**：
-- **cdp-bridge**: Chrome DevTools Protocol 浏览器自动化
-- **lark-mcp**: 飞书/Lark 集成
-- **wps-office**: WPS Office 集成
-- **github**: GitHub 仓库集成
-- **filesystem**: 本地文件系统访问
+**方式 2：命令行安装**
 
-### 手动安装
-
-如果你偏好手动配置：
-
-**1. 安装依赖**
-
-对于 `uvx`（cdp-bridge 需要）：
 ```bash
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows (PowerShell)
-irm https://astral.sh/uv/install.ps1 | iex
+panda mcp install cdp-bridge        # 安装单个服务器
+panda mcp install lark-mcp wps-office  # 批量安装
+panda mcp doctor                     # 健康检查
 ```
 
-对于 `npx`（大多数其他服务器需要）：
-- 从 https://nodejs.org 安装 Node.js
+**方式 3：手动配置**（高级用户）
 
-**2. 编辑配置文件**
-
-打开 `~/.pandacc.json` 并添加：
+编辑 `~/.pandacc.json`：
 
 ```json
 {
@@ -71,47 +48,35 @@ irm https://astral.sh/uv/install.ps1 | iex
     "cdp-bridge": {
       "command": "uvx",
       "args": ["cdp-bridge@latest"]
-    },
-    "lark-mcp": {
-      "command": "npx",
-      "args": ["-y", "@larksuite/lark-mcp"]
     }
   }
 }
 ```
 
-**3. 验证安装**
+### 平台兼容性
 
-```bash
-panda mcp doctor
-```
-
-预期输出：
-```
-✓ Configuration file found: ~/.pandacc.json
-✓ 2 MCP servers configured
-
-Checking MCP servers...
-✓ cdp-bridge         - Connected
-✓ lark-mcp          - Connected
-
-Summary: 2 connected, 0 missing dependencies, 0 failed
-```
+| 平台 | 支持状态 | 说明 |
+|------|---------|------|
+| **macOS** | 原生支持 | 无需额外配置 |
+| **Linux** | 原生支持 | 无需额外配置 |
+| **Windows** | 自动兼容（v2.32.0+） | stdio transport 已自动处理环境变量和 shell 模式 |
 
 ### 故障排查
 
-**问题**：`uvx: command not found`  
-**解决**：安装 `uv` 并重启终端（见上方步骤 1）
+**问题：安装后工具不可用**
+```bash
+panda mcp doctor  # 自动诊断配置、依赖、连接状态
+```
 
-**问题**：`Connection failed` 或 `Connection timeout`  
-**解决**：运行 `panda mcp doctor` 诊断问题
+**问题：依赖未安装**
+- `uvx` (Python MCP)：[安装指南](https://docs.astral.sh/uv/)
+- `npx` (Node.js MCP)：[安装 Node.js](https://nodejs.org)
 
-**问题**：服务器已配置  
-**解决**：使用 `--force` 标志覆盖：`panda mcp install cdp-bridge --force`
+### 详细文档
 
-**详细 MCP 配置指南**：
-- [English Guide](docs/guides/mcp-setup.en.md)
-- [中文指南](docs/guides/mcp-setup.md)
+- [完整配置指南](docs/guides/mcp-setup.md)（中文）
+- [Full Setup Guide](docs/guides/mcp-setup.en.md)（English）
+- [MCP 协议原理](docs/extensibility/mcp-protocol.mdx)
 
 ---
 

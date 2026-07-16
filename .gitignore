@@ -56,3 +56,4 @@ P[0-9]-*.md
 WINDOWS_*.md
 FABLE*.md
 UPSTREAM_*.md
+.git-rewrite/

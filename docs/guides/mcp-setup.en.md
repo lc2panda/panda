@@ -164,6 +164,17 @@ On first startup, the browser extension may display an `ERR_CONNECTION_REFUSED` 
 
 ---
 
+**Note for v2.32.0+ Users**
+
+If you are using Panda v2.32.0 or higher, Windows platform now has automatic stdio transport compatibility:
+- No need to manually configure `shell: true`
+- Environment variables automatically passed (`PATH`, `NODE_OPTIONS`, etc.)
+- Race condition on startup fixed (shared cwd serialized startup)
+
+If you encounter issues, use `panda mcp doctor` for diagnosis first.
+
+---
+
 ## 5. Troubleshooting
 
 ### Issue 1: Tool reference not found
