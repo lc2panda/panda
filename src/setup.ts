@@ -377,13 +377,12 @@ export async function setup(
   // Pre-fetch data for Logo v2 - await to ensure it's ready before logo renders.
   // --bare / SIMPLE: skip — release notes are interactive-UI display data,
   // and getRecentActivity() reads up to 10 session JSONL files.
+  // Recent activity must preload regardless of release notes — otherwise
+  // second launch (lastReleaseNotesSeen == current) leaves cachedActivity=[]
+  // and the welcome feed falls into empty / wrong fallbacks.
   if (!isBareMode()) {
-    const { hasReleaseNotes } = await checkForReleaseNotes(
-      getGlobalConfig().lastReleaseNotesSeen,
-    )
-    if (hasReleaseNotes) {
-      await getRecentActivity()
-    }
+    await checkForReleaseNotes(getGlobalConfig().lastReleaseNotesSeen)
+    await getRecentActivity()
   }
 
   // If permission mode is set to bypass, verify we're in a safe environment

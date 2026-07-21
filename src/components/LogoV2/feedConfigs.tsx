@@ -46,21 +46,9 @@ export function createRecentActivityFeed(activities: LogOption[]): FeedConfig {
       timestamp: time
     };
   });
-  // 如果没有最近活动，尝试展示超级助手习惯记忆
-  if (lines.length === 0) {
-    try {
-      const habitsPath = findLatestProjectMemoryFile('procedural', 'habits.md')
-      if (habitsPath && existsSync(habitsPath)) {
-        const content = readFileSync(habitsPath, 'utf-8')
-        const recentLines = content.split('\n')
-          .filter(l => l.trim() && !l.startsWith('#') && !l.startsWith('---'))
-          .slice(-3)
-          .reverse()
-          .map(l => ({ text: l.trim().slice(0, 60) }))
-        if (recentLines.length > 0) lines.push(...recentLines)
-      }
-    } catch {}
-  }
+  // Empty activities → empty feed (emptyMessage). Do NOT fall back to
+  // cross-project habits.md — that surfaces unrelated ISO tool_use lines
+  // (e.g. 2026-04-11) as "Recent activity".
   return {
     title: t('Recent activity', '最近活动'),
     lines,
