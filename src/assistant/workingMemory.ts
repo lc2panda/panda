@@ -87,6 +87,14 @@ const MEMORY_FILE_TMP = MEMORY_FILE + '.tmp'
 const MEMORY_FILE_V1_BAK = MEMORY_FILE + '.v1-bak'
 const TTL_MS = 24 * 60 * 60 * 1000
 
+/**
+ * 豁免 24h TTL 的 key 集合。
+ * sessionStartTime 只写一次，updatedAt 不会刷新；若套用 TTL，
+ * 超时后 get 返回 undefined → REPL 用 now 回填 → 会话时长被重置。
+ * 仅此 key；勿扩大豁免面。
+ */
+const NO_TTL_KEYS = new Set(['sessionStartTime'])
+
 const LIMITS = {
   global: 50,
   project: 30,
@@ -231,7 +239,8 @@ function ensureSessionBucket(
   return session
 }
 
-function isFresh(entry: StoredEntry, now: number): boolean {
+function isFresh(entry: StoredEntry, now: number, key?: string): boolean {
+  if (key !== undefined && NO_TTL_KEYS.has(key)) return true
   return now - entry.updatedAt < TTL_MS
 }
 
@@ -240,7 +249,7 @@ function pruneExpired(store: StoreV2, now: number = Date.now()): boolean {
   let changed = false
 
   for (const key of Object.keys(store.global)) {
-    if (!isFresh(store.global[key]!, now)) {
+    if (!isFresh(store.global[key]!, now, key)) {
       delete store.global[key]
       changed = true
     }
@@ -249,7 +258,7 @@ function pruneExpired(store: StoreV2, now: number = Date.now()): boolean {
   for (const slug of Object.keys(store.projects)) {
     const project = store.projects[slug]!
     for (const key of Object.keys(project.entries)) {
-      if (!isFresh(project.entries[key]!, now)) {
+      if (!isFresh(project.entries[key]!, now, key)) {
         delete project.entries[key]
         changed = true
       }
@@ -257,7 +266,7 @@ function pruneExpired(store: StoreV2, now: number = Date.now()): boolean {
     for (const sid of Object.keys(project.sessions)) {
       const session = project.sessions[sid]!
       for (const key of Object.keys(session.entries)) {
-        if (!isFresh(session.entries[key]!, now)) {
+        if (!isFresh(session.entries[key]!, now, key)) {
           delete session.entries[key]
           changed = true
         }
@@ -320,7 +329,8 @@ function migrateV1ToV2(
       typeof e.updatedAt === 'number' && Number.isFinite(e.updatedAt)
         ? e.updatedAt
         : now
-    if (now - updatedAt >= TTL_MS) continue
+    // NO_TTL_KEYS 在迁移时也保留（与 isFresh 一致）
+    if (now - updatedAt >= TTL_MS && !NO_TTL_KEYS.has(e.key)) continue
 
     const scope = resolveWorkingMemoryScope(e.key)
     const stored: StoredEntry = { value: e.value, updatedAt }
@@ -570,7 +580,7 @@ export function getWorkingMemory(
 
   const tryScope = (s: WorkingMemoryScope): string | undefined => {
     const entry = readFromScope(store, key, s, project, sessionId)
-    if (entry && isFresh(entry, now)) return entry.value
+    if (entry && isFresh(entry, now, key)) return entry.value
     return undefined
   }
 
@@ -624,7 +634,7 @@ export function getAllWorkingMemory(opts?: {
   const out: WorkingMemoryEntry[] = []
 
   for (const [key, entry] of Object.entries(store.global)) {
-    if (isFresh(entry, now)) {
+    if (isFresh(entry, now, key)) {
       out.push({ key, value: entry.value, updatedAt: entry.updatedAt })
     }
   }
@@ -632,14 +642,14 @@ export function getAllWorkingMemory(opts?: {
   const bucket = store.projects[project.slug]
   if (bucket) {
     for (const [key, entry] of Object.entries(bucket.entries)) {
-      if (isFresh(entry, now)) {
+      if (isFresh(entry, now, key)) {
         out.push({ key, value: entry.value, updatedAt: entry.updatedAt })
       }
     }
     const session = bucket.sessions[sessionId]
     if (session) {
       for (const [key, entry] of Object.entries(session.entries)) {
-        if (isFresh(entry, now)) {
+        if (isFresh(entry, now, key)) {
           out.push({ key, value: entry.value, updatedAt: entry.updatedAt })
         }
       }

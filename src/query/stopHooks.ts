@@ -196,7 +196,14 @@ export async function* handleStopHooks(
         void checkProactiveSuggestions({
           messages: stopHookContext.messages,
           turnCount: stopHookContext.messages.filter((m: any) => m.type === 'user').length,
-          sessionStartTime: (() => { try { const { getSessionStartTime } = require('../bootstrap/state.js'); return getSessionStartTime?.() || Date.now() } catch { return Date.now() } })()
+          sessionStartTime: (() => {
+            try {
+              const { getWorkingMemory } = require('../assistant/workingMemory.js') as typeof import('../assistant/workingMemory.js')
+              return Date.parse(getWorkingMemory('sessionStartTime') ?? '') || Date.now()
+            } catch {
+              return Date.now()
+            }
+          })()
         }).then(suggestions => {
           if (suggestions.length > 0 && toolUseContext.appendSystemMessage) {
             const appendSystemMessage = toolUseContext.appendSystemMessage as (message: string) => void

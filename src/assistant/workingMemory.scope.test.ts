@@ -289,3 +289,43 @@ describe('API 签名兼容', () => {
     expect(getWorkingMemory('currentProject')).toBe(root)
   })
 })
+
+describe('sessionStartTime TTL 豁免', () => {
+  test('updatedAt >24h 后 get 仍可读；普通 session key 仍过期', () => {
+    const sessionA = asSessionId('00000000-0000-4000-8000-0000000000f1')
+    switchSession(sessionA)
+
+    const startIso = '2026-07-01T00:00:00.000Z'
+    setWorkingMemory('sessionStartTime', startIso)
+    setWorkingMemory('lastPrompt', 'should-expire')
+
+    __resetWorkingMemoryCacheForTests()
+    const onDisk = JSON.parse(readFileSync(paths.file, 'utf-8')) as {
+      projects: Record<
+        string,
+        {
+          sessions: Record<
+            string,
+            { entries: Record<string, { value: string; updatedAt: number }> }
+          >
+        }
+      >
+    }
+    const projectSlug = Object.keys(onDisk.projects)[0]
+    expect(projectSlug).toBeTruthy()
+    const sessions = onDisk.projects[projectSlug!]!.sessions
+    const sid = Object.keys(sessions)[0]
+    expect(sid).toBeTruthy()
+    const entries = sessions[sid!]!.entries
+    expect(entries['sessionStartTime']).toBeTruthy()
+    expect(entries['lastPrompt']).toBeTruthy()
+
+    const stale = Date.now() - 25 * 60 * 60 * 1000
+    entries['sessionStartTime']!.updatedAt = stale
+    entries['lastPrompt']!.updatedAt = stale
+    writeRaw(JSON.stringify(onDisk, null, 2))
+
+    expect(getWorkingMemory('sessionStartTime')).toBe(startIso)
+    expect(getWorkingMemory('lastPrompt')).toBeUndefined()
+  })
+})

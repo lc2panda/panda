@@ -3656,9 +3656,46 @@ export function REPL({
       const { setWorkingMemory, getWorkingMemory } = require('../assistant/workingMemory.js')
       setWorkingMemory('lastPrompt', input.slice(0, 200))
       setWorkingMemory('lastPromptTime', new Date().toISOString())
-      // 记录会话开始时间（仅首次）
+      // 记录会话开始时间（仅首次）。优先从当前 messages 取最早有效 timestamp，
+      // 避免 resume / 重启后用 now 回填导致会话时长被重置。
       if (!getWorkingMemory('sessionStartTime')) {
-        setWorkingMemory('sessionStartTime', new Date().toISOString())
+        let startIso: string | undefined
+        try {
+          const msgs = messagesRef.current ?? []
+          // 优先：首条 user message 的合法 timestamp
+          for (const m of msgs) {
+            if (!m || (m as { type?: string }).type !== 'user') continue
+            const raw = (m as { timestamp?: string | number }).timestamp
+            if (raw === undefined || raw === null || raw === '') continue
+            const t =
+              typeof raw === 'number' ? raw : Date.parse(String(raw))
+            if (Number.isFinite(t) && t > 0) {
+              startIso = new Date(t).toISOString()
+              break
+            }
+          }
+          // 回退：全量消息中最早合法 timestamp
+          if (!startIso) {
+            let earliest = Infinity
+            for (const m of msgs) {
+              if (!m) continue
+              const raw = (m as { timestamp?: string | number }).timestamp
+              if (raw === undefined || raw === null || raw === '') continue
+              const t =
+                typeof raw === 'number' ? raw : Date.parse(String(raw))
+              if (Number.isFinite(t) && t > 0 && t < earliest) earliest = t
+            }
+            if (earliest !== Infinity) {
+              startIso = new Date(earliest).toISOString()
+            }
+          }
+        } catch {
+          // messages 解析失败则走 now
+        }
+        setWorkingMemory(
+          'sessionStartTime',
+          startIso ?? new Date().toISOString(),
+        )
       }
       // 语义 key：当前项目（C4：禁止 process.cwd()；值用完整 path）
       const projectPath = getProjectRoot() || getOriginalCwd()
