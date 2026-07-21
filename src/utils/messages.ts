@@ -1564,31 +1564,52 @@ export function isSystemLocalCommandMessage(
  * This handles the case where a session was saved with MCP tools that are no longer
  * available (e.g., MCP server was disconnected, renamed, or removed).
  * Without this filtering, the API rejects with "Tool reference not found in available tools".
+ *
+ * @param availableToolNames Set of available tool names (and aliases, if any).
+ *   Availability is checked via normalizeLegacyToolName + has.
+ * @param canonicalByName Optional map (alias/legacy/normalized → canonical
+ *   tools[].name). When present, KEEP'd references are rewritten so
+ *   tool_name matches the API tools payload. When absent, behavior is
+ *   strip-only (identical to pre-map callers).
  */
 function stripUnavailableToolReferencesFromUserMessage(
   message: UserMessage,
   availableToolNames: Set<string>,
+  canonicalByName?: Map<string, string>,
 ): UserMessage {
   const content = message.message.content
   if (!Array.isArray(content)) {
     return message
   }
 
-  // Check if any tool_reference blocks point to unavailable tools
-  const hasUnavailableReference = content.some(
-    block =>
-      block.type === 'tool_result' &&
-      Array.isArray(block.content) &&
-      block.content.some(c => {
-        if (!isToolReferenceBlock(c)) return false
-        const toolName = (c as { tool_name?: string }).tool_name
-        return (
-          toolName && !availableToolNames.has(normalizeLegacyToolName(toolName))
-        )
-      }),
-  )
+  // Detect strip and/or canonical rewrite needs in one pass.
+  let needsChange = false
+  for (const block of content) {
+    if (block.type !== 'tool_result' || !Array.isArray(block.content)) {
+      continue
+    }
+    for (const c of block.content) {
+      if (!isToolReferenceBlock(c)) continue
+      const rawToolName = (c as { tool_name?: string }).tool_name
+      if (!rawToolName) continue
+      const toolName = normalizeLegacyToolName(rawToolName)
+      if (!availableToolNames.has(toolName)) {
+        needsChange = true
+        break
+      }
+      if (canonicalByName) {
+        const canonical =
+          canonicalByName.get(toolName) ?? canonicalByName.get(rawToolName)
+        if (canonical && canonical !== rawToolName) {
+          needsChange = true
+          break
+        }
+      }
+    }
+    if (needsChange) break
+  }
 
-  if (!hasUnavailableReference) {
+  if (!needsChange) {
     return message
   }
 
@@ -1601,11 +1622,19 @@ function stripUnavailableToolReferencesFromUserMessage(
           return block
         }
 
-        // Filter out tool_reference blocks for unavailable tools
-        const filteredContent = block.content.filter(c => {
-          if (!isToolReferenceBlock(c)) return true
+        // Strip unavailable tool_reference blocks; optionally rewrite KEEP'd
+        // tool_name to the API-canonical name.
+        const filteredContent: typeof block.content = []
+        for (const c of block.content) {
+          if (!isToolReferenceBlock(c)) {
+            filteredContent.push(c)
+            continue
+          }
           const rawToolName = (c as { tool_name?: string }).tool_name
-          if (!rawToolName) return true
+          if (!rawToolName) {
+            filteredContent.push(c)
+            continue
+          }
           const toolName = normalizeLegacyToolName(rawToolName)
           const isAvailable = availableToolNames.has(toolName)
           if (!isAvailable) {
@@ -1613,9 +1642,24 @@ function stripUnavailableToolReferencesFromUserMessage(
               `Filtering out tool_reference for unavailable tool: ${toolName}`,
               { level: 'warn' },
             )
+            continue
           }
-          return isAvailable
-        })
+          // KEEP — optional canonical rewrite so tool_name matches tools[].name
+          if (canonicalByName) {
+            const canonical =
+              canonicalByName.get(toolName) ??
+              canonicalByName.get(rawToolName)
+            if (canonical && canonical !== rawToolName) {
+              filteredContent.push({
+                ...(c as object),
+                type: 'tool_reference' as const,
+                tool_name: canonical,
+              } as (typeof block.content)[number])
+              continue
+            }
+          }
+          filteredContent.push(c)
+        }
 
         // If all content was filtered out, replace with a placeholder
         if (filteredContent.length === 0) {
@@ -1637,6 +1681,36 @@ function stripUnavailableToolReferencesFromUserMessage(
       }),
     },
   }
+}
+
+/**
+ * Last-mile strip of unavailable tool_reference blocks across a messages array.
+ * Only touches user messages; assistant messages are returned unchanged.
+ * Intended to run against the final API tools name set (after ToolSearch /
+ * schema assembly / stabilizeToolOrder) so references absent from the
+ * payload are never sent.
+ */
+export function stripUnavailableToolReferencesFromMessages(
+  messages: (UserMessage | AssistantMessage)[],
+  availableToolNames: Set<string>,
+  canonicalByName?: Map<string, string>,
+): (UserMessage | AssistantMessage)[] {
+  let changed = false
+  const result = messages.map(msg => {
+    if (msg.type !== 'user') {
+      return msg
+    }
+    const stripped = stripUnavailableToolReferencesFromUserMessage(
+      msg,
+      availableToolNames,
+      canonicalByName,
+    )
+    if (stripped !== msg) {
+      changed = true
+    }
+    return stripped
+  })
+  return changed ? result : messages
 }
 
 /**
@@ -2208,8 +2282,18 @@ export function normalizeMessagesForAPI(
   messages: Message[],
   tools: Tools = [],
 ): (UserMessage | AssistantMessage)[] {
-  // Build set of available tool names for filtering unavailable tool references
-  const availableToolNames = new Set(tools.map(t => t.name))
+  // Build set of available tool names (canonical + aliases) and optional
+  // alias → canonical map for rewriting KEEP'd tool_reference tool_name.
+  const availableToolNames = new Set<string>()
+  const canonicalByName = new Map<string, string>()
+  for (const t of tools) {
+    availableToolNames.add(t.name)
+    canonicalByName.set(t.name, t.name)
+    for (const alias of t.aliases ?? []) {
+      availableToolNames.add(alias)
+      canonicalByName.set(alias, t.name)
+    }
+  }
 
   // First, reorder attachments to bubble up until they hit a tool result or assistant message
   // Then strip virtual messages — they're display-only (e.g. REPL inner tool
@@ -2325,6 +2409,7 @@ export function normalizeMessagesForAPI(
             normalizedMessage = stripUnavailableToolReferencesFromUserMessage(
               message,
               availableToolNames,
+              canonicalByName,
             )
           }
 

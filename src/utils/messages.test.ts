@@ -1,12 +1,14 @@
 /**
  * P0: stripUnavailableToolReferencesFromAssistantMessage
  * P2: stripIllegalToolUseInLastTurn
+ * last-mile: stripUnavailableToolReferencesFromMessages
  *
  * 验证：
  * - 合法 tool_use 保留
  * - 非法 tool_use 转 text 提示（含 "tool no longer available" / "Do not retry"）
  * - 不破坏 user 侧现有 strip 行为
  * - stripIllegalToolUseInLastTurn 仅动最近一轮 assistant，并清理 orphan tool_result
+ * - last-mile user tool_reference 按 final tools 集合剥离 / canonical 改写
  */
 import { describe, expect, test } from 'bun:test'
 import type { Tool } from '../Tool.js'
@@ -15,11 +17,13 @@ import {
   normalizeMessagesForAPI,
   stripIllegalToolUseInLastTurn,
   stripUnavailableToolReferencesFromAssistantMessage,
+  stripUnavailableToolReferencesFromMessages,
 } from './messages.js'
 
-function makeTool(name: string): Tool {
+function makeTool(name: string, aliases?: string[]): Tool {
   return {
     name,
+    aliases,
     inputSchema: {} as Tool['inputSchema'],
     description: async () => name,
     prompt: async () => name,
@@ -284,5 +288,136 @@ describe('stripIllegalToolUseInLastTurn (P2)', () => {
     ])
     const messages: Message[] = [asst]
     expect(stripIllegalToolUseInLastTurn(messages, available)).toBe(false)
+  })
+})
+
+// ── helpers for last-mile user tool_reference tests ─────────────────
+
+function makeUserWithToolReferences(
+  toolNames: string[],
+): UserMessage {
+  return {
+    type: 'user',
+    uuid: 'user-uuid-refs',
+    timestamp: new Date().toISOString(),
+    message: {
+      role: 'user',
+      content: [
+        {
+          type: 'tool_result',
+          tool_use_id: 'tr_refs',
+          content: toolNames.map(tool_name => ({
+            type: 'tool_reference' as const,
+            tool_name,
+          })),
+        },
+      ],
+    },
+  } as unknown as UserMessage
+}
+
+function collectToolReferenceNames(msg: UserMessage): string[] {
+  const content = msg.message.content
+  if (!Array.isArray(content)) return []
+  const names: string[] = []
+  for (const block of content) {
+    if (
+      typeof block !== 'object' ||
+      block === null ||
+      (block as { type?: string }).type !== 'tool_result'
+    ) {
+      continue
+    }
+    const inner = (block as { content?: unknown }).content
+    if (!Array.isArray(inner)) continue
+    for (const c of inner) {
+      if (
+        typeof c === 'object' &&
+        c !== null &&
+        (c as { type?: string }).type === 'tool_reference' &&
+        typeof (c as { tool_name?: unknown }).tool_name === 'string'
+      ) {
+        names.push((c as { tool_name: string }).tool_name)
+      }
+    }
+  }
+  return names
+}
+
+describe('stripUnavailableToolReferencesFromMessages (last-mile)', () => {
+  test('H2: available 仅含 WebSearch 时剥离 WebFetch，保留 WebSearch', () => {
+    const user = makeUserWithToolReferences(['WebFetch', 'WebSearch'])
+    const available = new Set(['WebSearch'])
+    const result = stripUnavailableToolReferencesFromMessages(
+      [user],
+      available,
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0]!.type).toBe('user')
+    const names = collectToolReferenceNames(result[0] as UserMessage)
+    expect(names).toEqual(['WebSearch'])
+    expect(names).not.toContain('WebFetch')
+  })
+
+  test('last-mile 导出：只改 user，assistant 原样返回', () => {
+    const asst = makeAssistantWithToolUses([
+      { id: 'tu_1', name: 'WebFetch', input: {} },
+    ])
+    const user = makeUserWithToolReferences(['WebFetch', 'WebSearch'])
+    const available = new Set(['WebSearch'])
+    const result = stripUnavailableToolReferencesFromMessages(
+      [asst, user],
+      available,
+    )
+    expect(result).toHaveLength(2)
+    // assistant untouched (same reference)
+    expect(result[0]).toBe(asst)
+    // user stripped
+    const names = collectToolReferenceNames(result[1] as UserMessage)
+    expect(names).toEqual(['WebSearch'])
+  })
+
+  test('canonical 改写：alias tool_name KEEP 后变为 canonical', () => {
+    const user = makeUserWithToolReferences(['legacy_web_fetch'])
+    const available = new Set(['WebFetch', 'legacy_web_fetch'])
+    const canonicalByName = new Map<string, string>([
+      ['WebFetch', 'WebFetch'],
+      ['legacy_web_fetch', 'WebFetch'],
+    ])
+    const result = stripUnavailableToolReferencesFromMessages(
+      [user],
+      available,
+      canonicalByName,
+    )
+    const names = collectToolReferenceNames(result[0] as UserMessage)
+    expect(names).toEqual(['WebFetch'])
+  })
+
+  test('不误伤：available 含 WebFetch+WebSearch 时两者均保留', () => {
+    const user = makeUserWithToolReferences(['WebFetch', 'WebSearch'])
+    const messages: (UserMessage | AssistantMessage)[] = [user]
+    const available = new Set(['WebFetch', 'WebSearch'])
+    const result = stripUnavailableToolReferencesFromMessages(
+      messages,
+      available,
+    )
+    // no change → same array reference
+    expect(result).toBe(messages)
+    const names = collectToolReferenceNames(result[0] as UserMessage)
+    expect(names).toEqual(['WebFetch', 'WebSearch'])
+  })
+
+  test('无 map 时旧行为：仅 strip，不改写 tool_name', () => {
+    const user = makeUserWithToolReferences(['legacy_web_fetch', 'WebSearch'])
+    const available = new Set(['legacy_web_fetch', 'WebSearch'])
+    const result = stripUnavailableToolReferencesFromMessages(
+      [user],
+      available,
+    )
+    // both available → unchanged names
+    const names = collectToolReferenceNames(
+      (result[0] ?? user) as UserMessage,
+    )
+    expect(names).toEqual(['legacy_web_fetch', 'WebSearch'])
   })
 })

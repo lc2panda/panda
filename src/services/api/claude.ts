@@ -94,6 +94,7 @@ import {
   stripCallerFieldFromAssistantMessage,
   stripIllegalToolUseInLastTurn,
   stripToolReferenceBlocksFromUserMessage,
+  stripUnavailableToolReferencesFromMessages,
 } from '../../utils/messages.js'
 import {
   getDefaultOpusModel,
@@ -1554,6 +1555,44 @@ async function* queryModel(
   }
   // ── Cache stabilization: deterministic tool ordering (Bug 5) ──────
   const allTools = stabilizeToolOrder([...toolSchemas, ...extraToolSchemas])
+
+  // ── Last-mile: strip tool_reference against final tools payload ───
+  // normalizeMessagesForAPI may KEEP references for tools that are in
+  // filteredTools (including deferred) but never made it into allTools
+  // after ToolSearch discovery / schema assembly. Always run — including
+  // when useToolSearch is true (that is the gap this closes). Do NOT
+  // remove the earlier !useToolSearch full-strip branch above.
+  {
+    const finalToolNames = new Set<string>()
+    const canonicalMap = new Map<string, string>()
+    for (const t of allTools) {
+      if (
+        t &&
+        typeof t === 'object' &&
+        'name' in t &&
+        typeof (t as { name: unknown }).name === 'string'
+      ) {
+        const name = (t as { name: string }).name
+        finalToolNames.add(name)
+        canonicalMap.set(name, name)
+      }
+    }
+    // Enrich alias → canonical from filteredTools, but only for tools that
+    // are actually present in the final payload (availability gate).
+    for (const t of filteredTools) {
+      if (!finalToolNames.has(t.name)) continue
+      canonicalMap.set(t.name, t.name)
+      for (const alias of t.aliases ?? []) {
+        finalToolNames.add(alias)
+        canonicalMap.set(alias, t.name)
+      }
+    }
+    messagesForAPI = stripUnavailableToolReferencesFromMessages(
+      messagesForAPI,
+      finalToolNames,
+      canonicalMap,
+    )
+  }
 
   // ── BP1: tools-array cache_control marker ─────────────────────────
   // Official prompt-caching guide recommends marking the last tool to
