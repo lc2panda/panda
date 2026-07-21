@@ -157,6 +157,9 @@ const VOLATILE_WM_KEYS = new Set([
   // containing epoch-ms — key names are stable but values churn:
   'im-reverse-push-queue',
   'last-skill-execution',
+  // C1: 高频/降级状态，不进入 prompt 注入
+  'clipboard-recent',
+  'os-notification-degraded',
 ])
 function filterVolatileWm<T extends { key: string }>(entries: readonly T[]): T[] {
   return entries.filter(e => !VOLATILE_WM_KEYS.has(e.key))
@@ -186,15 +189,7 @@ function getPersonaContext(): string | null {
     const mood = getMoodSense()
     if (mood && mood !== 'neutral') parts.push(`用户情绪：${mood}`)
   } catch {}
-  // Panda: inject working memory summary (volatile keys filtered to preserve cache)
-  try {
-    const { getAllWorkingMemory } = require('./assistant/workingMemory.js')
-    const wm = filterVolatileWm(getAllWorkingMemory())
-    if (Array.isArray(wm) && wm.length > 0) {
-      const summary = wm.slice(0, 5).map((e: any) => `${e.key}: ${e.value}`).join('; ')
-      parts.push(`当前工作记忆: ${summary}`)
-    }
-  } catch {}
+  // 工作记忆已迁至 workingMemoryContext 唯一注入点（C1），此处仅 persona/mood/情感
   // Panda: inject emotional state
   try {
     const { getRecentEmotionalEvents } = require('./assistant/emotionalMemory.js')
@@ -301,6 +296,11 @@ export const getGitStatus = memoize(async (): Promise<string | null> => {
 
 /**
  * This context is prepended to each conversation, and cached for the duration of the conversation.
+ *
+ * memoize 说明（C1/C6）：getSystemContext 仍按 lodash memoize 缓存整次结果。
+ * 工作记忆注入依赖调用方在合适时机 cache.clear（如 setSystemPromptInjection、
+ * compact 路径等）；本刀不强制每 turn clear，避免破坏 messages/system 前缀缓存策略。
+ * 注入数据源为 getInjectedWorkingMemoryEntries()（仅 global+当前 project+当前 session）。
  */
 export const getSystemContext = memoize(
   async (): Promise<{
@@ -330,12 +330,24 @@ export const getSystemContext = memoize(
     // and the messages-layer prefix intact.
     const personaContext = getPersonaContext()
 
+    // 唯一工作记忆注入点（C1）：scoped 聚合 + volatile 过滤
     let workingMemoryContext: string | null = null
     try {
-      const { getAllWorkingMemory } = require('./assistant/workingMemory.js')
-      const wm = filterVolatileWm(getAllWorkingMemory())
+      const {
+        getInjectedWorkingMemoryEntries,
+      } = require('./assistant/workingMemory.js') as {
+        getInjectedWorkingMemoryEntries: () => Array<{
+          key: string
+          value: string
+          updatedAt: number
+        }>
+      }
+      const wm = filterVolatileWm(getInjectedWorkingMemoryEntries())
       if (wm && wm.length > 0) {
-        const wmSummary = wm.slice(0, 10).map((e: { key: string; value: string }) => `- ${e.key}: ${e.value}`).join('\n')
+        const wmSummary = wm
+          .slice(0, 10)
+          .map((e: { key: string; value: string }) => `- ${e.key}: ${e.value}`)
+          .join('\n')
         workingMemoryContext = `[Working Memory]\n${wmSummary}`
       }
     } catch {}
