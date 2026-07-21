@@ -247,6 +247,33 @@ function isRecordableMessage(
   )
 }
 
+/**
+ * P3: 同名工具失败累计熔断状态更新（纯函数，便于单测）。
+ * 同名失败累计；仅同名成功才清零，他工具成功不重置（勿误读为“绝对连续”）。
+ * 切换到另一工具失败则从 1 重新计数；达到 threshold 返回 broken=true。
+ * @internal exported for tests
+ */
+export function updateSameToolFailureCircuit(
+  state: { toolName: string | null; failCount: number },
+  toolName: string,
+  isError: boolean,
+  threshold: number = 3,
+): { toolName: string | null; failCount: number; broken: boolean } {
+  if (!isError) {
+    if (state.toolName === toolName) {
+      return { toolName: null, failCount: 0, broken: false }
+    }
+    return { toolName: state.toolName, failCount: state.failCount, broken: false }
+  }
+  const nextName = toolName
+  const nextCount = state.toolName === toolName ? state.failCount + 1 : 1
+  return {
+    toolName: nextName,
+    failCount: nextCount,
+    broken: nextCount >= threshold,
+  }
+}
+
 export async function* runAgent({
   agentDefinition,
   promptMessages,
@@ -819,8 +846,14 @@ export async function* runAgent({
     // P0-Fix5: Auto-continue wrapper for incomplete agent responses
     let _p0AutoRetry = 0;
     const _P0_MAX_RETRIES = 2;
+    // P3: 同名工具失败累计阈值（与 incomplete auto-retry 兼容）；仅同名成功才清零，他工具成功不重置
+    const _P0_SAME_TOOL_THRESHOLD = 3;
     let _p0LastText = '';
     let _p0ToolCalls = 0;
+    let _p0SameToolName: string | null = null;
+    let _p0SameToolFailCount = 0;
+    const _p0ToolUseIdToName = new Map<string, string>();
+    let _p0CircuitBroken = false;
 
     while (_p0AutoRetry <= _P0_MAX_RETRIES) {
     _p0LastText = '';
@@ -897,16 +930,53 @@ export async function* runAgent({
         if (message.type !== 'progress') {
           lastRecordedUuid = message.uuid
         }
-        // P0-Fix5: Track agent output for completeness check
+        // P0-Fix5 + P3: Track agent output + consecutive same-tool failures
         if ((message as any)?.message?.content) {
           const _p0blocks = (message as any).message.content;
           for (const _p0b of Array.isArray(_p0blocks) ? _p0blocks : []) {
             if (_p0b.type === 'text') _p0LastText = _p0b.text || '';
-            if (_p0b.type === 'tool_use') _p0ToolCalls++;
+            if (_p0b.type === 'tool_use') {
+              _p0ToolCalls++;
+              if (typeof _p0b.id === 'string' && typeof _p0b.name === 'string') {
+                _p0ToolUseIdToName.set(_p0b.id, _p0b.name);
+              }
+            }
+            if (_p0b.type === 'tool_result' && typeof _p0b.tool_use_id === 'string') {
+              const toolName = _p0ToolUseIdToName.get(_p0b.tool_use_id);
+              if (toolName) {
+                const next = updateSameToolFailureCircuit(
+                  { toolName: _p0SameToolName, failCount: _p0SameToolFailCount },
+                  toolName,
+                  Boolean(_p0b.is_error),
+                  _P0_SAME_TOOL_THRESHOLD,
+                );
+                _p0SameToolName = next.toolName;
+                _p0SameToolFailCount = next.failCount;
+                if (next.broken && !_p0CircuitBroken) {
+                  _p0CircuitBroken = true;
+                  logForDebugging(
+                    `[P3] same-tool circuit breaker: ${toolName} failed ${_p0SameToolFailCount} times consecutively — stop auto-retry`,
+                    { level: 'warn' },
+                  );
+                }
+              }
+            }
           }
         }
         yield message
+        // P3: 熔断后立即结束本轮 for-await，避免同 query 内继续空转
+        if (_p0CircuitBroken) {
+          break
+        }
       }
+    }
+
+    // P3: 同工具连续失败熔断 — 不再 incomplete auto-retry
+    if (_p0CircuitBroken) {
+      logForDebugging(
+        `[P3] circuit broken for tool=${_p0SameToolName} (count=${_p0SameToolFailCount}) — skip incomplete auto-retry`,
+      );
+      break;
     }
 
     // P0-Fix5: Check if response looks incomplete

@@ -460,12 +460,12 @@ export async function* runToolUse(
         content: [
           {
             type: 'tool_result',
-            content: `<tool_use_error>Error: No such tool available: ${toolName}</tool_use_error>`,
+            content: `<tool_use_error>Error: No such tool available: ${toolName}. Do not retry this tool call.</tool_use_error>`,
             is_error: true,
             tool_use_id: toolUse.id,
           },
         ],
-        toolUseResult: `Error: No such tool available: ${toolName}`,
+        toolUseResult: `Error: No such tool available: ${toolName}. Do not retry this tool call.`,
         sourceToolAssistantUUID: assistantMessage.uuid,
       }),
     }
@@ -648,13 +648,44 @@ export function buildSchemaNotSentHint(
   // cost one extra round-trip on an already-failing path.
   if (!isToolSearchEnabledOptimistic()) return null
   if (!isToolSearchToolAvailable(tools)) return null
-  if (!isDeferredTool(tool)) return null
-  const discovered = extractDiscoveredToolNames(messages)
-  if (discovered.has(tool.name)) return null
+  return composeSchemaHint(tool, messages, tools)
+}
+
+/**
+ * P1 纯函数：拆分 deferred / 非 deferred 两条路径，避免引导模型无限重试。
+ *
+ * - deferred 工具 + 未被发现 → 保留"Load the tool first"消息，引导模型
+ *   通过 TOOL_SEARCH_TOOL_NAME 加载 schema 后再重试。
+ * - 非 deferred 工具 + 不在当前 tools 列表中（即真正不存在）→ 返回永久性
+ *   错误，明确告诉模型"不要再重试"，切断死循环。
+ *
+ * 已发现的 deferred 工具不命中任何分支：它的 schema 已加载，Zod 失败属于
+ * 真实输入问题，与本函数无关。
+ *
+ * 提取为独立导出函数，便于单元测试不依赖运行时 feature flag / env。
+ */
+export function composeSchemaHint(
+  tool: Tool,
+  messages: Message[],
+  tools: readonly { name: string }[],
+): string | null {
+  if (isDeferredTool(tool)) {
+    const discovered = extractDiscoveredToolNames(messages)
+    if (discovered.has(tool.name)) return null
+    return (
+      `\n\nThis tool's schema was not sent to the API — it was not in the discovered-tool set derived from message history. ` +
+      `Without the schema in your prompt, typed parameters (arrays, numbers, booleans) get emitted as strings and the client-side parser rejects them. ` +
+      `Load the tool first: call ${TOOL_SEARCH_TOOL_NAME} with query "select:${tool.name}", then retry this call.`
+    )
+  }
+
+  // 非 deferred 路径：工具理应始终加载。若它不在当前 tools 列表里，说明它
+  // 已被禁用 / 删除（"真正不存在"）。Zod 校验失败的根本原因是 schema 不可
+  // 达，模型再调多少次都不会成功，必须给永久性错误阻断重试循环。
+  const toolsByName = new Set(tools.map(t => t.name))
+  if (toolsByName.has(tool.name)) return null
   return (
-    `\n\nThis tool's schema was not sent to the API — it was not in the discovered-tool set derived from message history. ` +
-    `Without the schema in your prompt, typed parameters (arrays, numbers, booleans) get emitted as strings and the client-side parser rejects them. ` +
-    `Load the tool first: call ${TOOL_SEARCH_TOOL_NAME} with query "select:${tool.name}", then retry this call.`
+    `\n\nTool "${tool.name}" is no longer available. Do not retry this tool call.`
   )
 }
 

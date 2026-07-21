@@ -92,6 +92,7 @@ import {
   normalizeMessagesForAPI,
   stripAdvisorBlocks,
   stripCallerFieldFromAssistantMessage,
+  stripIllegalToolUseInLastTurn,
   stripToolReferenceBlocksFromUserMessage,
 } from '../../utils/messages.js'
 import {
@@ -2736,6 +2737,26 @@ async function* queryModel(
       didFallBackToNonStreaming = true
       if (options.onStreamingFallback) {
         options.onStreamingFallback()
+      }
+
+      // P2 修复：fallback 前剥离最近一轮 assistant message 中引用不存在工具
+      // 的 tool_use blocks，转写为 text 提示（"tool no longer available. Do not
+      // retry"），并清理紧随其后 user 消息中的 orphan tool_result。否则 non-streaming
+      // 重试会再次失败并陷入死循环（与 streaming 同样的非法 tool_use 残留）。
+      // 严格控制范围：仅在 fallback 启用（disableFallback=false）时执行，且仅
+      // 影响最后一条 assistant message 内的 tool_use，不动其他 turn。
+      const availableToolNamesForFallback = new Set<string>(
+        filteredTools.map(t => t.name),
+      )
+      const stripped = stripIllegalToolUseInLastTurn(
+        messagesForAPI,
+        availableToolNamesForFallback,
+      )
+      if (stripped) {
+        logForDebugging(
+          'P2: stripped illegal tool_use blocks from last assistant turn before non-streaming fallback',
+          { level: 'warn' },
+        )
       }
 
       logEvent('tengu_streaming_fallback_to_non_streaming', {

@@ -1640,6 +1640,195 @@ function stripUnavailableToolReferencesFromUserMessage(
 }
 
 /**
+ * P0 修复：剥离 assistant message 中引用不存在工具的 tool_use blocks。
+ *
+ * 背景：当一个 tool 之后被禁用 / 从工具列表移除，但 assistant 历史消息中
+ * 仍然引用该 tool 名称的 tool_use block，会让 API 报错（模型陷入死循环重试同
+ * 一非法 tool 调用）。为切断这个循环，我们将非法 tool_use **剥离**并替换为
+ * text 提示（"tool no longer available. Do not retry this tool call."）。
+ *
+ * 注意：不能把 tool_result 放进 assistant role（API 仅允许 tool_result 出现在
+ * user 消息）。配对的 orphan tool_result 由 ensureToolResultPairing 清理。
+ *
+ * 合法的 tool_use 不会被改动。函数保持 immutable（无非法时返回原引用）。
+ */
+export function stripUnavailableToolReferencesFromAssistantMessage(
+  message: AssistantMessage,
+  availableToolNames: Set<string>,
+): AssistantMessage {
+  const content = message.message.content
+  if (!Array.isArray(content)) {
+    return message
+  }
+
+  const hasIllegalToolUse = content.some(
+    block =>
+      typeof block !== 'string' &&
+      block.type === 'tool_use' &&
+      typeof block.name === 'string' &&
+      !availableToolNames.has(normalizeLegacyToolName(block.name)),
+  )
+
+  if (!hasIllegalToolUse) {
+    return message
+  }
+
+  const nextContent = content.flatMap(block => {
+    if (
+      typeof block === 'string' ||
+      block.type !== 'tool_use' ||
+      typeof block.name !== 'string'
+    ) {
+      return [block]
+    }
+    if (availableToolNames.has(normalizeLegacyToolName(block.name))) {
+      return [block]
+    }
+
+    logForDebugging(
+      `Stripping unavailable tool_use from assistant message: ${block.name} (id=${block.id})`,
+      { level: 'warn' },
+    )
+
+    // API-valid: assistant 只能有 text/tool_use/thinking 等
+    return [
+      {
+        type: 'text' as const,
+        text: `tool no longer available: ${block.name} (tool_use_id=${block.id}). Do not retry this tool call.`,
+      },
+    ]
+  })
+
+  const finalContent =
+    nextContent.length > 0
+      ? nextContent
+      : [
+          {
+            type: 'text' as const,
+            text: 'tool no longer available. Do not retry this tool call.',
+          },
+        ]
+
+  return {
+    ...message,
+    message: {
+      ...message.message,
+      content: finalContent,
+    },
+  }
+}
+
+/**
+ * P2 修复：在 fallback / 重试之前，扫描 messages 中**最近一轮** assistant
+ * message，把所有引用不存在工具的 tool_use blocks in-place 剥离为 text 提示。
+ * 同时清理紧随其后的 user 消息中对应 orphan tool_result。
+ *
+ * 目的：当主请求路径（streaming）失败并需要回退到 non-streaming 重试时，
+ * 历史消息中可能残留已停用工具的 tool_use 引用。若不在重试前剥离，non-streaming
+ * 重试会再次失败，导致死循环。
+ *
+ * 行为：
+ * - 仅检查最后一条 assistant message（最近一轮）。
+ * - in-place 修改该消息；并清理紧随其后 user 中匹配的 tool_result。
+ * - 若无可剥离内容，返回 false，不修改任何状态。
+ *
+ * @param messages 完整的 API-bound messages 数组（会被 in-place 修改）
+ * @param availableToolNames 当前可用工具名集合
+ * @returns 是否实际执行了剥离
+ */
+export function stripIllegalToolUseInLastTurn(
+  messages: Message[],
+  availableToolNames: Set<string>,
+): boolean {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (!msg || msg.type !== 'assistant') continue
+
+    const assistantMsg = msg as AssistantMessage
+    const content = assistantMsg.message.content
+    if (!Array.isArray(content)) return false
+
+    const illegalIds = new Set<string>()
+    const hasIllegal = content.some(block => {
+      if (
+        typeof block !== 'string' &&
+        block.type === 'tool_use' &&
+        typeof block.name === 'string' &&
+        !availableToolNames.has(normalizeLegacyToolName(block.name))
+      ) {
+        illegalIds.add(block.id)
+        return true
+      }
+      return false
+    })
+    if (!hasIllegal) return false
+
+    // in-place 剥离非法 tool_use → text 提示（不把 tool_result 放进 assistant）
+    const nextContent = content.flatMap(block => {
+      if (
+        typeof block === 'string' ||
+        block.type !== 'tool_use' ||
+        typeof block.name !== 'string'
+      ) {
+        return [block]
+      }
+      if (availableToolNames.has(normalizeLegacyToolName(block.name))) {
+        return [block]
+      }
+      return [
+        {
+          type: 'text' as const,
+          text: `tool no longer available: ${block.name} (tool_use_id=${block.id}). Do not retry this tool call.`,
+        },
+      ]
+    })
+    assistantMsg.message.content =
+      nextContent.length > 0
+        ? nextContent
+        : [
+            {
+              type: 'text' as const,
+              text: 'tool no longer available. Do not retry this tool call.',
+            },
+          ]
+
+    // 清理紧随其后的 user 消息中匹配的 orphan tool_result
+    if (illegalIds.size > 0) {
+      for (let j = i + 1; j < messages.length; j++) {
+        const follow = messages[j]
+        if (!follow) continue
+        if (follow.type === 'assistant') break
+        if (follow.type !== 'user') continue
+        const userMsg = follow as UserMessage
+        const userContent = userMsg.message.content
+        if (!Array.isArray(userContent)) continue
+        const filtered = userContent.filter(
+          block =>
+            !(
+              typeof block !== 'string' &&
+              block.type === 'tool_result' &&
+              illegalIds.has(block.tool_use_id)
+            ),
+        )
+        if (filtered.length !== userContent.length) {
+          userMsg.message.content =
+            filtered.length > 0
+              ? filtered
+              : [
+                  {
+                    type: 'text' as const,
+                    text: 'tool no longer available. Do not retry this tool call.',
+                  },
+                ]
+        }
+      }
+    }
+    return true
+  }
+  return false
+}
+
+/**
  * Appends a [id:...] message ID tag to the last text block of a user message.
  * Only mutates the API-bound copy, not the stored message.
  * This lets Claude reference message IDs when calling the snip tool.
@@ -2233,7 +2422,9 @@ export function normalizeMessagesForAPI(
           // like 'caller' from tool_use blocks, as these are only valid with the
           // tool search beta header
           const toolSearchEnabled = isToolSearchEnabledOptimistic()
-          const normalizedMessage: AssistantMessage = {
+          // P0: 先规范化 tool_use input，再剥离当前不可用工具的 tool_use，
+          // 避免把非法 tool 名原样发给 API 引发死循环。
+          const preStripMessage: AssistantMessage = {
             ...message,
             message: {
               ...message.message,
@@ -2273,6 +2464,11 @@ export function normalizeMessagesForAPI(
               }),
             },
           }
+          const normalizedMessage =
+            stripUnavailableToolReferencesFromAssistantMessage(
+              preStripMessage,
+              availableToolNames,
+            )
 
           // Find a previous assistant message with the same message ID and merge.
           // Walk backwards, skipping tool results and different-ID assistants,
