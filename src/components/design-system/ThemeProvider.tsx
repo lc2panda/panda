@@ -63,10 +63,16 @@ export function ThemeProvider({
   initialState,
   onThemeSave = defaultSaveTheme
 }: Props) {
-  const [themeSetting, setThemeSetting] = useState(initialState ?? defaultInitialTheme);
+  // 首帧即同步 env/prefetch，避免 mount effect 之前 children 首 render
+  // 读到 isMatrixTheme() 旧值 → hooks 数量翻转 → React #300
+  const [themeSetting, setThemeSetting] = useState(() => {
+    const initial = initialState ?? defaultInitialTheme();
+    syncMatrixEnv(initial);
+    return initial;
+  });
   const [previewTheme, setPreviewTheme] = useState<ThemeSetting | null>(null);
 
-  // Sync PANDA_THEME env var + prefetch cache on mount for Matrix detection
+  // 保留 mount effect 作幂等再同步（与 lazy init 语义一致）
   useEffect(() => {
     syncMatrixEnv(themeSetting);
   }, []); // run once on mount

@@ -135,12 +135,19 @@ function computeBarWidth(
 }
 
 export function TurnHeader({ role, displayName, timestamp, flashTrigger, isLoading }: Props): React.ReactNode {
+  // 全部 hooks 无条件调用（React #300：isMatrixTheme 在 render 间翻转时
+  // early-return 后少 hook → "Rendered fewer hooks than expected"）
   // v3.7 Pro 波次4：reducedMotion 时禁用流式 progress bar 动效（回退静态 ▰ GEN）
-  // useAppState hook 必须在条件分支前，遵守 React hooks 规则
   const reducedMotion = useAppState(s => s.settings.prefersReducedMotion) ?? false;
   // 仅在 panda 流式时启用 stream progress hook（节流 100ms）
   const isPandaStreaming = role === 'panda' && !!isLoading && !reducedMotion;
   const streamBytes = useStreamProgress(isPandaStreaming);
+  // T-C1 phosphor fade-in：4 步从 SHADOW (age=1.0) 到目标色（首帧期 only）
+  const fadeProgress = usePhosphorFadeIn(300, 4); // 0 → 1
+  // T-C3 完成 flash：触发后 150ms 内高亮成 FLASH
+  const flashed = useFlashOnce(flashTrigger, 150);
+  // 终端宽度响应（hook 在 render 期同步读 context；窄终端缩短延伸线）
+  const { columns } = useTerminalSize();
 
   if (!isMatrixTheme()) return null;
   const lightMode = isMatrixLight();
@@ -149,21 +156,14 @@ export function TurnHeader({ role, displayName, timestamp, flashTrigger, isLoadi
   const baseColor = getRoleColor(role, lightMode);
   const dimColor = getRoleDimColor(role, lightMode);
 
-  // T-C1 phosphor fade-in：4 步从 SHADOW (age=1.0) 到目标色（首帧期 only）
-  const fadeProgress = usePhosphorFadeIn(300, 4); // 0 → 1
   const fading = fadeProgress < 1;
   const fadeAge = 0.7 - fadeProgress * 0.5;
   const fadeColor = lightMode ? ageToHexLight(fadeAge) : ageToHex(fadeAge);
 
-  // T-C3 完成 flash：触发后 150ms 内高亮成 FLASH
-  const flashed = useFlashOnce(flashTrigger, 150);
   const flashColor = lightMode ? MATRIX_SCALE_LIGHT.FLASH : MATRIX_SCALE.FLASH;
 
   // 优先级：flash > fade > base
   const finalColor = flashed ? flashColor : fading ? fadeColor : baseColor;
-
-  // 终端宽度响应（hook 在 render 期同步读 context；窄终端缩短延伸线）
-  const { columns } = useTerminalSize();
 
   const ts = fmtTime(timestamp);
   const labelText = displayName ?? ROLE_LABEL[role];

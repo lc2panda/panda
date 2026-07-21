@@ -67,6 +67,13 @@ function generateDashPattern(innerWidth: number, seed: number): string {
 }
 
 export function TurnSeparator({ turnIndex, width }: Props): React.ReactNode {
+  // 种子混合 turnIndex（不同 turn 看到不同分隔，但同一 turn 不抖动）
+  // Hooks 必须无条件调用（React #300：theme 翻转时 early-return 会少 hook）
+  const [seed] = useState(() => {
+    const base = Math.floor(Math.random() * 0xffff_ffff);
+    return (base ^ (turnIndex * 2654435761)) >>> 0; // 黄金比例哈希混合
+  });
+
   if (!isMatrixTheme()) return null;
 
   // 默认宽度 60；响应式时由 props.width 覆盖
@@ -76,12 +83,6 @@ export function TurnSeparator({ turnIndex, width }: Props): React.ReactNode {
 
   // 两端 ╳ 各占 1 字符，紧邻 1 空格 → 中段 = safeWidth - 4
   const innerWidth = Math.max(4, safeWidth - 4);
-
-  // 种子混合 turnIndex（不同 turn 看到不同分隔，但同一 turn 不抖动）
-  const [seed] = useState(() => {
-    const base = Math.floor(Math.random() * 0xffff_ffff);
-    return (base ^ (turnIndex * 2654435761)) >>> 0; // 黄金比例哈希混合
-  });
 
   const lightMode = isMatrixLight();
   const dashColor = lightMode ? MATRIX_SCALE_LIGHT.SHADOW : MATRIX_SCALE.SHADOW; // G3 极暗

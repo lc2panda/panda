@@ -26,13 +26,15 @@ interface Props {
 }
 
 export function ScanLine({ active, width = 12 }: Props): React.ReactNode {
-  if (!isMatrixTheme()) return null;
+  // Hooks 必须无条件调用（React #300：theme 翻转时 early-return 会少 hook）
   const [tick, setTick] = useState(0);
   useEffect(() => {
-    if (!active) return;
+    if (!isMatrixTheme() || !active) return;
     const id = setInterval(() => setTick(t => t + 1), FRAME_MS);
     return () => clearInterval(id);
   }, [active]);
+
+  if (!isMatrixTheme()) return null;
 
   const lightMode = isMatrixLight();
   const S = lightMode ? MATRIX_SCALE_LIGHT : MATRIX_SCALE;

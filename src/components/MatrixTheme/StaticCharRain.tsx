@@ -78,14 +78,15 @@ function generatePattern(
  * mount 时一次性生成 pattern；后续 render 不重算（useState 持久化种子）。
  */
 export function StaticCharRain(props: StaticCharRainProps): React.ReactNode {
-  if (!isMatrixTheme()) return null;
-
   const { width, density = 0.25, seed } = props;
 
   // 种子持久化：seed prop 存在时用之；否则 mount 时一次性随机
+  // Hooks 必须无条件调用（React #300：theme 翻转时 early-return 会少 hook）
   const [resolvedSeed] = useState(() =>
     seed !== undefined ? seed : Math.floor(Math.random() * 0xffff_ffff),
   );
+
+  if (!isMatrixTheme()) return null;
 
   const lightMode = isMatrixLight();
   // 颜色：SHADOW (G3) — 极暗，不抢正文 / chrome 风头

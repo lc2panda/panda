@@ -213,11 +213,12 @@ export function ScreenFrame(props: ScreenFrameProps): React.ReactNode {
   const matrixOn = isMatrixTheme();
   // 波次4 — live data：仅 matrix 主题启用 5s refresh，节省非 matrix 用户资源
   const live = useScreenFrameLiveData(matrixOn);
+  // use* 命名函数也放 early-return 前，避免 eslint-rules-of-hooks 误报与风格漂移
+  const rounded = useRoundedFrame();
 
   if (!matrixOn) return null;
 
   const { position, cols } = props;
-  const rounded = useRoundedFrame();
   const chars = getFrameChars(rounded);
   const lightMode = isMatrixLight();
   const ui = lightMode ? MATRIX_UI_LIGHT : MATRIX_UI;

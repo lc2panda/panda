@@ -78,14 +78,21 @@ function statusLight(status: WorkerScopeProps['status']): string {
 }
 
 export function WorkerScope(props: WorkerScopeProps): React.ReactNode {
+  const { workerName, startTimestamp, status, durationSec, commitSha, children } = props;
+  // Hooks 必须无条件调用（React #300：theme 翻转时 early-return 会少 hook）
+  const reducedMotion = useAppState(s => s.settings.prefersReducedMotion) ?? false;
+  // 波次4 — 状态灯心跳（1Hz 慢呼吸，仅 running 时启用）。
+  // 完成态 status='completed'/'failed' 静态；reducedMotion 时整体禁用动效。
+  // 插值：80% ↔ 100% 亮度档位，使用 borderColor (lightOn) <-> borderDim (lightOff) 二值切换
+  // —— 不需要连续插值（连续会闪烁），二值切换在阈值上下变化已足够"心跳"感。
+  const breath = usePhosphorBreath(1000); // 1Hz
+
   // 非 matrix 主题：透明返回 children（不引入额外视觉元素）
   if (!isMatrixTheme()) {
-    return <>{props.children}</>;
+    return <>{children}</>;
   }
 
-  const { workerName, startTimestamp, status, durationSec, commitSha, children } = props;
   const lightMode = isMatrixLight();
-  const reducedMotion = useAppState(s => s.settings.prefersReducedMotion) ?? false;
 
   // 颜色梯度（v3.7 Pro 波次1 4 档 + 暗 1 档）
   const borderColor = getRoleColor('worker', lightMode); // WORKER_DIM #008822
@@ -97,11 +104,6 @@ export function WorkerScope(props: WorkerScopeProps): React.ReactNode {
   const lightOn = borderColor;
   const lightOff = borderDim;
 
-  // 波次4 — 状态灯心跳（1Hz 慢呼吸，仅 running 时启用）。
-  // 完成态 status='completed'/'failed' 静态；reducedMotion 时整体禁用动效。
-  // 插值：80% ↔ 100% 亮度档位，使用 borderColor (lightOn) <-> borderDim (lightOff) 二值切换
-  // —— 不需要连续插值（连续会闪烁），二值切换在阈值上下变化已足够"心跳"感。
-  const breath = usePhosphorBreath(1000); // 1Hz
   const isRunning = status === 'running';
   // breath 范围 0..1，阈值 0.4 以下显 dim，以上显 on（保证 60% 时间可见，40% 时间略暗）
   const breathOn = !reducedMotion && isRunning ? breath > 0.4 : true;

@@ -51,7 +51,7 @@ function fmtNum(n: number): string {
 }
 
 export function MatrixHUD({ model, messages }: Props): React.ReactNode {
-  if (!isMatrixTheme()) return null;
+  // Hooks 必须无条件调用（React #300：theme 翻转时 early-return 会少 hook）
   const ui = useMatrixUI();
 
   // 模型名（去 -YYYYMMDD 尾）
@@ -68,8 +68,12 @@ export function MatrixHUD({ model, messages }: Props): React.ReactNode {
   // usage===null（首次启动无 API call）时跳过 ctx 段，匹配文件头"任一段缺数据则跳过"
   const ctxStr = usage && ctxMax > 0 ? `${fmtNum(used)}/${fmtNum(ctxMax)}` : null;
   // P7: ctx > 80% 启用闪烁；交替 warning ↔ FLASH（高对比 alarm，无关高亮带）
-  const ctxOver = ctxPct > 0.8;
+  // useWarnFlash 必须在 isMatrixTheme gate 前调用
+  const ctxOver = isMatrixTheme() && ctxPct > 0.8;
   const ctxFlashing = useWarnFlash(ctxOver);
+
+  if (!isMatrixTheme()) return null;
+
   const flashHi = isMatrixLight() ? MATRIX_SCALE_LIGHT.FLASH : MATRIX_SCALE.FLASH;
   const ctxColor = ctxOver ? (ctxFlashing ? flashHi : ui.warning) : ui.statusLine;
 

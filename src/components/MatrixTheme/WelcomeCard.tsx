@@ -28,14 +28,17 @@ function truncatePath(p: string, max: number): string {
 }
 
 export function WelcomeCard(): React.ReactNode {
-  if (!isMatrixTheme()) return null;
+  // Hooks 必须无条件调用（React #300：theme 翻转时 early-return 会少 hook）
   const ui = useMatrixUI();
+  // P9.3: 5s 慢呼吸 — borderColor BASE → NEON → BRIGHT → NEON → BASE
+  const breathT = usePhosphorBreath(5000, 100);
+
+  if (!isMatrixTheme()) return null;
+
   const lightMode = isMatrixLight();
   const S = lightMode ? MATRIX_SCALE_LIGHT : MATRIX_SCALE;
   const palette = lightMode ? MATRIX_BREATH_PULSE_LIGHT : MATRIX_BREATH_PULSE;
 
-  // P9.3: 5s 慢呼吸 — borderColor BASE → NEON → BRIGHT → NEON → BASE
-  const breathT = usePhosphorBreath(5000, 100);
   const idx = Math.min(palette.length - 1, Math.floor(breathT * palette.length));
   const breathBorder = palette[idx];
 
