@@ -8,6 +8,21 @@
 
 ## [Unreleased]
 
+## [2.32.1] - 2026-07-21
+
+### Fixed
+- **工作记忆分层 scope 隔离** — session / project / global 分层隔离，避免跨会话污染
+- **sessionStartTime 豁免 24h TTL + transcript 回填** — 修复 resume 时会话起点被重置（`c0c3050c4`）
+- **Welcome Recent activity** — 始终预加载最近活动、去掉 habits 回退；按最新优先排序
+- **Matrix 主题 React hooks 顺序** — 在 early return / `isMatrixTheme` 门控前无条件调用 hooks，修复 React #310/#300
+- **tool_reference last-mile 剥离** — 在最终 API tools 列表上 strip `tool_reference`，避免无效字段上行
+- **无效 tool_use 循环与 AskUserQuestion 400** — 阻止错误工具调用死循环
+
+### Tests
+- awaySummary：阻止 incomplete messages mock 泄漏
+
+[2.32.1]: https://github.com/lc2panda/panda/compare/v2.32.0...v2.32.1
+
 ## [2.32.0] - 2026-07-16
 
 ### Fixed
