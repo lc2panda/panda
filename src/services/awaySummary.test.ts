@@ -86,24 +86,9 @@ describe('generateAwaySummary — /recap 复用前提', () => {
     mock.module('./SessionMemory/sessionMemoryUtils.js', () => ({
       getSessionMemoryContent: async () => 'memory-block',
     }))
-    mock.module('../utils/messages.js', () => ({
-      createUserMessage: (input: { content: string }) =>
-        ({
-          type: 'user',
-          message: {
-            id: 'u',
-            role: 'user',
-            content: [{ type: 'text', text: input.content }],
-          },
-          uuid: 'u',
-          timestamp: '0',
-          isMeta: false,
-        }) as any,
-      getAssistantMessageText: (m: any) => {
-        // 直接返回 mock content 中的 text
-        return m?.message?.content?.[0]?.text ?? ''
-      },
-    }))
+    // 不 mock ../utils/messages.js：不完整 mock.module 会污染全局 module graph，
+    // 导致后续 toolExecution 等测试的 createUserMessage 丢失 toolUseResult 字段。
+    // 真实 createUserMessage / getAssistantMessageText 对本用例足够。
     mock.module('../utils/model/model.js', () => ({
       getSmallFastModel: () => 'mock-haiku',
     }))
