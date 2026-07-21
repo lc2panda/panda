@@ -34,7 +34,11 @@ import { getCwd } from '../../utils/cwd.js';
 import { formatRelativeTimeAgo } from '../../utils/format.js';
 import type { FeedConfig, FeedLine } from './Feed.js';
 export function createRecentActivityFeed(activities: LogOption[]): FeedConfig {
-  const lines: FeedLine[] = activities.map(log => {
+  // Newest first so welcome "Recent activity" shows latest session on top
+  const ordered = [...activities].sort(
+    (a, b) => b.modified.getTime() - a.modified.getTime(),
+  )
+  const lines: FeedLine[] = ordered.map(log => {
     const time = formatRelativeTimeAgo(log.modified);
     const description = log.summary && log.summary !== 'No prompt' ? log.summary : log.firstPrompt;
     return {
@@ -51,6 +55,7 @@ export function createRecentActivityFeed(activities: LogOption[]): FeedConfig {
         const recentLines = content.split('\n')
           .filter(l => l.trim() && !l.startsWith('#') && !l.startsWith('---'))
           .slice(-3)
+          .reverse()
           .map(l => ({ text: l.trim().slice(0, 60) }))
         if (recentLines.length > 0) lines.push(...recentLines)
       }
