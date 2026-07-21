@@ -62,6 +62,11 @@ export function AssistantToolUseMessage(t0) {
   const hasStrippedRules = useAppStateMaybeOutsideOfProvider(_temp3);
   const isAutoClassifier = permissionMode === "auto" || permissionMode === "plan" && hasStrippedRules;
   const isClassifierChecking = false && isClassifierCheckingRaw && permissionMode !== "auto";
+  // React #310/#300：必须在任何 early return 之前无条件调用。
+  // 旧路径：!parsed / transparent wrapper / 空 tool name / null render 会先 return，
+  // 下一次再走到完整渲染时 hooks 数增加 → minified #310（上次 fewer → #300）。
+  // enabled=isMatrixTheme()：非 matrix 时不跑 interval，hooks 声明次数仍恒定。
+  const _matrixBreathT = usePhosphorBreath(1600, 80, isMatrixTheme());
   let t1;
   if ($[0] !== param.input || $[1] !== param.name || $[2] !== tools) {
     bb0: {
@@ -210,7 +215,7 @@ export function AssistantToolUseMessage(t0) {
   const t8 = userFacingToolNameBackgroundColor ? "inverseText" : undefined;
   // v3 P6: Matrix 主题下在 toolName 前追加 [exec] 标签
   // P9.7 呼吸：进行中（!isResolved && !isQueued）时 [exec] BASE↔NEON↔BRIGHT 1.6s 周期
-  const _matrixBreathT = usePhosphorBreath(1600);
+  // _matrixBreathT 已在组件顶无条件调用（React #310/#300）
   const _execActive = isMatrixTheme() && !isResolved && !isQueued;
   const _execColor = (() => {
     if (!isMatrixTheme()) return undefined;

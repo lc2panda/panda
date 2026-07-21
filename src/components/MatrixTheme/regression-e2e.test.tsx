@@ -269,3 +269,65 @@ test('isMatrixDark / isMatrixLight — env=light 不是 matrix → 都 false', a
   expect(isMatrixDark()).toBe(false)
   expect(isMatrixLight()).toBe(false)
 })
+
+// ─────────────────────────────────────────────────────────────────────
+// 5) React #310/#300 守护 — hooks 不得出现在 isMatrixTheme early-return 之后
+// ─────────────────────────────────────────────────────────────────────
+
+const HOOK_RE =
+  /\buse(?:State|Effect|Memo|Callback|Ref|AppState|AppStateMaybeOutsideOfProvider|PhosphorBreath|PhosphorFadeIn|FlashOnce|WarnFlash|StreamProgress|TerminalSize|MatrixUI|SelectedMessageBg|IsClassifierChecking|Theme)\b/
+
+function firstHookAfterMatrixGate(src: string): string | null {
+  // 在 export function 体内：找 if (!isMatrixTheme()) return … 之后是否还有 hook 调用
+  const gate = /if\s*\(\s*!isMatrixTheme\s*\(\s*\)\s*\)\s*(?:return\b|\{)/g
+  let m: RegExpExecArray | null
+  while ((m = gate.exec(src))) {
+    const after = src.slice(m.index)
+    // 截到本函数大致结束（下一个 export 或文件尾）
+    const rest = after.slice(0, 4000)
+    // gate 语句本身结束后再搜 hook
+    const afterGateBody = rest.replace(/^if\s*\(\s*!isMatrixTheme\s*\(\s*\)\s*\)\s*(?:return[^;\n]*;|\{[^}]*\})/, '')
+    const hook = HOOK_RE.exec(afterGateBody)
+    if (hook) return hook[0]
+  }
+  return null
+}
+
+test('React #310/#300 — MatrixTheme 组件 hooks 均在 isMatrixTheme gate 之前', async () => {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const dir = path.dirname(new URL(import.meta.url).pathname)
+  const files = [
+    'ScanLine.tsx',
+    'WorkerScope.tsx',
+    'TurnHeader.tsx',
+    'WelcomeCard.tsx',
+    'TurnSeparator.tsx',
+    'StaticCharRain.tsx',
+    'MatrixHUD.tsx',
+    'ScreenFrame.tsx',
+  ]
+  for (const f of files) {
+    const src = fs.readFileSync(path.join(dir, f), 'utf8')
+    const bad = firstHookAfterMatrixGate(src)
+    expect(bad, `${f}: hook after isMatrixTheme gate: ${bad}`).toBeNull()
+  }
+})
+
+test('React #310/#300 — AssistantToolUseMessage usePhosphorBreath 在首个 return null 之前', async () => {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const dir = path.dirname(new URL(import.meta.url).pathname)
+  const src = fs.readFileSync(
+    path.join(dir, '../messages/AssistantToolUseMessage.tsx'),
+    'utf8',
+  )
+  const fn = src.split('export function AssistantToolUseMessage')[1] ?? ''
+  const hookAt = fn.indexOf('usePhosphorBreath')
+  const retAt = fn.indexOf('return null')
+  expect(hookAt).toBeGreaterThan(0)
+  expect(retAt).toBeGreaterThan(0)
+  expect(hookAt).toBeLessThan(retAt)
+  // 仅一处调用（禁止重复声明导致 hooks 数仍不稳定）
+  expect(fn.split('usePhosphorBreath').length - 1).toBe(1)
+})
