@@ -198,32 +198,101 @@ export const REPEATED_529_ERROR_MESSAGE = 'Repeated 529 Overloaded errors'
 export const CUSTOM_OFF_SWITCH_MESSAGE =
   'Opus is experiencing high load, please use /model to switch to Sonnet'
 export const API_TIMEOUT_ERROR_MESSAGE = 'Request timed out'
-export function getPdfTooLargeErrorMessage(): string {
-  const limits = `max ${API_PDF_MAX_PAGES} pages, ${formatFileSize(PDF_TARGET_RAW_SIZE)}`
-  return getIsNonInteractiveSession()
-    ? `PDF too large (${limits}). Try reading the file a different way (e.g., extract text with pdftotext).`
-    : `PDF too large (${limits}). Double press esc to go back and try again, or use pdftotext to convert to text first.`
+/** Build media-size error text for a fixed locale (used by UI + strip-map dual registration). */
+function pdfTooLargeMessage(zh: boolean): string {
+  const size = formatFileSize(PDF_TARGET_RAW_SIZE)
+  if (getIsNonInteractiveSession()) {
+    return zh
+      ? `PDF 过大（最大 ${API_PDF_MAX_PAGES} 页、${size}）。请换种方式读取（例如用 pdftotext 提取文本）。`
+      : `PDF too large (max ${API_PDF_MAX_PAGES} pages, ${size}). Try reading the file a different way (e.g., extract text with pdftotext).`
+  }
+  return zh
+    ? `PDF 过大（最大 ${API_PDF_MAX_PAGES} 页、${size}）。连按两次 esc 返回重试，或先用 pdftotext 转为文本。`
+    : `PDF too large (max ${API_PDF_MAX_PAGES} pages, ${size}). Double press esc to go back and try again, or use pdftotext to convert to text first.`
 }
-export function getPdfPasswordProtectedErrorMessage(): string {
-  return getIsNonInteractiveSession()
-    ? 'PDF is password protected. Try using a CLI tool to extract or convert the PDF.'
+
+function pdfPasswordProtectedMessage(zh: boolean): string {
+  if (getIsNonInteractiveSession()) {
+    return zh
+      ? 'PDF 已加密。请用命令行工具提取或转换该 PDF。'
+      : 'PDF is password protected. Try using a CLI tool to extract or convert the PDF.'
+  }
+  return zh
+    ? 'PDF 已加密。请连按两次 esc 编辑消息后重试。'
     : 'PDF is password protected. Please double press esc to edit your message and try again.'
 }
-export function getPdfInvalidErrorMessage(): string {
-  return getIsNonInteractiveSession()
-    ? 'The PDF file was not valid. Try converting it to text first (e.g., pdftotext).'
+
+function pdfInvalidMessage(zh: boolean): string {
+  if (getIsNonInteractiveSession()) {
+    return zh
+      ? 'PDF 文件无效。请先转为文本（例如用 pdftotext）。'
+      : 'The PDF file was not valid. Try converting it to text first (e.g., pdftotext).'
+  }
+  return zh
+    ? 'PDF 文件无效。连按两次 esc 返回，换用其他文件重试。'
     : 'The PDF file was not valid. Double press esc to go back and try again with a different file.'
 }
-export function getImageTooLargeErrorMessage(): string {
-  return getIsNonInteractiveSession()
-    ? 'Image was too large. Try resizing the image or using a different approach.'
+
+function imageTooLargeMessage(zh: boolean): string {
+  if (getIsNonInteractiveSession()) {
+    return zh
+      ? '图片过大。请缩小图片或换用其他方式。'
+      : 'Image was too large. Try resizing the image or using a different approach.'
+  }
+  return zh
+    ? '图片过大。连按两次 esc 返回，换用更小的图片重试。'
     : 'Image was too large. Double press esc to go back and try again with a smaller image.'
 }
+
+function requestTooLargeMessage(zh: boolean): string {
+  const size = formatFileSize(PDF_TARGET_RAW_SIZE)
+  if (getIsNonInteractiveSession()) {
+    return zh
+      ? `请求过大（最大 ${size}，含会话上下文）。请换用更小的文件重试。`
+      : `Request too large (max ${size}). Try with a smaller file.`
+  }
+  return zh
+    ? `请求过大（最大 ${size}，含会话上下文）。连按两次 esc 返回，换用更小的文件重试。`
+    : `Request too large (max ${size}). Double press esc to go back and try with a smaller file.`
+}
+
+export function getPdfTooLargeErrorMessage(): string {
+  return pdfTooLargeMessage(isZh())
+}
+export function getPdfPasswordProtectedErrorMessage(): string {
+  return pdfPasswordProtectedMessage(isZh())
+}
+export function getPdfInvalidErrorMessage(): string {
+  return pdfInvalidMessage(isZh())
+}
+export function getImageTooLargeErrorMessage(): string {
+  return imageTooLargeMessage(isZh())
+}
 export function getRequestTooLargeErrorMessage(): string {
-  const limits = `max ${formatFileSize(PDF_TARGET_RAW_SIZE)}`
-  return getIsNonInteractiveSession()
-    ? `Request too large (${limits}). Try with a smaller file.`
-    : `Request too large (${limits}). Double press esc to go back and try with a smaller file.`
+  return requestTooLargeMessage(isZh())
+}
+
+/**
+ * Exact error texts (en + zh) for the current interactive mode.
+ * normalizeMessagesForAPI uses these as strip keys — both locales must be
+ * registered so document/image stripping still works after localization.
+ */
+export function getMediaSizeErrorStripMap(): Record<string, Set<'document' | 'image'>> {
+  const document = new Set<'document' | 'image'>(['document'])
+  const image = new Set<'document' | 'image'>(['image'])
+  const both = new Set<'document' | 'image'>(['document', 'image'])
+  return {
+    [pdfTooLargeMessage(false)]: document,
+    [pdfTooLargeMessage(true)]: document,
+    [pdfPasswordProtectedMessage(false)]: document,
+    [pdfPasswordProtectedMessage(true)]: document,
+    [pdfInvalidMessage(false)]: document,
+    [pdfInvalidMessage(true)]: document,
+    [imageTooLargeMessage(false)]: image,
+    [imageTooLargeMessage(true)]: image,
+    [requestTooLargeMessage(false)]: both,
+    [requestTooLargeMessage(true)]: both,
+  }
 }
 export const OAUTH_ORG_NOT_ALLOWED_ERROR_MESSAGE =
   'Your account does not have access to Panda. Please run /login.'

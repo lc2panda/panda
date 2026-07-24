@@ -30,11 +30,7 @@ import {
   getFeatureValue_CACHED_MAY_BE_STALE,
 } from '../services/analytics/growthbook.js'
 import {
-  getImageTooLargeErrorMessage,
-  getPdfInvalidErrorMessage,
-  getPdfPasswordProtectedErrorMessage,
-  getPdfTooLargeErrorMessage,
-  getRequestTooLargeErrorMessage,
+  getMediaSizeErrorStripMap,
 } from '../services/api/errors.js'
 import type { AnyObject, Progress } from '../Tool.js'
 import { isConnectorTextBlock } from '../types/connectorText.js'
@@ -2303,13 +2299,9 @@ export function normalizeMessagesForAPI(
   )
 
   // Build a map from error text → which block types to strip from the preceding user message.
-  const errorToBlockTypes: Record<string, Set<string>> = {
-    [getPdfTooLargeErrorMessage()]: new Set(['document']),
-    [getPdfPasswordProtectedErrorMessage()]: new Set(['document']),
-    [getPdfInvalidErrorMessage()]: new Set(['document']),
-    [getImageTooLargeErrorMessage()]: new Set(['image']),
-    [getRequestTooLargeErrorMessage()]: new Set(['document', 'image']),
-  }
+  // Includes both en and zh variants so stripping still works after i18n localization.
+  const errorToBlockTypes: Record<string, Set<string>> =
+    getMediaSizeErrorStripMap()
 
   // Walk the reordered messages to build a targeted strip map:
   // userMessageUUID → set of block types to strip from that message.

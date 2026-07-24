@@ -172,7 +172,8 @@
 
 #### H-006｜双源升级：local / `npm-local` 路径完全不走 tarball
 - **级别**：P1  
-- **状态**：已证实  
+- **状态**：已证实 → **已修复**  
+- **修复 commit**：`b7eedfd88` — fix(update): dual-source tarball for local install path (H-006)  
 - **位置**：  
   - `src/components/AutoUpdater.tsx` ~L127–L131：`installOrUpdateClaudePackage(channel, latestVersion)`  
   - `src/cli/update.ts` ~L373–L377：local 分支同样只调 `installOrUpdateClaudePackage`  
@@ -180,6 +181,7 @@
 - **因果机制**：`getLatestVersionInfo` 可能判定 GH 更新，但 local 安装仍打 Packages；Packages 滞后时 **失败或装旧**，与 dual-source 产品承诺不一致  
 - **触发**：用户为 npm-local 安装 + Packages 落后于 GH Release  
 - **建议**：local 安装复用 tarball 选项，或 GH 领先时明确降级提示而非静默失败  
+- **修复说明**：local / npm-local 升级路径对齐 dual-source，优先可用 tarball 
 
 #### H-007｜inferRiskLevel 前缀只读匹配导致复合命令低估风险
 - **级别**：P1（审计完整性；非权限闸门，但污染审计与后续策略）  
