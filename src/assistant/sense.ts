@@ -183,20 +183,51 @@ export function pushNotification(notification: PandaNotification): void {
           execFileSync('powershell', ['-c',
             `New-BurntToastNotification -Text "Panda: ${safeTitle}","${safeBody}"`
           ], { timeout: 5000 })
-        } catch {
+        } catch (burntToastErr) {
           // fallback: msg（同样用 execFileSync）
-          try { execFileSync('msg', ['*', `Panda: ${notification.title} - ${notification.body}`], { timeout: 3000 }) } catch {}
+          try {
+            execFileSync('msg', ['*', `Panda: ${notification.title} - ${notification.body}`], { timeout: 3000 })
+          } catch (msgErr) {
+            logSenseNotifyFailure('os-win32', notification.title, msgErr || burntToastErr)
+          }
         }
       } else {
         // Linux: notify-send
-        try { execFileSync('notify-send', ['Panda', `${notification.title}: ${notification.body}`], { timeout: 3000 }) } catch {}
+        try {
+          execFileSync('notify-send', ['Panda', `${notification.title}: ${notification.body}`], { timeout: 3000 })
+        } catch (e) {
+          logSenseNotifyFailure('os-linux', notification.title, e)
+        }
       }
-    } catch {}
+    } catch (e) {
+      logSenseNotifyFailure('os-notify', notification.title, e)
+    }
   }
 
   // Channel 出站推送——通过 MCP Channel 工具发送到外部平台
   if (notification.channel === 'all') {
     _pushToChannels(notification)
+  }
+}
+
+/**
+ * H-009：通知链路失败可观测。
+ * 只记日志、不抛错，避免把投递失败升级成主流程崩溃。
+ * @internal 导出供回归测试 spy
+ */
+export function logSenseNotifyFailure(
+  channel: string,
+  title: string | undefined,
+  err: unknown,
+): void {
+  try {
+    const { logForDebugging } = require('../utils/debug.js') as typeof import('../utils/debug.js')
+    const msg = err instanceof Error ? err.message : String(err)
+    logForDebugging(
+      `[sense] notification failed (channel=${channel}, title=${title ?? ''}): ${msg}`,
+    )
+  } catch {
+    // debug logger 不可用时无法再降级
   }
 }
 
@@ -228,9 +259,19 @@ function _pushToChannels(notification: PandaNotification): void {
         headers: { 'Content-Type': 'application/json' },
         body: payload,
         signal: controller.signal,
-      }).catch(() => {}).finally(() => clearTimeout(timeoutId))
+      })
+        .catch((e: unknown) => {
+          logSenseNotifyFailure('webhook', notification.title, e)
+        })
+        .finally(() => clearTimeout(timeoutId))
     }
-  } catch {}
+  } catch (e) {
+    // 未配置 proactive.json 属常态，不刷屏；其它配置/解析错误必须可观测
+    const msg = e instanceof Error ? e.message : String(e)
+    if (!/ENOENT|no such file|not found/i.test(msg)) {
+      logSenseNotifyFailure('webhook-config', notification.title, e)
+    }
+  }
 
   // 方式 2：写入 Channel 队列文件，供 Channel MCP Server 轮询读取
   try {
@@ -238,7 +279,11 @@ function _pushToChannels(notification: PandaNotification): void {
     const { join } = require('path')
     const { homedir } = require('os')
     const queueDir = join(homedir(), '.pandacc', 'channels', 'outbox')
-    try { mkdirSync(queueDir, { recursive: true }) } catch {}
+    try {
+      mkdirSync(queueDir, { recursive: true })
+    } catch (e) {
+      logSenseNotifyFailure('outbox-mkdir', notification.title, e)
+    }
     const entry = JSON.stringify({
       type: notification.type,
       title: notification.title,
@@ -246,7 +291,9 @@ function _pushToChannels(notification: PandaNotification): void {
       timestamp: new Date().toISOString(),
     }) + '\n'
     appendFileSync(join(queueDir, 'notifications.jsonl'), entry)
-  } catch {}
+  } catch (e) {
+    logSenseNotifyFailure('outbox', notification.title, e)
+  }
 
   // 方式 3：已连接的 IM Connector 直接投递
   try {
@@ -258,11 +305,22 @@ function _pushToChannels(notification: PandaNotification): void {
       try {
         if (typeof conn.sendNotification === 'function') {
           // 异步发送，不 await（避免阻塞推送管道）
-          void conn.sendNotification(notification).catch(() => {})
+          const channel = String(conn.platform || 'connector')
+          void conn.sendNotification(notification).catch((e: unknown) => {
+            logSenseNotifyFailure(channel, notification.title, e)
+          })
         }
-      } catch {}
+      } catch (e) {
+        logSenseNotifyFailure(
+          String(conn?.platform || 'connector'),
+          notification.title,
+          e,
+        )
+      }
     }
-  } catch {}
+  } catch (e) {
+    logSenseNotifyFailure('connector-registry', notification.title, e)
+  }
 
   // 方式 4：高优先级通知填充 reverse-push 队列
   try {
@@ -277,7 +335,9 @@ function _pushToChannels(notification: PandaNotification): void {
       })
       setWorkingMemory('im-reverse-push-queue', JSON.stringify(existing.slice(-20)))
     }
-  } catch {}
+  } catch (e) {
+    logSenseNotifyFailure('reverse-push-queue', notification.title, e)
+  }
 
   // 方式 5：通过已注册的 MCP Channel 插件推送（WeChat/飞书等）
   // 使用 channelRegistry 中缓存的 server 引用和最近 inbound context
@@ -287,25 +347,11 @@ function _pushToChannels(notification: PandaNotification): void {
     void pushViaChannelMCP(notification.title, notification.body).catch(
       (e: unknown) => {
         // pushViaChannelMCP 设计为不抛错；若仍 reject 必须可观测
-        try {
-          const { logForDebugging } = require('../utils/debug.js')
-          logForDebugging(
-            `[sense] pushViaChannelMCP rejected: ${(e as Error)?.message || e}`,
-          )
-        } catch {
-          // debug logger 不可用时无法再降级
-        }
+        logSenseNotifyFailure('mcp-channel', notification.title, e)
       },
     )
   } catch (e) {
-    try {
-      const { logForDebugging } = require('../utils/debug.js')
-      logForDebugging(
-        `[sense] pushViaChannelMCP invoke failed: ${(e as Error)?.message || e}`,
-      )
-    } catch {
-      // debug logger 不可用
-    }
+    logSenseNotifyFailure('mcp-channel-invoke', notification.title, e)
   }
 }
 
