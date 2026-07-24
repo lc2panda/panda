@@ -9,6 +9,7 @@ import { slackConnectorFactory } from './slack/index.js'
 import { telegramConnectorFactory } from './telegram/index.js'
 import { teamsConnectorFactory } from './teams/index.js'
 import { wechatConnectorFactory } from './wechat/index.js'
+import { purgeExpiredConnectorAggregates } from './aggregator.js'
 import { logForDebugging } from 'src/utils/debug.js'
 
 // why: 全局单例 flag，避免 proactive 重复激活时重复注册导致日志噪声
@@ -33,6 +34,21 @@ export function bootConnectors(): void {
   registry.registerFactory(wechatConnectorFactory)
 
   logForDebugging('[connectors/boot] 6 内置 factory 已注册（feishu/dingtalk/slack/telegram/teams/wechat）')
+
+  // P-004：启动时按 dataRetentionDays 清理 connector 聚合缓存（不碰主会话 transcript）
+  try {
+    const purge = purgeExpiredConnectorAggregates()
+    if (purge.cleared) {
+      logForDebugging(
+        `[connectors/boot] connector 聚合缓存已按保留期清理 cutoffMs=${purge.cutoffMs ?? 'n/a'}`,
+      )
+    }
+  } catch (e) {
+    logForDebugging(
+      `[connectors/boot] 保留期清理失败（忽略，聚合路径仍会过滤）: ${(e as Error).message}`,
+      { level: 'error' },
+    )
+  }
 }
 
 /**

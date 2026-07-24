@@ -15,9 +15,9 @@
 |------|--------|----------|------|------------------------|
 | P0   | 1      | 0        | 1    | H-001（有残余） |
 | P1   | 7      | 1        | 8    | H-002/H-008、H-003、H-004、H-005、H-007（第二批 P1 全清） |
-| P2   | 7      | 3        | 10   | — |
+| P2   | 7      | 3        | 10   | H-009（`9b48301d6`） |
 | P3   | 3      | 2        | 5    | — |
-| **合计** | **18** | **6** | **24** | + P-001/P-002（隐私节） |
+| **合计** | **18** | **6** | **24** | + P-001/P-002/P-003/P-004（隐私节）；H-009 已修复 |
 
 > **首批修复独立验收**（2026-07-24 17:07:55 +08:00）：commits `03ddb4bb9` (H-001)、`c73ce663e` (H-005)、`37d9a1fc8` (P-001/P-002)。详见各条目「修复状态」段。  
 > **第二批修复独立验收（初轮）**（2026-07-24 17:18:22 +08:00）：commits `c7accadcf` (H-004)、`09c3576e9` (H-007)、`033a7c85b` (H-002/H-008)。当时 H-003 无 commit，判定未完成。  
@@ -209,12 +209,13 @@
 
 #### H-009｜sense / 渠道路径空 catch 吞掉通知错误（scar 模式）
 - **级别**：P2  
-- **状态**：已证实  
+- **状态**：**已修复** · commit `9b48301d6` · 验收 2026-07-24  
 - **位置**：  
   - `src/assistant/sense.ts` ~L233、~L249、~L265：`.catch(() => {})`  
   - `src/assistant/channelRegistry.ts` 多处失败仅 `logForDebugging`  
-- **因果**：失败无用户可见信号、无指标、无重试钩子 → scar `silent-catch-empty` 复发形态  
-- **建议**：至少 `logForDebugging`/`logError` + 可选用户 toast；禁止空 body catch  
+- **因果**（历史）：失败无用户可见信号、无指标、无重试钩子 → scar `silent-catch-empty` 复发形态  
+- **修复**：通知失败改为可观测（log + 非空 catch），不再静默吞错  
+- **建议**（历史）：至少 `logForDebugging`/`logError` + 可选用户 toast；禁止空 body catch  
 
 #### H-010｜channelRegistry 冷启动只加载 Map 中「第一个」用户 token
 - **级别**：P2  
@@ -467,8 +468,8 @@
 |----|--------|------|------|----------|----------|
 | P-001 | **高** | `src/bridge/webhookSanitizer.ts` | `sanitizeInboundWebhookContent` 为恒等 stub（原样返回） | 入站 webhook 消毒失效；注入/密钥内容无剥离 | **已修复但有残余** · commit `37d9a1fc8` · 验收 2026-07-24 17:07:55 +08:00 · 已实现 redactSecrets+HTML/PII；catch 返回 `[REDACTED_SANITIZER_ERROR]` 不回吐原文；测试 5 项通过但 **未覆盖** sanitizer 内部抛错 fail-closed 路径 |
 | P-002 | **高** | `src/connectors/aggregator.ts` `applyPrivacyFilter` | catch 后 **fail-open** 返回未过滤消息 | 隐私过滤异常时敏感消息照常进入时间线 | **已修复** · commit `37d9a1fc8` · 验收 2026-07-24 17:07:55 +08:00 · 单条占位 / 整批 `[]` / 配置加载失败 `[]`；`bun test ...aggregator.privacy.test.ts` 含 fail-closed 断言通过 |
-| P-003 | **中高** | `src/assistant/privacyConfig.ts` vs 调用方 | `isPathExcluded`/`containsSensitiveContent`/`isDomainExcluded`/`excludeApps` **仅 memdir 部分使用**；connectors 不读 privacy.json 的路径/域名/App 排除 | 文档承诺的本地隐私配置对连接器通道基本不生效 |
-| P-004 | **中** | `privacy.json` `dataRetentionDays` | 字段有默认值与类型，**无强制清理实现** | 保留策略形同虚设，本地敏感数据可无限期残留 |
+| P-003 | **中高** | `src/assistant/privacyConfig.ts` vs 调用方 | `isPathExcluded`/`containsSensitiveContent`/`isDomainExcluded`/`excludeApps` **仅 memdir 部分使用**；connectors 不读 privacy.json 的路径/域名/App 排除 | 文档承诺的本地隐私配置对连接器通道基本不生效 | **已修复** · 见 P-003/P-004 commit · 验收 2026-07-24 · `applyPrivacyFilter` 生产路径 `loadPrivacyConfigResult` fail-closed；合并 path/domain/app/sensitive/excludeChannels；兼容别名 `containsSensitiveContent`；`bun test src/connectors/aggregator.privacy.test.ts` 18 pass |
+| P-004 | **中** | `privacy.json` `dataRetentionDays` | 字段有默认值与类型，**无强制清理实现** | 保留策略形同虚设，本地敏感数据可无限期残留 | **已修复** · 见 P-003/P-004 commit · 验收 2026-07-24 · `applyDataRetentionFilter` + 聚合路径 cutoff；`purgeExpiredConnectorAggregates` 启动清缓存；**不**触碰主会话 transcript |
 | P-005 | **中** | README §6 vs `getAPIMetadata` | 文档写「隐私增强时」才固定 ID；代码 **始终** 固定 device_id/session_id；`cc4all@gmail.com` **源码中未找到** | 文档/实现漂移，验收易误判 |
 | P-006 | **中** | `src/services/analytics/index.ts` `_privacyGuard` | 仅拦第三方 `ANTHROPIC_BASE_URL` host，**不**直接检查 `isAnalyticsDisabled`/`privacyEnhanced`（依赖 sink 侧） | 守卫分层不完整；若 sink 误挂可漏拦 |
 | P-007 | **中** | `src/services/api/client.ts` routing env 覆写 | 运行时改写 `process.env` API key/baseURL（H-001 类并发风险延伸） | 竞态下可能串密钥/串端点 |

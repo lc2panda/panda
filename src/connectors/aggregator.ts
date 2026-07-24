@@ -17,6 +17,14 @@ import type {
 import { getConnectorRegistry } from './registry.js'
 import { getConnectorsConfig } from './config.js'
 import { logForDebugging } from 'src/utils/debug.js'
+import {
+  loadPrivacyConfigResult,
+  getDataRetentionCutoffMs,
+  isAppExcluded,
+  isDomainExcluded,
+  isPathExcluded,
+  type PrivacyConfig,
+} from '../assistant/privacyConfig.js'
 
 // ─── LRU 缓存层（5 分钟 TTL） ───
 
@@ -77,14 +85,116 @@ function deduplicateMessages(messages: IMMessage[], windowMs: number = 5000): IM
 
 // ─── 隐私过滤 ───
 
-/** Privacy block used by aggregator (exported shape for unit tests). */
+/**
+ * Privacy block used by aggregator (exported shape for unit tests).
+ * connectors.json 的 aggregator.privacy + privacy.json 合并后的有效规则。
+ */
 export type AggregatorPrivacyConfig = {
   filterPatterns: string[]
   excludeChannels: string[]
   excludeSenders: string[]
+  /** privacy.json excludeApps（匹配 senderName / channelName） */
+  excludeApps?: string[]
+  /** privacy.json excludeBrowserDomains（匹配正文/附件 URL 域名） */
+  excludeBrowserDomains?: string[]
+  /** privacy.json excludePaths（匹配附件路径/文件名） */
+  excludePaths?: string[]
+  /**
+   * 保留天数（仅 connector 聚合消息）。
+   * - undefined：不在 override 路径做保留期裁剪（生产路径用 privacy.json）
+   * - 0：不清理
+   * - >0：丢弃 timestamp 早于 cutoff 的消息
+   */
+  dataRetentionDays?: number
 }
 
 const FILTER_FAILURE_PLACEHOLDER = '[REDACTED_FILTER_ERROR]'
+
+/** 从文本中提取疑似 URL / 域名（用于 isDomainExcluded）。 */
+const URL_OR_DOMAIN_RE =
+  /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+)(?:[/:?#][^\s]*)?/gi
+
+/** 从文本中提取疑似文件路径。 */
+const PATH_CANDIDATE_RE =
+  /(?:~|\/|\b[A-Za-z]:[\\/])[^\s"'<>|]+/g
+
+function extractDomains(text: string): string[] {
+  const out: string[] = []
+  URL_OR_DOMAIN_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = URL_OR_DOMAIN_RE.exec(text)) !== null) {
+    if (m[1]) out.push(m[1])
+  }
+  return out
+}
+
+function extractPathCandidates(text: string): string[] {
+  const out: string[] = []
+  PATH_CANDIDATE_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = PATH_CANDIDATE_RE.exec(text)) !== null) {
+    if (m[0]) out.push(m[0])
+  }
+  return out
+}
+
+/**
+ * 将 privacy.json + connectors.json privacy 合并为有效过滤规则。
+ * privacy.json 损坏 → 返回 null（调用方 fail-closed）。
+ */
+export function resolveEffectivePrivacyConfig(
+  privacyOverride?: AggregatorPrivacyConfig | null,
+): AggregatorPrivacyConfig | null | 'fail-closed' {
+  // 显式 null：测试/调用方要求透传
+  if (privacyOverride === null) return null
+
+  // 显式对象：仅用 override（单元测试可控）
+  if (privacyOverride !== undefined) return privacyOverride
+
+  // 生产路径：privacy.json 严格加载 + connectors 合并
+  let fileCfg: PrivacyConfig
+  try {
+    const result = loadPrivacyConfigResult()
+    if (result.status === 'error') {
+      logForDebugging(
+        `[aggregator] privacy.json 加载失败 (fail-closed): ${result.error}`,
+        { level: 'error' },
+      )
+      return 'fail-closed'
+    }
+    fileCfg = result.config
+  } catch (e) {
+    logForDebugging(
+      `[aggregator] privacy.json 加载异常 (fail-closed): ${(e as Error).message}`,
+      { level: 'error' },
+    )
+    return 'fail-closed'
+  }
+
+  let connectorsPrivacy: AggregatorPrivacyConfig | null = null
+  try {
+    connectorsPrivacy = getConnectorsConfig().aggregator?.privacy ?? null
+  } catch (e) {
+    logForDebugging(
+      `[aggregator] connectors 隐私配置加载失败 (fail-closed): ${(e as Error).message}`,
+      { level: 'error' },
+    )
+    return 'fail-closed'
+  }
+
+  return {
+    filterPatterns: [
+      ...(fileCfg.sensitivePatterns || []),
+      ...(connectorsPrivacy?.filterPatterns || []),
+    ],
+    excludeChannels: [...(connectorsPrivacy?.excludeChannels || [])],
+    excludeSenders: [...(connectorsPrivacy?.excludeSenders || [])],
+    excludeApps: [...(fileCfg.excludeApps || [])],
+    excludeBrowserDomains: [...(fileCfg.excludeBrowserDomains || [])],
+    excludePaths: [...(fileCfg.excludePaths || [])],
+    dataRetentionDays: fileCfg.dataRetentionDays,
+  }
+}
 
 /** Build a timeline-safe stand-in without reading potentially poisoned fields. */
 function safeFailedMessage(msg: IMMessage): IMMessage {
@@ -113,35 +223,48 @@ function safeFailedMessage(msg: IMMessage): IMMessage {
 }
 
 /**
+ * 仅过滤 connector 聚合消息的保留期（P-004）。
+ * 不触及主会话 transcript / 其他存储。
+ */
+export function applyDataRetentionFilter(
+  messages: IMMessage[],
+  dataRetentionDays?: number,
+  nowMs: number = Date.now(),
+): IMMessage[] {
+  if (dataRetentionDays === undefined) return messages
+  if (!Number.isFinite(dataRetentionDays) || dataRetentionDays <= 0) return messages
+  const cutoff = nowMs - Math.floor(dataRetentionDays) * 86_400_000
+  return messages.filter(m => {
+    try {
+      return typeof m.timestamp === 'number' && m.timestamp >= cutoff
+    } catch {
+      // 时间戳不可读 → 丢弃（fail-closed，避免无限保留敏感残留）
+      return false
+    }
+  })
+}
+
+/**
  * Apply privacy blocklists / content redaction to inbound IM messages.
  *
- * Semantics (fail-closed):
- * - No privacy config → pass-through (filtering not configured).
- * - Single-message evaluation error → drop that message or emit safe placeholder
- *   content (never emit original unfiltered text).
- * - Batch / structural failure → return empty list (never emit unfiltered set).
- * - Invalid regex patterns are skipped with an error log (not used as pass-all).
- *
- * @param privacyOverride When provided (including `null`), skips loading config
- *   and uses the override. `undefined` loads from connectors config.
+ * Semantics (fail-closed, P-002/P-003/P-004):
+ * - `privacyOverride === null` → pass-through（显式关闭，测试用）
+ * - `privacyOverride === undefined` → 加载 privacy.json（损坏 fail-closed）
+ *   + 合并 connectors.json privacy + dataRetentionDays
+ * - Single-message evaluation error → safe placeholder（不放行原文）
+ * - Batch / structural failure → 空列表
+ * - Invalid regex patterns are skipped（不作为 pass-all）
+ * - 仅处理 connector 消息；不碰主会话 transcript
  */
 export function applyPrivacyFilter(
   messages: IMMessage[],
   privacyOverride?: AggregatorPrivacyConfig | null,
 ): IMMessage[] {
-  let privacy: AggregatorPrivacyConfig | null | undefined = privacyOverride
-  if (privacy === undefined) {
-    try {
-      privacy = getConnectorsConfig().aggregator?.privacy ?? null
-    } catch (e) {
-      logForDebugging(
-        `[aggregator] 隐私配置加载失败 (fail-closed, 返回空列表): ${(e as Error).message}`,
-        { level: 'error' },
-      )
-      return []
-    }
-  }
-  if (!privacy) return messages
+  const resolved = resolveEffectivePrivacyConfig(privacyOverride)
+  if (resolved === 'fail-closed') return []
+  if (!resolved) return messages
+
+  const privacy = resolved
 
   // Compile patterns individually — bad patterns are skipped, not a free pass.
   const patterns: RegExp[] = []
@@ -156,15 +279,73 @@ export function applyPrivacyFilter(
     }
   }
 
+  // 构造轻量 PrivacyConfig 视图，复用 privacyConfig 判定函数
+  const fileView: PrivacyConfig | null =
+    privacy.excludeApps || privacy.excludeBrowserDomains || privacy.excludePaths
+      ? {
+          excludePaths: privacy.excludePaths || [],
+          excludeApps: privacy.excludeApps || [],
+          excludeBrowserDomains: privacy.excludeBrowserDomains || [],
+          sensitivePatterns: privacy.filterPatterns || [],
+          dataRetentionDays: privacy.dataRetentionDays ?? 0,
+          localLLMForSensitive: true,
+        }
+      : null
+
   try {
     const excludeChannels = new Set(privacy.excludeChannels || [])
     const excludeSenders = new Set(privacy.excludeSenders || [])
+    // P-004：保留期裁剪（仅 connector 聚合路径）
+    const retained = applyDataRetentionFilter(messages, privacy.dataRetentionDays)
     const result: IMMessage[] = []
 
-    for (const msg of messages) {
+    for (const msg of retained) {
       try {
         if (excludeChannels.has(msg.channelId)) continue
         if (excludeSenders.has(msg.senderId)) continue
+
+        // P-003：excludeApps → senderName / channelName
+        if (fileView) {
+          if (msg.senderName && isAppExcluded(msg.senderName, fileView)) continue
+          if (msg.channelName && isAppExcluded(msg.channelName, fileView)) continue
+
+          // 域名：正文 + 附件 URL
+          const domainSources: string[] = [msg.content]
+          if (msg.attachments) {
+            for (const a of msg.attachments) {
+              if (a.url) domainSources.push(a.url)
+              if (a.name) domainSources.push(a.name)
+            }
+          }
+          let excludedByDomain = false
+          for (const src of domainSources) {
+            for (const d of extractDomains(src)) {
+              if (isDomainExcluded(d, fileView)) {
+                excludedByDomain = true
+                break
+              }
+            }
+            if (excludedByDomain) break
+          }
+          if (excludedByDomain) continue
+
+          // 路径：附件 name/url + 正文中的路径片段
+          let excludedByPath = false
+          const pathSources: string[] = [...extractPathCandidates(msg.content)]
+          if (msg.attachments) {
+            for (const a of msg.attachments) {
+              if (a.name) pathSources.push(a.name)
+              if (a.url) pathSources.push(a.url)
+            }
+          }
+          for (const p of pathSources) {
+            if (isPathExcluded(p, fileView)) {
+              excludedByPath = true
+              break
+            }
+          }
+          if (excludedByPath) continue
+        }
 
         let content = msg.content
         for (const p of patterns) {
@@ -196,6 +377,38 @@ export function applyPrivacyFilter(
       { level: 'error' },
     )
     return []
+  }
+}
+
+/**
+ * 启动/按需清理：清空聚合缓存中可能含过期消息的条目。
+ * 仅 clearAggregatorCache，绝不触碰主会话 transcript。
+ */
+export function purgeExpiredConnectorAggregates(): {
+  cutoffMs: number | null
+  cleared: boolean
+} {
+  try {
+    const result = loadPrivacyConfigResult()
+    if (result.status === 'error') {
+      // fail-closed：配置不可信时清空缓存，避免继续提供可能过期/未过滤数据
+      clearAggregatorCache()
+      return { cutoffMs: null, cleared: true }
+    }
+    const cutoffMs = getDataRetentionCutoffMs(result.config)
+    // 有保留期策略时清空缓存，迫使下次聚合重新按 cutoff 过滤
+    if (cutoffMs !== null) {
+      clearAggregatorCache()
+      return { cutoffMs, cleared: true }
+    }
+    return { cutoffMs: null, cleared: false }
+  } catch (e) {
+    logForDebugging(
+      `[aggregator] purgeExpiredConnectorAggregates 异常 (fail-closed 清缓存): ${(e as Error).message}`,
+      { level: 'error' },
+    )
+    clearAggregatorCache()
+    return { cutoffMs: null, cleared: true }
   }
 }
 
