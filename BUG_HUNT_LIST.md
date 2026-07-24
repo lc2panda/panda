@@ -11,21 +11,22 @@
 
 ## 0. 统计摘要
 
-| 级别 | 已证实 | 可疑风险 | 小计 | 其中已修复（首批验收） |
+| 级别 | 已证实 | 可疑风险 | 小计 | 其中已修复（验收） |
 |------|--------|----------|------|------------------------|
 | P0   | 1      | 0        | 1    | H-001（有残余） |
-| P1   | 7      | 1        | 8    | H-005 |
+| P1   | 7      | 1        | 8    | H-002/H-008、H-004、H-005、H-007；**H-003 未完成** |
 | P2   | 7      | 3        | 10   | — |
 | P3   | 3      | 2        | 5    | — |
 | **合计** | **18** | **6** | **24** | + P-001/P-002（隐私节） |
 
-> **首批修复独立验收**（2026-07-24 17:07:55 +08:00）：commits `03ddb4bb9` (H-001)、`c73ce663e` (H-005)、`37d9a1fc8` (P-001/P-002)。详见各条目「修复状态」段。
+> **首批修复独立验收**（2026-07-24 17:07:55 +08:00）：commits `03ddb4bb9` (H-001)、`c73ce663e` (H-005)、`37d9a1fc8` (P-001/P-002)。详见各条目「修复状态」段。  
+> **第二批修复独立验收**（2026-07-24 17:18:22 +08:00）：commits `c7accadcf` (H-004)、`09c3576e9` (H-007)、`033a7c85b` (H-002/H-008)。**H-003 无对应 commit，源码仍 fire-and-forget，判定未完成。** 工作区 clean。
 
-**Top 3 最危险项**（猎杀时排序；H-001 已修，下列为当前未修最高危）
+**Top 3 最危险项**（猎杀时排序；已修项划掉）
 
 1. ~~**H-001** maxVersion 熔断被 preferTarball 绕过~~ → **已修复但有残余** (`03ddb4bb9`)  
-2. **H-002** MCP stdio 锁键与真实 spawn cwd 不一致 → EEXIST 竞态 scar 复发  
-3. **H-003** `pushViaChannelMCP` 未等成功即 `delivered=true` → 静默丢通知且永不重投  
+2. ~~**H-002** MCP stdio 锁键与真实 spawn cwd 不一致~~ → **已修复** (`033a7c85b`，与 H-008 同 commit)  
+3. **H-003** `pushViaChannelMCP` 未等成功即 `delivered=true` → **未完成**（静默丢通知且永不重投）  
 
 ---
 
@@ -95,44 +96,55 @@
 
 #### H-002｜MCP stdio 串行锁 cwd ≠ 真实 spawn cwd（EEXIST scar 复发）
 - **级别**：P1  
-- **状态**：已证实  
-- **位置**：  
-  - `src/services/mcp/client.ts` `getEffectiveLocalMcpCwd` ~L488–L499  
-  - `enqueueMcpStartupByCwd` / `processLocalServer` ~L503–L520、~L2889  
-  - `connectToServer` Stdio 分支 ~L1236–L1241：`cwd: getOriginalCwd()`  
-- **因果机制**：  
-  - 锁键 = `config.cwd ?? CLAUDE_PLUGIN_ROOT ?? getOriginalCwd()`  
-  - 真实子进程 cwd **恒为** `getOriginalCwd()`，**从不使用** config.cwd / plugin root  
-  - 两个 plugin MCP 有不同 `CLAUDE_PLUGIN_ROOT` → **不同锁** → **并行 spawn 到同一真实 cwd**  
-  - 若服务器在 cwd 下创建同名目录/socket（历史 EEXIST 场景），竞态复发  
-- **触发条件**：同会话并行启动 ≥2 个 stdio MCP（尤其 plugin 来源），且实现依赖 cwd 内独占资源  
-- **静态证据**：scar `memory/scars/mcp-stdio-eexist-race.md` 描述的修复是「按 cwd 串行」；当前实现锁与 spawn 语义分裂，修复不完整  
-- **建议**：spawn 的 `cwd` 必须等于锁键所用 effective cwd；或锁键强制统一为真实 spawn cwd  
+- **状态**：已证实 → **已修复**  
+- **修复 commit**：`033a7c85b` — fix(mcp): align stdio spawn cwd with startup lock (H-002, H-008)  
+- **验收时间**：2026-07-24 17:18:22 +08:00  
+- **验收结论**：
+  - `getEffectiveLocalMcpCwd` 统一 effective cwd：`config.cwd` → `CLAUDE_PLUGIN_ROOT` → `getOriginalCwd()`，并 `resolve` 为绝对路径
+  - Stdio 分支 `spawnCwd = getEffectiveLocalMcpCwd(...) ?? getOriginalCwd()`，`StdioClientTransport({ cwd: spawnCwd })` 与锁键同源
+  - 测试：`bun test src/services/mcp/__tests__/stdio-env-inject.test.ts` → **15 pass / 0 fail**（含源码守卫：spawnCwd 绑定）
+  - 未引入 `resolveWindowsCommand`（scar 约束遵守）
+- **残余（非阻断）**：集成级「真实双 stdio 并行 EEXIST」未在本验收跑真实子进程；依赖单元 + 源码守卫
+- **位置**（历史描述保留）：  
+  - `src/services/mcp/client.ts` `getEffectiveLocalMcpCwd` ~L499–L520  
+  - `connectToServer` Stdio 分支 ~L1258–L1271  
+- **因果机制**（历史）：锁键与 spawn cwd 分裂 → 并行 spawn 同真实 cwd → EEXIST  
+- **建议**（已落地）：spawn cwd === lock key effective cwd  
 
 #### H-003｜channelRegistry：异步 MCP 推送未完成即标记已投递
 - **级别**：P1  
-- **状态**：已证实  
-- **位置**：`src/assistant/channelRegistry.ts` `pushViaChannelMCP` ~L255–L280  
+- **状态**：已证实 → **未完成**（第二批验收 2026-07-24 17:18:22 +08:00）  
+- **修复 commit**：无（`git log --grep='H-003|await MCP|marking delivered'` 无命中；HEAD `033a7c85b` 工作区 clean，无未提交改动）  
+- **验收结论**：
+  - 源码仍在 `src/assistant/channelRegistry.ts` `pushViaChannelMCP` ~L232–L241：
+    - `void server.client.callTool(...).catch(...)` **不 await**
+    - 紧接着 `delivered = true`（发起即标成功）
+  - 失败仅 `logForDebugging`，不回灌 `_pendingMessages`
+  - **无对应测试文件可跑**
+- **位置**：`src/assistant/channelRegistry.ts` `pushViaChannelMCP` ~L202–L259  
 - **因果机制**：  
-  1. `client.callTool(...).then(...).catch(...)` **不 await**  
-  2. 立即 `delivered = true` 并 `return true`  
-  3. 调用方（`flushPendingNotifications` / 冷启动回放）认为成功 → **清缓冲**  
-  4. 实际 callTool 失败只打 debug 日志，**不会重新入队**  
+  1. `client.callTool(...)` **不 await**  
+  2. 立即 `delivered = true`  
+  3. 调用方认为成功 → 不入 pending / 清缓冲  
+  4. 实际失败只打 debug 日志，**不会重新入队**  
 - **触发**：MCP 未连上、工具名不存在、网络/权限失败  
 - **影响**：微信/渠道通知「已发送」假象 + 永久丢失  
-- **建议**：await callTool；仅 isError=false 时 delivered=true；失败保留 pending 并限次重试  
+- **建议**：await callTool；仅成功时 delivered=true；失败保留 pending 并限次重试  
 
 #### H-004｜飞书默认 MCP Connector 无 sendNotification（空壳路径）
 - **级别**：P1  
-- **状态**：已证实  
-- **位置**：  
-  - `src/connectors/feishu/index.ts` `FeishuMCPConnector` ~L28–L50（无 `sendNotification`）  
-  - `FeishuAPIConnector.sendNotification` ~L554–L587（仅 API 模式）  
-  - 工厂：`feishuConnectorFactory.create` ~L627–L629、`createFeishuConnector` ~L637–L641 **默认 MCP**  
-  - 调用方：`src/assistant/sense.ts` ~L230–L233：`typeof conn.sendNotification === 'function'` 才调用  
-- **因果机制**：默认/ MCP 配置下 connector 没有该方法 → sense 静默 skip → 用户配置了飞书却收不到助手主动通知  
-- **触发**：`mode` 非 api 或默认工厂；proactive/sense 路径发 notification  
-- **建议**：MCP 模式映射 `feishu_send_message` 实现 `sendNotification`；或工厂在需要通知能力时拒绝 silent default  
+- **状态**：已证实 → **已修复（有残余）**  
+- **修复 commit**：`c7accadcf` — fix(feishu): implement sendNotification on MCP connector (H-004)  
+- **验收时间**：2026-07-24 17:18:22 +08:00  
+- **验收结论**：
+  - `FeishuMCPConnector.sendNotification` 已实现：读 `extra.chatId`，`await callTool('feishu_send_message', ...)`
+  - 测试：`bun test src/connectors/feishu/sendNotification.test.ts` → **8 pass / 0 fail / 20 expect**
+- **残余（非阻断）**：catch 仍吞错仅 `logForDebugging`，调用方无法从 Promise reject 感知失败；无 chatId 时静默 return  
+- **位置**（历史描述保留）：  
+  - `src/connectors/feishu/index.ts` `FeishuMCPConnector.sendNotification` ~L169–L190  
+  - 调用方：`src/assistant/sense.ts` `typeof conn.sendNotification === 'function'`  
+- **因果机制**（历史）：默认 MCP connector 无方法 → sense 静默 skip  
+- **建议**（主路径已落地）：MCP 模式映射 `feishu_send_message`  
 
 #### H-005｜release-cli 对 `v*`（含 beta）一律 `--latest`
 - **级别**：P1  
@@ -167,22 +179,25 @@
 
 #### H-007｜inferRiskLevel 前缀只读匹配导致复合命令低估风险
 - **级别**：P1（审计完整性；非权限闸门，但污染审计与后续策略）  
-- **状态**：已证实  
-- **位置**：`src/utils/auditLog.ts` `inferRiskLevel` ~L114–L148  
-- **因果机制**：  
-  1. `readOnlyPattern` 用 `^\s*(ls|cat|...|echo|tee|...)` **仅看命令串开头**  
-  2. 匹配后 **立即 return `read-only`**，后面的 `destructivePattern` **永远到不了**  
-  3. 例：`ls; rm -rf /tmp/x`、`echo hi > important.txt`、`tee /etc/passwd` 均可被标为 read-only  
-- **触发**：Bash 工具审计写入 `writeAuditEntry`（`toolExecution.ts` ~L218–L222）  
-- **证据**：与 MEMORY「B14」一致；`auditLog.test.ts` 未覆盖复合命令  
-- **建议**：先拆 `&&/||/;/|` 管道段再逐段判定；写重定向与 `tee` 不得进只读表；destructive 优先于 read-only  
+- **状态**：已证实 → **已修复**  
+- **修复 commit**：`09c3576e9` — fix(audit): stop under-classifying compound bash risk (H-007)  
+- **验收时间**：2026-07-24 17:18:22 +08:00  
+- **验收结论**：
+  - 拆段 `splitBashSegments`（`;` `&&` `||` `|` 换行）+ 段级最高风险；destructive 优先；`tee`/写重定向抬升 high-write；不确定 fail-safe high-write
+  - 测试：`bun test src/utils/auditLog.test.ts` → **18 pass / 0 fail / 51 expect**
+- **残余（非阻断）**：启发式拆段，嵌套引号/子 shell 边界未全覆盖；属审计启发式固有限制  
+- **位置**：`src/utils/auditLog.ts` `inferRiskLevel` / `classifyBashCommand` ~L114–L214  
+- **因果机制**（历史）：前缀只读短路 → 复合命令 under-classify  
+- **建议**（已落地）：拆段 + 最高风险 + destructive 优先  
 
 #### H-008｜Stdio MCP 忽略用户配置的 `cwd`（功能错误 + 放大 H-002）
 - **级别**：P1（与 H-002 同源，单独成条因影响面是「配置无效」）  
-- **状态**：已证实  
-- **位置**：`src/services/mcp/client.ts` ~L1240 vs ~L496  
-- **因果机制**：配置 `cwd` 只参与锁键，不参与 spawn → 服务器在错误工作目录启动，相对路径/配置文件找不到  
-- **建议**：与 H-002 一并：effective cwd 贯通 lock + spawn  
+- **状态**：已证实 → **已修复**（同 H-002 commit `033a7c85b`）  
+- **验收时间**：2026-07-24 17:18:22 +08:00  
+- **验收结论**：spawn `cwd` 使用 `getEffectiveLocalMcpCwd`，用户 `config.cwd` / plugin root 生效；测试同 H-002（15 pass）  
+- **位置**：`src/services/mcp/client.ts` ~L1258–L1271 vs ~L499–L520  
+- **因果机制**（历史）：配置 cwd 只参与锁键不参与 spawn  
+- **建议**（已落地）：effective cwd 贯通 lock + spawn  
 
 ---
 
@@ -301,10 +316,10 @@
 
 ## 5. 建议修复优先级（供审查，不实施）
 
-1. **立即**：H-001（熔断）+ H-005（发版 latest）—— 防错误版本进入用户机  
-2. **本周**：H-002/H-008（MCP cwd 贯通）+ H-003（delivered 语义）+ H-004（飞书通知）  
-3. **随后**：H-006 双源 local 对齐、H-007 审计、H-009 去空 catch  
-4. **顺带**：Advisor 三连、死代码清理  
+1. ~~**立即**：H-001（熔断）+ H-005（发版 latest）~~ → 首批已修  
+2. ~~H-002/H-008（MCP cwd）~~ / ~~H-004（飞书通知）~~ / ~~H-007（审计）~~ → 第二批已修；**H-003（delivered 语义）仍未完成，应优先**  
+3. **随后**：H-006 双源 local 对齐、H-009 去空 catch  
+4. **顺带**：Advisor 三连、死代码清理；H-004 残余（失败可观测性）  
 
 每项修复验收建议：**失败必须可观测**（测试断言 + 非空错误日志 + 不误标成功）。
 
