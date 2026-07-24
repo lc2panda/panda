@@ -147,8 +147,18 @@ const SMART_CRON_TASKS: SmartCronTask[] = [
           try {
             const { pushViaChannelMCP } = await import('../assistant/channelRegistry.js')
             const lines = content.split('\n').filter(l => l.trim() && !l.startsWith('#')).slice(0, 8)
-            pushViaChannelMCP('📋 晨间简报', lines.join('\n'))
-          } catch {}
+            // H-003：await 投递结果；失败由 pushViaChannelMCP 内部 buffer + log，不标成功
+            const delivered = await pushViaChannelMCP('📋 晨间简报', lines.join('\n'))
+            if (!delivered) {
+              logForDebugging(
+                '[builtinTasks] morning-brief: channel MCP push not delivered (buffered for retry)',
+              )
+            }
+          } catch (e) {
+            logForDebugging(
+              `[builtinTasks] morning-brief: channel MCP push failed: ${(e as Error)?.message || e}`,
+            )
+          }
 
           // why: P2-T7 panda-on-desk 联动 — 晨间简报 system 横幅 + overlay 卡片（10s TTL）
           try {

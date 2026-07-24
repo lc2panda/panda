@@ -128,8 +128,12 @@ export function saveChannelContext(
     updated: Date.now(),
   })
 
-  // Context 到达，flush 之前积压的 pending 消息
-  _flushPending(channel)
+  // Context 到达，flush 之前积压的 pending 消息（异步，失败已在内部回写 pending）
+  void _flushPending(channel).catch((e: unknown) => {
+    logForDebugging(
+      `[channelRegistry] _flushPending rejected (channel=${channel}): ${(e as Error)?.message || e}`,
+    )
+  })
 }
 
 /**
@@ -189,6 +193,19 @@ function _loadPersistedContext(channel: string): ChannelReplyContext | null {
 }
 
 /**
+ * 判定 MCP callTool 结果是否为业务失败。
+ * SDK 可能 resolve 带 isError:true 的结果而不 reject。
+ */
+function _isCallToolErrorResult(result: unknown): boolean {
+  return (
+    !!result &&
+    typeof result === 'object' &&
+    'isError' in result &&
+    (result as { isError?: boolean }).isError === true
+  )
+}
+
+/**
  * 通过已注册的 channel MCP server 推送通知。
  * 遍历所有已注册 server，使用最近的 context 调用 reply 工具。
  *
@@ -196,75 +213,102 @@ function _loadPersistedContext(channel: string): ChannelReplyContext | null {
  * Feishu  reply tool 参数：{ user_id, chat_id, text }
  * 全程 try/catch，不抛出异常。
  *
+ * delivered 语义（H-003）：仅在 callTool **成功完成**（无 throw、无 isError）后为 true。
+ * 失败时返回 false 并将消息写入 pending，供后续 saveChannelContext 重投。
+ *
  * 如果所有 channel 都没有可用 context，消息暂存到 _pendingMessages，
  * 等下次 saveChannelContext 时自动 flush。
  */
-export function pushViaChannelMCP(title: string, body: string): void {
+export async function pushViaChannelMCP(
+  title: string,
+  body: string,
+): Promise<boolean> {
   const message = `[${title || 'Panda'}]\n${body || ''}`
   let delivered = false
 
-  for (const [channel, server] of _servers) {
-    try {
-      let ctx = _contexts.get(channel)
-      if (!ctx) {
-        ctx = _loadPersistedContext(channel)
-        if (!ctx) continue
-      }
+  try {
+    for (const [channel, server] of _servers) {
+      try {
+        let ctx = _contexts.get(channel)
+        if (!ctx) {
+          ctx = _loadPersistedContext(channel)
+          if (!ctx) continue
+        }
 
-      // 检查 context 是否过期
-      if (Date.now() - ctx.updated > CONTEXT_TTL_MS) continue
+        // 检查 context 是否过期
+        if (Date.now() - ctx.updated > CONTEXT_TTL_MS) continue
 
-      const toolName = REPLY_TOOL_MAP[channel]
-      if (!toolName) continue
+        const toolName = REPLY_TOOL_MAP[channel]
+        if (!toolName) continue
 
-      // 构造正确的参数名：WeChat → context_token, Feishu → chat_id
-      const args: Record<string, string> = {
-        user_id: ctx.user_id,
-        text: message,
-      }
-      if (channel === 'wechat') {
-        args.context_token = ctx.context_token
-      } else {
-        // Feishu and other channels use chat_id
-        args.chat_id = ctx.context_token
-      }
+        // 构造正确的参数名：WeChat → context_token, Feishu → chat_id
+        const args: Record<string, string> = {
+          user_id: ctx.user_id,
+          text: message,
+        }
+        if (channel === 'wechat') {
+          args.context_token = ctx.context_token
+        } else {
+          // Feishu and other channels use chat_id
+          args.chat_id = ctx.context_token
+        }
 
-      // 异步调用 MCP reply 工具，不 await（避免阻塞推送管道）
-      void server.client.callTool({
-        name: toolName,
-        arguments: args,
-      }).catch((e: unknown) => {
+        // H-003：必须 await 成功后再标 delivered，禁止 fire-and-forget 假成功
+        const result = await server.client.callTool({
+          name: toolName,
+          arguments: args,
+        })
+        if (_isCallToolErrorResult(result)) {
+          logForDebugging(
+            `[channelRegistry] pushViaChannelMCP: reply 返回 isError (channel=${channel}): ${JSON.stringify((result as { content?: unknown }).content ?? result)}`,
+          )
+          continue
+        }
+        delivered = true
+        logForDebugging(
+          `[channelRegistry] pushViaChannelMCP: delivered via ${channel}`,
+        )
+      } catch (e) {
         logForDebugging(
           `[channelRegistry] pushViaChannelMCP: reply 调用失败 (channel=${channel}): ${(e as Error)?.message || e}`,
         )
-      })
-      delivered = true
-    } catch (e) {
+      }
+    }
+
+    // 如果没有任何 channel 成功投递，暂存到 pending buffer 供重试
+    if (!delivered) {
+      _pendingMessages.push({ title, body, timestamp: Date.now() })
+      // 超出上限时淘汰最旧的
+      while (_pendingMessages.length > MAX_PENDING) {
+        _pendingMessages.shift()
+      }
       logForDebugging(
-        `[channelRegistry] pushViaChannelMCP: 处理 channel=${channel} 时异常: ${(e as Error)?.message || e}`,
+        `[channelRegistry] No successful delivery, buffered notification (${_pendingMessages.length} pending): ${title}`,
       )
+    }
+  } catch (e) {
+    // 外层兜底：绝不向调用方抛错；失败可观测且进入 pending
+    logForDebugging(
+      `[channelRegistry] pushViaChannelMCP: unexpected error: ${(e as Error)?.message || e}`,
+    )
+    if (!delivered) {
+      _pendingMessages.push({ title, body, timestamp: Date.now() })
+      while (_pendingMessages.length > MAX_PENDING) {
+        _pendingMessages.shift()
+      }
     }
   }
 
-  // 如果没有任何 channel 成功投递，暂存到 pending buffer
-  if (!delivered) {
-    _pendingMessages.push({ title, body, timestamp: Date.now() })
-    // 超出上限时淘汰最旧的
-    while (_pendingMessages.length > MAX_PENDING) {
-      _pendingMessages.shift()
-    }
-    logForDebugging(
-      `[channelRegistry] No available context, buffered notification (${_pendingMessages.length} pending): ${title}`,
-    )
-  }
+  return delivered
 }
 
 /**
  * Flush pending 消息到指定 channel。
  * 在 saveChannelContext 后调用，将积压的通知补发出去。
- * 全程 try/catch + 异步，不阻塞调用方。
+ * 仅在 callTool 成功后丢弃消息；失败则回写 pending 供重试。
+ * 全程 try/catch，不向调用方抛错。
  */
-function _flushPending(channel: string): void {
+async function _flushPending(channel: string): Promise<void> {
   if (_pendingMessages.length === 0) return
 
   const server = _servers.get(channel)
@@ -279,7 +323,7 @@ function _flushPending(channel: string): void {
 
   const now = Date.now()
 
-  // 取出所有 pending 消息并清空 buffer
+  // 取出所有 pending 消息并清空 buffer；失败项会回写
   const messages = _pendingMessages.splice(0, _pendingMessages.length)
 
   // 过滤掉超过 TTL 的消息
@@ -298,6 +342,8 @@ function _flushPending(channel: string): void {
     `[channelRegistry] Flushing ${valid.length} pending notification(s) to ${channel}`,
   )
 
+  const failed: PendingMessage[] = []
+
   for (const msg of valid) {
     try {
       const text = `[${msg.title || 'Panda'}]\n${msg.body || ''}`
@@ -311,20 +357,33 @@ function _flushPending(channel: string): void {
         args.chat_id = ctx.context_token
       }
 
-      // 异步发送，不 await（避免阻塞 saveChannelContext 调用链）
-      void server.client.callTool({
+      const result = await server.client.callTool({
         name: toolName,
         arguments: args,
-      }).catch((e: unknown) => {
-        logForDebugging(
-          `[channelRegistry] Failed to flush pending notification to ${channel}: ${msg.title} (${(e as Error)?.message || e})`,
-        )
       })
+      if (_isCallToolErrorResult(result)) {
+        logForDebugging(
+          `[channelRegistry] Failed to flush pending notification to ${channel}: ${msg.title} (isError)`,
+        )
+        failed.push(msg)
+      }
     } catch (e) {
       logForDebugging(
-        `[channelRegistry] _flushPending: 处理 channel=${channel} 消息时异常: ${(e as Error)?.message || e}`,
+        `[channelRegistry] Failed to flush pending notification to ${channel}: ${msg.title} (${(e as Error)?.message || e})`,
       )
+      failed.push(msg)
     }
+  }
+
+  if (failed.length > 0) {
+    // 失败消息回写队首，保留可重试语义
+    _pendingMessages.unshift(...failed)
+    while (_pendingMessages.length > MAX_PENDING) {
+      _pendingMessages.pop()
+    }
+    logForDebugging(
+      `[channelRegistry] Re-queued ${failed.length} failed pending notification(s) (${_pendingMessages.length} pending)`,
+    )
   }
 }
 
@@ -340,4 +399,14 @@ export function getRegisteredChannels(): string[] {
  */
 export function getPendingCount(): number {
   return _pendingMessages.length
+}
+
+/**
+ * 测试用：清空 servers / contexts / pending，避免用例间状态串扰。
+ * @internal
+ */
+export function resetChannelRegistryForTests(): void {
+  _servers.clear()
+  _contexts.clear()
+  _pendingMessages.length = 0
 }

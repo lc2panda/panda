@@ -281,10 +281,32 @@ function _pushToChannels(notification: PandaNotification): void {
 
   // 方式 5：通过已注册的 MCP Channel 插件推送（WeChat/飞书等）
   // 使用 channelRegistry 中缓存的 server 引用和最近 inbound context
+  // H-003：pushViaChannelMCP 现为 async，内部 await 成功后才 delivered；此处不阻塞推送管道
   try {
     const { pushViaChannelMCP } = require('./channelRegistry.js')
-    pushViaChannelMCP(notification.title, notification.body)
-  } catch {}
+    void pushViaChannelMCP(notification.title, notification.body).catch(
+      (e: unknown) => {
+        // pushViaChannelMCP 设计为不抛错；若仍 reject 必须可观测
+        try {
+          const { logForDebugging } = require('../utils/debug.js')
+          logForDebugging(
+            `[sense] pushViaChannelMCP rejected: ${(e as Error)?.message || e}`,
+          )
+        } catch {
+          // debug logger 不可用时无法再降级
+        }
+      },
+    )
+  } catch (e) {
+    try {
+      const { logForDebugging } = require('../utils/debug.js')
+      logForDebugging(
+        `[sense] pushViaChannelMCP invoke failed: ${(e as Error)?.message || e}`,
+      )
+    } catch {
+      // debug logger 不可用
+    }
+  }
 }
 
 export function getNotifications(): readonly PandaNotification[] {
