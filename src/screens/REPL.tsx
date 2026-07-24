@@ -3420,8 +3420,13 @@ export function REPL({
       }
     }
 
-    // Remote mode: skip empty input early before any state mutations
-    if (activeRemote.isRemoteMode && !input.trim()) {
+    // Remote mode: skip empty input early before any state mutations.
+    // Image-only submits (no text) must NOT be dropped — same condition as the
+    // local hasPastedImages guard at willSendContent below.
+    const hasPastedImagesEarly = Object.values(pastedContents).some(
+      c => c.type === 'image',
+    );
+    if (activeRemote.isRemoteMode && !input.trim() && !hasPastedImagesEarly) {
       return;
     }
 

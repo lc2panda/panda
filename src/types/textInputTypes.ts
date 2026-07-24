@@ -129,6 +129,19 @@ export type BaseTextInputProps = {
   ) => void
 
   /**
+   * Mark that an async clipboard/file image paste is starting. Used by
+   * PromptInput to defer Enter until the image lands in pastedContents.
+   * Pair every begin with a finally-end (including no-image outcomes).
+   */
+  readonly onImagePasteBegin?: () => void
+
+  /**
+   * Mark that an async clipboard/file image paste has settled. When the
+   * in-flight count reaches 0, any Enter deferred during the paste is replayed.
+   */
+  readonly onImagePasteEnd?: () => void
+
+  /**
    * Optional callback when a large text (over 800 chars) is pasted
    */
   readonly onPaste?: (text: string) => void

@@ -1696,9 +1696,28 @@ function PromptInput({
     }
   }, [previousModeBeforeAuto, toolPermissionContext, setAppState, setToolPermissionContext]);
 
+  // Shared image-paste in-flight barrier. Armed by chat:imagePaste AND by
+  // usePasteHandler's Cmd+V / empty-bracketed-paste clipboard path (via
+  // onImagePasteBegin/End on BaseTextInput). Enter is deferred while > 0.
+  const beginImagePaste = useCallback(() => {
+    imagePasteInFlightRef.current += 1;
+  }, []);
+  const endImagePaste = useCallback(() => {
+    imagePasteInFlightRef.current = Math.max(0, imagePasteInFlightRef.current - 1);
+    // If an Enter arrived while the paste was in flight, replay it now that
+    // the image is in pastedContents and its placeholder has been inserted.
+    if (imagePasteInFlightRef.current === 0 && deferredSubmitRef.current) {
+      const replay = deferredSubmitRef.current;
+      deferredSubmitRef.current = null;
+      // Defer one tick so the setPastedContents/insertTextAtCursor state
+      // updates from onImagePaste have committed before we read them.
+      setTimeout(replay, 0);
+    }
+  }, []);
+
   // Handler for chat:imagePaste - paste image from clipboard
   const handleImagePaste = useCallback(() => {
-    imagePasteInFlightRef.current += 1;
+    beginImagePaste();
     void getImageFromClipboard()
       .then(imageData => {
         if (imageData) {
@@ -1715,18 +1734,9 @@ function PromptInput({
         }
       })
       .finally(() => {
-        imagePasteInFlightRef.current = Math.max(0, imagePasteInFlightRef.current - 1);
-        // If an Enter arrived while the paste was in flight, replay it now that
-        // the image is in pastedContents and its placeholder has been inserted.
-        if (imagePasteInFlightRef.current === 0 && deferredSubmitRef.current) {
-          const replay = deferredSubmitRef.current;
-          deferredSubmitRef.current = null;
-          // Defer one tick so the setPastedContents/insertTextAtCursor state
-          // updates from onImagePaste have committed before we read them.
-          setTimeout(replay, 0);
-        }
+        endImagePaste();
       });
-  }, [addNotification, onImagePaste]);
+  }, [addNotification, onImagePaste, beginImagePaste, endImagePaste]);
 
   // Register chat:submit handler directly in the handler registry (not via
   // useKeybindings) so that only the ChordInterceptor can invoke it for chord
@@ -2290,6 +2300,8 @@ function PromptInput({
       key
     }),
     onImagePaste,
+    onImagePasteBegin: beginImagePaste,
+    onImagePasteEnd: endImagePaste,
     columns: textInputColumns,
     maxVisibleLines,
     disableCursorMovementForUpDownKeys: suggestions.length > 0 || !!footerItemSelected,
