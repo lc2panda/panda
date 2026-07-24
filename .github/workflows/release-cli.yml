@@ -16,7 +16,11 @@
 # Token 用法说明：
 #   - GH_TOKEN env 由 GitHub Actions 自动注入 secrets.GITHUB_TOKEN（无需手动配 Secrets）
 #   - contents:write → gh release create 发 GitHub Release
-#   - packages:write → npm publish 发 GitHub Packages
+#   - packages:write → npm publish 发 GitHub Packages（GITHUB_TOKEN 需仓库 Actions 默认权限含 write）
+#   - Packages 发布 token 优先级：secrets.GH_PACKAGES_TOKEN > secrets.NPM_PKG_TOKEN > secrets.GITHUB_TOKEN
+#     · 若出现 403 write_package：在 repo Secrets 配置 classic PAT
+#       scopes: write:packages, read:packages, repo（或 fine-grained: Packages write + Contents read）
+#     · Secret 名优先 GH_PACKAGES_TOKEN（已与历史约定对齐），兼容 NPM_PKG_TOKEN
 #
 # 回滚：删除本文件即回滚到纯手动发版流程；已发布的 Release/Packages 不受影响。
 
@@ -107,13 +111,22 @@ jobs:
       # npm publish 到 GitHub Packages；版本若已存在才允许补发/重跑跳过。
       # prepublishOnly 会再跑一次 bun run build，幂等无副作用。
       # 其他发布失败（权限、网络、registry）必须让 workflow 失败，避免 Release 成功但 Packages 未更新。
+      # Token：优先 PAT（GH_PACKAGES_TOKEN / NPM_PKG_TOKEN），回退 GITHUB_TOKEN。
+      # 背景：仓库 default_workflow_permissions=read 时，仅靠 packages:write 声明仍可能 E403 write_package。
       - name: Publish to GitHub Packages
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.NPM_PKG_TOKEN || secrets.GITHUB_TOKEN }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          if npm view "@lc2panda/panda-code@${RELEASE_VERSION}" version >/dev/null 2>&1; then
+          if npm view "@lc2panda/panda-code@${RELEASE_VERSION}" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
             echo "@lc2panda/panda-code@${RELEASE_VERSION} 已存在于 GitHub Packages，跳过重复 publish"
           else
-            npm publish
+            npm publish --registry=https://npm.pkg.github.com
           fi
+          # 发布后校验：latest 或指定版本必须可读（防静默失败）
+          PUBLISHED="$(npm view "@lc2panda/panda-code@${RELEASE_VERSION}" version --registry=https://npm.pkg.github.com 2>/dev/null || true)"
+          if [ "${PUBLISHED}" != "${RELEASE_VERSION}" ]; then
+            echo "::error::GitHub Packages 校验失败：期望 ${RELEASE_VERSION}，实际 '${PUBLISHED}'"
+            exit 1
+          fi
+          echo "Packages 校验通过：@lc2panda/panda-code@${PUBLISHED}"
