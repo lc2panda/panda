@@ -332,7 +332,7 @@
 
 | ID | 原级 | 重评级 | 判定 | 摘要（审查后） | 证据缺口 / 残余 |
 |----|------|--------|------|----------------|-----------------|
-| S-001 | P1 | **P2** | **部分缓解 / 仍可疑** | 粘贴 defer 已有三层同步屏障；极端同帧/键绑定旁路仍缺集成复现 | 终端集成测；chat:submit 旁路 |
+| S-001 | P1 | **P3** | **已充分缓解** | 路径粘贴首 chunk 即 begin；超时在清 pastePending 前同步武装；chat:submit/onSubmit 均查 inFlight | 残余：无扩展名的分片路径在中间 chunk 未 arm（超时仍同步 arm）；缺终端 E2E |
 | S-002 | P2 | **P3** | **主伤已缓解** | portable 扫描**不再**按 boundary 截断 buffer；畸形 JSON→null 不会误截断 | 损坏 fixture 回归测（加固） |
 | S-003 | P2 | **P3** | **主伤已缓解** | walk + relink + 回归测覆盖；relink 失败仅 warn、链可能仍断 | 破坏性 fixture：无 attachment 的 dangling |
 | S-004 | P3 | **P3** | **仍可疑 · 需实机** | 单测覆盖 env 启发式；Win11+Termius 9.x 真彩/256 未验 | 实机截图/COLORTERM |
@@ -364,7 +364,7 @@
 2. ~~H-002/H-008（MCP cwd）~~ / ~~H-003（delivered 语义）~~ / ~~H-004（飞书通知）~~ / ~~H-007（审计）~~ → 第二批全清  
 3. **随后**：H-006 双源 local 对齐、H-009 去空 catch  
 4. **顺带**：Advisor 三连、死代码清理；H-004 残余（失败可观测性）  
-5. **S 系列（§9）**：优先 **S-006** 装后版本断言 → 可选 S-001 集成测/提前 begin；~~S-005 流程门禁~~ 已修；S-002/003/004 不急  
+5. **S 系列（§9）**：优先 **S-006** 装后版本断言；~~S-001 提前 begin~~ 已修；~~S-005 流程门禁~~ 已修；S-002/003/004 不急  
 
 每项修复验收建议：**失败必须可观测**（测试断言 + 非空错误日志 + 不误标成功）。
 
@@ -542,7 +542,7 @@
 
 | ID | 原级 | 重评级 | 判定 | 一句话 |
 |----|------|--------|------|--------|
-| S-001 | P1 | **P2** | 部分缓解 / 仍可疑 | pastePending + imagePasteInFlight + isPasting 三层 defer；100ms 窗内 Enter 多被吞入 paste，缺终端集成证伪极端同帧 |
+| S-001 | P1 | **P3** | 已充分缓解 | 路径粘贴首 chunk / 超时同步 arm + clipboard 立即 arm + onSubmit inFlight；纯函数单测覆盖谓词 |
 | S-002 | P2 | **P3** | 主伤已缓解 | `boundaryStartOffset` 恒 0、boundary 命中**从不截断**；畸形 JSON→null 不截断；原「skip 丢历史」scar 已死 |
 | S-003 | P2 | **P3** | 主伤已缓解 | `walkChainBeforeParse` 保留 boundary 前字节 + `relinkDanglingMainchainParents` + 回归测；relink 失败仅 warn |
 | S-004 | P3 | **P3** | 仍可疑 · 需实机 | `shouldUseDegradedColors`/`isTermius` 有单测；Win11+Termius 9.x 实机未验 |
@@ -555,14 +555,15 @@
 
 | 字段 | 内容 |
 |------|------|
-| **路径** | `/Users/panda/Downloads/cc-panda/src/hooks/usePasteHandler.ts` L16 (`PASTE_COMPLETION_TIMEOUT_MS=100`)、L94–L108（`pastePendingRef`）、L124–L170（空粘贴 → `checkClipboardForImage` leading）、L172–L210（路径粘贴 → 超时后 `beginImagePaste`）；`/Users/panda/Downloads/cc-panda/src/components/PromptInput/PromptInput.tsx` L1012–L1024（`imagePasteInFlightRef` defer submit）、L1704–L1741（begin/end）；`/Users/panda/Downloads/cc-panda/src/components/BaseTextInput.tsx` L54–L68（`isPasting && key.return` 吞 Enter） |
-| **触发** | 用户粘贴图片（空 bracketed paste 走剪贴板，或粘贴 `/path/to/img.png`）后在异步读图完成前按 Enter / 触发 submit |
-| **错误行为（历史）** | 同 stdin chunk 内 paste+Enter：React 状态 `timeoutId` 未提交 → Enter 走 `onInput` → 提交旧输入、丢粘贴图 |
-| **当前机制** | ① **同步** `pastePendingRef`：pending 期间输入一律当 paste chunk，不进 `onInput`；② 空粘贴 **立即** `checkClipboardForImage`（debounce leading）→ 首行 `onImagePasteBegin`；③ 路径粘贴在 100ms 聚合结束后才 `beginImagePaste`，但 100ms 内 `pastePendingRef` 为 true；④ `imagePasteInFlightRef` 在 in-flight 时把 `onSubmit` 挂到 `pendingSubmitRef`；⑤ `BaseTextInput` 再用 **状态** `isPasting` 挡 `key.return` |
-| **闭合判定** | **不能升级 H**：无失败复现、无失败测试。**不能标误报**：路径粘贴在超时完成→`beginImagePaste` 之前的「状态 `isPasting` 已清、ref 已清、但异步尚未 begin」窗口理论上极窄但仍存在；`chat:submit` 等键绑定若绕过 `wrappedOnInput` 需再核。**判定：部分缓解 / 仍可疑** |
-| **重评级** | P1→**P2**（主路径有同步屏障；残余为极端时序 + 旁路） |
-| **成本/收益** | 成本 3（Ink 集成测难）/ 收益 3 → 建议优先级 **中** |
-| **升级为 H 的条件** | 终端集成：粘贴 PNG 后 <50ms 连按 Enter，断言最终 query 含 image block；或证明某键绑定在 `imagePasteInFlightRef` 未置位时直接 `onSubmit` |
+| **路径** | `/Users/panda/Downloads/cc-panda/src/hooks/usePasteHandler.ts`（`PASTE_COMPLETION_TIMEOUT_MS=100`、`pastePendingRef`、`pasteChunksRef`、`imagePasteSessionArmedRef`、`chunkLooksLikeImagePathPaste` / `extractImagePathsFromPasteChunks`）；`/Users/panda/Downloads/cc-panda/src/components/PromptInput/PromptInput.tsx`（`imagePasteInFlightRef` defer submit；`beginImagePaste`/`endImagePaste`）；`/Users/panda/Downloads/cc-panda/src/components/BaseTextInput.tsx`（`isPasting && key.return`）；单测 `src/hooks/usePasteHandler.imageGuard.test.ts` |
+| **触发** | 用户粘贴图片（空 bracketed paste 走剪贴板，或粘贴 `/path/to/img.png`）后在异步读图完成前按 Enter / 触发 `chat:submit` |
+| **错误行为（历史）** | 同 stdin chunk 内 paste+Enter：React 状态未提交 → Enter 走 `onInput` → 提交旧输入、丢粘贴图；路径粘贴 100ms 聚合窗内 `imagePasteInFlightRef===0`，`chat:submit` 可旁路 |
+| **当前机制** | ① **同步** `pastePendingRef`：pending 期间输入一律当 paste chunk；② 空粘贴 **立即** `checkClipboardForImage` → `onImagePasteBegin`；③ **路径粘贴首 chunk 含 image path 时立即** `onImagePasteBegin`（`imagePasteSessionArmedRef` 防双 begin）；④ 100ms 超时用 `pasteChunksRef` **在清 pastePending 之前**同步 arm；⑤ `onSubmit`（Enter + `chat:submit` 唯一入口）查 `imagePasteInFlightRef` 并 defer replay；⑥ `BaseTextInput` `isPasting` 挡 `key.return` |
+| **闭合判定** | **已充分缓解（2026-07-24）**：原「等 100ms 才 begin」与「先清 pending 再进 setState 才 begin」两处窗口已关。`chat:submit` 与 Enter 均经 `onSubmit` inFlight 检查。**残余**：① 分片路径在中间 chunk 尚无扩展名时首 chunk 不 early-arm，但超时仍同步 arm；② 无终端 E2E 证伪同帧 stdin。不升级 H。 |
+| **重评级** | P1→P2（审查）→**P3 已充分缓解**（加固后） |
+| **成本/收益** | 成本 1（已落地）/ 收益 3 |
+| **修复** | `fix(paste): arm image paste guard earlier (S-001)` — 见 git log；单测 `usePasteHandler.imageGuard.test.ts` |
+| **升级为 H 的条件** | 终端集成仍复现：粘贴 PNG 后 <50ms 连按 Enter，query 缺 image block |
 
 #### S-002｜compact-boundary / hasPreservedSegment 扫描
 
@@ -631,7 +632,7 @@
 
 | S 项 | 相关 H / scar | 是否已部分缓解 | 说明 |
 |------|---------------|----------------|------|
-| S-001 | （无 H 编号；有 paste/race 注释与 `useTextInput.race.test.ts` 邻域） | 是（实现层） | race test 管的是 coalesced Enter 文本，**不是**图片粘贴 defer |
+| S-001 | （无 H 编号；`usePasteHandler.imageGuard.test.ts` + `useTextInput.race.test.ts` 邻域） | **是（充分缓解）** | 提前 arm + 超时同步 arm；race test 管 coalesced Enter 文本；imageGuard 管 early-arm 谓词 |
 | S-002 | scar compact-boundary | **是（主伤）** | 截断路径已消除 |
 | S-003 | scar + `sessionStorage.resumeChain.test.ts` | **是（主伤）** | walk+relink+测试 |
 | S-004 | H-017 启发式过宽 | 部分 | H-017 是误标面；S-004 是实机显示面 |
@@ -643,7 +644,7 @@
 | ID | 成本 | 收益 | 建议 |
 |----|------|------|------|
 | S-006 | 2 | 4 | **建议动手 #1**：`installFromTarball` success 前读全局包 version / `npm list -g --json` 比对 `specificVersion` |
-| S-001 | 3 | 3 | **建议动手 #2**（可选）：路径粘贴在**收到首 chunk 时**即 `beginImagePaste`（或 pending 占位），收窄 100ms；补 Ink 级集成测 |
+| S-001 | 1 | 3 | **已修**：首 chunk early-arm + 超时同步 arm；`usePasteHandler.imageGuard.test.ts`；残余仅分片无扩展名中间态 + 无 E2E |
 | S-005 | 1–2 | 3 | **已修**：`CONFIRM_MANUAL_RELEASE=1` 门禁 + `[MISSING]` 清单 + README-DEV 唯一入口指向 `release-cli.yml` |
 | S-002 | 2 | 2 | 不急；加 malformed boundary fixture 即可 |
 | S-003 | 2 | 2 | 不急；relink 0 条时用户提示可选 |
@@ -656,6 +657,6 @@
 
 ### 9.6 本轮执行边界（复核）
 
-- 未改业务源码  
-- 未把任一 S 强行升为已证实 H（均未满足「可复现错误行为」门槛）  
-- 结论已回写 §3 状态表 + 本节  
+- 2026-07-24 深度审查：未把任一 S 强行升为已证实 H  
+- 2026-07-24 S-001 加固：`fix(paste): arm image paste guard earlier (S-001)` — 源码 + 单测 + 本清单回写  
+- S-002/003/004/006 本轮未改业务源码  

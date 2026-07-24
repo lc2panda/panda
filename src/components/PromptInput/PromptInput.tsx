@@ -1004,10 +1004,9 @@ function PromptInput({
     setSuggestionsStateRaw(prev => typeof updater === 'function' ? updater(prev) : updater);
   }, []);
   const onSubmit = useCallback(async (inputParam: string, isSubmittingSlashCommand = false) => {
-    // Image-paste barrier: if an async clipboard image paste is still in flight,
-    // defer this Enter until the image has landed in pastedContents (and its
-    // placeholder has been inserted). Without this, paste-then-immediate-Enter
-    // submits before the image exists and the image is silently dropped.
+    // Image-paste barrier (all submit entries: Enter via BaseTextInput and
+    // chat:submit keybinding both land here). Counter is armed on first
+    // image-path paste chunk / clipboard empty paste / chat:imagePaste (S-001).
     // Plain-text Enter (no paste in flight) is never affected: the counter is 0.
     if (imagePasteInFlightRef.current > 0) {
       // Capture the typed text now; the replay re-reads the latest input via
@@ -1696,9 +1695,12 @@ function PromptInput({
     }
   }, [previousModeBeforeAuto, toolPermissionContext, setAppState, setToolPermissionContext]);
 
-  // Shared image-paste in-flight barrier. Armed by chat:imagePaste AND by
-  // usePasteHandler's Cmd+V / empty-bracketed-paste clipboard path (via
-  // onImagePasteBegin/End on BaseTextInput). Enter is deferred while > 0.
+  // Shared image-paste in-flight barrier. Armed by:
+  // - chat:imagePaste keybinding
+  // - usePasteHandler empty-bracketed-paste clipboard path (immediate)
+  // - usePasteHandler path-image paste: first chunk (S-001 early arm) and/or
+  //   100ms timeout (sync, before pastePending clear)
+  // Enter / chat:submit is deferred via onSubmit while counter > 0.
   const beginImagePaste = useCallback(() => {
     imagePasteInFlightRef.current += 1;
   }, []);

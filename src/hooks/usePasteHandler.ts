@@ -1,3 +1,7 @@
+// Input: terminal paste chunks (bracketed paste / large paste / image paths)
+// Output: wrappedOnInput + paste aggregation + image-paste begin/end barrier hooks
+// Pos: PromptInput/BaseTextInput paste path — S-001 image-paste Enter race guard
+
 import { basename } from 'path'
 import React from 'react'
 import { logError } from 'src/utils/log.js'
@@ -14,6 +18,38 @@ import { getPlatform } from '../utils/platform.js'
 
 const CLIPBOARD_CHECK_DEBOUNCE_MS = 50
 const PASTE_COMPLETION_TIMEOUT_MS = 100
+
+/**
+ * Split paste text the same way path-image detection does (space before abs
+ * path, then newlines) and report whether any line looks like an image path.
+ * Exported for unit tests (S-001 early-arm predicate).
+ */
+export function chunkLooksLikeImagePathPaste(input: string): boolean {
+  return input
+    .split(/ (?=\/|[A-Za-z]:\\)/)
+    .flatMap(part => part.split('\n'))
+    .some(line => isImageFilePath(line.trim()))
+}
+
+/**
+ * Join paste chunks and extract image-looking paths (shared by timeout + tests).
+ */
+export function extractImagePathsFromPasteChunks(chunks: string[]): {
+  pastedText: string
+  lines: string[]
+  imagePaths: string[]
+} {
+  const pastedText = chunks
+    .join('')
+    .replace(/\[I$/, '')
+    .replace(/\[O$/, '')
+  const lines = pastedText
+    .split(/ (?=\/|[A-Za-z]:\\)/)
+    .flatMap(part => part.split('\n'))
+    .filter(line => line.trim())
+  const imagePaths = lines.filter(line => isImageFilePath(line))
+  return { pastedText, lines, imagePaths }
+}
 
 type PasteHandlerProps = {
   onPaste?: (text: string) => void
@@ -63,6 +99,13 @@ export function usePasteHandler({
   // reads stale pasteState.timeoutId (null) and takes the onInput path. If
   // that key is Enter, it submits the old input and the paste is lost.
   const pastePendingRef = React.useRef(false)
+  // Sync mirror of pasteState.chunks so the 100ms timeout can arm the image
+  // barrier BEFORE clearing pastePending (S-001: no gap while waiting for
+  // React to run setPasteState updaters).
+  const pasteChunksRef = React.useRef<string[]>([])
+  // True while this path-image paste session has already called begin.
+  // Prevents double-begin when early-arm (first chunk) + timeout both fire.
+  const imagePasteSessionArmedRef = React.useRef(false)
 
   const isMacOS = React.useMemo(() => getPlatform() === 'macos', [])
   // Empty-paste → clipboard-read must run on every platform that has imagePaste
@@ -137,39 +180,33 @@ export function usePasteHandler({
           onImagePasteBegin,
           onImagePasteEnd,
           pastePendingRef,
+          pasteChunksRef,
+          imagePasteSessionArmedRef,
         ) => {
+          // S-001: decide + arm from sync chunk mirror BEFORE releasing
+          // pastePending. Previously pastePending was cleared first and
+          // beginImagePaste only ran inside a React setState updater (async),
+          // so chat:submit could slip through imagePasteInFlightRef === 0.
+          const { pastedText, lines, imagePaths } =
+            extractImagePathsFromPasteChunks(pasteChunksRef.current)
+
+          if (onImagePaste && imagePaths.length > 0) {
+            if (!imagePasteSessionArmedRef.current) {
+              imagePasteSessionArmedRef.current = true
+              onImagePasteBegin?.()
+            }
+          }
+
           pastePendingRef.current = false
-          setPasteState(({ chunks }) => {
-            // Join chunks and filter out orphaned focus sequences
-            // These can appear when focus events split during paste
-            const pastedText = chunks
-              .join('')
-              .replace(/\[I$/, '')
-              .replace(/\[O$/, '')
 
-            // Check if the pasted text contains image file paths
-            // When dragging multiple images, they may come as:
-            // 1. Newline-separated paths (common in some terminals)
-            // 2. Space-separated paths (common when dragging from Finder)
-            // For space-separated paths, we split on spaces that precede absolute paths:
-            // - Unix: space followed by `/` (e.g., `/Users/...`)
-            // - Windows: space followed by drive letter and `:\` (e.g., `C:\Users\...`)
-            // This works because spaces within paths are escaped (e.g., `file\ name.png`)
-            const lines = pastedText
-              .split(/ (?=\/|[A-Za-z]:\\)/)
-              .flatMap(part => part.split('\n'))
-              .filter(line => line.trim())
-            const imagePaths = lines.filter(line => isImageFilePath(line))
-
+          setPasteState(() => {
             if (onImagePaste && imagePaths.length > 0) {
               const isTempScreenshot =
                 /\/TemporaryItems\/.*screencaptureui.*\/Screenshot/i.test(
                   pastedText,
                 )
 
-              // Process all image paths. Arm the in-flight barrier so Enter
-              // during async path reads is deferred (same as clipboard path).
-              onImagePasteBegin?.()
+              // Barrier already armed above (or on first chunk). Do not begin again.
               void Promise.all(
                 imagePaths.map(imagePath => tryReadImageFromPath(imagePath)),
               )
@@ -179,7 +216,6 @@ export function usePasteHandler({
                   )
 
                   if (validImages.length > 0) {
-                    // Successfully read at least one image
                     for (const imageData of validImages) {
                       const filename = basename(imageData.path)
                       onImagePaste(
@@ -190,7 +226,6 @@ export function usePasteHandler({
                         imageData.path,
                       )
                     }
-                    // If some paths weren't images, paste them as text
                     const nonImageLines = lines.filter(
                       line => !isImageFilePath(line),
                     )
@@ -199,8 +234,7 @@ export function usePasteHandler({
                     }
                     setIsPasting(false)
                   } else if (isTempScreenshot && isMacOS) {
-                    // For temporary screenshot files that no longer exist, try clipboard
-                    // (macOS TemporaryItems path). Clipboard check arms its own barrier.
+                    // Clipboard path arms its own barrier (counter +1).
                     checkClipboardForImage()
                   } else {
                     if (onPaste) {
@@ -216,24 +250,31 @@ export function usePasteHandler({
                   setIsPasting(false)
                 })
                 .finally(() => {
+                  imagePasteSessionArmedRef.current = false
                   onImagePasteEnd?.()
                 })
+              pasteChunksRef.current = []
               return { chunks: [], timeoutId: null }
             }
 
-            // If paste is empty (common when trying to paste images with Cmd+V),
-            // check if clipboard has an image (macOS + Windows).
+            // Early-armed but final text has no image paths — disarm.
+            if (imagePasteSessionArmedRef.current) {
+              imagePasteSessionArmedRef.current = false
+              onImagePasteEnd?.()
+            }
+
+            // Empty paste → clipboard image (macOS + Windows).
             if (canClipboardImage && onImagePaste && pastedText.length === 0) {
               checkClipboardForImage()
+              pasteChunksRef.current = []
               return { chunks: [], timeoutId: null }
             }
 
-            // Handle regular paste
             if (onPaste) {
               onPaste(pastedText)
             }
-            // Reset isPasting state after paste is complete
             setIsPasting(false)
+            pasteChunksRef.current = []
             return { chunks: [], timeoutId: null }
           })
         },
@@ -248,6 +289,8 @@ export function usePasteHandler({
         onImagePasteBegin,
         onImagePasteEnd,
         pastePendingRef,
+        pasteChunksRef,
+        imagePasteSessionArmedRef,
       )
     },
     [
@@ -289,10 +332,7 @@ export function usePasteHandler({
     // When dragging multiple images, they may come as newline-separated or
     // space-separated paths. Split on spaces preceding absolute paths:
     // - Unix: ` /` - Windows: ` C:\` etc.
-    const hasImageFilePath = input
-      .split(/ (?=\/|[A-Za-z]:\\)/)
-      .flatMap(part => part.split('\n'))
-      .some(line => isImageFilePath(line.trim()))
+    const hasImageFilePath = chunkLooksLikeImagePathPaste(input)
 
     // Handle empty paste (clipboard image on macOS / Windows)
     // When the user pastes an image with Cmd+V, the terminal sends an empty
@@ -320,9 +360,18 @@ export function usePasteHandler({
 
     if (shouldHandleAsPaste) {
       pastePendingRef.current = true
+      // S-001: arm image-paste barrier on first image-path chunk — do not wait
+      // for the 100ms aggregation timeout. chat:submit only checks
+      // imagePasteInFlightRef; pastePending only swallows Enter via onInput.
+      if (hasImageFilePath && onImagePaste && !imagePasteSessionArmedRef.current) {
+        imagePasteSessionArmedRef.current = true
+        onImagePasteBegin?.()
+      }
       setPasteState(({ chunks, timeoutId }) => {
+        const nextChunks = [...chunks, input]
+        pasteChunksRef.current = nextChunks
         return {
-          chunks: [...chunks, input],
+          chunks: nextChunks,
           timeoutId: resetPasteTimeout(timeoutId),
         }
       })
