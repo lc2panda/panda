@@ -1,16 +1,19 @@
-# Input: git tag vX.Y.Z 推送（排除 desk-v*） 触发 CLI 构建 + GitHub Release + GitHub Packages 发布
-# Output: lc2panda-panda-code-X.Y.Z.tgz → GH Release latest 资产；@lc2panda/panda-code@X.Y.Z → GitHub Packages
+# Input: git tag v* 推送（排除 desk-v*） 触发 CLI 构建 + GitHub Release + GitHub Packages 发布
+# Output: lc2panda-panda-code-*.tgz → GH Release 资产；@lc2panda/panda-code@* → GitHub Packages
 # Pos: panda CLI 主发版自动化 god-workflow — 防止手动漏发 Release/Packages（v2.28.3/4 缺陷治本）
 #
 # [NEW-FILE:#20260608-01]
 #
 # 触发约定：
-#   1. `npm version` 更新 package.json version 并打 tag vX.Y.Z 后 push tag
-#   2. 本 workflow 自动 build → npm pack → gh release create --latest → npm publish 到 GitHub Packages
-#   3. README install.sh 拉 `releases/latest` 的 .tgz 资产安装，本 workflow 保证 latest 始终是最新版
+#   1. `npm version` 更新 package.json version 并打 tag 后 push tag
+#   2. 本 workflow 自动 build → npm pack → gh release create → npm publish 到 GitHub Packages
+#   3. README install.sh 拉 `releases/latest` 的 .tgz 资产安装
+#      → 仅稳定版 tag（vX.Y.Z 纯三段数字）标记 --latest
+#      → 预发布（含 - 后缀 / alpha|beta|rc|pre|dev）使用 --prerelease，绝不抢 latest
 #
 # 与 panda-on-desk 桌面端发版 (`desk-v*` tag) 解耦：
-#   - 本 workflow 仅 `v*` tag 触发，且显式排除 `desk-v*`（见 tags-ignore）
+#   - 本 workflow 仅 `v*` tag 触发，且 `desk-v*` 前缀不为 `v` 开头的纯版本路径；
+#     实际 desk tag 形如 `desk-vX.Y.Z`，不会被 `v*` 命中，天然与 release-panda-on-desk.yml 解耦
 #   - 桌面端走 `.github/workflows/release-panda-on-desk.yml`
 #
 # Token 用法说明：
@@ -23,13 +26,14 @@
 #     · Secret 名优先 GH_PACKAGES_TOKEN（已与历史约定对齐），兼容 NPM_PKG_TOKEN
 #
 # 回滚：删除本文件即回滚到纯手动发版流程；已发布的 Release/Packages 不受影响。
+# 本变更（H-005）回滚：恢复「一律 --latest」即回退；仅影响后续 tag 发版标记。
 
 name: Release panda CLI
 
 on:
   push:
     tags:
-      # 仅匹配 vX.Y.Z（CLI 版本 tag）。桌面端 tag 形如 `desk-vX.Y.Z`，前缀为 `desk-`，
+      # 仅匹配 v*（CLI 版本 tag）。桌面端 tag 形如 `desk-vX.Y.Z`，前缀为 `desk-`，
       # 不会被 `v*` 命中，因此天然与 release-panda-on-desk.yml 解耦、不会双触发。
       # 注意：GitHub Actions 不允许同一 push 过滤器同时存在 tags 与 tags-ignore，故不用 tags-ignore。
       - 'v*'
@@ -74,13 +78,21 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          # tag 格式 vX.Y.Z → version=X.Y.Z
+          # tag 格式 vX.Y.Z 或 vX.Y.Z-<pre> → version=去 v 前缀
           TAG_NAME="${GITHUB_REF#refs/tags/}"
           VERSION="${TAG_NAME#v}"
+          # 稳定版：vX.Y.Z 纯数字三段（无 - 预发布后缀）
+          # 预发布：semver prerelease（- 后缀）或含 alpha/beta/rc/pre/dev → 不得抢 latest
+          IS_STABLE=false
+          if [[ "${TAG_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            IS_STABLE=true
+          fi
           echo "tag=${TAG_NAME}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "is_stable=${IS_STABLE}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG_NAME} version=${VERSION} is_stable=${IS_STABLE}"
 
-      # npm pack 生成 lc2panda-panda-code-X.Y.Z.tgz（install.sh 选取 latest release 中首个 .tgz 资产）
+      # npm pack 生成 lc2panda-panda-code-*.tgz（install.sh 选取 latest release 中首个 .tgz 资产）
       - name: Pack tarball
         id: pack
         run: |
@@ -88,25 +100,46 @@ jobs:
           echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
           ls -lh "${TARBALL}"
 
-      # gh release create 失败若因 Release 已存在（补发/重跑场景）→ 改为上传资产到现有 Release
-      - name: Create GitHub Release (--latest)
+      # 稳定版 → --latest；预发布 → --prerelease（补发路径同样不得抢 latest）
+      - name: Create GitHub Release (stable=latest / pre=prerelease)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          IS_STABLE: ${{ steps.version.outputs.is_stable }}
           TARBALL: ${{ steps.pack.outputs.tarball }}
         run: |
-          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            echo "Release ${RELEASE_TAG} 已存在 — 上传/覆盖资产到现有 Release 并标记 latest"
-            gh release upload "${RELEASE_TAG}" "${TARBALL}" --clobber
-            gh release edit "${RELEASE_TAG}" --latest
+          set -euo pipefail
+          if [ "${IS_STABLE}" = true ]; then
+            KIND="stable (latest)"
           else
+            KIND="prerelease (not latest)"
+          fi
+          echo "Publishing ${RELEASE_TAG} as ${KIND}"
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} 已存在 — 上传/覆盖资产；仅稳定版标记 latest"
+            gh release upload "${RELEASE_TAG}" "${TARBALL}" --clobber
+            if [ "${IS_STABLE}" = true ]; then
+              gh release edit "${RELEASE_TAG}" --latest
+            else
+              # 预发布补发：强制 prerelease，绝不传 --latest
+              gh release edit "${RELEASE_TAG}" --prerelease
+            fi
+          elif [ "${IS_STABLE}" = true ]; then
             gh release create "${RELEASE_TAG}" \
               --title "panda v${RELEASE_VERSION}" \
               --generate-notes \
               --latest \
               "${TARBALL}"
+          else
+            gh release create "${RELEASE_TAG}" \
+              --title "panda v${RELEASE_VERSION}" \
+              --generate-notes \
+              --prerelease \
+              "${TARBALL}"
           fi
+          echo "Release ${RELEASE_TAG} published as ${KIND}"
 
       # npm publish 到 GitHub Packages；版本若已存在才允许补发/重跑跳过。
       # prepublishOnly 会再跑一次 bun run build，幂等无副作用。
@@ -123,7 +156,7 @@ jobs:
           else
             npm publish --registry=https://npm.pkg.github.com
           fi
-          # 发布后校验：latest 或指定版本必须可读（防静默失败）
+          # 发布后校验：指定版本必须可读（防静默失败）
           PUBLISHED="$(npm view "@lc2panda/panda-code@${RELEASE_VERSION}" version --registry=https://npm.pkg.github.com 2>/dev/null || true)"
           if [ "${PUBLISHED}" != "${RELEASE_VERSION}" ]; then
             echo "::error::GitHub Packages 校验失败：期望 ${RELEASE_VERSION}，实际 '${PUBLISHED}'"
