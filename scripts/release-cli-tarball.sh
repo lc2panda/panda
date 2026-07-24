@@ -1,63 +1,102 @@
 #!/usr/bin/env bash
-# Input:  无（自动读取 package.json#version）；可选环境变量 SKIP_UPLOAD=1
-# Output: 在仓库根生成 lc2panda-panda-code-<version>.tgz，并（默认）用 gh release upload
-#         挂载到 GitHub Release v<version>（补零 token 安装缺口，配合根 install.sh）
-# Pos:    发版工具链 — npm pack → gh release upload .tgz（R3 调用）
+# Input:  仓库根 package.json + dist/（可选预构建）；CONFIRM_MANUAL_RELEASE=1；网络/gh 凭据
+# Output: 本地 .tgz +（若 gh 可用）上传到已有 GitHub Release 的 CLI tarball 资产
+# Pos:    手动应急「仅 tarball」补丁脚本。官方齐套发版唯一推荐：.github/workflows/release-cli.yml
 #
-# 用法：
-#   bash scripts/release-cli-tarball.sh            # pack + 上传到 v<version>
-#   SKIP_UPLOAD=1 bash scripts/release-cli-tarball.sh  # 仅 pack，打印 tgz 路径
+# 一旦我被修改，请更新我的头部注释，以及所属文件夹的 md。
 #
-# 前置（上传时）：
-#   - dist/ 已 build（npm pack 会按 package.json#files 打包，需先 bun run build）
-#   - gh 已认证（gh auth status）且 Release v<version> 已存在
+# =============================================================================
+# ⚠ 强警告：本脚本不是官方发版入口，且功能不完整
+# =============================================================================
 #
-# 说明：本脚本只负责 CLI tarball 的 pack + 挂载，不做 git tag / npm publish；
-#       那些由 publish-final.sh / R3 发版主流程负责。
-
+# 官方唯一推荐路径：
+#   git tag vX.Y.Z && git push origin vX.Y.Z
+#   → .github/workflows/release-cli.yml
+#     build → npm pack → gh release create → npm publish (GitHub Packages)
+#
+# 本脚本只做：npm pack +（可选）gh release upload 一个 tarball。
+# 本脚本不会执行：
+#   [MISSING] gh release create（Release 必须已存在）
+#   [MISSING] npm publish → GitHub Packages / npmjs
+#   [MISSING] 安装脚本等其它 Release 资产
+#
+# 继续执行必须显式设置：
+#   CONFIRM_MANUAL_RELEASE=1 ./scripts/release-cli-tarball.sh
+# =============================================================================
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
 
-REPO="lc2panda/panda"
-VERSION="$(node -p "require('./package.json').version")"
-TAG="v${VERSION}"
-# npm pack 对 scoped 包生成的文件名：@scope/name → scope-name-version.tgz
-TGZ_NAME="lc2panda-panda-code-${VERSION}.tgz"
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-echo "==> 时间锚点：$(date '+%Y-%m-%d %H:%M:%S %z')"
-echo "==> 包版本：@lc2panda/panda-code@${VERSION}（tag ${TAG}）"
+echo -e "${RED}================================================================${NC}"
+echo -e "${RED}  MANUAL TARBALL HELPER — NOT THE OFFICIAL RELEASE PATH${NC}"
+echo -e "${RED}================================================================${NC}"
+echo -e "${YELLOW}官方入口: .github/workflows/release-cli.yml（push tag v* 触发）${NC}"
+echo ""
+echo "本脚本缺失 / 不会执行的步骤（相对 CI）："
+echo "  [MISSING] gh release create（需要 Release 已存在才能 upload）"
+echo "  [MISSING] npm publish → GitHub Packages / npmjs.org"
+echo "  [MISSING] 其它 Release 资产（安装脚本等）"
+echo "  [ONLY   ] npm pack + 可选 gh release upload tarball"
+echo ""
 
-# ── 1. npm pack 生成 tarball ────────────────────────────────────────────────
-echo "==> npm pack（生成 ${TGZ_NAME}）..."
-rm -f "${TGZ_NAME}"
-PACKED="$(npm pack 2>/dev/null | tail -n1)"
-
-if [ ! -f "${PACKED}" ]; then
-  echo "✗ npm pack 未生成预期文件（got: '${PACKED}'）" >&2
+if [[ "${CONFIRM_MANUAL_RELEASE:-}" != "1" ]]; then
+  echo -e "${RED}已中止：未设置 CONFIRM_MANUAL_RELEASE=1${NC}"
+  echo "应急补传 tarball："
+  echo "  CONFIRM_MANUAL_RELEASE=1 $0"
+  echo "齐套发版请走 CI tag，不要依赖本脚本。"
   exit 1
 fi
-echo "✓ tarball 已生成：${PACKED} ($(du -h "${PACKED}" | cut -f1))"
 
-TGZ_PATH="$(cd "$(dirname "${PACKED}")" && pwd)/$(basename "${PACKED}")"
+echo -e "${YELLOW}CONFIRM_MANUAL_RELEASE=1 已确认 — 继续应急 tarball 路径${NC}"
+echo ""
 
-# ── 2.（可选）上传到 GitHub Release ──────────────────────────────────────────
-if [ "${SKIP_UPLOAD:-0}" = "1" ]; then
-  echo "==> SKIP_UPLOAD=1，跳过上传。"
-  echo "TGZ_PATH=${TGZ_PATH}"
+VERSION="$(node -p "require('./package.json').version")"
+TGZ_NAME="panda-code-${VERSION}.tgz"
+ASSET_NAME="panda-code-${VERSION}.tgz"
+TAG="v${VERSION}"
+
+echo "==> Building CLI for ${VERSION}"
+bun run build
+
+echo "==> Packing npm tarball"
+npm pack --pack-destination "$ROOT"
+PACKED="$(ls -1 "$ROOT"/lc2panda-panda-code-*.tgz | tail -1)"
+if [[ -z "${PACKED}" || ! -f "${PACKED}" ]]; then
+  echo "npm pack failed: tarball not found" >&2
+  exit 1
+fi
+
+# Normalize name for release asset
+cp "${PACKED}" "${ROOT}/${ASSET_NAME}"
+echo "    packed: ${PACKED}"
+echo "    asset:  ${ASSET_NAME}"
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "gh not found; tarball left at ${ROOT}/${ASSET_NAME}"
+  echo -e "${YELLOW}提醒：仍需手动 npm publish（Packages + 如需 npmjs）与确认 Release 存在。${NC}"
   exit 0
 fi
 
-if ! command -v gh >/dev/null 2>&1; then
-  echo "✗ 未检测到 gh CLI，无法上传。tarball 已就绪：${TGZ_PATH}" >&2
-  echo "  手动上传：gh release upload ${TAG} ${TGZ_PATH} --repo ${REPO} --clobber" >&2
+if gh release view "${TAG}" >/dev/null 2>&1; then
+  echo "==> Uploading ${ASSET_NAME} to existing release ${TAG}"
+  gh release upload "${TAG}" "${ROOT}/${ASSET_NAME}" --clobber
+  echo "    uploaded to ${TAG}"
+else
+  echo "Release ${TAG} not found."
+  echo -e "${RED}[MISSING] gh release create ${TAG}${NC}"
+  echo "Create the release first (or push tag to let release-cli.yml do the full flow),"
+  echo "then re-run with CONFIRM_MANUAL_RELEASE=1. Tarball kept at ${ROOT}/${ASSET_NAME}"
   exit 1
 fi
 
-echo "==> gh release upload ${TAG} ${PACKED} --repo ${REPO} --clobber ..."
-gh release upload "${TAG}" "${TGZ_PATH}" --repo "${REPO}" --clobber
-
 echo ""
-echo "✓ 上传完成：${TGZ_NAME} → GitHub Release ${TAG}"
-echo "  一行安装可用：curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash"
-echo "  显式安装：npm i -g https://github.com/${REPO}/releases/download/${TAG}/${TGZ_NAME}"
+echo -e "${YELLOW}tarball 步骤完成 — 发版仍可能不齐套。请确认：${NC}"
+echo "  [ ] npm publish → https://npm.pkg.github.com （用户默认更新源）"
+echo "  [ ] 如需公网 npm：npm publish → registry.npmjs.org"
+echo "  [ ] gh release view ${TAG} 资产齐全"
+echo "推荐下次直接：git push origin ${TAG} 触发 release-cli.yml"

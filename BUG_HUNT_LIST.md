@@ -159,7 +159,7 @@
   - `IS_STABLE` 仅 `^v[0-9]+\.[0-9]+\.[0-9]+$`；create/edit 两条路径：稳定才 `--latest`，非稳定仅 `--prerelease`，**无** prerelease+`--latest` 组合
   - 补发路径对非稳定 `gh release edit --prerelease`，不传 `--latest`
   - 静态 workflow 核对通过；本项无对应单元测试（YAML）
-- **残余（非阻断）**：历史若已被标为 GitHub Latest 的 beta Release **不会**被本 workflow 自动纠正；手动/绕过 CI 发版仍见 S-005  
+- **残余（非阻断）**：历史若已被标为 GitHub Latest 的 beta Release **不会**被本 workflow 自动纠正；手动应急发版须 `CONFIRM_MANUAL_RELEASE=1`（S-005 门禁已落地）  
 - **位置**（历史描述保留）：`.github/workflows/release-cli.yml`  
   - trigger：`tags: ['v*']` ~L8–L10  
   - `gh release create ... --latest` ~L82–L88  
@@ -336,7 +336,7 @@
 | S-002 | P2 | **P3** | **主伤已缓解** | portable 扫描**不再**按 boundary 截断 buffer；畸形 JSON→null 不会误截断 | 损坏 fixture 回归测（加固） |
 | S-003 | P2 | **P3** | **主伤已缓解** | walk + relink + 回归测覆盖；relink 失败仅 warn、链可能仍断 | 破坏性 fixture：无 attachment 的 dangling |
 | S-004 | P3 | **P3** | **仍可疑 · 需实机** | 单测覆盖 env 启发式；Win11+Termius 9.x 真彩/256 未验 | 实机截图/COLORTERM |
-| S-005 | P3 | **P3** | **部分缓解 / 流程残余** | CI `release-cli.yml` 已补齐；`scripts/publish-final.sh` 等手动路径仍在 | 流程门禁/文档禁令 |
+| S-005 | P3 | **已修** | **门禁已落地** | 手动脚本须 `CONFIRM_MANUAL_RELEASE=1` + `[MISSING]` 警告；README-DEV 唯一入口 CI | 仍可有意应急绕过（设计如此） |
 | S-006 | P2 | **P2** | **仍可疑（H-001/012 未覆盖装后）** | 装前 URL/cap/integrity 已闸；`installFromTarball` 仅 exit code，无装后版本断言 | 装后 `npm list -g` / package.json 读版本 |
 
 **说明**：scar「compact-boundary / preservedSegment」主路径在 7014efb4e 后有 stitch + relink，**本轮未发现新的已证实 P0 resume 丢上下文**；S-002/S-003 降为 P3 回归面。
@@ -364,7 +364,7 @@
 2. ~~H-002/H-008（MCP cwd）~~ / ~~H-003（delivered 语义）~~ / ~~H-004（飞书通知）~~ / ~~H-007（审计）~~ → 第二批全清  
 3. **随后**：H-006 双源 local 对齐、H-009 去空 catch  
 4. **顺带**：Advisor 三连、死代码清理；H-004 残余（失败可观测性）  
-5. **S 系列（§9）**：优先 **S-006** 装后版本断言 → 可选 S-001 集成测/提前 begin → 可选 S-005 流程门禁；S-002/003/004 不急  
+5. **S 系列（§9）**：优先 **S-006** 装后版本断言 → 可选 S-001 集成测/提前 begin；~~S-005 流程门禁~~ 已修；S-002/003/004 不急  
 
 每项修复验收建议：**失败必须可观测**（测试断言 + 非空错误日志 + 不误标成功）。
 
@@ -546,7 +546,7 @@
 | S-002 | P2 | **P3** | 主伤已缓解 | `boundaryStartOffset` 恒 0、boundary 命中**从不截断**；畸形 JSON→null 不截断；原「skip 丢历史」scar 已死 |
 | S-003 | P2 | **P3** | 主伤已缓解 | `walkChainBeforeParse` 保留 boundary 前字节 + `relinkDanglingMainchainParents` + 回归测；relink 失败仅 warn |
 | S-004 | P3 | **P3** | 仍可疑 · 需实机 | `shouldUseDegradedColors`/`isTermius` 有单测；Win11+Termius 9.x 实机未验 |
-| S-005 | P3 | **P3** | 部分缓解 / 流程残余 | CI 发布齐套；手动 `publish-final.sh` / `release-cli-tarball.sh` 仍可绕过 |
+| S-005 | P3 | **已修** | 门禁已落地 | 默认拒绝手动脚本；`CONFIRM_MANUAL_RELEASE=1` 应急 + 列出缺失步骤；CI 唯一推荐 |
 | S-006 | P2 | **P2** | 仍可疑 | `installFromTarball` 成功=exit 0；H-001/H-012 只挡装前错误版本 URL，不验装后落地版本 |
 
 ### 9.2 逐条因果与闭合
@@ -608,10 +608,11 @@
 | **路径** | `/Users/panda/Downloads/cc-panda/.github/workflows/release-cli.yml`（tag `v*` → build → GH Release + Packages + npm）；`/Users/panda/Downloads/cc-panda/scripts/publish-final.sh`、`scripts/release-cli-tarball.sh`；scar `memory/scars/manual-release-missing-publish.md`；H-005 `c73ce663e`（stable 才标 latest） |
 | **触发** | 人类本地 `npm publish` / 只打 tag 不走完整 workflow / 跑旧 shell 脚本漏步骤 |
 | **错误行为** | 用户装到旧 npm 或缺 tarball；与 scar 一致 |
-| **当前机制** | CI 已是主路径且含 Packages/Release；**无法从代码禁止**本地 npm publish。手动脚本仍在仓库 |
-| **闭合判定** | **部分缓解**（CI 齐套 + H-005 latest 语义）。流程残余仍在，**不能标误报**。**不升级 H**（非运行时缺陷）。**判定：部分缓解 / 流程残余** |
-| **重评级** | 维持 **P3** |
-| **成本/收益** | 成本 1（文档/脚本头警告）～3（废弃手动脚本）/ 收益 3 → 优先级 **中低** |
+| **当前机制** | CI 为唯一推荐齐套路径；手动两脚本默认 `exit 1`，须 `CONFIRM_MANUAL_RELEASE=1`，并打印相对 CI 的 `[MISSING]` 步骤；`README-DEV.md` 发布流程指向 `release-cli.yml` |
+| **闭合判定** | **已修（门禁级）**：禁止静默旁路；应急仍可 `CONFIRM_MANUAL_RELEASE=1`。不废止脚本、不改 workflow 行为。**不升级 H**（非运行时缺陷）。**判定：已修 / 流程门禁** |
+| **重评级** | **P3 → 已修** |
+| **成本/收益** | 成本 1–2 / 收益 3 → 已落地 |
+| **修复** | `chore(release): discourage manual publish bypass (S-005)` — `e4323ab44` |
 
 #### S-006｜tarball 装后未断言版本
 
@@ -634,7 +635,7 @@
 | S-002 | scar compact-boundary | **是（主伤）** | 截断路径已消除 |
 | S-003 | scar + `sessionStorage.resumeChain.test.ts` | **是（主伤）** | walk+relink+测试 |
 | S-004 | H-017 启发式过宽 | 部分 | H-017 是误标面；S-004 是实机显示面 |
-| S-005 | H-005 + scar manual-release | **是（CI 路径）** | 手动绕过仍在 |
+| S-005 | H-005 + scar manual-release | **是（CI + 脚本门禁）** | `CONFIRM_MANUAL_RELEASE=1` + 强警告；默认不可静默旁路 |
 | S-006 | H-001、H-012 | **装前是 / 装后否** | 熔断与 asset 闸 ≠ 装后版本断言 |
 
 ### 9.4 修复成本×收益（1–5）与建议动手
@@ -643,7 +644,7 @@
 |----|------|------|------|
 | S-006 | 2 | 4 | **建议动手 #1**：`installFromTarball` success 前读全局包 version / `npm list -g --json` 比对 `specificVersion` |
 | S-001 | 3 | 3 | **建议动手 #2**（可选）：路径粘贴在**收到首 chunk 时**即 `beginImagePaste`（或 pending 占位），收窄 100ms；补 Ink 级集成测 |
-| S-005 | 1–2 | 3 | **建议动手 #3**（可选）：手动脚本头注释「禁止生产发版」+ README 唯一入口指向 workflow |
+| S-005 | 1–2 | 3 | **已修**：`CONFIRM_MANUAL_RELEASE=1` 门禁 + `[MISSING]` 清单 + README-DEV 唯一入口指向 `release-cli.yml` |
 | S-002 | 2 | 2 | 不急；加 malformed boundary fixture 即可 |
 | S-003 | 2 | 2 | 不急；relink 0 条时用户提示可选 |
 | S-004 | 4 | 2 | 等实机/用户报告 |

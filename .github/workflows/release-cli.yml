@@ -16,6 +16,11 @@
 #     实际 desk tag 形如 `desk-vX.Y.Z`，不会被 `v*` 命中，天然与 release-panda-on-desk.yml 解耦
 #   - 桌面端走 `.github/workflows/release-panda-on-desk.yml`
 #
+# 手动路径（S-005 / scar manual-release-missing-publish）：
+#   - 生产发版唯一推荐：push tag → 本 workflow（Release + Packages 齐套）
+#   - scripts/publish-final.sh、scripts/release-cli-tarball.sh 默认拒绝执行，
+#     须 CONFIRM_MANUAL_RELEASE=1；二者均不齐套，不能替代本 workflow
+#
 # Token 用法说明：
 #   - GH_TOKEN env 由 GitHub Actions 自动注入 secrets.GITHUB_TOKEN（无需手动配 Secrets）
 #   - contents:write → gh release create 发 GitHub Release
