@@ -612,7 +612,7 @@
 | **闭合判定** | **已修（门禁级）**：禁止静默旁路；应急仍可 `CONFIRM_MANUAL_RELEASE=1`。不废止脚本、不改 workflow 行为。**不升级 H**（非运行时缺陷）。**判定：已修 / 流程门禁** |
 | **重评级** | **P3 → 已修** |
 | **成本/收益** | 成本 1–2 / 收益 3 → 已落地 |
-| **修复** | `chore(release): discourage manual publish bypass (S-005)` — `e4323ab44` |
+| **修复** | `chore(release): discourage manual publish bypass (S-005)` — `14b0bfcb2` |
 
 #### S-006｜tarball 装后未断言版本
 
