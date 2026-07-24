@@ -80,6 +80,50 @@ test('inferRiskLevel — Bash git reset --hard 升级 destructive', () => {
   expect(inferRiskLevel('Bash', { command: 'git reset --hard HEAD~5' })).toBe('destructive')
 })
 
+// H-007: 禁止前缀只读短路；复合/重定向/tee 取最高风险
+test('inferRiskLevel — H-007 纯 ls 仍为 read-only', () => {
+  expect(inferRiskLevel('Bash', { command: 'ls' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'ls -la' })).toBe('read-only')
+})
+
+test('inferRiskLevel — H-007 纯 cat 仍为 read-only', () => {
+  expect(inferRiskLevel('Bash', { command: 'cat file' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'cat README.md' })).toBe('read-only')
+})
+
+test('inferRiskLevel — H-007 复合 ls; rm -rf 升级 destructive', () => {
+  expect(inferRiskLevel('Bash', { command: 'ls; rm -rf x' })).toBe('destructive')
+  expect(inferRiskLevel('Bash', { command: 'ls -la; rm -rf /tmp/test' })).toBe('destructive')
+  expect(inferRiskLevel('Bash', { command: 'ls && rm -rf ./out' })).toBe('destructive')
+})
+
+test('inferRiskLevel — H-007 写重定向不得标 read-only', () => {
+  expect(inferRiskLevel('Bash', { command: 'echo hi > file' })).not.toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'echo hi > file' })).toBe('high-write')
+  expect(inferRiskLevel('Bash', { command: 'echo hi >> file' })).toBe('high-write')
+  expect(inferRiskLevel('Bash', { command: 'cat a > b' })).toBe('high-write')
+})
+
+test('inferRiskLevel — H-007 cat|tee 不得标 read-only', () => {
+  expect(inferRiskLevel('Bash', { command: 'cat a | tee b' })).not.toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'cat a | tee b' })).toBe('high-write')
+  expect(inferRiskLevel('Bash', { command: 'ls | tee out.txt' })).toBe('high-write')
+})
+
+test('inferRiskLevel — H-007 其他复合/管道取最高风险', () => {
+  expect(inferRiskLevel('Bash', { command: 'git status && touch x' })).toBe('high-write')
+  expect(inferRiskLevel('Bash', { command: 'pwd || mkdir y' })).toBe('high-write')
+  expect(inferRiskLevel('Bash', { command: 'ls\nrm -rf z' })).toBe('destructive')
+  // 只读管道组合仍可为 read-only
+  expect(inferRiskLevel('Bash', { command: 'ls | wc -l' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'cat a | grep foo' })).toBe('read-only')
+})
+
+test('inferRiskLevel — H-007 fd 复制 2>&1 不误判为写重定向', () => {
+  expect(inferRiskLevel('Bash', { command: 'ls 2>&1' })).toBe('read-only')
+  expect(inferRiskLevel('Bash', { command: 'cat file 2>&1' })).toBe('read-only')
+})
+
 test('rotateAuditLog — 删除超过 30 天的条目', () => {
   // 写两条：一条 60 天前，一条今天
   const old = JSON.stringify({

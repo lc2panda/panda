@@ -99,23 +99,115 @@ const RISK_BY_TOOL: Record<string, ToolRiskLevel> = {
   CronDelete: 'destructive',
 }
 
+/** 风险等级排序：数值越高越危险。复合命令取最高风险（fail-safe）。 */
+const RISK_RANK: Record<ToolRiskLevel, number> = {
+  'read-only': 0,
+  'low-write': 1,
+  'high-write': 2,
+  destructive: 3,
+}
+
+function higherRisk(a: ToolRiskLevel, b: ToolRiskLevel): ToolRiskLevel {
+  return RISK_RANK[a] >= RISK_RANK[b] ? a : b
+}
+
+/**
+ * 破坏性模式：命中即 destructive。
+ * 与历史 destructivePattern 对齐，并覆盖 sudo rm / 磁盘工具等。
+ */
+const DESTRUCTIVE_RE =
+  /\b(rm\s+-rf|git\s+reset\s+--hard|git\s+push\s+--force|sudo\s+rm|drop\s+table|drop\s+database|truncate|dd\s+if=|mkfs|fdisk)\b/i
+
+/**
+ * 写重定向：`>` / `>>` 写文件。
+ * 排除 fd 复制（`2>&1` / `>&2`），那些不是落盘写。
+ */
+function hasWriteRedirect(segment: string): boolean {
+  const withoutFdDup = segment.replace(/\d*>&\d+/g, '').replace(/>&\d+/g, '')
+  return />>?/.test(withoutFdDup)
+}
+
+/**
+ * 段级只读前缀。注意：
+ * - 不含 tee（tee 会写文件）
+ * - 不含会改状态的 git/npm 子命令
+ * - 必须整段评估，禁止“前缀只读即整串只读”
+ */
+const READ_ONLY_CMD_RE =
+  /^\s*(ls|cat|head|tail|grep|find|git\s+(status|log|diff|show|branch|tag)|npm\s+(list|ls|view|info|search)|echo|pwd|whoami|date|which|type|help|man|less|more|wc|env|printenv|set|history|hostname|uptime|df|du\s+-sh?|free|top\s+-bn1|ps\s+aux|netstat|curl\s+(-[sL]+\s+)?https?|wget\s+(-[qO-]+\s+)?https?|jq|yq|sort|uniq|awk|sed\s+-n|tr|cut|basename|dirname|realpath|stat|file|xxd|hexdump|tree|bat)\b/i
+
+/** find 的写/执行动作，不能因 find 前缀降为 read-only */
+const FIND_MUTATING_RE = /\s-(delete|exec|execdir|fprint|fprintf|fls)\b/i
+
+/**
+ * 已知写/变更类动词（非 destructive 时至少 high-write）。
+ * 不确定时宁可高估，禁止 silent under-classify。
+ */
+const HIGH_WRITE_VERB_RE =
+  /\b(rm|mv|chmod|chown|chgrp|mkdir|touch|cp|install|kill|pkill|killall|sudo|tee|dd|npm\s+i(nstall)?|git\s+(commit|push|add|checkout|merge|rebase|clean|reset|stash)|sed\s+-i)\b/i
+
+/**
+ * 按 shell 复合算子拆段：`;` `&&` `||` `|` 换行。
+ * 审计分级用启发式拆分；无法安全证明只读时由段级逻辑抬高风险。
+ */
+function splitBashSegments(cmd: string): string[] {
+  return cmd
+    .split(/(?:&&|\|\||;|\n|\|)/)
+    .map(s => s.trim())
+    .filter(Boolean)
+}
+
+function classifyBashSegment(segment: string): ToolRiskLevel {
+  const s = segment.trim()
+  if (!s) return 'read-only'
+
+  // 1) 破坏性优先
+  if (DESTRUCTIVE_RE.test(s)) return 'destructive'
+
+  // 2) 写重定向 / tee 等落盘写 → 至少 high-write
+  if (hasWriteRedirect(s) || /\btee\b/i.test(s)) return 'high-write'
+
+  // 3) 已知写动词
+  if (HIGH_WRITE_VERB_RE.test(s)) return 'high-write'
+
+  // 4) 仅当段本身是只读命令且无写副作用时才降为 read-only
+  if (READ_ONLY_CMD_RE.test(s)) {
+    if (/\bfind\b/i.test(s) && FIND_MUTATING_RE.test(s)) {
+      return 'high-write'
+    }
+    return 'read-only'
+  }
+
+  // 5) 不确定 → high-write（Bash 默认，fail-safe）
+  return 'high-write'
+}
+
+function classifyBashCommand(cmd: string): ToolRiskLevel {
+  const trimmed = cmd.trim()
+  if (!trimmed) return 'high-write'
+
+  // 整串先扫破坏性（覆盖拆段边界上的漏检）
+  if (DESTRUCTIVE_RE.test(trimmed)) return 'destructive'
+
+  const segments = splitBashSegments(trimmed)
+  if (segments.length === 0) return 'high-write'
+
+  let max: ToolRiskLevel = 'read-only'
+  for (const seg of segments) {
+    max = higherRisk(max, classifyBashSegment(seg))
+    if (max === 'destructive') return 'destructive'
+  }
+  return max
+}
+
 export function inferRiskLevel(toolName: string, args?: unknown): ToolRiskLevel {
   const baseLevel = RISK_BY_TOOL[toolName] || 'low-write'
 
-  // Bash 风险细化检测
+  // Bash 风险细化：复合命令拆段取最高风险；禁止前缀只读短路
   if (toolName === 'Bash' && typeof args === 'object' && args !== null) {
     const cmd = (args as { command?: string }).command || ''
-
-    // 1. 只读命令降级为 read-only
-    const readOnlyPattern = /^\s*(ls|cat|head|tail|grep|find|git\s+(status|log|diff|show|branch|tag)|npm\s+(list|ls|view|info|search)|echo|pwd|whoami|date|which|type|help|man|less|more|wc|env|printenv|set|history|hostname|uptime|df|du\s+-sh?|free|top\s+-bn1|ps\s+aux|netstat|curl\s+(-[sL]+\s+)?https?|wget\s+(-[qO-]+\s+)?https?|jq|yq|tee|sort|uniq|awk|sed\s+-n|tr|cut|basename|dirname|realpath|stat|file|xxd|hexdump|tree|bat)\b/i
-    if (readOnlyPattern.test(cmd.trim())) {
-      return 'read-only'
-    }
-
-    // 2. destructive 命令升级
-    if (/\b(rm\s+-rf|git\s+reset\s+--hard|git\s+push\s+--force|sudo\s+rm|drop\s+table|drop\s+database|truncate|dd\s+if=|mkfs|fdisk)\b/i.test(cmd)) {
-      return 'destructive'
-    }
+    if (!cmd.trim()) return baseLevel
+    return classifyBashCommand(cmd)
   }
 
   return baseLevel
