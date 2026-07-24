@@ -387,19 +387,27 @@ export async function update() {
 
   let status: InstallStatus
 
+  // Shared dual-source options (H-006): local and global both honor
+  // resolveInstallTarget preferTarball / tarballUrl / maxVersion cap.
+  const dualSourceOpts = {
+    tarballUrl: target.tarballUrl,
+    preferTarball: target.preferTarball,
+  }
+
   if (useLocalUpdate) {
     logForDebugging(
-      'update: Calling installOrUpdateClaudePackage() for local update',
+      `update: Calling installOrUpdateClaudePackage(${latestVersion}, preferTarball=${target.preferTarball}, capped=${target.cappedByMaxVersion}) for local update`,
     )
-    status = await installOrUpdateClaudePackage(channel)
+    status = await installOrUpdateClaudePackage(
+      channel,
+      latestVersion,
+      dualSourceOpts,
+    )
   } else {
     logForDebugging(
       `update: Calling installGlobalPackage(${latestVersion}, preferTarball=${target.preferTarball}, capped=${target.cappedByMaxVersion})`,
     )
-    status = await installGlobalPackage(latestVersion, {
-      tarballUrl: target.tarballUrl,
-      preferTarball: target.preferTarball,
-    })
+    status = await installGlobalPackage(latestVersion, dualSourceOpts)
   }
 
   logForDebugging(`update: Installation status: ${status}`)

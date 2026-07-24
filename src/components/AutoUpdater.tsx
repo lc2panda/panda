@@ -117,7 +117,8 @@ export function AutoUpdater({
       }
 
       // preferTarball / tarballUrl already sanitized by resolveInstallTarget
-      const globalInstallOpts = {
+      // Shared by local + global so Packages lag can still ship GH tarball (H-006)
+      const dualSourceOpts = {
         tarballUrl: target.tarballUrl,
         preferTarball: target.preferTarball,
       };
@@ -126,17 +127,23 @@ export function AutoUpdater({
       let installStatus: InstallStatus;
       let updateMethod: 'local' | 'global';
       if (installationType === 'npm-local') {
-        // Use local update for local installations
-        logForDebugging('AutoUpdater: Using local update method');
+        // Local prefix install — same dual-source tarball rules as global (H-006)
+        logForDebugging(
+          `AutoUpdater: Using local update method preferTarball=${dualSourceOpts.preferTarball} capped=${target.cappedByMaxVersion}`,
+        );
         updateMethod = 'local';
-        installStatus = await installOrUpdateClaudePackage(channel, latestVersion);
+        installStatus = await installOrUpdateClaudePackage(
+          channel,
+          latestVersion,
+          dualSourceOpts,
+        );
       } else if (installationType === 'npm-global') {
         // Prefer GH Release tarball when Packages lag — unless maxVersion capped
         logForDebugging(
-          `AutoUpdater: Using global update method preferTarball=${globalInstallOpts.preferTarball} capped=${target.cappedByMaxVersion}`,
+          `AutoUpdater: Using global update method preferTarball=${dualSourceOpts.preferTarball} capped=${target.cappedByMaxVersion}`,
         );
         updateMethod = 'global';
-        installStatus = await installGlobalPackage(latestVersion, globalInstallOpts);
+        installStatus = await installGlobalPackage(latestVersion, dualSourceOpts);
       } else if (installationType === 'native') {
         // This shouldn't happen - native should use NativeAutoUpdater
         logForDebugging('AutoUpdater: Unexpected native installation in non-native updater');
@@ -148,9 +155,13 @@ export function AutoUpdater({
         const isMigrated = config.installMethod === 'local';
         updateMethod = isMigrated ? 'local' : 'global';
         if (isMigrated) {
-          installStatus = await installOrUpdateClaudePackage(channel, latestVersion);
+          installStatus = await installOrUpdateClaudePackage(
+            channel,
+            latestVersion,
+            dualSourceOpts,
+          );
         } else {
-          installStatus = await installGlobalPackage(latestVersion, globalInstallOpts);
+          installStatus = await installGlobalPackage(latestVersion, dualSourceOpts);
         }
       }
       onChangeIsUpdating(false);

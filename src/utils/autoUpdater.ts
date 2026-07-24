@@ -723,7 +723,12 @@ export async function getLatestVersion(
   return info?.version ?? null
 }
 
-async function downloadReleaseTarball(
+/**
+ * Download a release tarball from GitHub Releases to a temp file.
+ * Returns the local path on success, null on failure.
+ * Exported for local install path (H-006) — same dual-source artifact as global.
+ */
+export async function downloadReleaseTarball(
   tarballUrl: string,
 ): Promise<string | null> {
   const dir = await mkdtemp(join(tmpdir(), 'panda-update-'))
