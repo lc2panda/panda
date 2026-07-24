@@ -15,9 +15,9 @@
 |------|--------|----------|------|------------------------|
 | P0   | 1      | 0        | 1    | H-001（有残余） |
 | P1   | 7      | 1        | 8    | H-002/H-008、H-003、H-004、H-005、H-007（第二批 P1 全清） |
-| P2   | 7      | 3        | 10   | H-009（`9b48301d6`）、H-010 |
-| P3   | 3      | 2        | 5    | H-016 |
-| **合计** | **18** | **6** | **24** | + P-001/P-002/P-003/P-004（隐私节）；H-009/H-010 已修复；H-016 已修复 |
+| P2   | 7      | 3        | 10   | H-009（`9b48301d6`）、H-010（`9c4220d54`）、H-011/H-012（`8ac3aeac5`）、H-013~015（`7b93a34f2`） |
+| P3   | 3      | 2        | 5    | H-016（`96ae62cdd`） |
+| **合计** | **18** | **6** | **24** | + P-001/P-002/P-003/P-004（隐私节）；H-009~H-015 已修复；H-016 已修复 |
 
 > **首批修复独立验收**（2026-07-24 17:07:55 +08:00）：commits `03ddb4bb9` (H-001)、`c73ce663e` (H-005)、`37d9a1fc8` (P-001/P-002)。详见各条目「修复状态」段。  
 > **第二批修复独立验收（初轮）**（2026-07-24 17:18:22 +08:00）：commits `c7accadcf` (H-004)、`09c3576e9` (H-007)、`033a7c85b` (H-002/H-008)。当时 H-003 无 commit，判定未完成。  
@@ -234,21 +234,37 @@
 
 #### H-011｜GH 非 stable 通道仍打 `/releases/latest`（拿不到预发）
 - **级别**：P2  
-- **状态**：已证实  
-- **位置**：`src/utils/autoUpdater.ts` `fetchGitHubReleaseVersion` ~L443–L468  
-- **因果**：`channel !== 'stable'` 时用 `/releases/latest`（GitHub 语义=最新非 prerelease）；beta/latest 通道的 GH 侧与 npm dist-tag 不对齐  
-- **建议**：latest/beta 列 releases 并按 tag 过滤 prerelease/dist-tag  
+- **状态**：已证实 → **已修复**  
+- **修复 commit**：`8ac3aeac5` — fix(update): align GH release channel + harden tarball pick (H-011, H-012)  
+- **验收时间**：2026-07-24  
+- **验收结论**：
+  - `getLatestVersionFromGitHub` 双通道统一走 `/releases?per_page=30`，经 `selectGitHubReleaseForChannel` 选 release
+  - stable：跳过 draft / GH prerelease / semver pre（即使 `prerelease=false` 的 beta tag）
+  - latest：取首个 non-draft（含 beta/prerelease），**不再**请求 `/releases/latest`
+  - 与 H-001 maxVersion 熔断、H-006 dual-source 兼容：`tarballSha256` 与 tarball 一并在 cap 时剥离
+  - 测试：`bun test src/utils/autoUpdater.maxVersion.test.ts src/utils/localInstaller.dualSource.test.ts` → **31 pass / 0 fail**
+- **位置**（历史）：`src/utils/autoUpdater.ts` 旧 `channel !== 'stable'` 分支打 `/releases/latest`  
+- **因果**（历史）：GitHub `/releases/latest` = 最新非 prerelease；beta/latest 通道与 npm dist-tag 不对齐  
 
 #### H-012｜tarball 资产选择过宽 + 无完整性校验
 - **级别**：P2  
-- **状态**：已证实  
-- **位置**：`src/utils/autoUpdater.ts` `pickTarballAsset` ~L409–L425；`downloadReleaseTarball` ~L536–L565  
-- **因果**：名称精确匹配失败时 fallback **任意 `.tgz`**；下载后无 checksum/sig → 错包或供应链风险  
-- **建议**：禁止任意 fallback；校验 sha256（Release 附带）与包名 `@lc2panda/panda-code`  
+- **状态**：已证实 → **已修复**  
+- **修复 commit**：`8ac3aeac5` — 与 H-011 同 commit  
+- **验收时间**：2026-07-24  
+- **验收结论**：
+  - `pickTarballAsset` 返回 `PickedTarballAsset`；精确名 `lc2panda-panda-code-${version}.tgz` 优先
+  - fallback 收紧为包名 marker + version pin；**禁止**任意 `.tgz` 静默接受
+  - `downloadReleaseTarball`：`MAX_TARBALL_BYTES=20MB` 硬顶、content-type 拒 HTML/JSON、stream 累计字节上限、可选 `expectedSha256` 校验
+  - digest 解析：`sha256:<hex>` / bare hex；sidecar 仅读 API digest 字段
+  - global + local 安装路径透传 `tarballSha256`（`update.ts` / `AutoUpdater.tsx` / `localInstaller.ts`）
+  - 测试：同上 **31 pass / 0 fail**（含 H-012 pick/integrity 用例）
+- **位置**（历史）：`pickTarballAsset` 任意 `.tgz` fallback；`downloadReleaseTarball` 无 checksum  
+- **因果**（历史）：错包或供应链风险  
 
 #### H-013｜advisor 配置命令启发式误伤分析问题
 - **级别**：P2  
 - **状态**：已修复  
+- **修复 commit**：`7b93a34f2` — fix(advisor): tighten config heuristic and model source (H-013, H-014, H-015)  
 - **位置**：`src/skills/utils/advisorHelper.ts` `isAdvisorConfigIntent`；`src/skills/bundled/advisor.ts` `isConfigCommand`  
 - **因果**：`startsWith('sonnet'|'opus'|...)` 使「sonnet vs opus 怎么选」类问题走配置分支而非决策分析  
 - **修复**：整词 model token + 显式 subcommand；分析标记（vs/怎么/如何/比较 等）强制决策分析  
@@ -257,6 +273,7 @@
 #### H-014｜advisorHelper 默认 `canUseTool: () => true`
 - **级别**：P2（潜伏；当前技能主路径未调用 helper）  
 - **状态**：已修复  
+- **修复 commit**：`7b93a34f2` — 与 H-013/H-015 同 commit  
 - **位置**：`src/skills/utils/advisorHelper.ts` `denyAllCanUseTool` / `callAdvisorForSkill`  
 - **因果**：未来调用方若漏传 canUseTool，顾问侧工具自动放行  
 - **修复**：默认 fail-closed `denyAllCanUseTool`；优先级 options.canUseTool > toolUseContext.canUseTool > deny  
@@ -265,6 +282,7 @@
 #### H-015｜advisorModel 双数据源不一致
 - **级别**：P2  
 - **状态**：已修复  
+- **修复 commit**：`7b93a34f2` — 与 H-013/H-014 同 commit  
 - **位置**：  
   - 统一入口：`resolveAdvisorModel`（`advisorHelper.ts`）  
   - 技能 / helper 均经此解析  
@@ -280,7 +298,7 @@
 #### H-016｜resolveWindowsCommand 死代码残留（scar  enticement）
 - **级别**：P3  
 - **状态**：已证实 → **已修复**  
-- **修复 commit**：chore(mcp): remove resolveWindowsCommand dead code (H-016)  
+- **修复 commit**：`96ae62cdd` — chore(mcp): remove resolveWindowsCommand dead code (H-016)  
 - **验收时间**：2026-07-24  
 - **验收结论**：
   - 删除 `export function resolveWindowsCommand` 及仅为其服务的 `basename`/`extname` import
