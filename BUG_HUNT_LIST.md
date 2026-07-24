@@ -14,19 +14,20 @@
 | 级别 | 已证实 | 可疑风险 | 小计 | 其中已修复（验收） |
 |------|--------|----------|------|------------------------|
 | P0   | 1      | 0        | 1    | H-001（有残余） |
-| P1   | 7      | 1        | 8    | H-002/H-008、H-004、H-005、H-007；**H-003 未完成** |
+| P1   | 7      | 1        | 8    | H-002/H-008、H-003、H-004、H-005、H-007（第二批 P1 全清） |
 | P2   | 7      | 3        | 10   | — |
 | P3   | 3      | 2        | 5    | — |
 | **合计** | **18** | **6** | **24** | + P-001/P-002（隐私节） |
 
 > **首批修复独立验收**（2026-07-24 17:07:55 +08:00）：commits `03ddb4bb9` (H-001)、`c73ce663e` (H-005)、`37d9a1fc8` (P-001/P-002)。详见各条目「修复状态」段。  
-> **第二批修复独立验收**（2026-07-24 17:18:22 +08:00）：commits `c7accadcf` (H-004)、`09c3576e9` (H-007)、`033a7c85b` (H-002/H-008)。**H-003 无对应 commit，源码仍 fire-and-forget，判定未完成。** 工作区 clean。
+> **第二批修复独立验收（初轮）**（2026-07-24 17:18:22 +08:00）：commits `c7accadcf` (H-004)、`09c3576e9` (H-007)、`033a7c85b` (H-002/H-008)。当时 H-003 无 commit，判定未完成。  
+> **第二批 H-003 补验收**（2026-07-24 17:22:39 +08:00）：commit `db697a3b7` — fix(channel): await MCP push before marking delivered (H-003)。测试 `bun test src/assistant/channelRegistry.test.ts` → **4 pass / 0 fail / 11 expect**。工作区仅 docs 更新。
 
 **Top 3 最危险项**（猎杀时排序；已修项划掉）
 
 1. ~~**H-001** maxVersion 熔断被 preferTarball 绕过~~ → **已修复但有残余** (`03ddb4bb9`)  
 2. ~~**H-002** MCP stdio 锁键与真实 spawn cwd 不一致~~ → **已修复** (`033a7c85b`，与 H-008 同 commit)  
-3. **H-003** `pushViaChannelMCP` 未等成功即 `delivered=true` → **未完成**（静默丢通知且永不重投）  
+3. ~~**H-003** `pushViaChannelMCP` 未等成功即 `delivered=true`~~ → **已修复** (`db697a3b7`)  
 
 ---
 
@@ -113,23 +114,26 @@
 
 #### H-003｜channelRegistry：异步 MCP 推送未完成即标记已投递
 - **级别**：P1  
-- **状态**：已证实 → **未完成**（第二批验收 2026-07-24 17:18:22 +08:00）  
-- **修复 commit**：无（`git log --grep='H-003|await MCP|marking delivered'` 无命中；HEAD `033a7c85b` 工作区 clean，无未提交改动）  
-- **验收结论**：
-  - 源码仍在 `src/assistant/channelRegistry.ts` `pushViaChannelMCP` ~L232–L241：
-    - `void server.client.callTool(...).catch(...)` **不 await**
-    - 紧接着 `delivered = true`（发起即标成功）
-  - 失败仅 `logForDebugging`，不回灌 `_pendingMessages`
-  - **无对应测试文件可跑**
-- **位置**：`src/assistant/channelRegistry.ts` `pushViaChannelMCP` ~L202–L259  
-- **因果机制**：  
+- **状态**：已证实 → **已修复**  
+- **修复 commit**：`db697a3b79f26c535fcc1de59522a4fa863c82f7` — fix(channel): await MCP push before marking delivered (H-003)  
+- **验收时间**：2026-07-24 17:22:39 +08:00  
+- **验收结论**（独立重验，禁止无证据通过）：
+  - `pushViaChannelMCP` 现为 `async`：`await server.client.callTool(...)` 后才可能 `delivered = true`（`src/assistant/channelRegistry.ts` ~L256–L267）
+  - `delivered=true` 仅在 callTool **无 throw 且非 isError**；reject / `isError:true` / 无 channel → `delivered=false` 并写入 `_pendingMessages`
+  - 失败路径：`catch` 内 `logForDebugging(...)`（含 error message），**非空 catch**；外层兜底同样 log + buffer（~L271–L299）
+  - `_flushPending` 失败回写 `failed` 到 pending 队首（~L378–L386），pending 可保留重试
+  - 调用方：`builtinTasks` `await` 并检查 `!delivered` 打 log；`sense` 侧 `void ...catch(log)` 不阻塞推送管道，但不再依赖「发起即成功」语义
+  - 测试：`bun test src/assistant/channelRegistry.test.ts` → **4 pass / 0 fail / 11 expect**（成功 / reject / isError / 无 channel）
+- **残余（非阻断）**：`sense.ts` `_pushToChannels` 仍 fire-and-forget 调用（不 await 返回值），属推送管道不阻塞设计；核心假成功语义已消除
+- **位置**：`src/assistant/channelRegistry.ts` `pushViaChannelMCP` ~L222–L303；测试 `src/assistant/channelRegistry.test.ts`  
+- **因果机制**（历史）：  
   1. `client.callTool(...)` **不 await**  
   2. 立即 `delivered = true`  
   3. 调用方认为成功 → 不入 pending / 清缓冲  
   4. 实际失败只打 debug 日志，**不会重新入队**  
 - **触发**：MCP 未连上、工具名不存在、网络/权限失败  
-- **影响**：微信/渠道通知「已发送」假象 + 永久丢失  
-- **建议**：await callTool；仅成功时 delivered=true；失败保留 pending 并限次重试  
+- **影响**（历史）：微信/渠道通知「已发送」假象 + 永久丢失  
+- **建议**（已落地）：await callTool；仅成功时 delivered=true；失败保留 pending  
 
 #### H-004｜飞书默认 MCP Connector 无 sendNotification（空壳路径）
 - **级别**：P1  
@@ -317,7 +321,7 @@
 ## 5. 建议修复优先级（供审查，不实施）
 
 1. ~~**立即**：H-001（熔断）+ H-005（发版 latest）~~ → 首批已修  
-2. ~~H-002/H-008（MCP cwd）~~ / ~~H-004（飞书通知）~~ / ~~H-007（审计）~~ → 第二批已修；**H-003（delivered 语义）仍未完成，应优先**  
+2. ~~H-002/H-008（MCP cwd）~~ / ~~H-003（delivered 语义）~~ / ~~H-004（飞书通知）~~ / ~~H-007（审计）~~ → 第二批全清  
 3. **随后**：H-006 双源 local 对齐、H-009 去空 catch  
 4. **顺带**：Advisor 三连、死代码清理；H-004 残余（失败可观测性）  
 
