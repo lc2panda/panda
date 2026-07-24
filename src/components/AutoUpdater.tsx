@@ -120,6 +120,7 @@ export function AutoUpdater({
       // Shared by local + global so Packages lag can still ship GH tarball (H-006)
       const dualSourceOpts = {
         tarballUrl: target.tarballUrl,
+        tarballSha256: target.tarballSha256,
         preferTarball: target.preferTarball,
       };
 

@@ -136,6 +136,8 @@ function localNpmInstallTarballArgs(tarballPath: string): string[] {
 export type LocalInstallPlan = {
   preferTarballFirst: boolean
   tarballUrl?: string
+  /** Integrity digest paired with tarballUrl (H-012); stripped with URL under maxVersion */
+  tarballSha256?: string
   installVersion: string
   allowTarballFallback: boolean
 }
@@ -153,6 +155,7 @@ export function planLocalInstall(
   ) {
     tarballUrl = undefined
   }
+  const tarballSha256 = tarballUrl ? options?.tarballSha256 : undefined
 
   let installVersion = specificVersion
     ? specificVersion
@@ -170,6 +173,7 @@ export function planLocalInstall(
   return {
     preferTarballFirst: Boolean(options?.preferTarball && tarballUrl),
     tarballUrl,
+    tarballSha256,
     installVersion,
     allowTarballFallback: Boolean(tarballUrl),
   }
@@ -212,7 +216,12 @@ export async function installOrUpdateClaudePackage(
       logForDebugging(
         `installOrUpdateClaudePackage: preferTarball, installing from ${plan.tarballUrl}`,
       )
-      const tarballPath = await downloadReleaseTarball(plan.tarballUrl)
+      const tarballPath = await downloadReleaseTarball(
+        plan.tarballUrl,
+        plan.tarballSha256
+          ? { expectedSha256: plan.tarballSha256 }
+          : undefined,
+      )
       if (tarballPath) {
         const tarballResult = await execFileNoThrowWithCwd(
           'npm',
@@ -265,7 +274,12 @@ export async function installOrUpdateClaudePackage(
         logForDebugging(
           `installOrUpdateClaudePackage: registry failed, falling back to tarball ${plan.tarballUrl}`,
         )
-        const tarballPath = await downloadReleaseTarball(plan.tarballUrl)
+        const tarballPath = await downloadReleaseTarball(
+          plan.tarballUrl,
+          plan.tarballSha256
+            ? { expectedSha256: plan.tarballSha256 }
+            : undefined,
+        )
         if (tarballPath) {
           const fallback = await execFileNoThrowWithCwd(
             'npm',

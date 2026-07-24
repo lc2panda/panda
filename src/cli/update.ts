@@ -391,6 +391,7 @@ export async function update() {
   // resolveInstallTarget preferTarball / tarballUrl / maxVersion cap.
   const dualSourceOpts = {
     tarballUrl: target.tarballUrl,
+    tarballSha256: target.tarballSha256,
     preferTarball: target.preferTarball,
   }
 

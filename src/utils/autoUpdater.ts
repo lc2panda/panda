@@ -1,9 +1,9 @@
 import axios from 'axios'
+import { createHash } from 'crypto'
 import { constants as fsConstants, createWriteStream } from 'fs'
 import { access, mkdtemp, unlink, writeFile } from 'fs/promises'
 import { homedir, tmpdir } from 'os'
 import { join } from 'path'
-import { pipeline } from 'stream/promises'
 import { getDynamicConfig_BLOCKS_ON_INIT } from 'src/services/analytics/growthbook.js'
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -45,11 +45,14 @@ export type LatestVersionInfo = {
   version: string
   source: 'npm' | 'github-release' | 'both'
   tarballUrl?: string
+  /** Lowercase hex sha256 of the tarball when GH provides digest/sidecar (H-012) */
+  tarballSha256?: string
   npmAvailable: boolean
 }
 
 export type InstallGlobalPackageOptions = {
   tarballUrl?: string
+  tarballSha256?: string
   preferTarball?: boolean
 }
 
@@ -65,21 +68,55 @@ export type InstallTargetDecision = {
   preferTarball: boolean
   /** Tarball URL safe for this target; undefined when capped or unavailable */
   tarballUrl?: string
+  /** Integrity digest paired with tarballUrl (stripped together under maxVersion) */
+  tarballSha256?: string
   /** True when maxVersion reduced the remote latest */
   cappedByMaxVersion: boolean
   /** True when current is already at/above max while remote is higher — do not upgrade */
   skipUpdate: boolean
 }
 
-type GitHubReleaseAsset = {
+/** Hard cap for GH release tarball downloads (H-012). Do not raise. */
+export const MAX_TARBALL_BYTES = 20 * 1024 * 1024
+
+/** npm package tarball asset name prefix used by GH Releases */
+export const GH_PACKAGE_TARBALL_PREFIX = 'lc2panda-panda-code'
+
+const ALLOWED_TARBALL_CONTENT_TYPES = new Set([
+  'application/gzip',
+  'application/x-gzip',
+  'application/x-gtar',
+  'application/x-tar',
+  'application/tar+gzip',
+  'application/octet-stream',
+  // Some CDNs omit subtype specifics
+  'binary/octet-stream',
+])
+
+export type GitHubReleaseAsset = {
   name?: string
   browser_download_url?: string
+  size?: number
+  content_type?: string
+  /** GitHub API digest field, e.g. "sha256:abcd..." */
+  digest?: string
 }
 
-type GitHubRelease = {
+export type GitHubRelease = {
   tag_name?: string
   prerelease?: boolean
+  draft?: boolean
   assets?: GitHubReleaseAsset[]
+}
+
+export type PickedTarballAsset = {
+  url: string
+  name: string
+  size?: number
+  contentType?: string
+  sha256?: string
+  /** true when name was exact lc2panda-panda-code-${version}.tgz */
+  exactMatch: boolean
 }
 
 class AutoUpdaterError extends ClaudeError {}
@@ -427,6 +464,7 @@ export function resolveInstallTarget(
         version,
         preferTarball: false,
         tarballUrl: undefined,
+        tarballSha256: undefined,
         cappedByMaxVersion: true,
         skipUpdate: true,
       }
@@ -440,9 +478,14 @@ export function resolveInstallTarget(
 
   // Tarball assets are for the remote GH version. After a maxVersion cap they
   // point at a forbidden higher build — never prefer or fall back to them.
+  // Integrity digest is stripped together with the URL (H-001 + H-012).
   const tarballUrl =
     !cappedByMaxVersion && latestInfo.tarballUrl
       ? latestInfo.tarballUrl
+      : undefined
+  const tarballSha256 =
+    tarballUrl && latestInfo.tarballSha256
+      ? latestInfo.tarballSha256
       : undefined
 
   // Prefer tarball only when it is the intended install artifact for `version`
@@ -455,6 +498,7 @@ export function resolveInstallTarget(
     version,
     preferTarball,
     tarballUrl,
+    tarballSha256,
     cappedByMaxVersion,
     skipUpdate: false,
   }
@@ -496,37 +540,192 @@ export function isTarballAllowedForInstall(
   return true
 }
 
-function pickTarballAsset(
+/**
+ * Parse GitHub asset digest field (`sha256:<hex>` or bare 64-char hex).
+ */
+export function parseGitHubAssetDigest(
+  digest: string | undefined | null,
+): string | undefined {
+  if (!digest || typeof digest !== 'string') {
+    return undefined
+  }
+  const trimmed = digest.trim()
+  const m = trimmed.match(/^(?:sha-?256:)?([a-f0-9]{64})$/i)
+  return m?.[1]?.toLowerCase()
+}
+
+/**
+ * True when the release is eligible for the stable channel:
+ * not draft/prerelease and version has no semver prerelease suffix.
+ * (GH may leave beta tags with prerelease=false — still exclude them.)
+ */
+export function isStableChannelRelease(release: GitHubRelease): boolean {
+  if (release.draft || release.prerelease) {
+    return false
+  }
+  const version = normalizeVersion(release.tag_name ?? '')
+  if (!version) {
+    return false
+  }
+  return !version.includes('-')
+}
+
+/**
+ * Select a release aligned with npm dist-tag semantics (H-011):
+ * - stable → first stable (non-prerelease, no semver pre) from list
+ * - latest → first non-draft (includes GH prerelease + semver pre / beta)
+ *
+ * Always driven by the releases list — never pin non-stable to
+ * `/releases/latest`, which only surfaces GitHub's single "latest" pointer.
+ */
+export function selectGitHubReleaseForChannel(
+  releases: GitHubRelease[],
+  channel: ReleaseChannel,
+): GitHubRelease | undefined {
+  const candidates = releases.filter(r => !r.draft && !!r.tag_name)
+  if (channel === 'stable') {
+    return candidates.find(isStableChannelRelease)
+  }
+  // latest (and any non-stable): newest non-draft, including betas/prereleases
+  return candidates[0]
+}
+
+/**
+ * Whether an asset name is an acceptable CLI package tarball (H-012).
+ * Requires package-name marker + optional version pin; rejects bare/random .tgz,
+ * checksum sidecars, and native binary-looking assets.
+ */
+export function isAcceptablePackageTarballName(
+  name: string,
+  version?: string,
+): boolean {
+  const lower = name.toLowerCase()
+  if (lower.endsWith('.sha256') || lower.endsWith('.sha512')) {
+    return false
+  }
+  if (lower.includes('checksum') || lower.includes('sha256sums')) {
+    return false
+  }
+  const isTgz = lower.endsWith('.tgz') || lower.endsWith('.tar.gz')
+  if (!isTgz) {
+    return false
+  }
+
+  // Native binary release assets (not the npm package tarball)
+  if (
+    /(?:^|[-_.])(darwin|linux|win32|windows|macos)[-_.](arm64|aarch64|x64|amd64|x86_64)/i.test(
+      name,
+    )
+  ) {
+    return false
+  }
+
+  const hasCanonical =
+    lower.includes(GH_PACKAGE_TARBALL_PREFIX) ||
+    lower.includes('lc2panda.panda-code')
+  const hasLoosePackage =
+    lower.includes('panda-code') &&
+    (lower.includes('lc2panda') || lower.startsWith('panda-code-'))
+
+  if (!hasCanonical && !hasLoosePackage) {
+    return false
+  }
+
+  if (version) {
+    const n = (normalizeVersion(version) ?? version).toLowerCase()
+    if (!lower.includes(n)) {
+      return false
+    }
+  }
+  return true
+}
+
+/**
+ * Look for a companion checksum asset digest for `tarballName` when present.
+ * Only trusts the GitHub API digest field (no sidecar body download).
+ */
+export function findSidecarSha256(
+  assets: GitHubReleaseAsset[] | undefined,
+  tarballName: string,
+): string | undefined {
+  if (!assets?.length) {
+    return undefined
+  }
+  const exactSidecar = assets.find(
+    a =>
+      a.name === `${tarballName}.sha256` ||
+      a.name === `${tarballName}.sha256.txt`,
+  )
+  if (exactSidecar?.digest) {
+    return parseGitHubAssetDigest(exactSidecar.digest)
+  }
+  return undefined
+}
+
+/**
+ * Prefer the canonical package tarball asset; never silently accept arbitrary .tgz (H-012).
+ * Asset names follow npm pack: `@scope/name` → `scope-name-version.tgz`
+ * e.g. `@lc2panda/panda-code@2.32.3` → `lc2panda-panda-code-2.32.3.tgz`
+ */
+export function pickTarballAsset(
   assets: GitHubReleaseAsset[] | undefined,
   version: string,
-): string | null {
+): PickedTarballAsset | null {
   if (!assets?.length) {
     return null
   }
-  // Prefer exact asset name used by install.sh comments, then any panda-code .tgz
+
+  const exactName = `${GH_PACKAGE_TARBALL_PREFIX}-${version}.tgz`
   const exact = assets.find(
-    a => a.name === `lc2panda-panda-code-${version}.tgz` && a.browser_download_url,
+    a => a.name === exactName && a.browser_download_url,
   )
-  if (exact?.browser_download_url) {
-    return exact.browser_download_url
+  if (exact?.browser_download_url && exact.name) {
+    const sha256 =
+      parseGitHubAssetDigest(exact.digest) ??
+      findSidecarSha256(assets, exact.name)
+    return {
+      url: exact.browser_download_url,
+      name: exact.name,
+      size: exact.size,
+      contentType: exact.content_type,
+      sha256,
+      exactMatch: true,
+    }
   }
-  const match = assets.find(
+
+  // Tightened fallback: package-name marker + version pin required. No bare .tgz.
+  const fallback = assets.find(
     a =>
-      typeof a.name === 'string' &&
-      a.name.includes('panda-code') &&
-      a.name.endsWith('.tgz') &&
-      a.browser_download_url,
+      !!a.name &&
+      !!a.browser_download_url &&
+      isAcceptablePackageTarballName(a.name, version),
   )
-  if (match?.browser_download_url) {
-    return match.browser_download_url
+  if (fallback?.browser_download_url && fallback.name) {
+    logForDebugging(
+      `pickTarballAsset: exact ${exactName} missing; using tightened match ${fallback.name}`,
+    )
+    const sha256 =
+      parseGitHubAssetDigest(fallback.digest) ??
+      findSidecarSha256(assets, fallback.name)
+    return {
+      url: fallback.browser_download_url,
+      name: fallback.name,
+      size: fallback.size,
+      contentType: fallback.content_type,
+      sha256,
+      exactMatch: false,
+    }
   }
-  const anyTgz = assets.find(
-    a =>
-      typeof a.name === 'string' &&
-      a.name.endsWith('.tgz') &&
-      a.browser_download_url,
-  )
-  return anyTgz?.browser_download_url ?? null
+
+  const rejected = assets
+    .filter(a => a.name?.endsWith('.tgz') || a.name?.endsWith('.tar.gz'))
+    .map(a => a.name)
+  if (rejected.length) {
+    logForDebugging(
+      `pickTarballAsset: rejected non-package tarball asset(s) for ${version}: ${rejected.join(', ')}`,
+    )
+  }
+  return null
 }
 
 function githubAuthHeaders(): Record<string, string> {
@@ -543,44 +742,37 @@ function githubAuthHeaders(): Record<string, string> {
 }
 
 /**
- * Resolve latest package version from GitHub Releases (not Packages metadata).
- * Aligns with install.sh GH release → .tgz flow.
+ * Resolve channel-aligned package version from GitHub Releases (H-011).
+ * Always lists /releases — never pins non-stable to /releases/latest.
+ * Aligns with install.sh GH release → .tgz flow and npm dist-tag semantics.
  */
 export async function getLatestVersionFromGitHub(
   channel: ReleaseChannel,
-): Promise<{ version: string; tarballUrl: string } | null> {
+): Promise<{
+  version: string
+  tarballUrl: string
+  tarballSha256?: string
+} | null> {
   try {
     const headers = githubAuthHeaders()
-    let release: GitHubRelease | null = null
-
-    if (channel === 'stable') {
-      // Prefer non-prerelease; latest endpoint already excludes drafts/prereleases
-      // but stable channel also scans recent list as a safety net.
-      const list = await axios.get<GitHubRelease[]>(
-        `https://api.github.com/repos/${GH_RELEASE_REPO}/releases`,
-        {
-          timeout: GH_API_TIMEOUT_MS,
-          headers,
-          params: { per_page: 10 },
-          validateStatus: s => s >= 200 && s < 300,
-        },
-      )
-      release =
-        list.data.find(r => r && r.prerelease !== true && r.tag_name) ?? null
-    } else {
-      const response = await axios.get<GitHubRelease>(
-        `https://api.github.com/repos/${GH_RELEASE_REPO}/releases/latest`,
-        {
-          timeout: GH_API_TIMEOUT_MS,
-          headers,
-          validateStatus: s => s >= 200 && s < 300,
-        },
-      )
-      release = response.data
-    }
+    // List for both channels so latest can include betas/prereleases and stable
+    // can apply semver-stable filtering (H-011). Never hit /releases/latest for
+    // non-stable — that endpoint only returns GitHub's single "latest" pointer.
+    const list = await axios.get<GitHubRelease[]>(
+      `https://api.github.com/repos/${GH_RELEASE_REPO}/releases`,
+      {
+        timeout: GH_API_TIMEOUT_MS,
+        headers,
+        params: { per_page: 30 },
+        validateStatus: s => s >= 200 && s < 300,
+      },
+    )
+    const release = selectGitHubReleaseForChannel(list.data ?? [], channel)
 
     if (!release?.tag_name) {
-      logForDebugging('GitHub releases: missing tag_name')
+      logForDebugging(
+        `GitHub releases: no release for channel=${channel}`,
+      )
       return null
     }
 
@@ -588,17 +780,32 @@ export async function getLatestVersionFromGitHub(
     if (!version) {
       return null
     }
-    const tarballUrl = pickTarballAsset(release.assets, version)
-    if (!tarballUrl) {
+    const picked = pickTarballAsset(release.assets, version)
+    if (!picked) {
       logForDebugging(
-        `GitHub releases: no .tgz asset for ${GH_RELEASE_REPO} ${version}`,
+        `GitHub releases: no acceptable package .tgz for ${GH_RELEASE_REPO} ${version}`,
       )
       return null
     }
+    if (picked.size !== undefined && picked.size > MAX_TARBALL_BYTES) {
+      logForDebugging(
+        `GitHub releases: asset ${picked.name} size ${picked.size} exceeds ${MAX_TARBALL_BYTES} cap — refuse`,
+      )
+      return null
+    }
+    if (!picked.sha256) {
+      logForDebugging(
+        `GitHub releases: WARNING no sha256 digest for ${picked.name}; download will proceed with name/content-type constraints only`,
+      )
+    }
     logForDebugging(
-      `GitHub releases: latest=${version} tarball=${tarballUrl} channel=${channel}`,
+      `GitHub releases: latest=${version} tarball=${picked.url} channel=${channel} exact=${picked.exactMatch} sha256=${picked.sha256 ? 'yes' : 'no'}`,
     )
-    return { version, tarballUrl }
+    return {
+      version,
+      tarballUrl: picked.url,
+      tarballSha256: picked.sha256,
+    }
   } catch (error) {
     logForDebugging(`GitHub releases lookup failed: ${error}`)
     return null
@@ -668,6 +875,7 @@ export async function getLatestVersionInfo(
 
   const ghVersion = ghInfo?.version ?? null
   const tarballUrl = ghInfo?.tarballUrl
+  const tarballSha256 = ghInfo?.tarballSha256
 
   if (!npmVersion && !ghVersion) {
     return null
@@ -683,7 +891,8 @@ export async function getLatestVersionInfo(
     return {
       version: ghVersion,
       source: 'github-release',
-      tarballUrl: tarballUrl,
+      tarballUrl,
+      tarballSha256,
       npmAvailable: false,
     }
   }
@@ -693,7 +902,8 @@ export async function getLatestVersionInfo(
     return {
       version: npmVersion!,
       source: 'both',
-      tarballUrl: tarballUrl,
+      tarballUrl,
+      tarballSha256,
       npmAvailable: true,
     }
   }
@@ -701,14 +911,18 @@ export async function getLatestVersionInfo(
     return {
       version: ghVersion!,
       source: 'github-release',
-      tarballUrl: tarballUrl,
+      tarballUrl,
+      tarballSha256,
       npmAvailable: true,
     }
   }
   return {
     version: npmVersion!,
     source: 'npm',
-    tarballUrl: tarballUrl,
+    // Keep GH tarball as optional fallback only when versions match was false
+    // and npm won; strip integrity with URL if callers still prefer tarball.
+    tarballUrl,
+    tarballSha256,
     npmAvailable: true,
   }
 }
@@ -725,25 +939,118 @@ export async function getLatestVersion(
 
 /**
  * Download a release tarball from GitHub Releases to a temp file.
+ * Enforces 20MB cap, optional content-type check, and sha256 integrity (H-012).
  * Returns the local path on success, null on failure.
  * Exported for local install path (H-006) — same dual-source artifact as global.
  */
 export async function downloadReleaseTarball(
   tarballUrl: string,
+  options?: {
+    expectedSha256?: string
+    maxBytes?: number
+  },
 ): Promise<string | null> {
+  const maxBytes = options?.maxBytes ?? MAX_TARBALL_BYTES
+  const expectedSha256 = options?.expectedSha256
+    ? options.expectedSha256.toLowerCase()
+    : undefined
   const dir = await mkdtemp(join(tmpdir(), 'panda-update-'))
   const filePath = join(dir, 'package.tgz')
   try {
     const headers = githubAuthHeaders()
-    // Prefer axios stream to match rest of autoUpdater HTTP usage
     const response = await axios.get(tarballUrl, {
       timeout: TARBALL_DOWNLOAD_TIMEOUT_MS,
       responseType: 'stream',
       headers,
       maxRedirects: 5,
+      maxContentLength: maxBytes,
+      maxBodyLength: maxBytes,
       validateStatus: s => s >= 200 && s < 300,
     })
-    await pipeline(response.data, createWriteStream(filePath))
+
+    const contentTypeHeader = String(
+      response.headers?.['content-type'] ?? '',
+    )
+      .split(';')[0]
+      ?.trim()
+      .toLowerCase()
+    if (
+      contentTypeHeader &&
+      !ALLOWED_TARBALL_CONTENT_TYPES.has(contentTypeHeader)
+    ) {
+      logForDebugging(
+        `tarball download: unexpected content-type ${contentTypeHeader} for ${tarballUrl}`,
+      )
+      // Soft constraint: log and continue — some mirrors use unusual types.
+      // Hard reject only clearly non-archive types.
+      if (
+        contentTypeHeader.startsWith('text/') ||
+        contentTypeHeader.includes('html') ||
+        contentTypeHeader.includes('json') ||
+        contentTypeHeader.includes('xml')
+      ) {
+        throw new Error(
+          `refusing tarball with content-type ${contentTypeHeader}`,
+        )
+      }
+    }
+
+    const contentLength = Number(response.headers?.['content-length'] ?? 0)
+    if (contentLength > maxBytes) {
+      throw new Error(
+        `tarball content-length ${contentLength} exceeds ${maxBytes} cap`,
+      )
+    }
+
+    let received = 0
+    const hash = createHash('sha256')
+    const writeStream = createWriteStream(filePath)
+
+    await new Promise<void>((resolve, reject) => {
+      const stream = response.data as NodeJS.ReadableStream
+      const onData = (chunk: Buffer | string) => {
+        const buf = typeof chunk === 'string' ? Buffer.from(chunk) : chunk
+        received += buf.length
+        if (received > maxBytes) {
+          stream.destroy()
+          writeStream.destroy()
+          reject(
+            new Error(
+              `tarball download exceeded ${maxBytes} byte cap (received ${received})`,
+            ),
+          )
+          return
+        }
+        hash.update(buf)
+        if (!writeStream.write(buf)) {
+          stream.pause()
+          writeStream.once('drain', () => stream.resume())
+        }
+      }
+      stream.on('data', onData)
+      stream.on('error', reject)
+      stream.on('end', () => {
+        writeStream.end(() => resolve())
+      })
+      writeStream.on('error', reject)
+    })
+
+    const actualSha256 = hash.digest('hex')
+    if (expectedSha256) {
+      if (actualSha256 !== expectedSha256) {
+        throw new Error(
+          `tarball sha256 mismatch: expected ${expectedSha256}, got ${actualSha256}`,
+        )
+      }
+      logForDebugging(
+        `tarball download: sha256 verified (${actualSha256.slice(0, 12)}…)`,
+      )
+    } else {
+      logForDebugging(
+        `tarball download: WARNING no expected sha256 for ${tarballUrl}; wrote ${received} bytes (hash=${actualSha256.slice(0, 12)}…)`,
+      )
+    }
+
     return filePath
   } catch (error) {
     logForDebugging(`tarball download failed: ${error}`)
@@ -980,12 +1287,17 @@ To fix this issue:
         `installGlobalPackage: dropped tarball (exceeds maxVersion/specificVersion): ${rawTarballUrl}`,
       )
     }
+    // Integrity digest only valid when the paired URL is kept (H-001 + H-012)
+    const tarballSha256 = tarballUrl ? options?.tarballSha256 : undefined
     const preferTarball = options?.preferTarball === true && !!tarballUrl
+    const tarballDlOpts = tarballSha256
+      ? { expectedSha256: tarballSha256 }
+      : undefined
 
     // Prefer GitHub Release tarball when npm is stale/unavailable
     if (preferTarball && tarballUrl) {
       logForDebugging(`installGlobalPackage: prefer tarball ${tarballUrl}`)
-      tarballPath = await downloadReleaseTarball(tarballUrl)
+      tarballPath = await downloadReleaseTarball(tarballUrl, tarballDlOpts)
       if (tarballPath && (await installFromTarball(tarballPath))) {
         saveGlobalConfig(current => ({
           ...current,
@@ -1032,7 +1344,7 @@ To fix this issue:
         `installGlobalPackage: npm failed, fallback tarball ${tarballUrl}`,
       )
       if (!tarballPath) {
-        tarballPath = await downloadReleaseTarball(tarballUrl)
+        tarballPath = await downloadReleaseTarball(tarballUrl, tarballDlOpts)
       }
       if (tarballPath && (await installFromTarball(tarballPath))) {
         saveGlobalConfig(current => ({
