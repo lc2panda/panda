@@ -77,25 +77,125 @@ function deduplicateMessages(messages: IMMessage[], windowMs: number = 5000): IM
 
 // ─── 隐私过滤 ───
 
-function applyPrivacyFilter(messages: IMMessage[]): IMMessage[] {
-  try {
-    const config = getConnectorsConfig()
-    const privacy = config.aggregator?.privacy
-    if (!privacy) return messages
+/** Privacy block used by aggregator (exported shape for unit tests). */
+export type AggregatorPrivacyConfig = {
+  filterPatterns: string[]
+  excludeChannels: string[]
+  excludeSenders: string[]
+}
 
-    const patterns = privacy.filterPatterns.map(p => new RegExp(p, 'gi'))
+const FILTER_FAILURE_PLACEHOLDER = '[REDACTED_FILTER_ERROR]'
+
+/** Build a timeline-safe stand-in without reading potentially poisoned fields. */
+function safeFailedMessage(msg: IMMessage): IMMessage {
+  // Read each field independently so a throwing content getter cannot
+  // re-throw during object spread and leak/drop inconsistently.
+  const read = <T>(fn: () => T, fallback: T): T => {
+    try {
+      return fn()
+    } catch {
+      return fallback
+    }
+  }
+  return {
+    id: read(() => msg.id, 'unknown'),
+    platform: read(() => msg.platform, 'unknown' as IMMessage['platform']),
+    channelId: read(() => msg.channelId, ''),
+    channelName: read(() => msg.channelName, ''),
+    senderId: read(() => msg.senderId, ''),
+    senderName: read(() => msg.senderName, ''),
+    content: FILTER_FAILURE_PLACEHOLDER,
+    contentType: read(() => msg.contentType, 'text'),
+    timestamp: read(() => msg.timestamp, 0),
+    isRead: read(() => msg.isRead, false),
+    isMentioned: read(() => msg.isMentioned, false),
+  }
+}
+
+/**
+ * Apply privacy blocklists / content redaction to inbound IM messages.
+ *
+ * Semantics (fail-closed):
+ * - No privacy config → pass-through (filtering not configured).
+ * - Single-message evaluation error → drop that message or emit safe placeholder
+ *   content (never emit original unfiltered text).
+ * - Batch / structural failure → return empty list (never emit unfiltered set).
+ * - Invalid regex patterns are skipped with an error log (not used as pass-all).
+ *
+ * @param privacyOverride When provided (including `null`), skips loading config
+ *   and uses the override. `undefined` loads from connectors config.
+ */
+export function applyPrivacyFilter(
+  messages: IMMessage[],
+  privacyOverride?: AggregatorPrivacyConfig | null,
+): IMMessage[] {
+  let privacy: AggregatorPrivacyConfig | null | undefined = privacyOverride
+  if (privacy === undefined) {
+    try {
+      privacy = getConnectorsConfig().aggregator?.privacy ?? null
+    } catch (e) {
+      logForDebugging(
+        `[aggregator] 隐私配置加载失败 (fail-closed, 返回空列表): ${(e as Error).message}`,
+        { level: 'error' },
+      )
+      return []
+    }
+  }
+  if (!privacy) return messages
+
+  // Compile patterns individually — bad patterns are skipped, not a free pass.
+  const patterns: RegExp[] = []
+  for (const p of privacy.filterPatterns || []) {
+    try {
+      patterns.push(new RegExp(p, 'gi'))
+    } catch (e) {
+      logForDebugging(
+        `[aggregator] 无效隐私过滤正则 ${JSON.stringify(p)} (已跳过): ${(e as Error).message}`,
+        { level: 'error' },
+      )
+    }
+  }
+
+  try {
     const excludeChannels = new Set(privacy.excludeChannels || [])
     const excludeSenders = new Set(privacy.excludeSenders || [])
+    const result: IMMessage[] = []
 
-    return messages
-      .filter(m => !excludeChannels.has(m.channelId) && !excludeSenders.has(m.senderId))
-      .map(m => ({
-        ...m,
-        content: patterns.reduce((c, p) => c.replace(p, '[REDACTED]'), m.content),
-      }))
+    for (const msg of messages) {
+      try {
+        if (excludeChannels.has(msg.channelId)) continue
+        if (excludeSenders.has(msg.senderId)) continue
+
+        let content = msg.content
+        for (const p of patterns) {
+          // Reset lastIndex for global regex reuse safety.
+          p.lastIndex = 0
+          content = content.replace(p, '[REDACTED]')
+        }
+        result.push(content === msg.content ? msg : { ...msg, content })
+      } catch (e) {
+        // 单条失败 → 丢弃原文，放入安全占位（不得放行未过滤原文）
+        // 注意：不能 ...msg 直接展开——content 可能是会抛错的 getter。
+        logForDebugging(
+          `[aggregator] 单条隐私过滤失败 id=${String((msg as { id?: string })?.id ?? '?')} (占位替换, fail-closed): ${(e as Error).message}`,
+          { level: 'error' },
+        )
+        try {
+          result.push(safeFailedMessage(msg))
+        } catch {
+          // 连构造占位都失败则整条丢弃
+        }
+      }
+    }
+
+    return result
   } catch (e) {
-    logForDebugging(`[aggregator] 隐私过滤异常: ${(e as Error).message}`)
-    return messages
+    // 整批失败 → 空列表，不得返回未过滤全集
+    logForDebugging(
+      `[aggregator] 隐私过滤整批异常 (fail-closed, 返回空列表): ${(e as Error).message}`,
+      { level: 'error' },
+    )
+    return []
   }
 }
 
