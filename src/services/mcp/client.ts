@@ -317,7 +317,7 @@ const isComputerUseMCPServer = feature('CHICAGO_MCP')
   : undefined
 
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
-import { basename, dirname, extname, isAbsolute, join } from 'path'
+import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
@@ -481,21 +481,42 @@ export function clearMcpAuthCache(): void {
 }
 
 /**
- * Windows 平台下解析命令，自动追加 .exe 或 .cmd 扩展名
- * @param command 原始命令（如 "node" / "python" / "npx"）
- * @returns 解析后的命令（如 "node.exe" / "npx.cmd"）
+ * Single source of truth for local MCP (stdio/sdk) working directory.
+ *
+ * Used BOTH as:
+ *  - the per-cwd startup lock key (serialize same-cwd spawns → prevent EEXIST)
+ *  - StdioClientTransport `cwd` (actual child process working directory)
+ *
+ * Priority (H-002 / H-008):
+ *  1. Explicit server config `cwd` when present and non-empty
+ *  2. Plugin root via `env.CLAUDE_PLUGIN_ROOT` for plugin MCP
+ *  3. Project root via `getOriginalCwd()`
+ *
+ * Always returns a normalized absolute path for local servers so relative
+ * variants of the same directory share one lock and match the spawn cwd.
+ * Non-local (remote) configs return undefined → no cwd lock / no stdio spawn.
  */
-export function getEffectiveLocalMcpCwd(config: ScopedMcpServerConfig): string | undefined {
+export function getEffectiveLocalMcpCwd(
+  config: ScopedMcpServerConfig,
+): string | undefined {
   if (!isLocalMcpServer(config)) {
     return undefined
   }
 
-  // Lock local MCP startup by the actual server working directory when present,
-  // or by plugin root for plugin MCP. This keeps the EEXIST protection for one
-  // shared root without serializing unrelated local servers across all projects.
-  const serverCwd = 'cwd' in config && typeof config.cwd === 'string' ? config.cwd : undefined
-  const pluginRoot = 'env' in config && config.env ? config.env.CLAUDE_PLUGIN_ROOT : undefined
-  return serverCwd ?? pluginRoot ?? getOriginalCwd()
+  const serverCwd =
+    'cwd' in config && typeof config.cwd === 'string' && config.cwd.length > 0
+      ? config.cwd
+      : undefined
+  const pluginRoot =
+    'env' in config &&
+    config.env &&
+    typeof config.env.CLAUDE_PLUGIN_ROOT === 'string' &&
+    config.env.CLAUDE_PLUGIN_ROOT.length > 0
+      ? config.env.CLAUDE_PLUGIN_ROOT
+      : undefined
+  const raw = serverCwd ?? pluginRoot ?? getOriginalCwd()
+  // Normalize to absolute form so lock key === spawn cwd for every caller.
+  return isAbsolute(raw) ? resolve(raw) : resolve(getOriginalCwd(), raw)
 }
 
 export function enqueueMcpStartupByCwd<T>(
@@ -1234,16 +1255,26 @@ export const connectToServer = memoize(
           ? [[stdioRef.command, ...stdioRef.args].join(' ')]
           : stdioRef.args
 
+        // H-002 / H-008: transport cwd MUST equal the per-cwd startup lock key
+        // from getEffectiveLocalMcpCwd. Previously this was always
+        // getOriginalCwd(), so plugin roots produced different lock keys but
+        // the same real spawn cwd → concurrent same-dir spawn → EEXIST race,
+        // and user-configured `cwd` was ignored at spawn time.
+        // Do NOT reintroduce resolveWindowsCommand here (scar: breaks cross-spawn).
+        const spawnCwd =
+          getEffectiveLocalMcpCwd(serverRef as ScopedMcpServerConfig) ??
+          getOriginalCwd()
+
         transport = new StdioClientTransport({
           command: finalCommand,
           args: finalArgs,
-          cwd: getOriginalCwd(),
+          cwd: spawnCwd,
           env: {
             ...subprocessEnv(),
             // v2.1.139: stdio MCP servers receive CLAUDE_PROJECT_DIR so they
-            // know the project root. Server-supplied `env` still wins on the
-            // off chance a user wants to override (rare, but consistent with
-            // how stdioRef.env shadows subprocessEnv).
+            // know the project root (not the spawn cwd). Server-supplied `env`
+            // still wins on the off chance a user wants to override (rare, but
+            // consistent with how stdioRef.env shadows subprocessEnv).
             CLAUDE_PROJECT_DIR: getOriginalCwd(),
             // v2.1.154: stdio MCP servers receive CLAUDECODE=1 (ecosystem
             // standard — third-party MCP servers detect they are running

@@ -1,8 +1,11 @@
 // Input: mock subprocessEnv + getSessionId + StdioClientTransport 构造拦截
-// Output: 断言 stdio MCP server spawn env 含 CLAUDECODE=1 + CLAUDE_CODE_SESSION_ID
-// Pos: v2.1.154 Wave3-E2 — Stdio MCP server env 注入单元测试
+// Output: 断言 stdio MCP server spawn env 含 CLAUDECODE=1 + CLAUDE_CODE_SESSION_ID；
+//         锁键与 spawn cwd 单一事实源 (H-002/H-008)
+// Pos: v2.1.154 Wave3-E2 — Stdio MCP server env 注入 + cwd 对齐单元测试
 
 import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test'
+import { readFile } from 'fs/promises'
+import { resolve } from 'path'
 import { enqueueMcpStartupByCwd, getEffectiveLocalMcpCwd } from '../client.js'
 
 // ---------- 辅助：构造 stdio MCP env 对象（与 client.ts:963-980 逻辑镜像） ----------
@@ -159,6 +162,106 @@ describe('Stdio MCP server env 注入 (Wave3-E2)', () => {
       'same-1-end',
       'same-2-start',
     ])
+  })
+
+  test('前一个失败不永久堵死后续（.then 双路径）', async () => {
+    const locks = new Map<string, Promise<void>>()
+    const events: string[] = []
+
+    const first = enqueueMcpStartupByCwd(locks, '/cwd-fail', async () => {
+      events.push('first')
+      throw new Error('startup boom')
+    })
+    const second = enqueueMcpStartupByCwd(locks, '/cwd-fail', async () => {
+      events.push('second')
+      return 'ok'
+    })
+
+    await expect(first).rejects.toThrow('startup boom')
+    await expect(second).resolves.toBe('ok')
+    expect(events).toEqual(['first', 'second'])
+  })
+
+  test('相对 config.cwd 解析为绝对路径，与绝对形式共享锁键', () => {
+    // Use real getOriginalCwd as base so both forms normalize the same way.
+    const { getOriginalCwd } = require('../../../bootstrap/state.js') as {
+      getOriginalCwd: () => string
+    }
+    const projectRoot = getOriginalCwd()
+    const abs = getEffectiveLocalMcpCwd({
+      type: 'stdio',
+      command: 'node',
+      args: ['s.js'],
+      cwd: resolve(projectRoot, 'mcp-data'),
+    } as any)
+    const rel = getEffectiveLocalMcpCwd({
+      type: 'stdio',
+      command: 'node',
+      args: ['s.js'],
+      cwd: 'mcp-data',
+    } as any)
+    expect(abs).toBe(resolve(projectRoot, 'mcp-data'))
+    expect(rel).toBe(abs)
+  })
+
+  test('空 config.cwd 回落到 plugin root', () => {
+    const effectiveCwd = getEffectiveLocalMcpCwd({
+      type: 'stdio',
+      command: 'node',
+      args: ['server.js'],
+      cwd: '',
+      env: { CLAUDE_PLUGIN_ROOT: '/plugin/root' },
+    } as any)
+    expect(effectiveCwd).toBe(resolve('/plugin/root'))
+  })
+
+  test('不同 plugin root 得到不同锁键（可并发）', () => {
+    const a = getEffectiveLocalMcpCwd({
+      type: 'stdio',
+      command: 'node',
+      args: ['a.js'],
+      env: { CLAUDE_PLUGIN_ROOT: '/plugins/a' },
+    } as any)
+    const b = getEffectiveLocalMcpCwd({
+      type: 'stdio',
+      command: 'node',
+      args: ['b.js'],
+      env: { CLAUDE_PLUGIN_ROOT: '/plugins/b' },
+    } as any)
+    expect(a).toBe(resolve('/plugins/a'))
+    expect(b).toBe(resolve('/plugins/b'))
+    expect(a).not.toBe(b)
+  })
+
+  test('非本地 (sse) 返回 undefined', () => {
+    expect(
+      getEffectiveLocalMcpCwd({
+        type: 'sse',
+        url: 'https://example.com/sse',
+      } as any),
+    ).toBeUndefined()
+  })
+
+  test('stdio transport cwd 使用 getEffectiveLocalMcpCwd（源码守卫 H-002/H-008）', async () => {
+    // Static regression: spawn cwd must call the same function as the lock key.
+    // Prevents recurrence of hard-coded getOriginalCwd() as transport cwd.
+    const src = await readFile(new URL('../client.ts', import.meta.url), 'utf8')
+    const transportMatch = src.match(
+      /const spawnCwd =\s*getEffectiveLocalMcpCwd\([\s\S]*?new StdioClientTransport\(\{[\s\S]*?cwd:\s*spawnCwd,[\s\S]*?CLAUDE_PROJECT_DIR:/,
+    )
+    expect(transportMatch).not.toBeNull()
+    // Must not hard-code getOriginalCwd as the transport cwd option
+    expect(src).not.toMatch(
+      /new StdioClientTransport\(\{[\s\S]{0,400}?cwd:\s*getOriginalCwd\s*\(/,
+    )
+    // Scar: finalCommand must not go through resolveWindowsCommand
+    expect(src).not.toMatch(
+      /resolveWindowsCommand\s*\(\s*(?:stdioRef\.command|finalCommand)/,
+    )
+    const commandAssign = src.match(
+      /const finalCommand =\s*process\.env\.CLAUDE_CODE_SHELL_PREFIX \|\| stdioRef\.command/,
+    )
+    expect(commandAssign).not.toBeNull()
   })
 })
 
