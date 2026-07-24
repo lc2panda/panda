@@ -325,18 +325,21 @@
 
 ---
 
-## 3. 可疑风险（未完全闭合，需运行/场景验证）
+## 3. 可疑风险（S 系列；深度审查见 §9）
 
-| ID | 级别 | 摘要 | 证据缺口 |
-|----|------|------|----------|
-| S-001 | P1 | 图片粘贴 100ms 窗口：`beginImagePaste` 仅在 paste 完成超时/空粘贴 debounce 后武装；极端同帧 Enter 是否仍可抢跑 | 需终端集成复现；`usePasteHandler.ts` ~L100–L108 vs `PromptInput.tsx` ~L1012 |
-| S-002 | P2 | compact-boundary + preservedSegment：大文件 skip 路径依赖 `hasPreservedSegment` 扫描；straddle/legacy 边界已有防护，但畸形 JSON 边界可能导致误判 | `sessionStoragePortable.ts` ~L590–L605；需损坏 fixture 测试 |
-| S-003 | P2 | `walkChainBeforeParse` 只保留字节不改写 parentUuid，依赖后续 `relinkDanglingMainchainParents`；若 relink 条件不满足仍可能短链 | `sessionStorage.ts` ~L2141+、~L3546+ |
-| S-004 | P3 | Windows Termius 256 色在 Win11+Termius 9.x 实机未在本轮验证 | MEMORY 待关注；代码侧 `shouldUseDegradedColors` |
-| S-005 | P3 | 手动发版漏 Release/Packages：CI 已补，但人类绕过 workflow 的流程仍可能复发 | scar `manual-release-missing-publish`；流程问题 |
-| S-006 | P2 | `installGlobalPackage` tarball 成功后未断言安装版本 == 请求版本 | 需装后 `npm list -g` 校验逻辑 |
+> **深度审查时间**：2026-07-24（会话基准） · 只读静态闭合 · 详见「§9 S 系列深度审查」  
+> **编号说明**：本节 S-001～S-006 为正式可疑项 ID。§8.3 隐私矩阵误复用 S- 前缀（S-001～S-024 语义不同），**以本节与 §9 为准**。
 
-**说明**：scar「compact-boundary / preservedSegment」主路径在 7014efb4e 后有 stitch + relink，**本轮未发现新的已证实 P0 resume 丢上下文**；保留为可疑回归面。
+| ID | 原级 | 重评级 | 判定 | 摘要（审查后） | 证据缺口 / 残余 |
+|----|------|--------|------|----------------|-----------------|
+| S-001 | P1 | **P2** | **部分缓解 / 仍可疑** | 粘贴 defer 已有三层同步屏障；极端同帧/键绑定旁路仍缺集成复现 | 终端集成测；chat:submit 旁路 |
+| S-002 | P2 | **P3** | **主伤已缓解** | portable 扫描**不再**按 boundary 截断 buffer；畸形 JSON→null 不会误截断 | 损坏 fixture 回归测（加固） |
+| S-003 | P2 | **P3** | **主伤已缓解** | walk + relink + 回归测覆盖；relink 失败仅 warn、链可能仍断 | 破坏性 fixture：无 attachment 的 dangling |
+| S-004 | P3 | **P3** | **仍可疑 · 需实机** | 单测覆盖 env 启发式；Win11+Termius 9.x 真彩/256 未验 | 实机截图/COLORTERM |
+| S-005 | P3 | **P3** | **部分缓解 / 流程残余** | CI `release-cli.yml` 已补齐；`scripts/publish-final.sh` 等手动路径仍在 | 流程门禁/文档禁令 |
+| S-006 | P2 | **P2** | **仍可疑（H-001/012 未覆盖装后）** | 装前 URL/cap/integrity 已闸；`installFromTarball` 仅 exit code，无装后版本断言 | 装后 `npm list -g` / package.json 读版本 |
+
+**说明**：scar「compact-boundary / preservedSegment」主路径在 7014efb4e 后有 stitch + relink，**本轮未发现新的已证实 P0 resume 丢上下文**；S-002/S-003 降为 P3 回归面。
 
 ---
 
@@ -361,6 +364,7 @@
 2. ~~H-002/H-008（MCP cwd）~~ / ~~H-003（delivered 语义）~~ / ~~H-004（飞书通知）~~ / ~~H-007（审计）~~ → 第二批全清  
 3. **随后**：H-006 双源 local 对齐、H-009 去空 catch  
 4. **顺带**：Advisor 三连、死代码清理；H-004 残余（失败可观测性）  
+5. **S 系列（§9）**：优先 **S-006** 装后版本断言 → 可选 S-001 集成测/提前 begin → 可选 S-005 流程门禁；S-002/003/004 不急  
 
 每项修复验收建议：**失败必须可观测**（测试断言 + 非空错误日志 + 不误标成功）。
 
@@ -525,3 +529,132 @@
 10. 触及 API client / MCP / connectors / permissions / analytics 的修复：**必须**说明是否改变外传字段、鉴权头、会话 ID、遥测开关；PR/commit 描述用中文写清影响与回滚。  
 11. 修 webhook/连接器入站：**先**恢复真实 sanitizer，禁止继续依赖恒等 stub。  
 12. 文档与代码不一致时：以**更严**的代码行为为准更新文档，禁止为对齐文档而放宽实现。  
+
+---
+
+## 9. S 系列深度审查（2026-07-24 · 只读 · 禁止业务源码改动）
+
+> **审查基线**：`main` 工作区（含第四批修复未提交变更不影响 S 路径）  
+> **方法**：定位路径/行号 → 因果链 → 静态闭合（升级 H / 降级误报缓解 / 仍可疑）→ 重评级 → 成本收益  
+> **对照已修 H**：H-001/H-012 仅装前闸门，**不**闭合 S-006 装后断言；H-005 部分缓解 S-005；compact scar 修复闭合 S-002/S-003 主伤。
+
+### 9.1 总表
+
+| ID | 原级 | 重评级 | 判定 | 一句话 |
+|----|------|--------|------|--------|
+| S-001 | P1 | **P2** | 部分缓解 / 仍可疑 | pastePending + imagePasteInFlight + isPasting 三层 defer；100ms 窗内 Enter 多被吞入 paste，缺终端集成证伪极端同帧 |
+| S-002 | P2 | **P3** | 主伤已缓解 | `boundaryStartOffset` 恒 0、boundary 命中**从不截断**；畸形 JSON→null 不截断；原「skip 丢历史」scar 已死 |
+| S-003 | P2 | **P3** | 主伤已缓解 | `walkChainBeforeParse` 保留 boundary 前字节 + `relinkDanglingMainchainParents` + 回归测；relink 失败仅 warn |
+| S-004 | P3 | **P3** | 仍可疑 · 需实机 | `shouldUseDegradedColors`/`isTermius` 有单测；Win11+Termius 9.x 实机未验 |
+| S-005 | P3 | **P3** | 部分缓解 / 流程残余 | CI 发布齐套；手动 `publish-final.sh` / `release-cli-tarball.sh` 仍可绕过 |
+| S-006 | P2 | **P2** | 仍可疑 | `installFromTarball` 成功=exit 0；H-001/H-012 只挡装前错误版本 URL，不验装后落地版本 |
+
+### 9.2 逐条因果与闭合
+
+#### S-001｜粘贴 100ms / 图片粘贴 defer 竞态
+
+| 字段 | 内容 |
+|------|------|
+| **路径** | `/Users/panda/Downloads/cc-panda/src/hooks/usePasteHandler.ts` L16 (`PASTE_COMPLETION_TIMEOUT_MS=100`)、L94–L108（`pastePendingRef`）、L124–L170（空粘贴 → `checkClipboardForImage` leading）、L172–L210（路径粘贴 → 超时后 `beginImagePaste`）；`/Users/panda/Downloads/cc-panda/src/components/PromptInput/PromptInput.tsx` L1012–L1024（`imagePasteInFlightRef` defer submit）、L1704–L1741（begin/end）；`/Users/panda/Downloads/cc-panda/src/components/BaseTextInput.tsx` L54–L68（`isPasting && key.return` 吞 Enter） |
+| **触发** | 用户粘贴图片（空 bracketed paste 走剪贴板，或粘贴 `/path/to/img.png`）后在异步读图完成前按 Enter / 触发 submit |
+| **错误行为（历史）** | 同 stdin chunk 内 paste+Enter：React 状态 `timeoutId` 未提交 → Enter 走 `onInput` → 提交旧输入、丢粘贴图 |
+| **当前机制** | ① **同步** `pastePendingRef`：pending 期间输入一律当 paste chunk，不进 `onInput`；② 空粘贴 **立即** `checkClipboardForImage`（debounce leading）→ 首行 `onImagePasteBegin`；③ 路径粘贴在 100ms 聚合结束后才 `beginImagePaste`，但 100ms 内 `pastePendingRef` 为 true；④ `imagePasteInFlightRef` 在 in-flight 时把 `onSubmit` 挂到 `pendingSubmitRef`；⑤ `BaseTextInput` 再用 **状态** `isPasting` 挡 `key.return` |
+| **闭合判定** | **不能升级 H**：无失败复现、无失败测试。**不能标误报**：路径粘贴在超时完成→`beginImagePaste` 之前的「状态 `isPasting` 已清、ref 已清、但异步尚未 begin」窗口理论上极窄但仍存在；`chat:submit` 等键绑定若绕过 `wrappedOnInput` 需再核。**判定：部分缓解 / 仍可疑** |
+| **重评级** | P1→**P2**（主路径有同步屏障；残余为极端时序 + 旁路） |
+| **成本/收益** | 成本 3（Ink 集成测难）/ 收益 3 → 建议优先级 **中** |
+| **升级为 H 的条件** | 终端集成：粘贴 PNG 后 <50ms 连按 Enter，断言最终 query 含 image block；或证明某键绑定在 `imagePasteInFlightRef` 未置位时直接 `onSubmit` |
+
+#### S-002｜compact-boundary / hasPreservedSegment 扫描
+
+| 字段 | 内容 |
+|------|------|
+| **路径** | `/Users/panda/Downloads/cc-panda/src/utils/sessionStoragePortable.ts` L493–L511（`parseBoundaryLine`）、L590–L605（扫描命中逻辑）、L553–L559（`boundaryStartOffset` 初始化） |
+| **触发** | 大 session JSONL 含 `compact_boundary`；或行内偶然含 `"type":"system"` + `"subtype":"compact_boundary"` 子串 |
+| **历史错误** | scar：确认 boundary 后清空 buffer → 丢 pre-compact 历史（见 `memory/scars/compact-boundary-preserved-segment-missing.md`） |
+| **当前机制** | `parseBoundaryLine`：先子串预筛，再 `jsonParse`；失败 **catch→null**（不当 boundary）。命中后无论 `hasPreservedSegment` true/false **只设 flag，不 `out.len=0`**。全文件检索 **`boundaryStartOffset` 无赋值点**（恒为 0）→ **不存在截断路径**。`hasPreservedSegment` 仅影响调用方是否跑 `walkChainBeforeParse`（`sessionStorage.ts` ~L3484） |
+| **闭合判定** | 原「误 skip / 截断丢历史」**已缓解**。残余：① 性能上大文件始终全量读入（非正确性）；② 无损坏 JSON fixture 单测；③ `Boolean(preservedSegment)` 对 `[]` 为 true（空段会跳过 walk——通常可接受）。**不升级 H**（无错误行为证据）。**判定：主伤已缓解（P3 回归面）** |
+| **重评级** | P2→**P3** |
+| **成本/收益** | 成本 2（加 malformed fixture）/ 收益 2 → 优先级 **低** |
+| **与 H 对照** | 非 H-xxx 编号项；对应 scar 修复，非本清单 H-001 系列 |
+
+#### S-003｜walkChainBeforeParse + relinkDanglingMainchainParents
+
+| 字段 | 内容 |
+|------|------|
+| **路径** | `/Users/panda/Downloads/cc-panda/src/utils/sessionStorage.ts` L2141–L2190（`relinkDanglingMainchainParents`）、L3460–L3495（`hasPreservedSegment` 门控）、L3546–L3640+（`walkChainBeforeParse`）、L3740–L3795（build + relink + attribution skip）；测试 `/Users/panda/Downloads/cc-panda/src/utils/sessionStorage.resumeChain.test.ts` |
+| **触发** | resume 旧格式无 `preservedSegment` 的 compact 会话；或 write 中断致 parent 悬空 |
+| **历史错误** | walk 在 boundary 截断且未带前缀 → 头悬空 → 显示/序列化丢链 |
+| **当前机制** | ① 无 `preservedSegment` 才 walk；② walk **保留** boundary 前已写入字节，仅停止继续向前；③ 建链后 `relinkDanglingMainchainParents` 把悬空头接到最近 `compact_boundary` + `agent_transcripts_removed` 的 `prefix`；④ 测试覆盖「无 preservedSegment 不丢 prefix」与「有 preservedSegment 跳过 walk」 |
+| **闭合判定** | 主路径 **已缓解**。残余：relink **找不到** prefix attachment 时只 `logForDebugging` warn，返回 0——极端损坏日志仍可能断链（正确降级，非静默当成功）。**不升级 H**。**判定：主伤已缓解（P3）** |
+| **重评级** | P2→**P3** |
+| **成本/收益** | 成本 2 / 收益 2 → 优先级 **低**（可选：relink 失败用户可见提示） |
+
+#### S-004｜Windows Termius 实机 256 色
+
+| 字段 | 内容 |
+|------|------|
+| **路径** | `/Users/panda/Downloads/cc-panda/src/ink/terminal.ts` L164–L178（`isTermius`）、L180–L220（`shouldUseDegradedColors`）；单测 `/Users/panda/Downloads/cc-panda/src/ink/__tests__/terminal.test.ts` |
+| **触发** | Win11 + Termius 9.x SSH 会话；`COLORTERM=truecolor` 或 `TERM=xterm-256color` |
+| **错误行为（潜在）** | truecolor 帧在 Termius 花屏/闪烁；或启发式过宽（H-017）误降级其他 SSH 客户端 |
+| **当前机制** | 单测覆盖 env 组合；`PANDA_FORCE_ANSI256` 强制降级；`COLORTERM=truecolor` 时 **不**降级（设计选择） |
+| **闭合判定** | **需实机**——静态无法证伪真彩兼容。关联 H-017（启发式过宽）已证实 P3。**判定：仍可疑 · 需实机** |
+| **重评级** | 维持 **P3** |
+| **成本/收益** | 成本 4（实机矩阵）/ 收益 2 → 优先级 **低**（有用户报告再升） |
+
+#### S-005｜手动发版绕 CI
+
+| 字段 | 内容 |
+|------|------|
+| **路径** | `/Users/panda/Downloads/cc-panda/.github/workflows/release-cli.yml`（tag `v*` → build → GH Release + Packages + npm）；`/Users/panda/Downloads/cc-panda/scripts/publish-final.sh`、`scripts/release-cli-tarball.sh`；scar `memory/scars/manual-release-missing-publish.md`；H-005 `c73ce663e`（stable 才标 latest） |
+| **触发** | 人类本地 `npm publish` / 只打 tag 不走完整 workflow / 跑旧 shell 脚本漏步骤 |
+| **错误行为** | 用户装到旧 npm 或缺 tarball；与 scar 一致 |
+| **当前机制** | CI 已是主路径且含 Packages/Release；**无法从代码禁止**本地 npm publish。手动脚本仍在仓库 |
+| **闭合判定** | **部分缓解**（CI 齐套 + H-005 latest 语义）。流程残余仍在，**不能标误报**。**不升级 H**（非运行时缺陷）。**判定：部分缓解 / 流程残余** |
+| **重评级** | 维持 **P3** |
+| **成本/收益** | 成本 1（文档/脚本头警告）～3（废弃手动脚本）/ 收益 3 → 优先级 **中低** |
+
+#### S-006｜tarball 装后未断言版本
+
+| 字段 | 内容 |
+|------|------|
+| **路径** | `/Users/panda/Downloads/cc-panda/src/utils/autoUpdater.ts` L1225–L1338（`installFromTarball`：`npm install -g <file.tgz>`，**成功条件=`exit code===0`**，L1306/L1337 `return 'success'`）；装前闸：`resolveInstallTarget` / `isTarballAllowedForInstall` / `versionFromTarballUrl`（H-001、H-012 测试在 `autoUpdater.maxVersion.test.ts`） |
+| **触发** | tarball 文件名/URL 版本与包内 `package.json` version 不一致；或 npm 装到意外 prefix/旧缓存仍 exit 0；或安装被 npm 生命周期脚本「成功」但 CLI 入口仍旧 |
+| **错误行为** | UI/日志报升级成功，实际 `claude -v` 仍旧或跳到错误版本 |
+| **与 H-001/H-012 关系** | **装前**：maxVersion cap 会 strip tarball；`isTarballAllowedForInstall` 拒超 cap URL；asset 名/integrity 收紧。**装后：无** `npm list -g` / 读安装树 version / 与 `specificVersion` 比对。**H-001/H-012 不能闭合 S-006** |
+| **闭合判定** | **仍可疑**，证据充分到「缺少断言」级，但未拿到「错误版本曾被标 success」的生产复现 → **不升级 H**（升级条件见下）。维持 P2 |
+| **重评级** | 维持 **P2** |
+| **成本/收益** | 成本 2 / 收益 4 → 建议优先级 **高（S 系列内 Top）** |
+| **升级为 H 的条件** | 构造 tgz：文件名 `…-2.32.3.tgz` 内 `version: 9.9.9`（或反之），`installFromTarball` 返回 success 且无校验失败；或 CI 集成断言 `npm list -g --depth=0` |
+
+### 9.3 与已修 H 的交叉
+
+| S 项 | 相关 H / scar | 是否已部分缓解 | 说明 |
+|------|---------------|----------------|------|
+| S-001 | （无 H 编号；有 paste/race 注释与 `useTextInput.race.test.ts` 邻域） | 是（实现层） | race test 管的是 coalesced Enter 文本，**不是**图片粘贴 defer |
+| S-002 | scar compact-boundary | **是（主伤）** | 截断路径已消除 |
+| S-003 | scar + `sessionStorage.resumeChain.test.ts` | **是（主伤）** | walk+relink+测试 |
+| S-004 | H-017 启发式过宽 | 部分 | H-017 是误标面；S-004 是实机显示面 |
+| S-005 | H-005 + scar manual-release | **是（CI 路径）** | 手动绕过仍在 |
+| S-006 | H-001、H-012 | **装前是 / 装后否** | 熔断与 asset 闸 ≠ 装后版本断言 |
+
+### 9.4 修复成本×收益（1–5）与建议动手
+
+| ID | 成本 | 收益 | 建议 |
+|----|------|------|------|
+| S-006 | 2 | 4 | **建议动手 #1**：`installFromTarball` success 前读全局包 version / `npm list -g --json` 比对 `specificVersion` |
+| S-001 | 3 | 3 | **建议动手 #2**（可选）：路径粘贴在**收到首 chunk 时**即 `beginImagePaste`（或 pending 占位），收窄 100ms；补 Ink 级集成测 |
+| S-005 | 1–2 | 3 | **建议动手 #3**（可选）：手动脚本头注释「禁止生产发版」+ README 唯一入口指向 workflow |
+| S-002 | 2 | 2 | 不急；加 malformed boundary fixture 即可 |
+| S-003 | 2 | 2 | 不急；relink 0 条时用户提示可选 |
+| S-004 | 4 | 2 | 等实机/用户报告 |
+
+### 9.5 编号卫生
+
+- **正式 S 项**：仅 **S-001～S-006**（§3 + 本节）。  
+- **§8.3** 表中 S-001～S-024 为隐私影响矩阵行号复用，**与正式 S 语义冲突**（例如 8.3 的 S-001=maxVersion 实为 H-001）。后续改文档时应改前缀为 `PS-` 或 `M-`，避免猎杀 ID 碰撞。
+
+### 9.6 本轮执行边界（复核）
+
+- 未改业务源码  
+- 未把任一 S 强行升为已证实 H（均未满足「可复现错误行为」门槛）  
+- 结论已回写 §3 状态表 + 本节  
