@@ -337,7 +337,7 @@
 | S-003 | P2 | **P3** | **主伤已缓解** | walk + relink + 回归测覆盖；relink 失败仅 warn、链可能仍断 | 破坏性 fixture：无 attachment 的 dangling |
 | S-004 | P3 | **P3** | **仍可疑 · 需实机** | 单测覆盖 env 启发式；Win11+Termius 9.x 真彩/256 未验 | 实机截图/COLORTERM |
 | S-005 | P3 | **已修** | **门禁已落地** | 手动脚本须 `CONFIRM_MANUAL_RELEASE=1` + `[MISSING]` 警告；README-DEV 唯一入口 CI | 仍可有意应急绕过（设计如此） |
-| S-006 | P2 | **已修** | **已闭合** | 装后 `npm list --json` + `evaluateInstalledVersion`；mismatch/unreadable → 失败，不标 success | 单测：`autoUpdater.maxVersion.test.ts` S-006 段 |
+| S-006 | P2 | **已修** | **已闭合** | 装后 `npm list --json` + `evaluateInstalledVersion`；mismatch/unreadable → 失败，不标 success | `286d02217`；单测：`autoUpdater.maxVersion.test.ts` S-006 段 |
 
 **说明**：scar「compact-boundary / preservedSegment」主路径在 7014efb4e 后有 stitch + relink，**本轮未发现新的已证实 P0 resume 丢上下文**；S-002/S-003 降为 P3 回归面。
 
@@ -626,7 +626,7 @@
 | **闭合判定** | **已修 / 已闭合** |
 | **重评级** | **已修** |
 | **成本/收益** | 成本 2 / 收益 4 |
-| **修复** | `fix(update): assert installed version after tarball install (S-006)` — global `installFromTarball` + local prefer/fallback；单测 mock match/mismatch/unreadable |
+| **修复** | `286d02217` — `fix(update): assert installed version after tarball install (S-006)`；global `installFromTarball` + local prefer/fallback；单测 mock match/mismatch/unreadable |
 
 ### 9.3 与已修 H 的交叉
 
@@ -659,5 +659,5 @@
 
 - 2026-07-24 深度审查：未把任一 S 强行升为已证实 H  
 - 2026-07-24 S-001 加固：`fix(paste): arm image paste guard earlier (S-001)` — 源码 + 单测 + 本清单回写  
-- 2026-07-24 S-006 修复：`fix(update): assert installed version after tarball install (S-006)` — global/local tarball 装后版本断言 + 单测  
+- 2026-07-24 S-006 修复：`286d02217` — `fix(update): assert installed version after tarball install (S-006)` — global/local tarball 装后版本断言 + 单测  
 - S-002/003/004 本轮未改业务源码  
