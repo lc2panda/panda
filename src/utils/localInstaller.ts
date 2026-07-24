@@ -110,15 +110,26 @@ export async function installOrUpdateClaudePackage(
       : channel === 'stable'
         ? 'stable'
         : 'latest'
+    // Force GH Packages registry + short fetch/process timeouts (avoid 10min hang)
     const result = await execFileNoThrowWithCwd(
       'npm',
-      ['install', `${MACRO.PACKAGE_URL}@${versionSpec}`],
-      { cwd: getLocalInstallDir(), maxBuffer: 1000000 },
+      [
+        'install',
+        `${MACRO.PACKAGE_URL}@${versionSpec}`,
+        '--registry=https://npm.pkg.github.com',
+        '--fetch-timeout=8000',
+        '--fetch-retries=1',
+      ],
+      {
+        cwd: getLocalInstallDir(),
+        maxBuffer: 1000000,
+        abortSignal: AbortSignal.timeout(120_000),
+      },
     )
 
     if (result.code !== 0) {
       const error = new Error(
-        `Failed to install Claude CLI package: ${result.stderr}`,
+        `Failed to install package ${MACRO.PACKAGE_URL}: ${result.stderr}`,
       )
       logError(error)
       return result.code === 190 ? 'in_progress' : 'install_failed'
@@ -142,12 +153,16 @@ export async function installOrUpdateClaudePackage(
  * Pure existence probe — callers use this to choose update path / UI hints.
  */
 export async function localInstallationExists(): Promise<boolean> {
-  try {
-    await access(join(getLocalInstallDir(), 'node_modules', '.bin', 'claude'))
-    return true
-  } catch {
-    return false
+  // Prefer product bin `panda`; keep legacy `claude` for dual-compat installs
+  for (const binName of ['panda', 'claude'] as const) {
+    try {
+      await access(join(getLocalInstallDir(), 'node_modules', '.bin', binName))
+      return true
+    } catch {
+      // try next
+    }
   }
+  return false
 }
 
 /**

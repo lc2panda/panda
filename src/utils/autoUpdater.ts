@@ -1,8 +1,9 @@
 import axios from 'axios'
-import { constants as fsConstants } from 'fs'
-import { access, writeFile } from 'fs/promises'
-import { homedir } from 'os'
+import { constants as fsConstants, createWriteStream } from 'fs'
+import { access, mkdtemp, unlink, writeFile } from 'fs/promises'
+import { homedir, tmpdir } from 'os'
 import { join } from 'path'
+import { pipeline } from 'stream/promises'
 import { getDynamicConfig_BLOCKS_ON_INIT } from 'src/services/analytics/growthbook.js'
 import {
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -16,8 +17,9 @@ import { ClaudeError, getErrnoCode, isENOENT } from './errors.js'
 import { execFileNoThrowWithCwd } from './execFileNoThrow.js'
 import { getFsImplementation } from './fsOperations.js'
 import { gracefulShutdownSync } from './gracefulShutdown.js'
+import { getUserAgent } from './http.js'
 import { logError } from './log.js'
-import { gte, lt } from './semver.js'
+import { gt, gte, lt } from './semver.js'
 import { getInitialSettings } from './settings/settings.js'
 import {
   filterClaudeAliases,
@@ -29,6 +31,38 @@ import { jsonParse } from './slowOperations.js'
 
 const GCS_BUCKET_URL =
   'https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases'
+
+/** GitHub Packages npm registry (scoped @lc2panda) */
+const GH_PACKAGES_REGISTRY = 'https://npm.pkg.github.com'
+/** Public releases repo — aligned with install.sh REPO */
+const GH_RELEASE_REPO = 'lc2panda/panda'
+const NPM_VIEW_TIMEOUT_MS = 12_000
+const GH_API_TIMEOUT_MS = 12_000
+const NPM_INSTALL_TIMEOUT_MS = 120_000
+const TARBALL_DOWNLOAD_TIMEOUT_MS = 120_000
+
+export type LatestVersionInfo = {
+  version: string
+  source: 'npm' | 'github-release' | 'both'
+  tarballUrl?: string
+  npmAvailable: boolean
+}
+
+export type InstallGlobalPackageOptions = {
+  tarballUrl?: string
+  preferTarball?: boolean
+}
+
+type GitHubReleaseAsset = {
+  name?: string
+  browser_download_url?: string
+}
+
+type GitHubRelease = {
+  tag_name?: string
+  prerelease?: boolean
+  assets?: GitHubReleaseAsset[]
+}
 
 class AutoUpdaterError extends ClaudeError {}
 
@@ -318,17 +352,148 @@ export async function checkGlobalInstallPermissions(): Promise<{
   }
 }
 
-export async function getLatestVersion(
+function normalizeVersion(version: string | null | undefined): string | null {
+  if (!version) {
+    return null
+  }
+  const trimmed = version.trim()
+  if (!trimmed) {
+    return null
+  }
+  return trimmed.startsWith('v') ? trimmed.slice(1) : trimmed
+}
+
+function pickTarballAsset(
+  assets: GitHubReleaseAsset[] | undefined,
+  version: string,
+): string | null {
+  if (!assets?.length) {
+    return null
+  }
+  // Prefer exact asset name used by install.sh comments, then any panda-code .tgz
+  const exact = assets.find(
+    a => a.name === `lc2panda-panda-code-${version}.tgz` && a.browser_download_url,
+  )
+  if (exact?.browser_download_url) {
+    return exact.browser_download_url
+  }
+  const match = assets.find(
+    a =>
+      typeof a.name === 'string' &&
+      a.name.includes('panda-code') &&
+      a.name.endsWith('.tgz') &&
+      a.browser_download_url,
+  )
+  if (match?.browser_download_url) {
+    return match.browser_download_url
+  }
+  const anyTgz = assets.find(
+    a =>
+      typeof a.name === 'string' &&
+      a.name.endsWith('.tgz') &&
+      a.browser_download_url,
+  )
+  return anyTgz?.browser_download_url ?? null
+}
+
+function githubAuthHeaders(): Record<string, string> {
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': getUserAgent(),
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  return headers
+}
+
+/**
+ * Resolve latest package version from GitHub Releases (not Packages metadata).
+ * Aligns with install.sh GH release → .tgz flow.
+ */
+export async function getLatestVersionFromGitHub(
+  channel: ReleaseChannel,
+): Promise<{ version: string; tarballUrl: string } | null> {
+  try {
+    const headers = githubAuthHeaders()
+    let release: GitHubRelease | null = null
+
+    if (channel === 'stable') {
+      // Prefer non-prerelease; latest endpoint already excludes drafts/prereleases
+      // but stable channel also scans recent list as a safety net.
+      const list = await axios.get<GitHubRelease[]>(
+        `https://api.github.com/repos/${GH_RELEASE_REPO}/releases`,
+        {
+          timeout: GH_API_TIMEOUT_MS,
+          headers,
+          params: { per_page: 10 },
+          validateStatus: s => s >= 200 && s < 300,
+        },
+      )
+      release =
+        list.data.find(r => r && r.prerelease !== true && r.tag_name) ?? null
+    } else {
+      const response = await axios.get<GitHubRelease>(
+        `https://api.github.com/repos/${GH_RELEASE_REPO}/releases/latest`,
+        {
+          timeout: GH_API_TIMEOUT_MS,
+          headers,
+          validateStatus: s => s >= 200 && s < 300,
+        },
+      )
+      release = response.data
+    }
+
+    if (!release?.tag_name) {
+      logForDebugging('GitHub releases: missing tag_name')
+      return null
+    }
+
+    const version = normalizeVersion(release.tag_name)
+    if (!version) {
+      return null
+    }
+    const tarballUrl = pickTarballAsset(release.assets, version)
+    if (!tarballUrl) {
+      logForDebugging(
+        `GitHub releases: no .tgz asset for ${GH_RELEASE_REPO} ${version}`,
+      )
+      return null
+    }
+    logForDebugging(
+      `GitHub releases: latest=${version} tarball=${tarballUrl} channel=${channel}`,
+    )
+    return { version, tarballUrl }
+  } catch (error) {
+    logForDebugging(`GitHub releases lookup failed: ${error}`)
+    return null
+  }
+}
+
+/**
+ * npm view against GitHub Packages with short fetch/process timeouts.
+ * Avoids hanging on full metadata over slow proxies.
+ */
+export async function getLatestVersionFromNpm(
   channel: ReleaseChannel,
 ): Promise<string | null> {
   const npmTag = channel === 'stable' ? 'stable' : 'latest'
-
   // Run from home directory to avoid reading project-level .npmrc
   // which could be maliciously crafted to redirect to an attacker's registry
   const result = await execFileNoThrowWithCwd(
     'npm',
-    ['view', `${MACRO.PACKAGE_URL}@${npmTag}`, 'version', '--prefer-online'],
-    { abortSignal: AbortSignal.timeout(5000), cwd: homedir() },
+    [
+      'view',
+      `${MACRO.PACKAGE_URL}@${npmTag}`,
+      'version',
+      '--prefer-online',
+      `--registry=${GH_PACKAGES_REGISTRY}`,
+      '--fetch-timeout=8000',
+      '--fetch-retries=0',
+    ],
+    { abortSignal: AbortSignal.timeout(NPM_VIEW_TIMEOUT_MS), cwd: homedir() },
   )
   if (result.code !== 0) {
     logForDebugging(`npm view failed with code ${result.code}`)
@@ -342,7 +507,160 @@ export async function getLatestVersion(
     }
     return null
   }
-  return result.stdout.trim()
+  return normalizeVersion(result.stdout)
+}
+
+/**
+ * Parallel npm + GitHub Release lookup; returns the higher semver and install hints.
+ */
+export async function getLatestVersionInfo(
+  channel: ReleaseChannel,
+): Promise<LatestVersionInfo | null> {
+  const [npmResult, ghResult] = await Promise.allSettled([
+    getLatestVersionFromNpm(channel),
+    getLatestVersionFromGitHub(channel),
+  ])
+
+  const npmVersion =
+    npmResult.status === 'fulfilled' ? npmResult.value : null
+  if (npmResult.status === 'rejected') {
+    logForDebugging(`npm version lookup rejected: ${npmResult.reason}`)
+  }
+
+  const ghInfo =
+    ghResult.status === 'fulfilled' ? ghResult.value : null
+  if (ghResult.status === 'rejected') {
+    logForDebugging(`GitHub version lookup rejected: ${ghResult.reason}`)
+  }
+
+  const ghVersion = ghInfo?.version ?? null
+  const tarballUrl = ghInfo?.tarballUrl
+
+  if (!npmVersion && !ghVersion) {
+    return null
+  }
+  if (npmVersion && !ghVersion) {
+    return {
+      version: npmVersion,
+      source: 'npm',
+      npmAvailable: true,
+    }
+  }
+  if (!npmVersion && ghVersion) {
+    return {
+      version: ghVersion,
+      source: 'github-release',
+      tarballUrl: tarballUrl,
+      npmAvailable: false,
+    }
+  }
+
+  // both present
+  if (npmVersion === ghVersion) {
+    return {
+      version: npmVersion!,
+      source: 'both',
+      tarballUrl: tarballUrl,
+      npmAvailable: true,
+    }
+  }
+  if (gt(ghVersion!, npmVersion!)) {
+    return {
+      version: ghVersion!,
+      source: 'github-release',
+      tarballUrl: tarballUrl,
+      npmAvailable: true,
+    }
+  }
+  return {
+    version: npmVersion!,
+    source: 'npm',
+    tarballUrl: tarballUrl,
+    npmAvailable: true,
+  }
+}
+
+/**
+ * Compatible wrapper: dual-source version string (npm + GitHub Releases).
+ */
+export async function getLatestVersion(
+  channel: ReleaseChannel,
+): Promise<string | null> {
+  const info = await getLatestVersionInfo(channel)
+  return info?.version ?? null
+}
+
+async function downloadReleaseTarball(
+  tarballUrl: string,
+): Promise<string | null> {
+  const dir = await mkdtemp(join(tmpdir(), 'panda-update-'))
+  const filePath = join(dir, 'package.tgz')
+  try {
+    const headers = githubAuthHeaders()
+    // Prefer axios stream to match rest of autoUpdater HTTP usage
+    const response = await axios.get(tarballUrl, {
+      timeout: TARBALL_DOWNLOAD_TIMEOUT_MS,
+      responseType: 'stream',
+      headers,
+      maxRedirects: 5,
+      validateStatus: s => s >= 200 && s < 300,
+    })
+    await pipeline(response.data, createWriteStream(filePath))
+    return filePath
+  } catch (error) {
+    logForDebugging(`tarball download failed: ${error}`)
+    try {
+      await unlink(filePath)
+    } catch {
+      // ignore cleanup errors
+    }
+    return null
+  }
+}
+
+async function installFromTarball(tarballPath: string): Promise<boolean> {
+  const packageManager = env.isRunningWithBun() ? 'bun' : 'npm'
+  const installResult = await execFileNoThrowWithCwd(
+    packageManager,
+    ['install', '-g', tarballPath],
+    {
+      cwd: homedir(),
+      abortSignal: AbortSignal.timeout(NPM_INSTALL_TIMEOUT_MS),
+    },
+  )
+  if (installResult.code !== 0) {
+    logForDebugging(
+      `tarball install failed: ${installResult.stdout} ${installResult.stderr}`,
+    )
+    return false
+  }
+  return true
+}
+
+async function installFromNpmRegistry(
+  packageSpec: string,
+): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  const packageManager = env.isRunningWithBun() ? 'bun' : 'npm'
+  const args =
+    packageManager === 'npm'
+      ? [
+          'install',
+          '-g',
+          packageSpec,
+          `--registry=${GH_PACKAGES_REGISTRY}`,
+          '--fetch-timeout=8000',
+          '--fetch-retries=1',
+        ]
+      : ['install', '-g', packageSpec]
+  const installResult = await execFileNoThrowWithCwd(packageManager, args, {
+    cwd: homedir(),
+    abortSignal: AbortSignal.timeout(NPM_INSTALL_TIMEOUT_MS),
+  })
+  return {
+    ok: installResult.code === 0,
+    stdout: installResult.stdout,
+    stderr: installResult.stderr,
+  }
 }
 
 export type NpmDistTags = {
@@ -358,8 +676,17 @@ export async function getNpmDistTags(): Promise<NpmDistTags> {
   // Run from home directory to avoid reading project-level .npmrc
   const result = await execFileNoThrowWithCwd(
     'npm',
-    ['view', MACRO.PACKAGE_URL, 'dist-tags', '--json', '--prefer-online'],
-    { abortSignal: AbortSignal.timeout(5000), cwd: homedir() },
+    [
+      'view',
+      MACRO.PACKAGE_URL,
+      'dist-tags',
+      '--json',
+      '--prefer-online',
+      `--registry=${GH_PACKAGES_REGISTRY}`,
+      '--fetch-timeout=8000',
+      '--fetch-retries=0',
+    ],
+    { abortSignal: AbortSignal.timeout(NPM_VIEW_TIMEOUT_MS), cwd: homedir() },
   )
 
   if (result.code !== 0) {
@@ -457,6 +784,7 @@ export async function getVersionHistory(limit: number): Promise<string[]> {
 
 export async function installGlobalPackage(
   specificVersion?: string | null,
+  options?: InstallGlobalPackageOptions,
 ): Promise<InstallStatus> {
   if (!(await acquireLock())) {
     logError(
@@ -471,6 +799,7 @@ export async function installGlobalPackage(
     return 'in_progress'
   }
 
+  let tarballPath: string | null = null
   try {
     await removeClaudeAliasesFromShellConfigs()
     // Check if we're using npm from Windows path in WSL
@@ -489,7 +818,7 @@ This configuration is not supported for updates.
 To fix this issue:
   1. Install Node.js within your Linux distribution: e.g. sudo apt install nodejs npm
   2. Make sure Linux NPM is in your PATH before the Windows version
-  3. Try updating again with 'claude update'
+  3. Try updating again with 'panda update'
 `)
       return 'install_failed'
     }
@@ -499,35 +828,71 @@ To fix this issue:
       return 'no_permissions'
     }
 
-    // Use specific version if provided, otherwise use latest
+    const tarballUrl = options?.tarballUrl
+    const preferTarball = options?.preferTarball === true && !!tarballUrl
+
+    // Prefer GitHub Release tarball when npm is stale/unavailable
+    if (preferTarball && tarballUrl) {
+      logForDebugging(`installGlobalPackage: prefer tarball ${tarballUrl}`)
+      tarballPath = await downloadReleaseTarball(tarballUrl)
+      if (tarballPath && (await installFromTarball(tarballPath))) {
+        saveGlobalConfig(current => ({
+          ...current,
+          installMethod: 'global',
+        }))
+        return 'success'
+      }
+      logForDebugging(
+        'installGlobalPackage: tarball install failed; trying npm if version known',
+      )
+    }
+
+    // Use specific version if provided, otherwise use latest from Packages
     const packageSpec = specificVersion
       ? `${MACRO.PACKAGE_URL}@${specificVersion}`
       : MACRO.PACKAGE_URL
 
     // Run from home directory to avoid reading project-level .npmrc/.bunfig.toml
     // which could be maliciously crafted to redirect to an attacker's registry
-    const packageManager = env.isRunningWithBun() ? 'bun' : 'npm'
-    const installResult = await execFileNoThrowWithCwd(
-      packageManager,
-      ['install', '-g', packageSpec],
-      { cwd: homedir() },
-    )
-    if (installResult.code !== 0) {
-      const error = new AutoUpdaterError(
-        `Failed to install new version of claude: ${installResult.stdout} ${installResult.stderr}`,
-      )
-      logError(error)
-      return 'install_failed'
+    const npmInstall = await installFromNpmRegistry(packageSpec)
+    if (npmInstall.ok) {
+      saveGlobalConfig(current => ({
+        ...current,
+        installMethod: 'global',
+      }))
+      return 'success'
     }
 
-    // Set installMethod to 'global' to track npm global installations
-    saveGlobalConfig(current => ({
-      ...current,
-      installMethod: 'global',
-    }))
+    // Fallback: download GH Release tgz when npm install fails and tarball available
+    if (tarballUrl) {
+      logForDebugging(
+        `installGlobalPackage: npm failed, fallback tarball ${tarballUrl}`,
+      )
+      if (!tarballPath) {
+        tarballPath = await downloadReleaseTarball(tarballUrl)
+      }
+      if (tarballPath && (await installFromTarball(tarballPath))) {
+        saveGlobalConfig(current => ({
+          ...current,
+          installMethod: 'global',
+        }))
+        return 'success'
+      }
+    }
 
-    return 'success'
+    const error = new AutoUpdaterError(
+      `Failed to install new version of panda: ${npmInstall.stdout} ${npmInstall.stderr}`,
+    )
+    logError(error)
+    return 'install_failed'
   } finally {
+    if (tarballPath) {
+      try {
+        await unlink(tarballPath)
+      } catch {
+        // ignore cleanup errors
+      }
+    }
     // Ensure we always release the lock
     await releaseLock()
   }

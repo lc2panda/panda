@@ -1,9 +1,10 @@
 import chalk from 'chalk'
 import { logEvent } from 'src/services/analytics/index.js'
 import {
-  getLatestVersion,
+  getLatestVersionInfo,
   type InstallStatus,
   installGlobalPackage,
+  type LatestVersionInfo,
 } from 'src/utils/autoUpdater.js'
 import { regenerateCompletionCache } from 'src/utils/completionCache.js'
 import {
@@ -32,7 +33,7 @@ export async function update() {
   writeToStdout(`Current version: ${MACRO.VERSION}\n`)
 
   const channel = getInitialSettings()?.autoUpdatesChannel ?? 'latest'
-  writeToStdout(`Checking for updates to ${channel} version...\n`)
+  writeToStdout(chalk.dim('Checking installation…') + '\n')
 
   logForDebugging('update: Starting update check')
 
@@ -43,6 +44,7 @@ export async function update() {
   logForDebugging(
     `update: Config install method: ${diagnostic.configInstallMethod}`,
   )
+  writeToStdout(chalk.dim(`Checking for updates (${channel})…`) + '\n')
 
   // Check for multiple installations
   if (diagnostic.multipleInstallations.length > 1) {
@@ -264,28 +266,30 @@ export async function update() {
     await removeInstalledSymlink()
   }
 
-  logForDebugging('update: Checking npm registry for latest version')
+  writeToStdout(chalk.dim('Checking registry…') + '\n')
+  writeToStdout(chalk.dim('Checking GitHub releases…') + '\n')
+  logForDebugging('update: Checking npm Packages + GitHub Releases')
   logForDebugging(`update: Package URL: ${MACRO.PACKAGE_URL}`)
-  const npmTag = channel === 'stable' ? 'stable' : 'latest'
-  const npmCommand = `npm view ${MACRO.PACKAGE_URL}@${npmTag} version`
-  logForDebugging(`update: Running: ${npmCommand}`)
-  const latestVersion = await getLatestVersion(channel)
+  const latestInfo: LatestVersionInfo | null =
+    await getLatestVersionInfo(channel)
   logForDebugging(
-    `update: Latest version from npm: ${latestVersion || 'FAILED'}`,
+    `update: Latest version info: ${latestInfo ? JSON.stringify(latestInfo) : 'FAILED'}`,
   )
 
-  if (!latestVersion) {
-    logForDebugging('update: Failed to get latest version from npm registry')
+  if (!latestInfo) {
+    logForDebugging('update: Failed to get latest version from npm and GitHub')
     process.stderr.write(chalk.red('Failed to check for updates') + '\n')
-    process.stderr.write('Unable to fetch latest version from npm registry\n')
+    process.stderr.write(
+      'Unable to fetch latest version from GitHub Packages or GitHub Releases\n',
+    )
     process.stderr.write('\n')
     process.stderr.write('Possible causes:\n')
     process.stderr.write('  • Network connectivity issues\n')
-    process.stderr.write('  • npm registry is unreachable\n')
-    process.stderr.write('  • Corporate proxy/firewall blocking npm\n')
+    process.stderr.write('  • GitHub Packages / API is unreachable or slow\n')
+    process.stderr.write('  • Corporate proxy/firewall blocking registry\n')
     if (MACRO.PACKAGE_URL && !MACRO.PACKAGE_URL.startsWith('@anthropic')) {
       process.stderr.write(
-        '  • Internal/development build not published to npm\n',
+        '  • Internal/development build not published yet\n',
       )
     }
     process.stderr.write('\n')
@@ -296,27 +300,36 @@ export async function update() {
       MACRO.PACKAGE_URL ||
       (process.env.USER_TYPE === 'ant'
         ? '@anthropic-ai/claude-cli'
-        : '@anthropic-ai/claude-code')
+        : '@lc2panda/panda-code')
     process.stderr.write(
-      `  • Manually check: npm view ${packageName} version\n`,
+      `  • Manually check: npm view ${packageName} version --registry=https://npm.pkg.github.com\n`,
     )
-
+    process.stderr.write(
+      '  • Or install from Release: curl -fsSL https://raw.githubusercontent.com/lc2panda/panda/main/install.sh | bash\n',
+    )
     process.stderr.write('  • Check if you need to login: npm whoami\n')
     await gracefulShutdown(1)
   }
 
-  // Check if versions match exactly, including any build metadata (like SHA)
-  if (latestVersion === MACRO.VERSION) {
+  const latestVersion = latestInfo.version
+  // Semver: local already >= dual-source latest → up to date
+  if (gte(MACRO.VERSION, latestVersion)) {
     writeToStdout(
       chalk.green(`Panda is up to date (${MACRO.VERSION})`) + '\n',
     )
     await gracefulShutdown(0)
   }
 
+  const sourceLabel =
+    latestInfo.source === 'github-release'
+      ? 'GitHub Release'
+      : latestInfo.source === 'both'
+        ? 'npm + GitHub Release'
+        : 'npm'
   writeToStdout(
-    `New version available: ${latestVersion} (current: ${MACRO.VERSION})\n`,
+    `New version available: ${latestVersion} (current: ${MACRO.VERSION}, source: ${sourceLabel})\n`,
   )
-  writeToStdout('Installing update...\n')
+  writeToStdout('Installing update…\n')
 
   // Determine update method based on what's actually running
   let useLocalUpdate = false
@@ -351,7 +364,7 @@ export async function update() {
       await gracefulShutdown(1)
   }
 
-  writeToStdout(`Using ${updateMethodName} installation update method...\n`)
+  writeToStdout(`Using ${updateMethodName} installation update method…\n`)
 
   logForDebugging(`update: Update method determined: ${updateMethodName}`)
   logForDebugging(`update: useLocalUpdate: ${useLocalUpdate}`)
@@ -364,8 +377,15 @@ export async function update() {
     )
     status = await installOrUpdateClaudePackage(channel)
   } else {
-    logForDebugging('update: Calling installGlobalPackage() for global update')
-    status = await installGlobalPackage()
+    const preferTarball =
+      latestInfo.source === 'github-release' || !latestInfo.npmAvailable
+    logForDebugging(
+      `update: Calling installGlobalPackage(${latestVersion}, preferTarball=${preferTarball})`,
+    )
+    status = await installGlobalPackage(latestVersion, {
+      tarballUrl: latestInfo.tarballUrl,
+      preferTarball,
+    })
   }
 
   logForDebugging(`update: Installation status: ${status}`)
@@ -374,7 +394,7 @@ export async function update() {
     case 'success':
       writeToStdout(
         chalk.green(
-          `Successfully updated from ${MACRO.VERSION} to version ${latestVersion}`,
+          `Successfully updated from ${MACRO.VERSION} to version ${latestVersion} via ${sourceLabel}`,
         ) + '\n',
       )
       await regenerateCompletionCache()
@@ -391,7 +411,7 @@ export async function update() {
       } else {
         process.stderr.write('Try running with sudo or fix npm permissions\n')
         process.stderr.write(
-          'Or consider using native installation with: panda install\n',
+          'Or install from GitHub Release: curl -fsSL https://raw.githubusercontent.com/lc2panda/panda/main/install.sh | bash\n',
         )
       }
       await gracefulShutdown(1)
@@ -405,8 +425,13 @@ export async function update() {
         )
       } else {
         process.stderr.write(
-          'Or consider using native installation with: panda install\n',
+          'Try: curl -fsSL https://raw.githubusercontent.com/lc2panda/panda/main/install.sh | bash\n',
         )
+        if (latestInfo.tarballUrl) {
+          process.stderr.write(
+            `Or: npm install -g ${latestInfo.tarballUrl}\n`,
+          )
+        }
       }
       await gracefulShutdown(1)
       break

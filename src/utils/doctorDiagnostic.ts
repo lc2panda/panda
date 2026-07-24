@@ -260,6 +260,7 @@ export async function getCurrentInstallationType(): Promise<InstallationType> {
   const npmConfigResult = await execa('npm config get prefix', {
     shell: true,
     reject: false,
+    timeout: 5000,
   })
   const globalPrefix =
     npmConfigResult.exitCode === 0 ? npmConfigResult.stdout.trim() : null
@@ -286,21 +287,27 @@ async function getInstallationPath(): Promise<string> {
       // This function doesn't expect errors
     }
 
-    try {
-      const path = await which('claude')
-      if (path) {
-        return path
+    // Prefer product bin `panda`, fall back to legacy `claude`
+    for (const binName of getCliBinNames()) {
+      try {
+        const path = await which(binName)
+        if (path) {
+          return path
+        }
+      } catch {
+        // continue
       }
-    } catch {
-      // This function doesn't expect errors
     }
 
     // If we can't find it, check common locations
-    try {
-      await getFsImplementation().stat(join(homedir(), '.local/bin/claude'))
-      return join(homedir(), '.local/bin/claude')
-    } catch {
-      // Not found
+    for (const binName of getCliBinNames()) {
+      try {
+        const candidate = join(homedir(), '.local/bin', binName)
+        await getFsImplementation().stat(candidate)
+        return candidate
+      } catch {
+        // continue
+      }
     }
     return 'native'
   }
@@ -327,6 +334,11 @@ export function getInvokedBinary(): string {
   }
 }
 
+/** Product CLI bin names (panda first; claude for legacy dual-compat). */
+function getCliBinNames(): string[] {
+  return ['panda', 'claude']
+}
+
 async function detectMultipleInstallations(): Promise<
   Array<{ type: string; path: string }>
 > {
@@ -339,39 +351,39 @@ async function detectMultipleInstallations(): Promise<
     installations.push({ type: 'npm-local', path: localPath })
   }
 
-  // Check for global npm installation
-  const packagesToCheck = ['@anthropic-ai/claude-code']
-  if (MACRO.PACKAGE_URL && MACRO.PACKAGE_URL !== '@anthropic-ai/claude-code') {
+  // Check for global npm installation — always include MACRO.PACKAGE_URL
+  const packagesToCheck = ['@anthropic-ai/claude-code', '@lc2panda/panda-code']
+  if (MACRO.PACKAGE_URL && !packagesToCheck.includes(MACRO.PACKAGE_URL)) {
     packagesToCheck.push(MACRO.PACKAGE_URL)
   }
-  const npmResult = await execFileNoThrow('npm', [
-    '-g',
-    'config',
-    'get',
-    'prefix',
-  ])
+  const npmResult = await execFileNoThrow(
+    'npm',
+    ['-g', 'config', 'get', 'prefix'],
+    { timeout: 5000, useCwd: false },
+  )
   if (npmResult.code === 0 && npmResult.stdout) {
     const npmPrefix = npmResult.stdout.trim()
     const isWindows = getPlatform() === 'windows'
 
-    // First check for active installations via bin/claude
-    // Linux / macOS have prefix/bin/claude and prefix/lib/node_modules
-    // Windows has prefix/claude and prefix/node_modules
-    const globalBinPath = isWindows
-      ? join(npmPrefix, 'claude')
-      : join(npmPrefix, 'bin', 'claude')
-
-    let globalBinExists = false
-    try {
-      await fs.stat(globalBinPath)
-      globalBinExists = true
-    } catch {
-      // Not found
+    // Active install if ANY product bin exists (panda preferred over legacy claude)
+    // Linux/macOS: prefix/bin/<name>; Windows: prefix/<name>
+    let globalBinPath: string | null = null
+    for (const binName of getCliBinNames()) {
+      const candidate = isWindows
+        ? join(npmPrefix, binName)
+        : join(npmPrefix, 'bin', binName)
+      try {
+        await fs.stat(candidate)
+        globalBinPath = candidate
+        break
+      } catch {
+        // try next bin name
+      }
     }
 
-    if (globalBinExists) {
+    if (globalBinPath) {
       // Check if this is actually a Homebrew cask installation, not npm-global
-      // When npm is installed via Homebrew, both can exist at /opt/homebrew/bin/claude
+      // When npm is installed via Homebrew, both can exist at /opt/homebrew/bin/*
       // We need to resolve the symlink to see where it actually points
       let isCurrentHomebrewInstallation = false
 
@@ -392,7 +404,7 @@ async function detectMultipleInstallations(): Promise<
         installations.push({ type: 'npm-global', path: globalBinPath })
       }
     } else {
-      // If no bin/claude exists, check for orphaned packages (no bin/claude symlink)
+      // No product bin: only then mark packages as orphan
       for (const packageName of packagesToCheck) {
         const globalPackagePath = isWindows
           ? join(npmPrefix, 'node_modules', packageName)
@@ -411,15 +423,16 @@ async function detectMultipleInstallations(): Promise<
     }
   }
 
-  // Check for native installation
-
-  // Check common native installation paths
-  const nativeBinPath = join(homedir(), '.local', 'bin', 'claude')
-  try {
-    await fs.stat(nativeBinPath)
-    installations.push({ type: 'native', path: nativeBinPath })
-  } catch {
-    // Not found
+  // Check for native installation (panda first)
+  for (const binName of getCliBinNames()) {
+    const nativeBinPath = join(homedir(), '.local', 'bin', binName)
+    try {
+      await fs.stat(nativeBinPath)
+      installations.push({ type: 'native', path: nativeBinPath })
+      break
+    } catch {
+      // try next
+    }
   }
 
   // Also check if config indicates native installation
@@ -584,23 +597,28 @@ async function detectConfigurationIssues(
 
   // Check if running local installation but it's not in PATH
   if (type === 'npm-local') {
-    // Check if claude is already accessible via PATH
-    const whichResult = await which('claude')
-    const claudeInPath = !!whichResult
+    // Check if product bin is already accessible via PATH (panda first)
+    let binInPath = false
+    for (const binName of getCliBinNames()) {
+      if (await which(binName)) {
+        binInPath = true
+        break
+      }
+    }
 
-    // Only show warning if claude is NOT in PATH AND no valid alias exists
-    if (!claudeInPath && !validAlias) {
+    // Only show warning if bin is NOT in PATH AND no valid alias exists
+    if (!binInPath && !validAlias) {
       if (existingAlias) {
         // Alias exists but points to invalid target
         warnings.push({
           issue: 'Local installation not accessible',
-          fix: `Alias exists but points to invalid target: ${existingAlias}. Update alias: alias claude="~/.pandacc/local/claude"`,
+          fix: `Alias exists but points to invalid target: ${existingAlias}. Update alias: alias panda="~/.pandacc/local/panda"`,
         })
       } else {
         // No alias exists and not in PATH
         warnings.push({
           issue: 'Local installation not accessible',
-          fix: 'Create alias: alias claude="~/.pandacc/local/claude"',
+          fix: 'Create alias: alias panda="~/.pandacc/local/panda" or add ~/.pandacc/local to PATH',
         })
       }
     }

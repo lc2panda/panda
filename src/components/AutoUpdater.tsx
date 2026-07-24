@@ -4,7 +4,7 @@ import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEve
 import { useInterval } from 'usehooks-ts';
 import { useUpdateNotification } from '../hooks/useUpdateNotification.js';
 import { Box, Text } from '../ink.js';
-import { type AutoUpdaterResult, getLatestVersion, getMaxVersion, type InstallStatus, installGlobalPackage, shouldSkipVersion } from '../utils/autoUpdater.js';
+import { type AutoUpdaterResult, getLatestVersionInfo, getMaxVersion, type InstallStatus, installGlobalPackage, shouldSkipVersion } from '../utils/autoUpdater.js';
 import { getGlobalConfig, isAutoUpdaterDisabled } from '../utils/config.js';
 import { logForDebugging } from '../utils/debug.js';
 import { getCurrentInstallationType } from '../utils/doctorDiagnostic.js';
@@ -67,7 +67,9 @@ export function AutoUpdater({
       return;
     }
     const channel = getInitialSettings()?.autoUpdatesChannel ?? 'latest';
-    let latestVersion = await getLatestVersion(channel);
+    // Dual-source: npm Packages may lag; GitHub Release often has the true latest
+    const latestInfo = await getLatestVersionInfo(channel);
+    let latestVersion = latestInfo?.version ?? null;
     const isDisabled = isAutoUpdaterDisabled();
 
     // Check if max version is set (server-side kill switch for auto-updates)
@@ -112,6 +114,13 @@ export function AutoUpdater({
         return;
       }
 
+      const preferTarball =
+        latestInfo?.source === 'github-release' || !latestInfo?.npmAvailable;
+      const globalInstallOpts = {
+        tarballUrl: latestInfo?.tarballUrl,
+        preferTarball: preferTarball === true && !!latestInfo?.tarballUrl,
+      };
+
       // Choose the appropriate update method based on what's actually running
       let installStatus: InstallStatus;
       let updateMethod: 'local' | 'global';
@@ -119,12 +128,14 @@ export function AutoUpdater({
         // Use local update for local installations
         logForDebugging('AutoUpdater: Using local update method');
         updateMethod = 'local';
-        installStatus = await installOrUpdateClaudePackage(channel);
+        installStatus = await installOrUpdateClaudePackage(channel, latestVersion);
       } else if (installationType === 'npm-global') {
-        // Use global update for global installations
-        logForDebugging('AutoUpdater: Using global update method');
+        // Prefer GH Release tarball when Packages lag behind releases
+        logForDebugging(
+          `AutoUpdater: Using global update method preferTarball=${globalInstallOpts.preferTarball}`,
+        );
         updateMethod = 'global';
-        installStatus = await installGlobalPackage();
+        installStatus = await installGlobalPackage(latestVersion, globalInstallOpts);
       } else if (installationType === 'native') {
         // This shouldn't happen - native should use NativeAutoUpdater
         logForDebugging('AutoUpdater: Unexpected native installation in non-native updater');
@@ -136,9 +147,9 @@ export function AutoUpdater({
         const isMigrated = config.installMethod === 'local';
         updateMethod = isMigrated ? 'local' : 'global';
         if (isMigrated) {
-          installStatus = await installOrUpdateClaudePackage(channel);
+          installStatus = await installOrUpdateClaudePackage(channel, latestVersion);
         } else {
-          installStatus = await installGlobalPackage();
+          installStatus = await installGlobalPackage(latestVersion, globalInstallOpts);
         }
       }
       onChangeIsUpdating(false);
@@ -200,9 +211,9 @@ export function AutoUpdater({
             ✓ Update installed · Restart to apply
           </Text>}
       {(autoUpdaterResult?.status === 'install_failed' || autoUpdaterResult?.status === 'no_permissions') && <Text color="error" wrap="truncate">
-          ✗ Auto-update failed &middot; Try <Text bold>claude doctor</Text> or{' '}
+          ✗ Auto-update failed &middot; Try <Text bold>panda doctor</Text> or{' '}
           <Text bold>
-            {hasLocalInstall ? `cd ~/.pandacc/local && npm update ${MACRO.PACKAGE_URL}` : `npm i -g ${MACRO.PACKAGE_URL}`}
+            {hasLocalInstall ? `cd ~/.pandacc/local && npm update ${MACRO.PACKAGE_URL}` : `panda update`}
           </Text>
         </Text>}
     </Box>;
