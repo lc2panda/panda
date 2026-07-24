@@ -1,6 +1,6 @@
-// Input: channel MCP server 连接注册 + inbound 消息 context 缓存
-// Output: 供 _pushToChannels 使用的 server 引用和 reply context
-// Pos: assistant/ 通知推送的 channel MCP 桥接层
+// Input: channel MCP server 连接注册 + inbound/磁盘多用户 context 缓存
+// Output: 供 _pushToChannels 使用的 server 引用与按 user_id 索引的 reply context
+// Pos: assistant/ 通知推送的 channel MCP 桥接层（H-010 冷启动恢复全部用户 token）
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { logForDebugging } from 'src/utils/debug.js'
@@ -43,8 +43,14 @@ interface PendingMessage {
 // channel 名 → server entry（如 "wechat" → { client, serverName, ... }）
 const _servers = new Map<string, ChannelServerEntry>()
 
-// channel 名 → 最近 reply context
-const _contexts = new Map<string, ChannelReplyContext>()
+// channel 名 → (user_id → reply context)。H-010：完整多用户 Map，不再只保留单条
+const _contexts = new Map<string, Map<string, ChannelReplyContext>>()
+
+// channel 名 → 最近 inbound 的 user_id（pending flush 目标）
+const _lastActiveUser = new Map<string, string>()
+
+// 已尝试从磁盘加载过的 channel（每进程每 channel 一次，避免反复 IO）
+const _diskLoaded = new Set<string>()
 
 // 等待 context 到达后补发的消息缓冲区（最大 50 条）
 const _pendingMessages: PendingMessage[] = []
@@ -67,6 +73,81 @@ const REPLY_TOOL_MAP: Record<string, string> = {
 
 /** context 最大有效期：24 小时 */
 const CONTEXT_TTL_MS = 86_400_000
+
+function _userMap(channel: string): Map<string, ChannelReplyContext> {
+  let m = _contexts.get(channel)
+  if (!m) {
+    m = new Map()
+    _contexts.set(channel, m)
+  }
+  return m
+}
+
+/** 写入/更新单个用户 context，并标记为 last active */
+function _upsertContext(
+  channel: string,
+  userId: string,
+  contextToken: string,
+  updated: number,
+  markActive: boolean,
+): ChannelReplyContext {
+  const ctx: ChannelReplyContext = {
+    user_id: userId,
+    context_token: contextToken,
+    updated,
+  }
+  _userMap(channel).set(userId, ctx)
+  if (markActive) {
+    _lastActiveUser.set(channel, userId)
+  }
+  return ctx
+}
+
+/** 返回 channel 下未过期的全部 context（按 Map 插入序） */
+function _listLiveContexts(channel: string): ChannelReplyContext[] {
+  const m = _contexts.get(channel)
+  if (!m || m.size === 0) return []
+  const now = Date.now()
+  const live: ChannelReplyContext[] = []
+  for (const ctx of m.values()) {
+    if (now - ctx.updated <= CONTEXT_TTL_MS) {
+      live.push(ctx)
+    }
+  }
+  return live
+}
+
+/**
+ * 取 reply 目标：
+ * - 指定 userId → 该用户（未过期）
+ * - 否则 last active（未过期）
+ * - 再否则第一个 live context
+ */
+function _resolveContext(
+  channel: string,
+  userId?: string,
+): ChannelReplyContext | undefined {
+  const m = _contexts.get(channel)
+  if (!m || m.size === 0) return undefined
+  const now = Date.now()
+
+  if (userId) {
+    const ctx = m.get(userId)
+    if (ctx && now - ctx.updated <= CONTEXT_TTL_MS) return ctx
+    return undefined
+  }
+
+  const activeId = _lastActiveUser.get(channel)
+  if (activeId) {
+    const active = m.get(activeId)
+    if (active && now - active.updated <= CONTEXT_TTL_MS) return active
+  }
+
+  for (const ctx of m.values()) {
+    if (now - ctx.updated <= CONTEXT_TTL_MS) return ctx
+  }
+  return undefined
+}
 
 /**
  * 从 MCP server name 提取 channel 标识。
@@ -122,11 +203,7 @@ export function saveChannelContext(
   if (!userId || !contextToken) return
 
   const channel = extractChannelName(serverName)
-  _contexts.set(channel, {
-    user_id: userId,
-    context_token: contextToken,
-    updated: Date.now(),
-  })
+  _upsertContext(channel, userId, contextToken, Date.now(), true)
 
   // Context 到达，flush 之前积压的 pending 消息（异步，失败已在内部回写 pending）
   void _flushPending(channel).catch((e: unknown) => {
@@ -137,17 +214,32 @@ export function saveChannelContext(
 }
 
 /**
- * 从磁盘加载持久化的 channel context（fallback）。
- * WeChat: ~/.pandacc/channels/wechat/context-tokens.json → { "user_id": "context_token" }
- * Feishu: ~/.pandacc/channels/feishu/user-chat-map.json  → { "user_id": "chat_id" }
- *
- * 加载成功后写入 _contexts 缓存，下次不再读磁盘。
- * 全程 try/catch，失败返回 null。
+ * 读取 channel 的 reply context。
+ * - 指定 userId：按用户精确取（H-010 多用户）
+ * - 省略 userId：last active → 任一 live
+ * 先 ensure 磁盘冷启动加载。
  */
-function _loadPersistedContext(channel: string): ChannelReplyContext | null {
+export function getChannelContext(
+  channel: string,
+  userId?: string,
+): ChannelReplyContext | undefined {
+  _ensureDiskContextsLoaded(channel)
+  return _resolveContext(channel, userId)
+}
+
+/**
+ * 从磁盘加载持久化的 channel context（fallback）。
+ * WeChat: ~/.pandacc/channels/wechat/context-tokens.json → { "user_id": "context_token", ... }
+ * Feishu: ~/.pandacc/channels/feishu/user-chat-map.json  → { "user_id": "chat_id", ... }
+ *
+ * H-010：恢复 Map 中**全部**用户 token，不再只取 entries[0]。
+ * 与内存中更新时间更新的条目合并（不覆盖更新的 in-memory）。
+ * 全程 try/catch，失败可观测日志。
+ */
+function _loadPersistedContext(channel: string): number {
   try {
     const relPath = PERSISTED_CONTEXT_FILES[channel]
-    if (!relPath) return null
+    if (!relPath) return 0
 
     const { readFileSync, statSync } = require('fs')
     const { join } = require('path')
@@ -162,34 +254,45 @@ function _loadPersistedContext(channel: string): ChannelReplyContext | null {
       logForDebugging(
         `[channelRegistry] Persisted context for ${channel} expired (mtime ${new Date(mtime).toISOString()})`,
       )
-      return null
+      return 0
     }
 
     const raw = JSON.parse(readFileSync(filePath, 'utf-8')) as Record<string, string>
     const entries = Object.entries(raw)
-    if (entries.length === 0) return null
+    if (entries.length === 0) return 0
 
-    const [userId, token] = entries[0]
-    if (!userId || !token) return null
-
-    const ctx: ChannelReplyContext = {
-      user_id: userId,
-      context_token: token,
-      updated: mtime,
+    const userMap = _userMap(channel)
+    let loaded = 0
+    for (const [userId, token] of entries) {
+      if (!userId || typeof token !== 'string' || !token) continue
+      const existing = userMap.get(userId)
+      // 不覆盖更新鲜的 in-memory 条目
+      if (existing && existing.updated >= mtime) continue
+      userMap.set(userId, {
+        user_id: userId,
+        context_token: token,
+        updated: mtime,
+      })
+      loaded++
     }
 
-    // 写入内存缓存，下次不再读磁盘
-    _contexts.set(channel, ctx)
     logForDebugging(
-      `[channelRegistry] Loaded persisted context for ${channel}: user=${userId.slice(0, 12)}...`,
+      `[channelRegistry] Loaded ${loaded}/${entries.length} persisted user context(s) for ${channel}`,
     )
-    return ctx
+    return loaded
   } catch (e) {
     logForDebugging(
       `[channelRegistry] Failed to load persisted context for ${channel}: ${(e as Error)?.message || e}`,
     )
-    return null
+    return 0
   }
+}
+
+/** 每 channel 冷启动只读一次磁盘，合并全部用户 token */
+function _ensureDiskContextsLoaded(channel: string): void {
+  if (_diskLoaded.has(channel)) return
+  _diskLoaded.add(channel)
+  _loadPersistedContext(channel)
 }
 
 /**
@@ -205,15 +308,33 @@ function _isCallToolErrorResult(result: unknown): boolean {
   )
 }
 
+/** 构造 reply 工具参数：WeChat → context_token，Feishu → chat_id */
+function _buildReplyArgs(
+  channel: string,
+  ctx: ChannelReplyContext,
+  text: string,
+): Record<string, string> {
+  const args: Record<string, string> = {
+    user_id: ctx.user_id,
+    text,
+  }
+  if (channel === 'wechat') {
+    args.context_token = ctx.context_token
+  } else {
+    args.chat_id = ctx.context_token
+  }
+  return args
+}
+
 /**
  * 通过已注册的 channel MCP server 推送通知。
- * 遍历所有已注册 server，使用最近的 context 调用 reply 工具。
+ * 遍历所有已注册 server，对 channel 下**全部 live 用户** fan-out 调用 reply（H-010）。
  *
  * WeChat reply tool 参数：{ user_id, context_token, text }
  * Feishu  reply tool 参数：{ user_id, chat_id, text }
  * 全程 try/catch，不抛出异常。
  *
- * delivered 语义（H-003）：仅在 callTool **成功完成**（无 throw、无 isError）后为 true。
+ * delivered 语义（H-003）：仅在至少一个 callTool **成功完成**（无 throw、无 isError）后为 true。
  * 失败时返回 false 并将消息写入 pending，供后续 saveChannelContext 重投。
  *
  * 如果所有 channel 都没有可用 context，消息暂存到 _pendingMessages，
@@ -229,45 +350,47 @@ export async function pushViaChannelMCP(
   try {
     for (const [channel, server] of _servers) {
       try {
-        let ctx = _contexts.get(channel)
-        if (!ctx) {
-          ctx = _loadPersistedContext(channel)
-          if (!ctx) continue
+        // H-010：冷启动恢复全部用户 token，再 fan-out 到 live 用户
+        _ensureDiskContextsLoaded(channel)
+        const targets = _listLiveContexts(channel)
+        if (targets.length === 0) {
+          logForDebugging(
+            `[channelRegistry] pushViaChannelMCP: no live context for ${channel}`,
+          )
+          continue
         }
-
-        // 检查 context 是否过期
-        if (Date.now() - ctx.updated > CONTEXT_TTL_MS) continue
 
         const toolName = REPLY_TOOL_MAP[channel]
         if (!toolName) continue
 
-        // 构造正确的参数名：WeChat → context_token, Feishu → chat_id
-        const args: Record<string, string> = {
-          user_id: ctx.user_id,
-          text: message,
-        }
-        if (channel === 'wechat') {
-          args.context_token = ctx.context_token
-        } else {
-          // Feishu and other channels use chat_id
-          args.chat_id = ctx.context_token
+        let channelDelivered = false
+        for (const ctx of targets) {
+          try {
+            // H-003：必须 await 成功后再标 delivered，禁止 fire-and-forget 假成功
+            const result = await server.client.callTool({
+              name: toolName,
+              arguments: _buildReplyArgs(channel, ctx, message),
+            })
+            if (_isCallToolErrorResult(result)) {
+              logForDebugging(
+                `[channelRegistry] pushViaChannelMCP: reply 返回 isError (channel=${channel}, user=${ctx.user_id.slice(0, 12)}...): ${JSON.stringify((result as { content?: unknown }).content ?? result)}`,
+              )
+              continue
+            }
+            channelDelivered = true
+            logForDebugging(
+              `[channelRegistry] pushViaChannelMCP: delivered via ${channel} user=${ctx.user_id.slice(0, 12)}...`,
+            )
+          } catch (e) {
+            logForDebugging(
+              `[channelRegistry] pushViaChannelMCP: reply 调用失败 (channel=${channel}, user=${ctx.user_id.slice(0, 12)}...): ${(e as Error)?.message || e}`,
+            )
+          }
         }
 
-        // H-003：必须 await 成功后再标 delivered，禁止 fire-and-forget 假成功
-        const result = await server.client.callTool({
-          name: toolName,
-          arguments: args,
-        })
-        if (_isCallToolErrorResult(result)) {
-          logForDebugging(
-            `[channelRegistry] pushViaChannelMCP: reply 返回 isError (channel=${channel}): ${JSON.stringify((result as { content?: unknown }).content ?? result)}`,
-          )
-          continue
+        if (channelDelivered) {
+          delivered = true
         }
-        delivered = true
-        logForDebugging(
-          `[channelRegistry] pushViaChannelMCP: delivered via ${channel}`,
-        )
       } catch (e) {
         logForDebugging(
           `[channelRegistry] pushViaChannelMCP: reply 调用失败 (channel=${channel}): ${(e as Error)?.message || e}`,
@@ -303,8 +426,8 @@ export async function pushViaChannelMCP(
 }
 
 /**
- * Flush pending 消息到指定 channel。
- * 在 saveChannelContext 后调用，将积压的通知补发出去。
+ * Flush pending 消息到指定 channel 的 last-active 用户。
+ * 在 saveChannelContext 后调用，将积压的通知补发给刚 inbound 的用户。
  * 仅在 callTool 成功后丢弃消息；失败则回写 pending 供重试。
  * 全程 try/catch，不向调用方抛错。
  */
@@ -312,10 +435,8 @@ async function _flushPending(channel: string): Promise<void> {
   if (_pendingMessages.length === 0) return
 
   const server = _servers.get(channel)
-  let ctx = _contexts.get(channel)
-  if (!ctx) {
-    ctx = _loadPersistedContext(channel)
-  }
+  // flush 目标：刚 save 的 last-active 用户（非 fan-out）
+  const ctx = _resolveContext(channel)
   if (!server || !ctx) return
 
   const toolName = REPLY_TOOL_MAP[channel]
@@ -339,7 +460,7 @@ async function _flushPending(channel: string): Promise<void> {
   if (valid.length === 0) return
 
   logForDebugging(
-    `[channelRegistry] Flushing ${valid.length} pending notification(s) to ${channel}`,
+    `[channelRegistry] Flushing ${valid.length} pending notification(s) to ${channel} user=${ctx.user_id.slice(0, 12)}...`,
   )
 
   const failed: PendingMessage[] = []
@@ -347,19 +468,9 @@ async function _flushPending(channel: string): Promise<void> {
   for (const msg of valid) {
     try {
       const text = `[${msg.title || 'Panda'}]\n${msg.body || ''}`
-      const args: Record<string, string> = {
-        user_id: ctx.user_id,
-        text,
-      }
-      if (channel === 'wechat') {
-        args.context_token = ctx.context_token
-      } else {
-        args.chat_id = ctx.context_token
-      }
-
       const result = await server.client.callTool({
         name: toolName,
-        arguments: args,
+        arguments: _buildReplyArgs(channel, ctx, text),
       })
       if (_isCallToolErrorResult(result)) {
         logForDebugging(
@@ -408,5 +519,7 @@ export function getPendingCount(): number {
 export function resetChannelRegistryForTests(): void {
   _servers.clear()
   _contexts.clear()
+  _lastActiveUser.clear()
+  _diskLoaded.clear()
   _pendingMessages.length = 0
 }

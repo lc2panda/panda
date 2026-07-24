@@ -15,9 +15,9 @@
 |------|--------|----------|------|------------------------|
 | P0   | 1      | 0        | 1    | H-001（有残余） |
 | P1   | 7      | 1        | 8    | H-002/H-008、H-003、H-004、H-005、H-007（第二批 P1 全清） |
-| P2   | 7      | 3        | 10   | H-009（`9b48301d6`） |
+| P2   | 7      | 3        | 10   | H-009（`9b48301d6`）、H-010 |
 | P3   | 3      | 2        | 5    | H-016 |
-| **合计** | **18** | **6** | **24** | + P-001/P-002/P-003/P-004（隐私节）；H-009 已修复；H-016 已修复 |
+| **合计** | **18** | **6** | **24** | + P-001/P-002/P-003/P-004（隐私节）；H-009/H-010 已修复；H-016 已修复 |
 
 > **首批修复独立验收**（2026-07-24 17:07:55 +08:00）：commits `03ddb4bb9` (H-001)、`c73ce663e` (H-005)、`37d9a1fc8` (P-001/P-002)。详见各条目「修复状态」段。  
 > **第二批修复独立验收（初轮）**（2026-07-24 17:18:22 +08:00）：commits `c7accadcf` (H-004)、`09c3576e9` (H-007)、`033a7c85b` (H-002/H-008)。当时 H-003 无 commit，判定未完成。  
@@ -221,10 +221,16 @@
 
 #### H-010｜channelRegistry 冷启动只加载 Map 中「第一个」用户 token
 - **级别**：P2  
-- **状态**：已证实  
-- **位置**：`src/assistant/channelRegistry.ts` `_loadPersistedContext` ~L163–L166：`const [userId, token] = entries[0]`  
-- **因果**：多用户/多会话持久化时，非首个 entry 的 pending 可能投到错误 user 或无法投递  
-- **建议**：按 pending 目标 userId 索引；或持久化 lastActiveUserId  
+- **状态**：已证实 → **已修复**  
+- **修复 commit**：`4acab2ba25eab35fc5e6123e1dd796a77a8566fa` — fix(channel): restore all persisted user tokens on cold start (H-010)  
+- **验收时间**：2026-07-24  
+- **验收结论**：
+  - `_contexts` 改为 `Map<channel, Map<user_id, ChannelReplyContext>>`；磁盘冷启动 `_loadPersistedContext` 恢复**全部** entry（不再 `entries[0]`）
+  - `getChannelContext(channel, userId?)` 按用户精确取；`pushViaChannelMCP` 对 live 用户 fan-out；`_flushPending` 仍只投 last-active（inbound 用户）
+  - 失败路径保留 H-009 风格 `logForDebugging`；delivered 语义与 H-003 兼容（任一用户 callTool 成功即 channel 送达）
+  - 测试：`bun test src/assistant/channelRegistry.test.ts` → **7 pass / 0 fail**（含多用户内存/磁盘恢复 + fan-out）
+- **位置**（历史）：`src/assistant/channelRegistry.ts` `_loadPersistedContext` 旧 `entries[0]`  
+- **因果**（历史）：多用户/多会话持久化时，非首个 entry 的 pending 可能投到错误 user 或无法投递  
 
 #### H-011｜GH 非 stable 通道仍打 `/releases/latest`（拿不到预发）
 - **级别**：P2  

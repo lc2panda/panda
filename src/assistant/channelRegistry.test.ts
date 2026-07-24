@@ -1,14 +1,18 @@
-// Input: mock MCP client / channel context
-// Output: H-003 delivered 语义断言
+// Input: mock MCP client / channel context / 多用户磁盘 token
+// Output: H-003 delivered 语义 + H-010 多用户冷启动恢复断言
 // Pos: assistant/channelRegistry 单元测试
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
-import { describe, expect, mock, beforeEach, test } from 'bun:test'
+import { describe, expect, mock, beforeEach, afterEach, test } from 'bun:test'
+import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'fs'
+import { join } from 'path'
+import { homedir } from 'os'
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import {
   pushViaChannelMCP,
   registerChannelServer,
   saveChannelContext,
+  getChannelContext,
   getPendingCount,
   resetChannelRegistryForTests,
   unregisterChannelServer,
@@ -89,5 +93,101 @@ describe('pushViaChannelMCP (H-003)', () => {
     const delivered = await pushViaChannelMCP('no-channel', 'body')
     expect(delivered).toBe(false)
     expect(getPendingCount()).toBe(before + 1)
+  })
+})
+
+describe('multi-user context restore (H-010)', () => {
+  const tokensPath = join(homedir(), '.pandacc', 'channels', 'wechat', 'context-tokens.json')
+  let backup: string | null = null
+  let hadFile = false
+
+  beforeEach(() => {
+    resetChannelRegistryForTests()
+    hadFile = existsSync(tokensPath)
+    backup = hadFile ? readFileSync(tokensPath, 'utf-8') : null
+  })
+
+  afterEach(() => {
+    resetChannelRegistryForTests()
+    try {
+      if (backup !== null) {
+        writeFileSync(tokensPath, backup, 'utf-8')
+      } else if (hadFile === false && existsSync(tokensPath)) {
+        // 测试新建的文件：仅当原先不存在时删除，避免误删真实生产 token
+        // 若目录下只有测试数据则可删；有备份则已恢复
+        // 此处 backup===null 且原先不存在 → 删除测试写入
+        rmSync(tokensPath, { force: true })
+      }
+    } catch {
+      // 清理失败不阻断
+    }
+  })
+
+  test('内存多用户：两个 user 都能取到各自 context', () => {
+    saveChannelContext('plugin:wechat:wechat', {
+      user_id: 'user-a',
+      context_token: 'token-a',
+    })
+    saveChannelContext('plugin:wechat:wechat', {
+      user_id: 'user-b',
+      context_token: 'token-b',
+    })
+
+    const a = getChannelContext('wechat', 'user-a')
+    const b = getChannelContext('wechat', 'user-b')
+    expect(a?.user_id).toBe('user-a')
+    expect(a?.context_token).toBe('token-a')
+    expect(b?.user_id).toBe('user-b')
+    expect(b?.context_token).toBe('token-b')
+  })
+
+  test('冷启动：磁盘多用户 Map 全部恢复，非仅 entries[0]', () => {
+    mkdirSync(join(homedir(), '.pandacc', 'channels', 'wechat'), { recursive: true })
+    // 故意把非首用户放在后面：旧实现 entries[0] 只会拿到 user-first
+    writeFileSync(
+      tokensPath,
+      JSON.stringify({
+        'user-first': 'token-first',
+        'user-second': 'token-second',
+      }),
+      'utf-8',
+    )
+
+    // 清空内存 → 模拟冷启动
+    resetChannelRegistryForTests()
+
+    const first = getChannelContext('wechat', 'user-first')
+    const second = getChannelContext('wechat', 'user-second')
+
+    expect(first?.user_id).toBe('user-first')
+    expect(first?.context_token).toBe('token-first')
+    expect(second?.user_id).toBe('user-second')
+    expect(second?.context_token).toBe('token-second')
+  })
+
+  test('冷启动 push fan-out：两个用户均收到 callTool', async () => {
+    mkdirSync(join(homedir(), '.pandacc', 'channels', 'wechat'), { recursive: true })
+    writeFileSync(
+      tokensPath,
+      JSON.stringify({
+        'user-alpha': 'tok-alpha',
+        'user-beta': 'tok-beta',
+      }),
+      'utf-8',
+    )
+    resetChannelRegistryForTests()
+
+    const seenUserIds: string[] = []
+    const callTool = mock(async (args: unknown) => {
+      const a = args as { arguments?: { user_id?: string } }
+      if (a.arguments?.user_id) seenUserIds.push(a.arguments.user_id)
+      return { content: [{ type: 'text', text: 'ok' }] }
+    })
+    registerChannelServer('plugin:wechat:wechat', mockClient(callTool))
+
+    const delivered = await pushViaChannelMCP('multi', 'body')
+    expect(delivered).toBe(true)
+    expect(seenUserIds.sort()).toEqual(['user-alpha', 'user-beta'])
+    expect(callTool).toHaveBeenCalledTimes(2)
   })
 })
