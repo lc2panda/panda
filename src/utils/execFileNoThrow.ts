@@ -85,6 +85,12 @@ function getErrorMessage(
 
 /**
  * execFile, but always resolves (never throws)
+ *
+ * Note: execa v9 renamed the `signal` option to `cancelSignal`. Passing the
+ * legacy `signal` key throws synchronously and — depending on how the call
+ * site is structured — can leave the outer Promise pending forever while an
+ * unhandled rejection fires. That is exactly what freezes `panda update` after
+ * "Running: npm view ...".
  */
 export function execFileNoThrowWithCwd(
   file: string,
@@ -106,45 +112,69 @@ export function execFileNoThrowWithCwd(
   },
 ): Promise<{ stdout: string; stderr: string; code: number; error?: string }> {
   return new Promise(resolve => {
-    // Use execa for cross-platform .bat/.cmd compatibility on Windows
-    execa(file, args, {
-      maxBuffer,
-      signal: abortSignal,
-      timeout: finalTimeout,
-      cwd: finalCwd,
-      env: finalEnv,
-      shell,
-      stdin: finalStdin,
-      input: finalInput,
-      reject: false, // Don't throw on non-zero exit codes
-    })
-      .then(result => {
-        if (result.failed) {
-          if (finalPreserveOutput) {
-            const errorCode = result.exitCode ?? 1
-            void resolve({
-              stdout: result.stdout || '',
-              stderr: result.stderr || '',
-              code: errorCode,
-              error: getErrorMessage(
-                result as unknown as ExecaResultWithError,
-                errorCode,
-              ),
-            })
-          } else {
-            void resolve({ stdout: '', stderr: '', code: result.exitCode ?? 1 })
-          }
-        } else {
-          void resolve({
-            stdout: result.stdout,
-            stderr: result.stderr,
-            code: 0,
-          })
-        }
-      })
-      .catch((error: ExecaError) => {
+    const resolveFailure = (error: unknown, code = 1): void => {
+      if (error instanceof Error) {
         logError(error)
-        void resolve({ stdout: '', stderr: '', code: 1 })
+      }
+      void resolve({
+        stdout: '',
+        stderr: error instanceof Error ? error.message : '',
+        code,
+        error: error instanceof Error ? error.message : String(error ?? code),
       })
+    }
+
+    try {
+      // Use execa for cross-platform .bat/.cmd compatibility on Windows.
+      // Only pass cancelSignal when set so the option key is absent otherwise
+      // (execa treats a present `signal` key as a hard error regardless of value).
+      const subprocess = execa(file, args, {
+        maxBuffer,
+        ...(abortSignal ? { cancelSignal: abortSignal } : {}),
+        timeout: finalTimeout,
+        cwd: finalCwd,
+        env: finalEnv,
+        shell,
+        stdin: finalStdin,
+        input: finalInput,
+        reject: false, // Don't throw on non-zero exit codes
+      })
+
+      void subprocess
+        .then(result => {
+          if (result.failed) {
+            if (finalPreserveOutput) {
+              const errorCode = result.exitCode ?? 1
+              void resolve({
+                stdout: result.stdout || '',
+                stderr: result.stderr || '',
+                code: errorCode,
+                error: getErrorMessage(
+                  result as unknown as ExecaResultWithError,
+                  errorCode,
+                ),
+              })
+            } else {
+              void resolve({
+                stdout: '',
+                stderr: '',
+                code: result.exitCode ?? 1,
+              })
+            }
+          } else {
+            void resolve({
+              stdout: result.stdout,
+              stderr: result.stderr,
+              code: 0,
+            })
+          }
+        })
+        .catch((error: ExecaError) => {
+          resolveFailure(error)
+        })
+    } catch (error) {
+      // Cover synchronous option-validation failures (e.g. wrong option names).
+      resolveFailure(error)
+    }
   })
 }
