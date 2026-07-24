@@ -2,9 +2,11 @@ import chalk from 'chalk'
 import { logEvent } from 'src/services/analytics/index.js'
 import {
   getLatestVersionInfo,
+  getMaxVersion,
   type InstallStatus,
   installGlobalPackage,
   type LatestVersionInfo,
+  resolveInstallTarget,
 } from 'src/utils/autoUpdater.js'
 import { regenerateCompletionCache } from 'src/utils/completionCache.js'
 import {
@@ -310,8 +312,21 @@ export async function update() {
     await gracefulShutdown(1)
   }
 
-  const latestVersion = latestInfo.version
-  // Semver: local already >= dual-source latest → up to date
+  // Single source of truth: maxVersion kill-switch caps version AND strips
+  // tarballUrl/preferTarball so GH tarball cannot bypass the cap.
+  const maxVersion = await getMaxVersion()
+  const target = resolveInstallTarget(latestInfo, maxVersion, MACRO.VERSION)
+  if (target.skipUpdate) {
+    writeToStdout(
+      chalk.green(
+        `Panda is up to date (${MACRO.VERSION}${maxVersion ? `; max allowed ${maxVersion}` : ''})`,
+      ) + '\n',
+    )
+    await gracefulShutdown(0)
+  }
+
+  const latestVersion = target.version
+  // Semver: local already >= capped target → up to date
   if (gte(MACRO.VERSION, latestVersion)) {
     writeToStdout(
       chalk.green(`Panda is up to date (${MACRO.VERSION})`) + '\n',
@@ -320,11 +335,13 @@ export async function update() {
   }
 
   const sourceLabel =
-    latestInfo.source === 'github-release'
-      ? 'GitHub Release'
-      : latestInfo.source === 'both'
-        ? 'npm + GitHub Release'
-        : 'npm'
+    target.cappedByMaxVersion
+      ? `maxVersion cap ${maxVersion} (remote ${latestInfo.version})`
+      : latestInfo.source === 'github-release'
+        ? 'GitHub Release'
+        : latestInfo.source === 'both'
+          ? 'npm + GitHub Release'
+          : 'npm'
   writeToStdout(
     `New version available: ${latestVersion} (current: ${MACRO.VERSION}, source: ${sourceLabel})\n`,
   )
@@ -376,14 +393,12 @@ export async function update() {
     )
     status = await installOrUpdateClaudePackage(channel)
   } else {
-    const preferTarball =
-      latestInfo.source === 'github-release' || !latestInfo.npmAvailable
     logForDebugging(
-      `update: Calling installGlobalPackage(${latestVersion}, preferTarball=${preferTarball})`,
+      `update: Calling installGlobalPackage(${latestVersion}, preferTarball=${target.preferTarball}, capped=${target.cappedByMaxVersion})`,
     )
     status = await installGlobalPackage(latestVersion, {
-      tarballUrl: latestInfo.tarballUrl,
-      preferTarball,
+      tarballUrl: target.tarballUrl,
+      preferTarball: target.preferTarball,
     })
   }
 
@@ -426,9 +441,9 @@ export async function update() {
         process.stderr.write(
           'Try: curl -fsSL https://raw.githubusercontent.com/lc2panda/panda/main/install.sh | bash\n',
         )
-        if (latestInfo.tarballUrl) {
+        if (target.tarballUrl) {
           process.stderr.write(
-            `Or: npm install -g ${latestInfo.tarballUrl}\n`,
+            `Or: npm install -g ${target.tarballUrl}\n`,
           )
         }
       }

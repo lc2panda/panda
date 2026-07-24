@@ -53,6 +53,24 @@ export type InstallGlobalPackageOptions = {
   preferTarball?: boolean
 }
 
+/**
+ * Install decision after applying maxVersion kill-switch.
+ * All install paths (UI AutoUpdater, CLI `panda update`, installGlobalPackage)
+ * must use this so tarballUrl/preferTarball never point past the cap.
+ */
+export type InstallTargetDecision = {
+  /** Version to install / compare against (already capped if needed) */
+  version: string
+  /** Use GH tarball first — only when tarball matches the capped target */
+  preferTarball: boolean
+  /** Tarball URL safe for this target; undefined when capped or unavailable */
+  tarballUrl?: string
+  /** True when maxVersion reduced the remote latest */
+  cappedByMaxVersion: boolean
+  /** True when current is already at/above max while remote is higher — do not upgrade */
+  skipUpdate: boolean
+}
+
 type GitHubReleaseAsset = {
   name?: string
   browser_download_url?: string
@@ -361,6 +379,121 @@ function normalizeVersion(version: string | null | undefined): string | null {
     return null
   }
   return trimmed.startsWith('v') ? trimmed.slice(1) : trimmed
+}
+
+/**
+ * Parse a package version embedded in a GitHub release tarball URL / asset name.
+ * Examples:
+ *   .../lc2panda-panda-code-2.32.3.tgz
+ *   .../panda-code-2.32.3.tgz?X-Amz-...
+ */
+export function versionFromTarballUrl(tarballUrl: string): string | null {
+  try {
+    const pathPart = tarballUrl.split('?')[0] ?? tarballUrl
+    const fileName = decodeURIComponent(pathPart.split('/').pop() ?? '')
+    const match = fileName.match(
+      /(?:^|[-_])v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.]+)?)\.tgz$/i,
+    )
+    return match?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Single source of truth for maxVersion kill-switch + tarball install decisions.
+ *
+ * When remote latest > maxVersion:
+ * - Cap install version to maxVersion
+ * - Drop tarballUrl / preferTarball (tarball always tracks uncapped GH latest)
+ * - Caller must install via npm @maxVersion or skip — never a higher tarball
+ *
+ * When current >= maxVersion while remote is higher: skipUpdate=true.
+ */
+export function resolveInstallTarget(
+  latestInfo: LatestVersionInfo,
+  maxVersion: string | undefined,
+  currentVersion: string,
+): InstallTargetDecision {
+  let version = latestInfo.version
+  let cappedByMaxVersion = false
+
+  if (maxVersion && gt(version, maxVersion)) {
+    if (gte(currentVersion, maxVersion)) {
+      logForDebugging(
+        `resolveInstallTarget: current ${currentVersion} >= maxVersion ${maxVersion}, skip (remote ${version})`,
+      )
+      return {
+        version,
+        preferTarball: false,
+        tarballUrl: undefined,
+        cappedByMaxVersion: true,
+        skipUpdate: true,
+      }
+    }
+    logForDebugging(
+      `resolveInstallTarget: cap ${version} → ${maxVersion}; stripping tarball (would exceed kill-switch)`,
+    )
+    version = maxVersion
+    cappedByMaxVersion = true
+  }
+
+  // Tarball assets are for the remote GH version. After a maxVersion cap they
+  // point at a forbidden higher build — never prefer or fall back to them.
+  const tarballUrl =
+    !cappedByMaxVersion && latestInfo.tarballUrl
+      ? latestInfo.tarballUrl
+      : undefined
+
+  // Prefer tarball only when it is the intended install artifact for `version`
+  // (GH is ahead / npm missing) and we did not cap below that artifact.
+  const preferTarball =
+    !!tarballUrl &&
+    (latestInfo.source === 'github-release' || !latestInfo.npmAvailable)
+
+  return {
+    version,
+    preferTarball,
+    tarballUrl,
+    cappedByMaxVersion,
+    skipUpdate: false,
+  }
+}
+
+/**
+ * Defense-in-depth: refuse a tarball whose embedded version exceeds either the
+ * caller-requested specificVersion or the server maxVersion kill-switch.
+ * Unparseable URLs are refused when any cap is active (fail closed).
+ */
+export function isTarballAllowedForInstall(
+  tarballUrl: string,
+  specificVersion?: string | null,
+  maxVersion?: string | null,
+): boolean {
+  const tarballVersion = versionFromTarballUrl(tarballUrl)
+  const caps = [specificVersion, maxVersion].filter(
+    (v): v is string => typeof v === 'string' && v.length > 0,
+  )
+
+  if (!tarballVersion) {
+    if (caps.length > 0) {
+      logForDebugging(
+        `isTarballAllowedForInstall: cannot parse version from ${tarballUrl} while cap(s) active — reject`,
+      )
+      return false
+    }
+    return true
+  }
+
+  for (const cap of caps) {
+    if (gt(tarballVersion, cap)) {
+      logForDebugging(
+        `isTarballAllowedForInstall: tarball ${tarballVersion} > cap ${cap} — reject`,
+      )
+      return false
+    }
+  }
+  return true
 }
 
 function pickTarballAsset(
@@ -828,7 +961,20 @@ To fix this issue:
       return 'no_permissions'
     }
 
-    const tarballUrl = options?.tarballUrl
+    const rawTarballUrl = options?.tarballUrl
+    // Kill-switch: never install a tarball past specificVersion (caller cap)
+    // or server maxVersion, even if preferTarball was set incorrectly.
+    const maxVersion = await getMaxVersion()
+    const tarballUrl =
+      rawTarballUrl &&
+      isTarballAllowedForInstall(rawTarballUrl, specificVersion, maxVersion)
+        ? rawTarballUrl
+        : undefined
+    if (rawTarballUrl && !tarballUrl) {
+      logForDebugging(
+        `installGlobalPackage: dropped tarball (exceeds maxVersion/specificVersion): ${rawTarballUrl}`,
+      )
+    }
     const preferTarball = options?.preferTarball === true && !!tarballUrl
 
     // Prefer GitHub Release tarball when npm is stale/unavailable
@@ -847,9 +993,20 @@ To fix this issue:
       )
     }
 
-    // Use specific version if provided, otherwise use latest from Packages
-    const packageSpec = specificVersion
-      ? `${MACRO.PACKAGE_URL}@${specificVersion}`
+    // Use specific version if provided, otherwise use latest from Packages.
+    // When maxVersion kill-switch is set, never install above it — even if the
+    // caller forgot to pass specificVersion or passed a higher value.
+    let installVersion = specificVersion || null
+    if (maxVersion) {
+      if (!installVersion || gt(installVersion, maxVersion)) {
+        logForDebugging(
+          `installGlobalPackage: applying maxVersion ${maxVersion} (requested ${installVersion ?? 'latest'})`,
+        )
+        installVersion = maxVersion
+      }
+    }
+    const packageSpec = installVersion
+      ? `${MACRO.PACKAGE_URL}@${installVersion}`
       : MACRO.PACKAGE_URL
 
     // Run from home directory to avoid reading project-level .npmrc/.bunfig.toml
@@ -864,6 +1021,7 @@ To fix this issue:
     }
 
     // Fallback: download GH Release tgz when npm install fails and tarball available
+    // (already filtered against maxVersion / specificVersion above)
     if (tarballUrl) {
       logForDebugging(
         `installGlobalPackage: npm failed, fallback tarball ${tarballUrl}`,

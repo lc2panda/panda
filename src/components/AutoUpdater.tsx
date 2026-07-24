@@ -4,13 +4,13 @@ import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEve
 import { useInterval } from 'usehooks-ts';
 import { useUpdateNotification } from '../hooks/useUpdateNotification.js';
 import { Box, Text } from '../ink.js';
-import { type AutoUpdaterResult, getLatestVersionInfo, getMaxVersion, type InstallStatus, installGlobalPackage, shouldSkipVersion } from '../utils/autoUpdater.js';
+import { type AutoUpdaterResult, getLatestVersionInfo, getMaxVersion, type InstallStatus, installGlobalPackage, resolveInstallTarget, shouldSkipVersion } from '../utils/autoUpdater.js';
 import { getGlobalConfig, isAutoUpdaterDisabled } from '../utils/config.js';
 import { logForDebugging } from '../utils/debug.js';
 import { getCurrentInstallationType } from '../utils/doctorDiagnostic.js';
 import { installOrUpdateClaudePackage, localInstallationExists } from '../utils/localInstaller.js';
 import { removeInstalledSymlink } from '../utils/nativeInstaller/index.js';
-import { gt, gte } from '../utils/semver.js';
+import { gte } from '../utils/semver.js';
 import { getInitialSettings } from '../utils/settings/settings.js';
 type Props = {
   isUpdating: boolean;
@@ -69,23 +69,25 @@ export function AutoUpdater({
     const channel = getInitialSettings()?.autoUpdatesChannel ?? 'latest';
     // Dual-source: npm Packages may lag; GitHub Release often has the true latest
     const latestInfo = await getLatestVersionInfo(channel);
-    let latestVersion = latestInfo?.version ?? null;
     const isDisabled = isAutoUpdaterDisabled();
 
-    // Check if max version is set (server-side kill switch for auto-updates)
+    // Single source of truth: maxVersion kill-switch caps version AND strips
+    // tarballUrl/preferTarball so GH tarball cannot bypass the cap.
     const maxVersion = await getMaxVersion();
-    if (maxVersion && latestVersion && gt(latestVersion, maxVersion)) {
-      logForDebugging(`AutoUpdater: maxVersion ${maxVersion} is set, capping update from ${latestVersion} to ${maxVersion}`);
-      if (gte(currentVersion, maxVersion)) {
-        logForDebugging(`AutoUpdater: current version ${currentVersion} is already at or above maxVersion ${maxVersion}, skipping update`);
-        setVersions({
-          global: currentVersion,
-          latest: latestVersion
-        });
-        return;
-      }
-      latestVersion = maxVersion;
+    if (!latestInfo?.version) {
+      logForDebugging('AutoUpdater: No latest version found');
+      return;
     }
+    const target = resolveInstallTarget(latestInfo, maxVersion, currentVersion);
+    if (target.skipUpdate) {
+      logForDebugging(`AutoUpdater: current version ${currentVersion} is already at or above maxVersion ${maxVersion}, skipping update`);
+      setVersions({
+        global: currentVersion,
+        latest: latestInfo.version
+      });
+      return;
+    }
+    const latestVersion = target.version;
     setVersions({
       global: currentVersion,
       latest: latestVersion
@@ -114,11 +116,10 @@ export function AutoUpdater({
         return;
       }
 
-      const preferTarball =
-        latestInfo?.source === 'github-release' || !latestInfo?.npmAvailable;
+      // preferTarball / tarballUrl already sanitized by resolveInstallTarget
       const globalInstallOpts = {
-        tarballUrl: latestInfo?.tarballUrl,
-        preferTarball: preferTarball === true && !!latestInfo?.tarballUrl,
+        tarballUrl: target.tarballUrl,
+        preferTarball: target.preferTarball,
       };
 
       // Choose the appropriate update method based on what's actually running
@@ -130,9 +131,9 @@ export function AutoUpdater({
         updateMethod = 'local';
         installStatus = await installOrUpdateClaudePackage(channel, latestVersion);
       } else if (installationType === 'npm-global') {
-        // Prefer GH Release tarball when Packages lag behind releases
+        // Prefer GH Release tarball when Packages lag — unless maxVersion capped
         logForDebugging(
-          `AutoUpdater: Using global update method preferTarball=${globalInstallOpts.preferTarball}`,
+          `AutoUpdater: Using global update method preferTarball=${globalInstallOpts.preferTarball} capped=${target.cappedByMaxVersion}`,
         );
         updateMethod = 'global';
         installStatus = await installGlobalPackage(latestVersion, globalInstallOpts);
