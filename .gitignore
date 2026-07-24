@@ -62,6 +62,7 @@ P[0-9]-*.md
 WINDOWS_*.md
 FABLE*.md
 UPSTREAM_*.md
+BUG_HUNT_LIST.md
 .git-rewrite/
 
 # Local test and investigation files
