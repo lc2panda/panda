@@ -13,7 +13,7 @@ coverage
 
 # Non-source artifacts
 package-v2.1.88
-monitor
+monitor/
 docs
 !docs/guides/
 data
@@ -25,6 +25,12 @@ README-DEV.md
 CHANGELOG.md
 CLAUDE.md
 TODO.md
+packages/**/TODO.md
+packages/**/STATUS.md
+packages/**/RELEASE_NOTES*.md
+packages/**/BUILD.md
+packages/**/docs/INSTALL_TEST.md
+packages/**/docs/mac-build.md
 .dev-review/
 .pandacc/worktrees/
 
