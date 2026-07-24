@@ -2123,6 +2123,53 @@ function applySnipRemovals(messages: Map<UUID, TranscriptMessage>): void {
 }
 
 /**
+ * Relink main-chain messages whose parentUuid is unusable for chain walk:
+ * - non-null but missing from the loaded map (flush gaps, channel origins), or
+ * - null on a non-boundary mid-stream root (wechat/channel resume often starts
+ *   a fresh root without forking the prior turn).
+ *
+ * buildConversationChain stops at the first unusable parent, so a single hole
+ * near the tip leaves --resume showing only the newest handful of turns while
+ * thousands of earlier messages remain on disk.
+ *
+ * Walks Map insertion order (= JSONL append order). For each non-sidechain
+ * entry with an unusable parent, rewrite parentUuid to the previous main-chain
+ * message. Sidechain entries are left untouched so agent branches stay
+ * isolated. compact_boundary keeps parentUuid:null (intentional chain cut /
+ * true session start after prune).
+ *
+ * Mutates the Map in place. Must run AFTER applyPreservedSegmentRelinks and
+ * applySnipRemovals so relinks target the post-prune survivor set.
+ */
+function relinkDanglingMainchainParents(
+  messages: Map<UUID, TranscriptMessage>,
+): void {
+  let prevMain: UUID | null = null
+  let relinked = 0
+  for (const [uuid, msg] of messages) {
+    if (msg.isSidechain) {
+      continue
+    }
+    const parent = msg.parentUuid
+    const isBoundary = isCompactBoundaryMessage(msg)
+    const parentUnusable =
+      !isBoundary &&
+      prevMain !== null &&
+      (parent === null || !messages.has(parent))
+    if (parentUnusable) {
+      messages.set(uuid, { ...msg, parentUuid: prevMain })
+      relinked++
+    }
+    prevMain = uuid
+  }
+  if (relinked > 0) {
+    logEvent('tengu_resume_dangling_parent_relinked', {
+      relinked_count: relinked,
+    })
+  }
+}
+
+/**
  * O(n) single-pass: find the message with the latest timestamp matching a predicate.
  * Replaces the `[...values].filter(pred).sort((a,b) => Date(b)-Date(a))[0]` pattern
  * which is O(n log n) + 2n Date allocations.
@@ -3394,6 +3441,7 @@ function walkChainBeforeParse(buf: Buffer): Buffer {
   const PARENT_PREFIX = Buffer.from('{"parentUuid":')
   const UUID_KEY = Buffer.from('"uuid":"')
   const SIDECHAIN_TRUE = Buffer.from('"isSidechain":true')
+  const COMPACT_BOUNDARY_MARKER = Buffer.from('"compact_boundary"')
   const UUID_LEN = 36
   const TS_SUFFIX = Buffer.from('","timestamp":"')
   const TS_SUFFIX_LEN = TS_SUFFIX.length
@@ -3494,10 +3542,28 @@ function walkChainBeforeParse(buf: Buffer): Buffer {
   }
   if (leafSlot < 0) return buf
 
+  // Main-chain slots in file order (non-sidechain only). Used as a fallback
+  // when parentUuid is dangling (uuid not present in this file) or when a
+  // mid-stream entry has parentUuid:null (channel/wechat resume often starts
+  // a new root without forking). Without this, a single hole turns the live
+  // chain into a short tail and the 50% dead-byte gate discards most of the
+  // session — measured on a 10MB resume: ~32 msgs kept vs 1400+ after stitch.
+  // compact_boundary's null parent is intentional and still terminates.
+  const mainSlots: number[] = []
+  const slotToMainOrd = new Map<number, number>()
+  for (let i = 0; i < msgIdx.length; i += 3) {
+    const sc = buf.indexOf(SIDECHAIN_TRUE, msgIdx[i]!)
+    if (sc === -1 || sc >= msgIdx[i + 1]!) {
+      slotToMainOrd.set(i, mainSlots.length)
+      mainSlots.push(i)
+    }
+  }
+
   // Walk parentUuid to root. Collect kept-message line starts and sum their
-  // byte lengths so we can decide whether the concat is worth it. A dangling
-  // parent (uuid not in file) is the normal termination for forked sessions
-  // and post-boundary chains -- same semantics as buildConversationChain.
+  // byte lengths so we can decide whether the concat is worth it. Dangling /
+  // mid-stream-null parents fall back to the previous main-chain entry in
+  // file order so channel-origin and write-gap sessions do not truncate
+  // resume. compact_boundary remains a hard terminator.
   // Correctness against index poisoning rests on the timestamp suffix check
   // above: a nested `"uuid":"` match without the suffix never becomes uk.
   const seen = new Set<number>()
@@ -3509,10 +3575,28 @@ function walkChainBeforeParse(buf: Buffer): Buffer {
     seen.add(slot)
     chain.add(msgIdx[slot]!)
     chainBytes += msgIdx[slot + 1]! - msgIdx[slot]!
+    const lineStart = msgIdx[slot]!
+    const lineEnd = msgIdx[slot + 1]!
+    // compact_boundary is always written with parentUuid:null and is the
+    // intentional pre/post cut — never bridge past it.
+    const boundaryHit = buf.indexOf(COMPACT_BOUNDARY_MARKER, lineStart)
+    if (boundaryHit !== -1 && boundaryHit < lineEnd) break
     const parentStart = msgIdx[slot + 2]!
-    if (parentStart < 0) break
-    const parent = buf.toString('latin1', parentStart, parentStart + UUID_LEN)
-    slot = uuidToSlot.get(parent)
+    if (parentStart >= 0) {
+      const parent = buf.toString('latin1', parentStart, parentStart + UUID_LEN)
+      const next = uuidToSlot.get(parent)
+      if (next !== undefined) {
+        slot = next
+        continue
+      }
+    }
+    // Dangling parentUuid OR mid-stream parentUuid:null: previous main-chain.
+    const ord = slotToMainOrd.get(slot)
+    if (ord !== undefined && ord > 0) {
+      slot = mainSlots[ord - 1]
+      continue
+    }
+    break
   }
 
   // parseJSONL cost scales with bytes, not entry count. A session can have
@@ -3787,6 +3871,9 @@ export async function loadTranscriptFile(
 
   applyPreservedSegmentRelinks(messages)
   applySnipRemovals(messages)
+  // Must follow the two prunes above: relink only against survivors, otherwise
+  // dangling parents can be rewritten to UUIDs that are about to be deleted.
+  relinkDanglingMainchainParents(messages)
 
   // Compute leaf UUIDs once at load time
   // Only user/assistant messages should be considered as leaves for anchoring resume.
