@@ -73,7 +73,7 @@
   - 测试：`bun test src/utils/autoUpdater.maxVersion.test.ts` → **14 pass / 0 fail**
 - **残余**：
   - cap 后即使 GH 上存在 **精确 maxVersion** 的 tarball 也不会选用（一律剥 tarball → 走 npm@max），Packages 滞后时可能装失败（与 H-006 相关，非绕过）
-  - 未对 `installGlobalPackage` 做集成 mock 测；装后版本断言仍见 S-006
+  - 未对 `installGlobalPackage` 做集成 mock 测（装后版本断言已由 S-006 闭合）
 - **位置**（历史描述保留）：  
   - `src/components/AutoUpdater.tsx` ~L75–L88（cap `latestVersion`）  
   - `src/components/AutoUpdater.tsx` ~L117–L138（`preferTarball` 仍用 `latestInfo`）  
@@ -337,7 +337,7 @@
 | S-003 | P2 | **P3** | **主伤已缓解** | walk + relink + 回归测覆盖；relink 失败仅 warn、链可能仍断 | 破坏性 fixture：无 attachment 的 dangling |
 | S-004 | P3 | **P3** | **仍可疑 · 需实机** | 单测覆盖 env 启发式；Win11+Termius 9.x 真彩/256 未验 | 实机截图/COLORTERM |
 | S-005 | P3 | **已修** | **门禁已落地** | 手动脚本须 `CONFIRM_MANUAL_RELEASE=1` + `[MISSING]` 警告；README-DEV 唯一入口 CI | 仍可有意应急绕过（设计如此） |
-| S-006 | P2 | **P2** | **仍可疑（H-001/012 未覆盖装后）** | 装前 URL/cap/integrity 已闸；`installFromTarball` 仅 exit code，无装后版本断言 | 装后 `npm list -g` / package.json 读版本 |
+| S-006 | P2 | **已修** | **已闭合** | 装后 `npm list --json` + `evaluateInstalledVersion`；mismatch/unreadable → 失败，不标 success | 单测：`autoUpdater.maxVersion.test.ts` S-006 段 |
 
 **说明**：scar「compact-boundary / preservedSegment」主路径在 7014efb4e 后有 stitch + relink，**本轮未发现新的已证实 P0 resume 丢上下文**；S-002/S-003 降为 P3 回归面。
 
@@ -364,7 +364,7 @@
 2. ~~H-002/H-008（MCP cwd）~~ / ~~H-003（delivered 语义）~~ / ~~H-004（飞书通知）~~ / ~~H-007（审计）~~ → 第二批全清  
 3. **随后**：H-006 双源 local 对齐、H-009 去空 catch  
 4. **顺带**：Advisor 三连、死代码清理；H-004 残余（失败可观测性）  
-5. **S 系列（§9）**：优先 **S-006** 装后版本断言；~~S-001 提前 begin~~ 已修；~~S-005 流程门禁~~ 已修；S-002/003/004 不急  
+5. **S 系列（§9）**：~~S-006 装后版本断言~~ 已修；~~S-001 提前 begin~~ 已修；~~S-005 流程门禁~~ 已修；S-002/003/004 不急  
 
 每项修复验收建议：**失败必须可观测**（测试断言 + 非空错误日志 + 不误标成功）。
 
@@ -536,7 +536,7 @@
 
 > **审查基线**：`main` 工作区（含第四批修复未提交变更不影响 S 路径）  
 > **方法**：定位路径/行号 → 因果链 → 静态闭合（升级 H / 降级误报缓解 / 仍可疑）→ 重评级 → 成本收益  
-> **对照已修 H**：H-001/H-012 仅装前闸门，**不**闭合 S-006 装后断言；H-005 部分缓解 S-005；compact scar 修复闭合 S-002/S-003 主伤。
+> **对照已修 H**：H-001/H-012 为装前闸门；**S-006 已补装后断言**（与 H-001/H-012 叠加）；H-005 部分缓解 S-005；compact scar 修复闭合 S-002/S-003 主伤。
 
 ### 9.1 总表
 
@@ -547,7 +547,7 @@
 | S-003 | P2 | **P3** | 主伤已缓解 | `walkChainBeforeParse` 保留 boundary 前字节 + `relinkDanglingMainchainParents` + 回归测；relink 失败仅 warn |
 | S-004 | P3 | **P3** | 仍可疑 · 需实机 | `shouldUseDegradedColors`/`isTermius` 有单测；Win11+Termius 9.x 实机未验 |
 | S-005 | P3 | **已修** | 门禁已落地 | 默认拒绝手动脚本；`CONFIRM_MANUAL_RELEASE=1` 应急 + 列出缺失步骤；CI 唯一推荐 |
-| S-006 | P2 | **P2** | 仍可疑 | `installFromTarball` 成功=exit 0；H-001/H-012 只挡装前错误版本 URL，不验装后落地版本 |
+| S-006 | P2 | **已修** | 已闭合 | 装后 `npm list --json` 比对 expected；mismatch/unreadable 不得 success；H-001/H-012 装前闸仍叠加 |
 
 ### 9.2 逐条因果与闭合
 
@@ -619,14 +619,14 @@
 
 | 字段 | 内容 |
 |------|------|
-| **路径** | `/Users/panda/Downloads/cc-panda/src/utils/autoUpdater.ts` L1225–L1338（`installFromTarball`：`npm install -g <file.tgz>`，**成功条件=`exit code===0`**，L1306/L1337 `return 'success'`）；装前闸：`resolveInstallTarget` / `isTarballAllowedForInstall` / `versionFromTarballUrl`（H-001、H-012 测试在 `autoUpdater.maxVersion.test.ts`） |
-| **触发** | tarball 文件名/URL 版本与包内 `package.json` version 不一致；或 npm 装到意外 prefix/旧缓存仍 exit 0；或安装被 npm 生命周期脚本「成功」但 CLI 入口仍旧 |
-| **错误行为** | UI/日志报升级成功，实际 `claude -v` 仍旧或跳到错误版本 |
-| **与 H-001/H-012 关系** | **装前**：maxVersion cap 会 strip tarball；`isTarballAllowedForInstall` 拒超 cap URL；asset 名/integrity 收紧。**装后：无** `npm list -g` / 读安装树 version / 与 `specificVersion` 比对。**H-001/H-012 不能闭合 S-006** |
-| **闭合判定** | **仍可疑**，证据充分到「缺少断言」级，但未拿到「错误版本曾被标 success」的生产复现 → **不升级 H**（升级条件见下）。维持 P2 |
-| **重评级** | 维持 **P2** |
-| **成本/收益** | 成本 2 / 收益 4 → 建议优先级 **高（S 系列内 Top）** |
-| **升级为 H 的条件** | 构造 tgz：文件名 `…-2.32.3.tgz` 内 `version: 9.9.9`（或反之），`installFromTarball` 返回 success 且无校验失败；或 CI 集成断言 `npm list -g --depth=0` |
+| **路径** | `src/utils/autoUpdater.ts`（`installFromTarball` + `queryInstalledPackageVersion` / `evaluateInstalledVersion`）；`src/utils/localInstaller.ts` prefer/fallback tarball 成功路径 |
+| **触发（历史）** | tarball 文件名/URL 版本与包内 `package.json` version 不一致；或 npm 装到意外 prefix/旧缓存仍 exit 0 |
+| **错误行为（历史）** | UI/日志报升级成功，实际 CLI 版本仍旧或跳到错误版本 |
+| **与 H-001/H-012 关系** | **装前**：maxVersion / integrity 闸门。**装后（S-006）**：`npm list --json` 读落地 version，与 `specificVersion` 或 tarball URL 版本比对；不一致或不可读 → 失败 |
+| **闭合判定** | **已修 / 已闭合** |
+| **重评级** | **已修** |
+| **成本/收益** | 成本 2 / 收益 4 |
+| **修复** | `fix(update): assert installed version after tarball install (S-006)` — global `installFromTarball` + local prefer/fallback；单测 mock match/mismatch/unreadable |
 
 ### 9.3 与已修 H 的交叉
 
@@ -637,13 +637,13 @@
 | S-003 | scar + `sessionStorage.resumeChain.test.ts` | **是（主伤）** | walk+relink+测试 |
 | S-004 | H-017 启发式过宽 | 部分 | H-017 是误标面；S-004 是实机显示面 |
 | S-005 | H-005 + scar manual-release | **是（CI + 脚本门禁）** | `CONFIRM_MANUAL_RELEASE=1` + 强警告；默认不可静默旁路 |
-| S-006 | H-001、H-012 | **装前是 / 装后否** | 熔断与 asset 闸 ≠ 装后版本断言 |
+| S-006 | H-001、H-012 | **是（装前+装后）** | 装前 cap/integrity + 装后 version assert 叠加 |
 
 ### 9.4 修复成本×收益（1–5）与建议动手
 
 | ID | 成本 | 收益 | 建议 |
 |----|------|------|------|
-| S-006 | 2 | 4 | **建议动手 #1**：`installFromTarball` success 前读全局包 version / `npm list -g --json` 比对 `specificVersion` |
+| S-006 | 2 | 4 | **已修**：装后 `npm list --json` + `evaluateInstalledVersion`；local/global tarball 路径均断言 |
 | S-001 | 1 | 3 | **已修**：首 chunk early-arm + 超时同步 arm；`usePasteHandler.imageGuard.test.ts`；残余仅分片无扩展名中间态 + 无 E2E |
 | S-005 | 1–2 | 3 | **已修**：`CONFIRM_MANUAL_RELEASE=1` 门禁 + `[MISSING]` 清单 + README-DEV 唯一入口指向 `release-cli.yml` |
 | S-002 | 2 | 2 | 不急；加 malformed boundary fixture 即可 |
@@ -659,4 +659,5 @@
 
 - 2026-07-24 深度审查：未把任一 S 强行升为已证实 H  
 - 2026-07-24 S-001 加固：`fix(paste): arm image paste guard earlier (S-001)` — 源码 + 单测 + 本清单回写  
-- S-002/003/004/006 本轮未改业务源码  
+- 2026-07-24 S-006 修复：`fix(update): assert installed version after tarball install (S-006)` — global/local tarball 装后版本断言 + 单测  
+- S-002/003/004 本轮未改业务源码  

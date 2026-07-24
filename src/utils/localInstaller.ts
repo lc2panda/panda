@@ -6,9 +6,12 @@ import { access, chmod, writeFile } from 'fs/promises'
 import { join } from 'path'
 import {
   downloadReleaseTarball,
+  evaluateInstalledVersion,
   getMaxVersion,
   type InstallGlobalPackageOptions,
   isTarballAllowedForInstall,
+  queryInstalledPackageVersion,
+  resolveExpectedTarballVersion,
 } from './autoUpdater.js'
 import { type ReleaseChannel, saveGlobalConfig } from './config.js'
 import { logForDebugging } from './debug.js'
@@ -229,17 +232,49 @@ export async function installOrUpdateClaudePackage(
           { cwd: localDir, ...LOCAL_NPM_EXEC_OPTS },
         )
         if (tarballResult.code === 0) {
-          saveGlobalConfig(current => ({
-            ...current,
-            installMethod: 'local',
-          }))
-          return 'success'
+          // S-006: exit 0 alone is not enough — assert landed version
+          const expectedVersion = resolveExpectedTarballVersion({
+            specificVersion,
+            tarballUrl: plan.tarballUrl,
+          })
+          const actualVersion = await queryInstalledPackageVersion({
+            cwd: localDir,
+          })
+          const check = evaluateInstalledVersion(
+            expectedVersion,
+            actualVersion,
+          )
+          if (!check.ok) {
+            const msg =
+              check.reason === 'unreadable'
+                ? `local tarball install version assert failed: expected ${check.expected}, could not read installed version`
+                : `local tarball install version mismatch: expected ${check.expected}, got ${check.actual}`
+            logError(new Error(msg))
+            logForDebugging(msg)
+            // fall through to registry rather than mark success
+          } else {
+            if ('skipped' in check && check.skipped) {
+              logForDebugging(
+                'local tarball install: no expectedVersion; skipped post-install version assert (S-006)',
+              )
+            } else if (check.ok && !('skipped' in check)) {
+              logForDebugging(
+                `local tarball install version ok: ${check.actual} (expected ${check.expected})`,
+              )
+            }
+            saveGlobalConfig(current => ({
+              ...current,
+              installMethod: 'local',
+            }))
+            return 'success'
+          }
+        } else {
+          logError(
+            new Error(
+              `Local tarball install failed, falling back to registry: ${tarballResult.stderr || tarballResult.stdout || 'Unknown error'}`,
+            ),
+          )
         }
-        logError(
-          new Error(
-            `Local tarball install failed, falling back to registry: ${tarballResult.stderr || tarballResult.stdout || 'Unknown error'}`,
-          ),
-        )
       } else {
         logForDebugging(
           'installOrUpdateClaudePackage: tarball download failed, falling back to registry',
@@ -287,17 +322,49 @@ export async function installOrUpdateClaudePackage(
             { cwd: localDir, ...LOCAL_NPM_EXEC_OPTS },
           )
           if (fallback.code === 0) {
-            saveGlobalConfig(current => ({
-              ...current,
-              installMethod: 'local',
-            }))
-            return 'success'
+            // S-006: exit 0 alone is not enough — assert landed version
+            const expectedVersion = resolveExpectedTarballVersion({
+              specificVersion,
+              tarballUrl: plan.tarballUrl,
+            })
+            const actualVersion = await queryInstalledPackageVersion({
+              cwd: localDir,
+            })
+            const check = evaluateInstalledVersion(
+              expectedVersion,
+              actualVersion,
+            )
+            if (!check.ok) {
+              const msg =
+                check.reason === 'unreadable'
+                  ? `local tarball fallback version assert failed: expected ${check.expected}, could not read installed version`
+                  : `local tarball fallback version mismatch: expected ${check.expected}, got ${check.actual}`
+              logError(new Error(msg))
+              logForDebugging(msg)
+              // do not mark success
+            } else {
+              if ('skipped' in check && check.skipped) {
+                logForDebugging(
+                  'local tarball fallback: no expectedVersion; skipped post-install version assert (S-006)',
+                )
+              } else if (check.ok && !('skipped' in check)) {
+                logForDebugging(
+                  `local tarball fallback version ok: ${check.actual} (expected ${check.expected})`,
+                )
+              }
+              saveGlobalConfig(current => ({
+                ...current,
+                installMethod: 'local',
+              }))
+              return 'success'
+            }
+          } else {
+            logError(
+              new Error(
+                `Local tarball fallback failed: ${fallback.stderr || fallback.stdout || 'Unknown error'}`,
+              ),
+            )
           }
-          logError(
-            new Error(
-              `Local tarball fallback failed: ${fallback.stderr || fallback.stdout || 'Unknown error'}`,
-            ),
-          )
         }
       }
       const error = new Error(

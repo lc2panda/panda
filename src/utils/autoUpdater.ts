@@ -437,6 +437,158 @@ export function versionFromTarballUrl(tarballUrl: string): string | null {
   }
 }
 
+/** Concrete semver (incl. prerelease/build), not a dist-tag like latest/stable. */
+export function isConcreteInstallVersion(
+  version: string | null | undefined,
+): boolean {
+  const normalized = normalizeVersion(version)
+  if (!normalized) {
+    return false
+  }
+  return /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.]+)?$/.test(normalized)
+}
+
+/**
+ * Resolve the version we expect after a tarball install (S-006).
+ * Prefer explicit specificVersion when concrete; else parse from tarball URL.
+ */
+export function resolveExpectedTarballVersion(options: {
+  specificVersion?: string | null
+  tarballUrl?: string | null
+}): string | null {
+  const fromSpecific = normalizeVersion(options.specificVersion)
+  if (fromSpecific && isConcreteInstallVersion(fromSpecific)) {
+    return fromSpecific
+  }
+  if (options.tarballUrl) {
+    return versionFromTarballUrl(options.tarballUrl)
+  }
+  return null
+}
+
+/**
+ * Parse package version from `npm list [--prefix|--global] <pkg> --json` stdout.
+ * Pure helper for S-006 post-install assertion (unit-testable).
+ */
+export function parseNpmListPackageVersion(
+  npmListJson: string,
+  packageName: string,
+): string | null {
+  try {
+    const parsed = jsonParse(npmListJson.trim()) as {
+      name?: string
+      version?: string
+      dependencies?: Record<string, { version?: string } | undefined>
+    }
+    const dep = parsed.dependencies?.[packageName]
+    if (dep && typeof dep.version === 'string' && dep.version.trim()) {
+      return normalizeVersion(dep.version)
+    }
+    // `npm list <pkg>` sometimes reports the package at the top level
+    if (
+      typeof parsed.version === 'string' &&
+      parsed.version.trim() &&
+      (parsed.name === packageName || !parsed.name)
+    ) {
+      return normalizeVersion(parsed.version)
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function installedVersionMatches(
+  expectedVersion: string,
+  actualVersion: string | null | undefined,
+): boolean {
+  const expected = normalizeVersion(expectedVersion)
+  const actual = normalizeVersion(actualVersion)
+  if (!expected || !actual) {
+    return false
+  }
+  return expected === actual
+}
+
+export type InstalledVersionCheck =
+  | { ok: true; expected: string; actual: string }
+  | {
+      ok: false
+      expected: string
+      actual: string | null
+      reason: 'mismatch' | 'unreadable'
+    }
+  | { ok: true; skipped: true; reason: 'no-expected-version' }
+
+/**
+ * Decide whether a post-install version assert should pass (S-006).
+ * Fail closed when expected is known but actual is missing or different.
+ */
+export function evaluateInstalledVersion(
+  expectedVersion: string | null | undefined,
+  actualVersion: string | null | undefined,
+): InstalledVersionCheck {
+  const expected = normalizeVersion(expectedVersion)
+  if (!expected) {
+    return { ok: true, skipped: true, reason: 'no-expected-version' }
+  }
+  const actual = normalizeVersion(actualVersion)
+  if (!actual) {
+    return {
+      ok: false,
+      expected,
+      actual: null,
+      reason: 'unreadable',
+    }
+  }
+  if (!installedVersionMatches(expected, actual)) {
+    return {
+      ok: false,
+      expected,
+      actual,
+      reason: 'mismatch',
+    }
+  }
+  return { ok: true, expected, actual }
+}
+
+/**
+ * Query the installed version of our package via `npm list --json`.
+ * Ignores npm exit code (list often exits 1 on peer warnings) and parses stdout.
+ */
+export async function queryInstalledPackageVersion(options?: {
+  global?: boolean
+  cwd?: string
+  packageName?: string
+}): Promise<string | null> {
+  const packageName = options?.packageName ?? MACRO.PACKAGE_URL
+  if (!packageName) {
+    return null
+  }
+
+  const args = options?.global
+    ? ['list', '-g', packageName, '--json', '--depth=0']
+    : options?.cwd
+      ? ['list', '--prefix', options.cwd, packageName, '--json', '--depth=0']
+      : ['list', packageName, '--json', '--depth=0']
+
+  const result = await execFileNoThrowWithCwd('npm', args, {
+    cwd: options?.cwd ?? (options?.global ? homedir() : process.cwd()),
+    maxBuffer: 1_000_000,
+    abortSignal: AbortSignal.timeout(NPM_VIEW_TIMEOUT_MS),
+  })
+
+  const out = result.stdout?.trim()
+  if (!out) {
+    logForDebugging(
+      `queryInstalledPackageVersion: empty stdout code=${result.code} stderr=${(result.stderr ?? '').slice(0, 200)}`,
+    )
+    return null
+  }
+
+  return parseNpmListPackageVersion(out, packageName)
+}
+
 /**
  * Single source of truth for maxVersion kill-switch + tarball install decisions.
  *
@@ -1063,7 +1215,14 @@ export async function downloadReleaseTarball(
   }
 }
 
-async function installFromTarball(tarballPath: string): Promise<boolean> {
+/**
+ * Install from a local tarball path (global). Success requires exit 0 AND
+ * (when expectedVersion is known) installed package version match (S-006).
+ */
+async function installFromTarball(
+  tarballPath: string,
+  expectedVersion?: string | null,
+): Promise<boolean> {
   const packageManager = env.isRunningWithBun() ? 'bun' : 'npm'
   const installResult = await execFileNoThrowWithCwd(
     packageManager,
@@ -1078,6 +1237,29 @@ async function installFromTarball(tarballPath: string): Promise<boolean> {
       `tarball install failed: ${installResult.stdout} ${installResult.stderr}`,
     )
     return false
+  }
+
+  // S-006: exit 0 alone is not enough — assert landed version matches request.
+  // Prefer npm list (works for both npm and bun-installed globals that npm sees).
+  const actualVersion = await queryInstalledPackageVersion({ global: true })
+  const check = evaluateInstalledVersion(expectedVersion, actualVersion)
+  if (!check.ok) {
+    const msg =
+      check.reason === 'unreadable'
+        ? `tarball install version assert failed: expected ${check.expected}, could not read installed version`
+        : `tarball install version mismatch: expected ${check.expected}, got ${check.actual}`
+    logError(new AutoUpdaterError(msg))
+    logForDebugging(msg)
+    return false
+  }
+  if ('skipped' in check && check.skipped) {
+    logForDebugging(
+      'tarball install: no expectedVersion; skipped post-install version assert (S-006)',
+    )
+  } else if (check.ok && !('skipped' in check)) {
+    logForDebugging(
+      `tarball install version ok: ${check.actual} (expected ${check.expected})`,
+    )
   }
   return true
 }
@@ -1298,7 +1480,14 @@ To fix this issue:
     if (preferTarball && tarballUrl) {
       logForDebugging(`installGlobalPackage: prefer tarball ${tarballUrl}`)
       tarballPath = await downloadReleaseTarball(tarballUrl, tarballDlOpts)
-      if (tarballPath && (await installFromTarball(tarballPath))) {
+      const expectedVersion = resolveExpectedTarballVersion({
+        specificVersion,
+        tarballUrl,
+      })
+      if (
+        tarballPath &&
+        (await installFromTarball(tarballPath, expectedVersion))
+      ) {
         saveGlobalConfig(current => ({
           ...current,
           installMethod: 'global',
@@ -1346,7 +1535,16 @@ To fix this issue:
       if (!tarballPath) {
         tarballPath = await downloadReleaseTarball(tarballUrl, tarballDlOpts)
       }
-      if (tarballPath && (await installFromTarball(tarballPath))) {
+      const expectedVersion = resolveExpectedTarballVersion({
+        // Use caller-requested version only (not maxVersion-as-installVersion),
+        // so a prefer-tarball install under the cap asserts against the artifact.
+        specificVersion,
+        tarballUrl,
+      })
+      if (
+        tarballPath &&
+        (await installFromTarball(tarballPath, expectedVersion))
+      ) {
         saveGlobalConfig(current => ({
           ...current,
           installMethod: 'global',

@@ -8,15 +8,20 @@
  */
 import { describe, expect, test } from 'bun:test'
 import {
+  evaluateInstalledVersion,
   GH_PACKAGE_TARBALL_PREFIX,
+  installedVersionMatches,
   isAcceptablePackageTarballName,
+  isConcreteInstallVersion,
   isStableChannelRelease,
   isTarballAllowedForInstall,
   type GitHubRelease,
   type LatestVersionInfo,
   MAX_TARBALL_BYTES,
   parseGitHubAssetDigest,
+  parseNpmListPackageVersion,
   pickTarballAsset,
+  resolveExpectedTarballVersion,
   resolveInstallTarget,
   selectGitHubReleaseForChannel,
   versionFromTarballUrl,
@@ -344,5 +349,185 @@ describe('H-012 pickTarballAsset + integrity helpers', () => {
         '2.32.3',
       ),
     ).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// S-006: post-install version assert (tarball success ≠ exit 0 alone)
+// ---------------------------------------------------------------------------
+
+const PKG = '@lc2panda/panda-code'
+const TGZ_2323 =
+  'https://github.com/lc2panda/panda/releases/download/v2.32.3/lc2panda-panda-code-2.32.3.tgz'
+const TGZ_2300 =
+  'https://github.com/lc2panda/panda/releases/download/v2.30.0/lc2panda-panda-code-2.30.0.tgz'
+
+describe('S-006 resolveExpectedTarballVersion', () => {
+  test('prefers concrete specificVersion over tarball URL', () => {
+    expect(
+      resolveExpectedTarballVersion({
+        specificVersion: '2.32.3',
+        tarballUrl: TGZ_2300,
+      }),
+    ).toBe('2.32.3')
+  })
+
+  test('falls back to versionFromTarballUrl when no specificVersion', () => {
+    expect(
+      resolveExpectedTarballVersion({
+        specificVersion: null,
+        tarballUrl: TGZ_2323,
+      }),
+    ).toBe('2.32.3')
+  })
+
+  test('ignores dist-tags as specificVersion', () => {
+    expect(
+      resolveExpectedTarballVersion({
+        specificVersion: 'latest',
+        tarballUrl: TGZ_2300,
+      }),
+    ).toBe('2.30.0')
+    expect(
+      resolveExpectedTarballVersion({
+        specificVersion: 'stable',
+        tarballUrl: null,
+      }),
+    ).toBe(null)
+  })
+
+  test('strips leading v on specificVersion', () => {
+    expect(
+      resolveExpectedTarballVersion({
+        specificVersion: 'v2.32.3',
+        tarballUrl: null,
+      }),
+    ).toBe('2.32.3')
+  })
+})
+
+describe('S-006 isConcreteInstallVersion', () => {
+  test('accepts semver including prerelease', () => {
+    expect(isConcreteInstallVersion('2.32.3')).toBe(true)
+    expect(isConcreteInstallVersion('v2.32.3')).toBe(true)
+    expect(isConcreteInstallVersion('2.32.3-beta.1')).toBe(true)
+  })
+
+  test('rejects dist-tags and empty', () => {
+    expect(isConcreteInstallVersion('latest')).toBe(false)
+    expect(isConcreteInstallVersion('stable')).toBe(false)
+    expect(isConcreteInstallVersion('')).toBe(false)
+    expect(isConcreteInstallVersion(null)).toBe(false)
+  })
+})
+
+describe('S-006 parseNpmListPackageVersion', () => {
+  test('reads version from dependencies map (npm list -g form)', () => {
+    const json = JSON.stringify({
+      dependencies: {
+        [PKG]: { version: '2.32.3', overridden: false },
+      },
+    })
+    expect(parseNpmListPackageVersion(json, PKG)).toBe('2.32.3')
+  })
+
+  test('reads top-level version when name matches', () => {
+    const json = JSON.stringify({
+      name: PKG,
+      version: '2.30.0',
+    })
+    expect(parseNpmListPackageVersion(json, PKG)).toBe('2.30.0')
+  })
+
+  test('returns null when package missing or JSON invalid', () => {
+    expect(
+      parseNpmListPackageVersion(
+        JSON.stringify({ dependencies: { 'other-pkg': { version: '1.0.0' } } }),
+        PKG,
+      ),
+    ).toBe(null)
+    expect(parseNpmListPackageVersion('not-json', PKG)).toBe(null)
+    expect(parseNpmListPackageVersion('', PKG)).toBe(null)
+  })
+
+  test('normalizes leading v on installed version', () => {
+    const json = JSON.stringify({
+      dependencies: { [PKG]: { version: 'v2.32.3' } },
+    })
+    expect(parseNpmListPackageVersion(json, PKG)).toBe('2.32.3')
+  })
+})
+
+describe('S-006 installedVersionMatches / evaluateInstalledVersion', () => {
+  test('match: expected == actual', () => {
+    expect(installedVersionMatches('2.32.3', '2.32.3')).toBe(true)
+    expect(installedVersionMatches('v2.32.3', '2.32.3')).toBe(true)
+    const ok = evaluateInstalledVersion('2.32.3', '2.32.3')
+    expect(ok.ok).toBe(true)
+    if (ok.ok && !('skipped' in ok)) {
+      expect(ok.actual).toBe('2.32.3')
+      expect(ok.expected).toBe('2.32.3')
+    }
+  })
+
+  test('mismatch: installed differs from requested → fail (must not mark success)', () => {
+    expect(installedVersionMatches('2.32.3', '2.30.0')).toBe(false)
+    const bad = evaluateInstalledVersion('2.32.3', '2.30.0')
+    expect(bad.ok).toBe(false)
+    if (!bad.ok) {
+      expect(bad.reason).toBe('mismatch')
+      expect(bad.expected).toBe('2.32.3')
+      expect(bad.actual).toBe('2.30.0')
+    }
+  })
+
+  test('unreadable installed version with known expected → fail closed', () => {
+    const unreadable = evaluateInstalledVersion('2.32.3', null)
+    expect(unreadable.ok).toBe(false)
+    if (!unreadable.ok) {
+      expect(unreadable.reason).toBe('unreadable')
+      expect(unreadable.actual).toBe(null)
+    }
+  })
+
+  test('no expected version → skip (ok, not a hard fail)', () => {
+    const skipped = evaluateInstalledVersion(null, '2.32.3')
+    expect(skipped.ok).toBe(true)
+    if (skipped.ok && 'skipped' in skipped) {
+      expect(skipped.skipped).toBe(true)
+    }
+  })
+
+  test('mock npm list JSON: match vs mismatch end-to-end with resolveExpected', () => {
+    const expected = resolveExpectedTarballVersion({
+      specificVersion: '2.32.3',
+      tarballUrl: TGZ_2323,
+    })
+    expect(expected).toBe('2.32.3')
+
+    const matchJson = JSON.stringify({
+      dependencies: { [PKG]: { version: '2.32.3' } },
+    })
+    const mismatchJson = JSON.stringify({
+      dependencies: { [PKG]: { version: '2.30.0' } },
+    })
+
+    const actualMatch = parseNpmListPackageVersion(matchJson, PKG)
+    const actualMismatch = parseNpmListPackageVersion(mismatchJson, PKG)
+
+    expect(evaluateInstalledVersion(expected, actualMatch).ok).toBe(true)
+    expect(evaluateInstalledVersion(expected, actualMismatch).ok).toBe(false)
+  })
+
+  test('compatible with H-001: expected under maxVersion still asserts exact land', () => {
+    // tarball allowed under max, expected from URL; wrong land still fails
+    expect(isTarballAllowedForInstall(TGZ_2300, null, '2.32.3')).toBe(true)
+    const expected = resolveExpectedTarballVersion({
+      specificVersion: null,
+      tarballUrl: TGZ_2300,
+    })
+    expect(expected).toBe('2.30.0')
+    expect(evaluateInstalledVersion(expected, '2.30.0').ok).toBe(true)
+    expect(evaluateInstalledVersion(expected, '2.32.3').ok).toBe(false)
   })
 })
