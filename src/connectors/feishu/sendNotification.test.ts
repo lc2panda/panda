@@ -133,3 +133,63 @@ test('sendNotification — 网络异常时捕获错误', async () => {
   // 不应抛出错误，应该被内部 catch 捕获
   await expect(connector.sendNotification({ title: 'Test', body: 'Body' })).resolves.toBeUndefined()
 })
+
+// ─── H-004: 默认 MCP connector 必须具备 sendNotification ───
+
+test('MCP sendNotification — 默认/ mcp 工厂实例具备方法 (H-004)', () => {
+  const defaultConn = createFeishuConnector({ platform: 'feishu' })
+  const mcpConn = createFeishuConnector({ platform: 'feishu', mode: 'mcp' })
+  expect(typeof defaultConn.sendNotification).toBe('function')
+  expect(typeof mcpConn.sendNotification).toBe('function')
+})
+
+test('MCP sendNotification — 无 chatId 配置时跳过', async () => {
+  const connector = createFeishuConnector({ platform: 'feishu', mode: 'mcp' })
+  // 不 initialize（避免拉起 MCP 子进程），直接注入 config
+  ;(connector as any).config = { platform: 'feishu', mode: 'mcp' }
+  const callToolSpy = spyOn(connector as any, 'callTool')
+
+  await connector.sendNotification!({ title: 'Test', body: 'Body' })
+
+  expect(callToolSpy).not.toHaveBeenCalled()
+})
+
+test('MCP sendNotification — 有 chatId 时走 feishu_send_message', async () => {
+  const connector = createFeishuConnector({ platform: 'feishu', mode: 'mcp' })
+  ;(connector as any).config = {
+    platform: 'feishu',
+    mode: 'mcp',
+    extra: { chatId: 'oc_mcp_test' },
+  }
+  const mockCallTool = mock(async () => ({ message_id: 'om_test' }))
+  ;(connector as any).callTool = mockCallTool
+
+  await connector.sendNotification!({ title: 'Panda 通知', body: 'MCP 路径消息' })
+
+  expect(mockCallTool).toHaveBeenCalledTimes(1)
+  const [toolName, args] = mockCallTool.mock.calls[0] as unknown as [
+    string,
+    { target: string; content: string; content_type: string },
+  ]
+  expect(toolName).toBe('feishu_send_message')
+  expect(args.target).toBe('oc_mcp_test')
+  expect(args.content_type).toBe('text')
+  expect(args.content).toContain('Panda 通知')
+  expect(args.content).toContain('MCP 路径消息')
+})
+
+test('MCP sendNotification — callTool 失败时捕获错误', async () => {
+  const connector = createFeishuConnector({ platform: 'feishu', mode: 'mcp' })
+  ;(connector as any).config = {
+    platform: 'feishu',
+    mode: 'mcp',
+    extra: { chatId: 'oc_mcp_test' },
+  }
+  ;(connector as any).callTool = mock(async () => {
+    throw new Error('MCP not connected')
+  })
+
+  await expect(
+    connector.sendNotification!({ title: 'Test', body: 'Body' }),
+  ).resolves.toBeUndefined()
+})

@@ -161,6 +161,33 @@ class FeishuMCPConnector extends MCPBridgeConnector {
       return emptyUnreadSummary('feishu')
     }
   }
+
+  /**
+   * 主动通知：经 MCP feishu_send_message 投递文本，语义对齐 API 版。
+   * 默认工厂走 MCP 时 sense 依赖本方法；缺失会导致静默 skip（H-004）。
+   */
+  async sendNotification(notification: PandaNotification): Promise<void> {
+    try {
+      const chatId = (this.config?.extra?.chatId as string) || ''
+      if (!chatId) {
+        logForDebugging('[feishu] sendNotification 跳过: 无配置的通知目标 chat_id')
+        return
+      }
+
+      const title = notification.title || 'Panda 通知'
+      const body = notification.body || ''
+      const content = `${title}\n\n${body}`
+
+      // 直接 callTool，避免 sendMessage 吞错后无法观测失败
+      await this.callTool('feishu_send_message', {
+        target: chatId,
+        content,
+        content_type: 'text',
+      })
+    } catch (e) {
+      logForDebugging(`[feishu] sendNotification 异常: ${(e as Error).message}`)
+    }
+  }
 }
 
 // ─── REST API fallback 模式 ───
