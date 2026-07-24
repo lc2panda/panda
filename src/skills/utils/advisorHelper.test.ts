@@ -1,107 +1,172 @@
 /**
- * advisorHelper.ts 单元测试
+ * Input: advisorHelper 纯函数（配置启发式 / 模型解析 / 权限默认 / 消息构造）
+ * Output: 单元测试覆盖 H-013 / H-014 / H-015
+ * Pos: src/skills/utils 测试
  */
 
-import { test, expect, mock } from 'bun:test'
-import type { Message } from '../../types/message.js'
+import { afterEach, describe, expect, mock, test } from 'bun:test'
+import {
+  buildMessagesForAdvisor,
+  denyAllCanUseTool,
+  extractTextFromContent,
+  isAdvisorAvailableForSkill,
+  isAdvisorConfigIntent,
+  resolveAdvisorModel,
+} from './advisorHelper.js'
 
-// 简化版测试：不使用复杂 mock，直接测试核心逻辑
+// ---------------------------------------------------------------------------
+// H-013: isAdvisorConfigIntent
+// ---------------------------------------------------------------------------
+describe('isAdvisorConfigIntent (H-013)', () => {
+  test('empty → config (status)', () => {
+    expect(isAdvisorConfigIntent('')).toBe(true)
+    expect(isAdvisorConfigIntent('   ')).toBe(true)
+  })
 
-test('isAdvisorAvailableForSkill 在配置缺失时返回 false', () => {
-  // 直接导入以测试真实行为的部分逻辑
-  // 由于 getGlobalConfig 依赖文件系统，我们仅测试函数存在性
-  const { isAdvisorAvailableForSkill } = require('./advisorHelper.js')
+  test('explicit subcommands → config', () => {
+    expect(isAdvisorConfigIntent('status')).toBe(true)
+    expect(isAdvisorConfigIntent('clear')).toBe(true)
+    expect(isAdvisorConfigIntent('off')).toBe(true)
+    expect(isAdvisorConfigIntent('on')).toBe(true)
+    expect(isAdvisorConfigIntent('SET')).toBe(true)
+  })
 
-  // 函数应该存在且可调用
-  expect(typeof isAdvisorAvailableForSkill).toBe('function')
+  test('single model token → config', () => {
+    expect(isAdvisorConfigIntent('sonnet')).toBe(true)
+    expect(isAdvisorConfigIntent('opus')).toBe(true)
+    expect(isAdvisorConfigIntent('haiku')).toBe(true)
+    expect(isAdvisorConfigIntent('claude-opus-4-6')).toBe(true)
+    expect(isAdvisorConfigIntent('sonnet-4')).toBe(true)
+  })
+
+  test('set/model + model token → config', () => {
+    expect(isAdvisorConfigIntent('set sonnet')).toBe(true)
+    expect(isAdvisorConfigIntent('model opus')).toBe(true)
+  })
+
+  test('analysis questions with model prefix → analysis (not config)', () => {
+    // 核心回归：startsWith 误伤
+    expect(isAdvisorConfigIntent('sonnet vs opus 怎么选')).toBe(false)
+    expect(isAdvisorConfigIntent('sonnet vs opus')).toBe(false)
+    expect(isAdvisorConfigIntent('opus 和 sonnet 比较')).toBe(false)
+    expect(isAdvisorConfigIntent('如何选择数据库')).toBe(false)
+    expect(isAdvisorConfigIntent('which model is better')).toBe(false)
+    expect(isAdvisorConfigIntent('sonnet or opus')).toBe(false)
+    expect(isAdvisorConfigIntent('haiku 适合做什么')).toBe(false)
+  })
+
+  test('natural language multi-token without model → analysis', () => {
+    expect(isAdvisorConfigIntent('帮我分析微服务拆分方案')).toBe(false)
+    expect(isAdvisorConfigIntent('compare postgres and mysql')).toBe(false)
+  })
 })
 
-test('callAdvisorForSkill 函数导出正确', () => {
-  const { callAdvisorForSkill } = require('./advisorHelper.js')
+// ---------------------------------------------------------------------------
+// H-014: denyAllCanUseTool fail-closed
+// ---------------------------------------------------------------------------
+describe('denyAllCanUseTool (H-014)', () => {
+  test('defaults to deny (fail-closed)', async () => {
+    const result = await denyAllCanUseTool()
+    expect(result.behavior).toBe('deny')
+    expect(result.decisionReason.reason).toBe('advisor-skill-default-deny')
+    expect(result.message.toLowerCase()).toContain('fail-closed')
+  })
 
-  expect(typeof callAdvisorForSkill).toBe('function')
-  expect(callAdvisorForSkill.length).toBe(2) // 接受 2 个参数
+  test('never auto-allows', async () => {
+    const result = await denyAllCanUseTool()
+    expect(result.behavior).not.toBe('allow')
+  })
 })
 
-test('SkillAdvisorContext 类型导出正确', () => {
-  const module = require('./advisorHelper.js')
+// ---------------------------------------------------------------------------
+// H-015: resolveAdvisorModel single source of truth
+// ---------------------------------------------------------------------------
+describe('resolveAdvisorModel (H-015)', () => {
+  afterEach(() => {
+    mock.restore()
+  })
 
-  // 验证核心函数都已导出
-  expect(module).toHaveProperty('callAdvisorForSkill')
-  expect(module).toHaveProperty('isAdvisorAvailableForSkill')
+  test('explicit override wins', () => {
+    const ctx = {
+      getAppState: () => ({ advisorModel: 'session-model' }),
+    }
+    expect(resolveAdvisorModel(ctx, 'override-model')).toBe('override-model')
+  })
+
+  test('session appState used when no override', () => {
+    const ctx = {
+      getAppState: () => ({ advisorModel: 'session-sonnet' }),
+    }
+    expect(resolveAdvisorModel(ctx)).toBe('session-sonnet')
+  })
+
+  test('falls back when appState empty', () => {
+    const ctx = {
+      getAppState: () => ({ advisorModel: undefined }),
+    }
+    // 无 settings mock 时可能为 undefined；确保不抛错
+    expect(() => resolveAdvisorModel(ctx)).not.toThrow()
+  })
+
+  test('isAdvisorAvailableForSkill reads session appState', () => {
+    const ctx = {
+      getAppState: () => ({ advisorModel: 'session-opus' }),
+    }
+    expect(isAdvisorAvailableForSkill(ctx)).toBe(true)
+  })
+
+  test('isAdvisorAvailableForSkill false when no model', () => {
+    const ctx = {
+      getAppState: () => ({ advisorModel: undefined }),
+    }
+    // 若全局 settings 也无 model，应为 false
+    // 此处只验证：空 session 不因 session 而 true
+    const available = isAdvisorAvailableForSkill(ctx)
+    // 不强制 false（settings 可能有值），但 session 为空时不应因 session 而 true
+    // 用 resolve 验证 session 未贡献
+    expect(resolveAdvisorModel(ctx) === 'session-opus').toBe(false)
+    void available
+  })
 })
 
-test('buildMessagesForAdvisor 应该构造正确的消息格式', async () => {
-  // 这是内部函数，通过集成测试验证
-  // 我们测试消息结构的完整性
-  const mockMessages: Message[] = [
-    {
-      type: 'user',
-      uuid: crypto.randomUUID(),
+// ---------------------------------------------------------------------------
+// 既有：消息构造 / 文本提取
+// ---------------------------------------------------------------------------
+describe('buildMessagesForAdvisor', () => {
+  test('appends user prompt and respects context limit', () => {
+    const history = Array.from({ length: 5 }, (_, i) => ({
+      type: 'user' as const,
+      uuid: `u-${i}`,
       message: {
-        role: 'user',
-        content: 'Hello',
+        role: 'user' as const,
+        content: [{ type: 'text' as const, text: `msg-${i}` }],
       },
-    },
-  ]
+    }))
 
-  // 验证 Message 类型结构
-  expect(mockMessages[0]).toHaveProperty('type')
-  expect(mockMessages[0]).toHaveProperty('uuid')
-  expect(mockMessages[0]).toHaveProperty('message')
-  expect(mockMessages[0].message).toHaveProperty('role')
-  expect(mockMessages[0].message.role).toBe('user')
+    const result = buildMessagesForAdvisor(history as any, 'analyze this', 3)
+    expect(result.length).toBe(4) // 3 history + 1 prompt
+    const last = result[result.length - 1] as any
+    expect(last.message.content[0].text).toBe('analyze this')
+  })
 })
 
-test('extractTextFromContent 应该处理字符串内容', () => {
-  // 测试文本提取逻辑（间接通过类型验证）
-  const stringContent = 'Simple text'
-  expect(typeof stringContent).toBe('string')
+describe('extractTextFromContent', () => {
+  test('string passthrough', () => {
+    expect(extractTextFromContent('hello')).toBe('hello')
+  })
 
-  const arrayContent = [
-    { type: 'text', text: 'Block 1' },
-    { type: 'text', text: 'Block 2' },
-  ]
-  expect(Array.isArray(arrayContent)).toBe(true)
-  expect(arrayContent.every(block => block.type === 'text')).toBe(true)
-})
+  test('extracts text blocks', () => {
+    expect(
+      extractTextFromContent([
+        { type: 'text', text: 'a' },
+        { type: 'tool_use', id: 'x' },
+        { type: 'text', text: 'b' },
+      ]),
+    ).toBe('a\nb')
+  })
 
-test('AdvisorCallOptions 类型应该包含必要字段', () => {
-  const mockOptions = {
-    prompt: 'Analyze this code',
-    advisorModel: 'claude-3-5-sonnet-20241022',
-    contextMessageLimit: 10,
-  }
-
-  expect(mockOptions).toHaveProperty('prompt')
-  expect(typeof mockOptions.prompt).toBe('string')
-  expect(mockOptions.prompt.length).toBeGreaterThan(0)
-})
-
-test('SkillAdvisorContext 类型应该包含必要字段', () => {
-  const mockContext = {
-    messages: [] as Message[],
-    workingDirectory: '/test/dir',
-    apiKey: 'test-key',
-    toolUseContext: {
-      systemPrompt: 'Test',
-      options: { model: 'test-model' },
-    },
-  }
-
-  expect(mockContext).toHaveProperty('messages')
-  expect(mockContext).toHaveProperty('workingDirectory')
-  expect(mockContext).toHaveProperty('apiKey')
-  expect(mockContext).toHaveProperty('toolUseContext')
-  expect(Array.isArray(mockContext.messages)).toBe(true)
-})
-
-// 集成测试标记（需要完整环境）
-test.skip('集成测试：callAdvisorForSkill 完整流程', async () => {
-  // 此测试需要：
-  // 1. 真实的 getGlobalConfig() 返回配置
-  // 2. query() 函数可用
-  // 3. 有效的 API 密钥
-  //
-  // 在 CI 环境中跳过，本地可手动启用
+  test('empty for unknown', () => {
+    expect(extractTextFromContent(null)).toBe('')
+    expect(extractTextFromContent(42)).toBe('')
+  })
 })

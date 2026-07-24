@@ -242,27 +242,30 @@
 
 #### H-013｜advisor 配置命令启发式误伤分析问题
 - **级别**：P2  
-- **状态**：已证实  
-- **位置**：`src/skills/bundled/advisor.ts` `isConfigCommand` ~L34–L44  
+- **状态**：已修复  
+- **位置**：`src/skills/utils/advisorHelper.ts` `isAdvisorConfigIntent`；`src/skills/bundled/advisor.ts` `isConfigCommand`  
 - **因果**：`startsWith('sonnet'|'opus'|...)` 使「sonnet vs opus 怎么选」类问题走配置分支而非决策分析  
-- **建议**：完整 token 匹配 + 显式 subcommand（`set`/`status`/`clear`）  
+- **修复**：整词 model token + 显式 subcommand；分析标记（vs/怎么/如何/比较 等）强制决策分析  
+- **验证**：`bun test src/skills/utils/advisorHelper.test.ts`（H-013 用例全过）
 
 #### H-014｜advisorHelper 默认 `canUseTool: () => true`
 - **级别**：P2（潜伏；当前技能主路径未调用 helper）  
-- **状态**：已证实（代码存在）  
-- **位置**：`src/skills/utils/advisorHelper.ts` ~L89  
+- **状态**：已修复  
+- **位置**：`src/skills/utils/advisorHelper.ts` `denyAllCanUseTool` / `callAdvisorForSkill`  
 - **因果**：未来调用方若漏传 canUseTool，顾问侧工具自动放行  
-- **建议**：默认拒绝或继承父会话严格策略；禁止 true 默认  
+- **修复**：默认 fail-closed `denyAllCanUseTool`；优先级 options.canUseTool > toolUseContext.canUseTool > deny  
+- **验证**：`bun test src/skills/utils/advisorHelper.test.ts`（H-014 用例全过）
 
 #### H-015｜advisorModel 双数据源不一致
 - **级别**：P2  
-- **状态**：已证实  
+- **状态**：已修复  
 - **位置**：  
-  - 技能：`appState.advisorModel`（`advisor.ts` ~L55–L56）  
-  - helper：`getGlobalConfig().settings?.advisorModel`（`advisorHelper.ts` ~L49–L50）  
+  - 统一入口：`resolveAdvisorModel`（`advisorHelper.ts`）  
+  - 技能 / helper 均经此解析  
   - 设置 schema：`src/utils/settings/types.ts` ~L809  
 - **因果**：用户经 `/advisor sonnet` 写入的 appState 与 helper 读取的 globalConfig.settings 可能分叉 → `isAdvisorAvailableForSkill` 误判  
-- **建议**：单一来源（settings 持久化 + 统一 getter）  
+- **修复**：单一解析链 override → appState.advisorModel → `getInitialAdvisorSetting()`（settings）；废弃 `getGlobalConfig().settings`  
+- **验证**：`bun test src/skills/utils/advisorHelper.test.ts`（H-015 用例全过）  
 
 ---
 

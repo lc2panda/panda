@@ -4,11 +4,21 @@
  * Pos: 技能层与 query() 核心接口之间的适配桥梁
  *
  * 为技能提供顾问模型调用能力，封装消息构造、可用性检查、结果提取等逻辑。
+ *
+ * 数据源约定（H-015）：
+ *   resolveAdvisorModel 是唯一解析入口：
+ *   1) options.advisorModel 显式覆盖
+ *   2) 会话 appState.advisorModel（/advisor 命令写入）
+ *   3) 持久化 settings.advisorModel（getInitialAdvisorSetting）
+ *   禁止读取 getGlobalConfig().settings（GlobalConfig 无 settings 字段）。
+ *
+ * 权限约定（H-014）：
+ *   canUseTool 默认 fail-closed 拒绝；禁止 () => true 自动放行。
  */
 
 import type { Message } from '../../types/message.js'
 import { query } from '../../query.js'
-import { getGlobalConfig } from '../../utils/config.js'
+import { getInitialAdvisorSetting } from '../../utils/advisor.js'
 import type { QuerySource } from '../../constants/querySource.js'
 
 /**
@@ -21,7 +31,7 @@ export interface SkillAdvisorContext {
   workingDirectory: string
   /** API 密钥 */
   apiKey: string
-  /** 技能的 toolUseContext（包含模型配置、系统提示等） */
+  /** 技能的 toolUseContext（包含模型配置、系统提示、canUseTool、getAppState 等） */
   toolUseContext: any // 使用 any 以兼容现有架构
 }
 
@@ -35,6 +45,161 @@ export interface AdvisorCallOptions {
   advisorModel?: string
   /** 可选：限制上下文消息数量（默认 10 条） */
   contextMessageLimit?: number
+  /**
+   * 可选：工具审批回调。若缺省，回退到 toolUseContext.canUseTool；
+   * 二者皆缺时 fail-closed 拒绝（H-014）。
+   */
+  canUseTool?: (tool: unknown, input: unknown) => unknown
+}
+
+/** AppState 子集：仅取 advisorModel */
+type AdvisorAppStateSlice = { advisorModel?: string }
+
+/** 可提供 getAppState 的上下文（ToolUseContext 子集） */
+export type AdvisorModelContext = {
+  getAppState?: () => AdvisorAppStateSlice
+}
+
+/**
+ * Fail-closed 默认 canUseTool：拒绝一切工具调用（H-014）。
+ * 调用方必须显式传入 canUseTool 才能放行。
+ */
+export async function denyAllCanUseTool(): Promise<{
+  behavior: 'deny'
+  message: string
+  decisionReason: { type: 'other'; reason: string }
+}> {
+  return {
+    behavior: 'deny',
+    message:
+      'Advisor skill denies tool use by default (fail-closed). Pass canUseTool explicitly to grant permissions.',
+    decisionReason: {
+      type: 'other',
+      reason: 'advisor-skill-default-deny',
+    },
+  }
+}
+
+/**
+ * 统一解析 advisorModel（H-015 单一事实源）。
+ *
+ * 优先级：
+ * 1. explicitOverride（调用方 options.advisorModel）
+ * 2. 会话 appState.advisorModel（/advisor 写入，与技能一致）
+ * 3. 持久化 settings.advisorModel（getInitialAdvisorSetting）
+ */
+export function resolveAdvisorModel(
+  toolUseContext?: AdvisorModelContext | null,
+  explicitOverride?: string,
+): string | undefined {
+  if (explicitOverride && explicitOverride.trim()) {
+    return explicitOverride.trim()
+  }
+
+  try {
+    const sessionModel = toolUseContext?.getAppState?.()?.advisorModel
+    if (sessionModel && sessionModel.trim()) {
+      return sessionModel.trim()
+    }
+  } catch {
+    // getAppState 不可用时回退 settings
+  }
+
+  return getInitialAdvisorSetting()
+}
+
+/**
+ * 判断输入是否为明确的配置意图（H-013）。
+ *
+ * 仅下列情况走配置分支：
+ * - 空输入（status）
+ * - 整词 subcommand：clear / status / off / on
+ * - 单 token 模型名（sonnet / opus / haiku / claude…）
+ * - `set <model>` / `model <model>`
+ *
+ * 含分析问法（vs / 怎么 / 如何 / 比较 等）→ 决策分析。
+ */
+export function isAdvisorConfigIntent(args: string): boolean {
+  const trimmed = args.trim()
+  if (!trimmed) return true // empty → status
+
+  const lower = trimmed.toLowerCase()
+
+  // 分析问法优先：一旦命中，绝不走配置
+  if (hasAnalysisIntent(lower)) {
+    return false
+  }
+
+  const tokens = lower.split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return true
+
+  // 显式 subcommand
+  const CONFIG_SUBCOMMANDS = new Set([
+    'clear',
+    'status',
+    'off',
+    'on',
+    'set',
+    'model',
+  ])
+  if (tokens.length === 1 && CONFIG_SUBCOMMANDS.has(tokens[0]!)) {
+    return true
+  }
+
+  // set <model> / model <model>
+  if (
+    tokens.length === 2 &&
+    (tokens[0] === 'set' || tokens[0] === 'model') &&
+    looksLikeModelToken(tokens[1]!)
+  ) {
+    return true
+  }
+
+  // 仅单 token 且像模型名 → 配置（/advisor sonnet）
+  if (tokens.length === 1 && looksLikeModelToken(tokens[0]!)) {
+    return true
+  }
+
+  // 其余（含多 token 自然语言）→ 决策分析
+  return false
+}
+
+/** CJK / 英文分析意图标记 */
+function hasAnalysisIntent(lowerText: string): boolean {
+  const cjkMarkers = [
+    '怎么',
+    '如何',
+    '比较',
+    '选择',
+    '哪个',
+    '哪款',
+    '区别',
+    '还是',
+    '推荐',
+    '建议',
+    '适合',
+    '为什么',
+  ]
+  if (cjkMarkers.some(m => lowerText.includes(m))) {
+    return true
+  }
+
+  // 英文整词匹配，避免 startsWith 误伤
+  return /\b(vs|versus|compare|comparison|which|better|difference|what|why|how|or)\b/i.test(
+    lowerText,
+  )
+}
+
+function looksLikeModelToken(token: string): boolean {
+  const SHORT = new Set(['sonnet', 'opus', 'haiku'])
+  if (SHORT.has(token)) return true
+  // claude / claude-sonnet-4-... / claude-3-5-sonnet-...
+  if (token.startsWith('claude')) return true
+  // sonnet-4 / opus@... 等扩展写法
+  for (const m of SHORT) {
+    if (token.startsWith(m + '-') || token.startsWith(m + '@')) return true
+  }
+  return false
 }
 
 /**
@@ -49,7 +214,7 @@ export interface AdvisorCallOptions {
  * ```typescript
  * const result = await callAdvisorForSkill(
  *   { messages, workingDirectory, apiKey, toolUseContext },
- *   { prompt: '分析当前代码库的架构模式' }
+ *   { prompt: '分析当前代码库的架构模式', canUseTool: parentCanUseTool }
  * )
  * ```
  */
@@ -57,41 +222,43 @@ export async function callAdvisorForSkill(
   context: SkillAdvisorContext,
   options: AdvisorCallOptions,
 ): Promise<string> {
-  // 1. 检查可用性
-  if (!isAdvisorAvailableForSkill()) {
+  // 1. 解析模型（单一事实源，H-015）
+  const advisorModel = resolveAdvisorModel(
+    context.toolUseContext,
+    options.advisorModel,
+  )
+  if (!advisorModel) {
     throw new Error(
-      'Advisor not configured. Set advisorModel in global config (~/.pandacc/config.json).',
+      'Advisor not configured. Run `/advisor <model>` or set settings.advisorModel.',
     )
   }
 
-  // 2. 获取顾问模型配置
-  const config = getGlobalConfig()
-  const advisorModel = options.advisorModel || config.settings?.advisorModel
-  if (!advisorModel) {
-    throw new Error('advisorModel not specified in config or options')
-  }
-
-  // 3. 构造消息数组
+  // 2. 构造消息数组
   const messages = buildMessagesForAdvisor(
     context.messages,
     options.prompt,
     options.contextMessageLimit,
   )
 
+  // 3. 权限：显式 options > toolUseContext > fail-closed deny（H-014）
+  const canUseTool =
+    options.canUseTool ??
+    (typeof context.toolUseContext?.canUseTool === 'function'
+      ? context.toolUseContext.canUseTool
+      : denyAllCanUseTool)
+
   // 4. 构造 QueryParams
-  // 注意：根据当前架构，query() 需要完整的 QueryParams
-  // 这里使用 toolUseContext 提供必要参数
   const queryParams = {
     messages,
     systemPrompt: context.toolUseContext.systemPrompt || '',
     userContext: context.toolUseContext.userContext || {},
     systemContext: context.toolUseContext.systemContext || {},
-    canUseTool: context.toolUseContext.canUseTool || (() => true),
+    canUseTool,
     toolUseContext: {
       ...context.toolUseContext,
       options: {
         ...context.toolUseContext.options,
-        model: advisorModel, // 使用顾问模型
+        model: advisorModel,
         apiKey: context.apiKey,
       },
     },
@@ -105,12 +272,13 @@ export async function callAdvisorForSkill(
 
   try {
     for await (const event of query(queryParams)) {
-      // 收集 assistant 消息内容
       if (event.type === 'assistant') {
         lastAssistantContent = event.message?.content
       }
-      // 也可以收集 content_block_delta 等流式事件
-      if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+      if (
+        event.type === 'content_block_delta' &&
+        event.delta?.type === 'text_delta'
+      ) {
         responseChunks.push(event.delta.text || '')
       }
     }
@@ -121,7 +289,6 @@ export async function callAdvisorForSkill(
   }
 
   // 6. 提取顾问结果
-  // 优先使用流式累积文本，如果为空则从最终消息提取
   if (responseChunks.length > 0) {
     return responseChunks.join('')
   }
@@ -134,14 +301,16 @@ export async function callAdvisorForSkill(
 }
 
 /**
- * 检查顾问是否可用
+ * 检查顾问是否可用（H-015：与 resolveAdvisorModel 同源）。
  *
- * @returns true 如果全局配置中存在 advisorModel
+ * @param toolUseContext 可选；传入时可读取会话 appState.advisorModel
+ * @returns true 当会话或持久化 settings 中存在 advisorModel
  */
-export function isAdvisorAvailableForSkill(): boolean {
+export function isAdvisorAvailableForSkill(
+  toolUseContext?: AdvisorModelContext | null,
+): boolean {
   try {
-    const config = getGlobalConfig()
-    return !!(config.settings?.advisorModel)
+    return !!resolveAdvisorModel(toolUseContext)
   } catch {
     return false
   }
@@ -155,15 +324,13 @@ export function isAdvisorAvailableForSkill(): boolean {
  * @param contextLimit 上下文消息数量限制（默认 10）
  * @returns 格式化的消息数组
  */
-function buildMessagesForAdvisor(
+export function buildMessagesForAdvisor(
   conversationHistory: Message[],
   userPrompt: string,
   contextLimit: number = 10,
 ): Message[] {
-  // 截取最近 N 条消息作为上下文
   const recentMessages = conversationHistory.slice(-contextLimit)
 
-  // 添加用户问题（构造简单的 UserMessage）
   const userMessage: Message = {
     type: 'user',
     uuid: crypto.randomUUID(),
@@ -187,7 +354,7 @@ function buildMessagesForAdvisor(
  * @param content 消息内容（string | ContentBlock[]）
  * @returns 提取的文本
  */
-function extractTextFromContent(content: any): string {
+export function extractTextFromContent(content: any): string {
   if (typeof content === 'string') {
     return content
   }

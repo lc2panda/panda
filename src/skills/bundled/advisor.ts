@@ -10,32 +10,33 @@
 // 2. 推理执行模式（真实 advisor API 调用）：
 //    - /advisor 如何选择数据库？ → 调用 advisorHelper 进行深度分析
 //
-// 配置持久化对齐：
-// - 读取路径：getAppState().advisorModel (来自 settings.advisorModel)
-// - 示例配置：{ "advisorModel": "claude-opus-4-6" }
+// 配置持久化对齐（H-015）：
+// - 读取路径：resolveAdvisorModel = appState.advisorModel ?? settings.advisorModel
+// - 写入路径：/advisor 命令同步写 appState + settings
 // - 未配置时友好提示配置方式，不静默失败
+//
+// H-013：配置启发式收紧，仅明确配置意图走配置分支
+// H-014：工具审批 fail-closed，经 toolUseContext.canUseTool 继承调用方
 
 import type { ContentBlockParam } from '@anthropic-ai/sdk/resources/messages.mjs'
 import type { ToolUseContext } from '../../Tool.js'
 import type { Message } from '../../types/message.js'
 import { registerBundledSkill } from '../bundledSkills.js'
-import { callAdvisorForSkill, isAdvisorAvailableForSkill } from '../utils/advisorHelper.js'
+import {
+  callAdvisorForSkill,
+  isAdvisorAvailableForSkill,
+  isAdvisorConfigIntent,
+  resolveAdvisorModel,
+} from '../utils/advisorHelper.js'
 
 /**
- * 判断 args 是否为配置命令（而非问题描述）
+ * 判断 args 是否为配置命令（而非问题描述）。
+ * 委托 isAdvisorConfigIntent（H-013）：
+ * - 仅整词 model 名 / 显式 subcommand 走配置
+ * - 「sonnet vs opus 怎么选」等分析问法走决策分析
  */
-function isConfigCommand(args: string): boolean {
-  const trimmed = args.trim().toLowerCase()
-  return (
-    !trimmed || // 空参数 → 显示状态
-    trimmed === 'status' ||
-    trimmed === 'off' ||
-    trimmed === 'unset' ||
-    trimmed.startsWith('claude-') || // 模型名称模式
-    trimmed.startsWith('opus') ||
-    trimmed.startsWith('sonnet') ||
-    trimmed.startsWith('haiku')
-  )
+export function isConfigCommand(args: string): boolean {
+  return isAdvisorConfigIntent(args)
 }
 
 /**
@@ -63,16 +64,17 @@ function buildConfigPrompt(args: string): string {
  */
 async function executeAdvisorQuery(
   question: string,
-  context: ToolUseContext
+  context: ToolUseContext,
 ): Promise<ContentBlockParam[]> {
-  const appState = context.getAppState()
-  const advisorModel = appState.advisorModel
+  // H-015：与 helper 同源解析（appState → settings）
+  const advisorModel = resolveAdvisorModel(context)
 
   // 配置检查
   if (!advisorModel) {
-    return [{
-      type: 'text',
-      text: `⚠️ **顾问模型未配置**
+    return [
+      {
+        type: 'text',
+        text: `⚠️ **顾问模型未配置**
 
 请先设置顾问模型以启用真实 advisor 调用：
 
@@ -80,15 +82,17 @@ async function executeAdvisorQuery(
 /advisor claude-opus-4-6
 \`\`\`
 
-或使用其他支持的模型（opus/sonnet/haiku 系列）。`
-    }]
+或使用其他支持的模型（opus/sonnet/haiku 系列）。`,
+      },
+    ]
   }
 
-  // 可用性检查
-  if (!isAdvisorAvailableForSkill()) {
-    return [{
-      type: 'text',
-      text: `⚠️ **Advisor 功能未启用**
+  // 可用性检查（同源，含会话 appState）
+  if (!isAdvisorAvailableForSkill(context)) {
+    return [
+      {
+        type: 'text',
+        text: `⚠️ **Advisor 功能未启用**
 
 需要配置 advisorModel 并确保 API 访问正常。
 当前配置：\`${advisorModel}\`
@@ -96,51 +100,68 @@ async function executeAdvisorQuery(
 如果问题持续，请检查：
 - API Key 是否有效（运行 \`panda config\` 验证）
 - 是否有网络连接
-- 模型名称是否正确`
-    }]
+- 模型名称是否正确`,
+      },
+    ]
   }
 
   try {
     // 调用 advisorHelper 真实实现
-    const result = await callAdvisorForSkill({
-      messages: context.messages as Message[],
-      workingDirectory: context.cwd || process.cwd(),
-      apiKey: context.options?.apiKey || '',
-      toolUseContext: context
-    }, {
-      prompt: question,
-      advisorModel,
-      contextMessageLimit: 10  // 限制上下文长度，控制成本
-    })
+    // H-014：canUseTool 由 toolUseContext 继承；helper 侧 fail-closed
+    const result = await callAdvisorForSkill(
+      {
+        messages: (context as ToolUseContext & { messages?: Message[] })
+          .messages as Message[],
+        workingDirectory:
+          (context as ToolUseContext & { cwd?: string }).cwd || process.cwd(),
+        apiKey:
+          (context as ToolUseContext & { options?: { apiKey?: string } }).options
+            ?.apiKey || '',
+        toolUseContext: context,
+      },
+      {
+        prompt: question,
+        advisorModel,
+        contextMessageLimit: 10, // 限制上下文长度，控制成本
+      },
+    )
 
-    return [{
-      type: 'text',
-      text: result,
-      cache_control: { type: 'ephemeral' }  // 启用 prompt caching
-    }]
-
+    return [
+      {
+        type: 'text',
+        text: result,
+        cache_control: { type: 'ephemeral' }, // 启用 prompt caching
+      },
+    ]
   } catch (error) {
     // 错误分级处理
     const errorMessage = error instanceof Error ? error.message : String(error)
 
     if (errorMessage.includes('429')) {
-      return [{
-        type: 'text',
-        text: `⚠️ **API 限流**
+      return [
+        {
+          type: 'text',
+          text: `⚠️ **API 限流**
 
 请求过于频繁，请稍后重试（建议等待 1-2 分钟）。
 
 如果频繁遇到此问题，可以：
 - 减少 advisor 调用频率
 - 检查 API 配额使用情况
-- 考虑升级 API 套餐`
-      }]
+- 考虑升级 API 套餐`,
+        },
+      ]
     }
 
-    if (errorMessage.includes('401') || errorMessage.includes('API Key') || errorMessage.includes('authentication')) {
-      return [{
-        type: 'text',
-        text: `❌ **认证失败**
+    if (
+      errorMessage.includes('401') ||
+      errorMessage.includes('API Key') ||
+      errorMessage.includes('authentication')
+    ) {
+      return [
+        {
+          type: 'text',
+          text: `❌ **认证失败**
 
 API Key 无效或已过期。
 
@@ -149,14 +170,19 @@ API Key 无效或已过期。
 2. 确认 Key 权限包含 Messages API 访问
 3. 检查 Key 是否已被撤销
 
-当前 advisor 模型：\`${advisorModel}\``
-      }]
+当前 advisor 模型：\`${advisorModel}\``,
+        },
+      ]
     }
 
-    if (errorMessage.includes('400') || errorMessage.includes('invalid_request')) {
-      return [{
-        type: 'text',
-        text: `❌ **请求格式错误**
+    if (
+      errorMessage.includes('400') ||
+      errorMessage.includes('invalid_request')
+    ) {
+      return [
+        {
+          type: 'text',
+          text: `❌ **请求格式错误**
 
 ${errorMessage}
 
@@ -165,24 +191,32 @@ ${errorMessage}
 - 上下文过长（当前限制：10 条消息）
 - 模型不支持当前请求格式
 
-请尝试简化问题描述或清空上下文后重试。`
-      }]
+请尝试简化问题描述或清空上下文后重试。`,
+        },
+      ]
     }
 
     // 通用错误
-    return [{
-      type: 'text',
-      text: `❌ **Advisor 执行失败**
+    const messageCount =
+      (context as ToolUseContext & { messages?: Message[] }).messages?.length ??
+      0
+    const cwd =
+      (context as ToolUseContext & { cwd?: string }).cwd || process.cwd()
+    return [
+      {
+        type: 'text',
+        text: `❌ **Advisor 执行失败**
 
 ${errorMessage}
 
 **调试信息**：
 - Advisor 模型：\`${advisorModel}\`
-- 工作目录：\`${context.cwd || process.cwd()}\`
-- 上下文消息数：${context.messages.length}
+- 工作目录：\`${cwd}\`
+- 上下文消息数：${messageCount}
 
-如果问题持续，请提供上述信息寻求支持。`
-    }]
+如果问题持续，请提供上述信息寻求支持。`,
+      },
+    ]
   }
 }
 

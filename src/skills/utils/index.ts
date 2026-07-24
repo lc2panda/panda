@@ -9,6 +9,10 @@
 export {
   callAdvisorForSkill,
   isAdvisorAvailableForSkill,
+  isAdvisorConfigIntent,
+  resolveAdvisorModel,
+  denyAllCanUseTool,
   type SkillAdvisorContext,
   type AdvisorCallOptions,
+  type AdvisorModelContext,
 } from './advisorHelper.js'
