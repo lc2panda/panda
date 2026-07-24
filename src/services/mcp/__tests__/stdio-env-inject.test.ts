@@ -254,10 +254,11 @@ describe('Stdio MCP server env 注入 (Wave3-E2)', () => {
     expect(src).not.toMatch(
       /new StdioClientTransport\(\{[\s\S]{0,400}?cwd:\s*getOriginalCwd\s*\(/,
     )
-    // Scar: finalCommand must not go through resolveWindowsCommand
+    // H-016 / scar: resolveWindowsCommand must not exist or be called on spawn path
     expect(src).not.toMatch(
-      /resolveWindowsCommand\s*\(\s*(?:stdioRef\.command|finalCommand)/,
+      /(?:export\s+)?function\s+resolveWindowsCommand\s*\(/,
     )
+    expect(src).not.toMatch(/resolveWindowsCommand\s*\(/)
     const commandAssign = src.match(
       /const finalCommand =\s*process\.env\.CLAUDE_CODE_SHELL_PREFIX \|\| stdioRef\.command/,
     )

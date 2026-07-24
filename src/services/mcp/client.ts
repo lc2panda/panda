@@ -317,7 +317,7 @@ const isComputerUseMCPServer = feature('CHICAGO_MCP')
   : undefined
 
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
-import { basename, dirname, extname, isAbsolute, join, resolve } from 'path'
+import { dirname, isAbsolute, join, resolve } from 'path'
 import { getClaudeConfigHomeDir } from '../../utils/envUtils.js'
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { jsonParse, jsonStringify } from '../../utils/slowOperations.js'
@@ -540,79 +540,10 @@ export function enqueueMcpStartupByCwd<T>(
   return current
 }
 
-export function resolveWindowsCommand(command: string): string {
-  // 已经是绝对路径且包含扩展名，直接返回
-  if (isAbsolute(command) && extname(command)) {
-    return command
-  }
-
-  // 已包含扩展名（相对路径），直接返回
-  if (extname(command)) {
-    return command
-  }
-
-  // Windows 下通过包管理器安装的 .cmd 脚本
-  // 这些命令在 Windows 上是批处理脚本，需要添加 .cmd 扩展名才能正确执行
-  const cmdScripts = [
-    // Node.js ecosystem
-    'npm',
-    'npx',
-    'yarn',
-    'pnpm',
-
-    // Python ecosystem
-    'uv',
-    'uvx',
-    'pip',
-    'pipx',
-    'poetry',
-    'pdm',
-
-    // Ruby ecosystem
-    'gem',
-    'bundle',
-
-    // Rust ecosystem
-    'cargo',
-
-    // Other build tools
-    'gradle',
-    'mvn',
-    'make',
-    'cmake',
-  ]
-
-  // Windows 下的 .exe 可执行文件
-  const exeCommands = [
-    'node',
-    'python',
-    'python3',
-    'py',
-    'deno',
-    'bun',
-    'docker',
-    'podman',
-    'go',
-    'java',
-    'dotnet',
-  ]
-
-  const baseName = basename(command)
-  const dir = dirname(command)
-
-  if (cmdScripts.includes(baseName)) {
-    // npm/npx/yarn/pnpm → .cmd（cross-spawn 会自动处理 .cmd 脚本）
-    return dir === '.' ? `${baseName}.cmd` : join(dir, `${baseName}.cmd`)
-  }
-
-  if (exeCommands.includes(baseName)) {
-    // node/python 等 → .exe
-    return dir === '.' ? `${baseName}.exe` : join(dir, `${baseName}.exe`)
-  }
-
-  // 其他命令：假设用户知道自己在做什么，返回原值
-  return command
-}
+// H-016 / scar windows-command-optimization-breaks-cross-spawn:
+// resolveWindowsCommand was deleted intentionally. Do NOT reintroduce a helper
+// that rewrites stdio commands to .cmd/.exe — pass stdioRef.command through to
+// StdioClientTransport and let cross-spawn resolve PATHEXT / shell wrapping.
 
 /**
  * Spread-ready analytics field for the server's base URL. Calls

@@ -1,82 +1,26 @@
-// Input: MCP command names and server config objects
-// Output: bun:test assertions on Windows command resolution and config parsing
-// Pos: guard MCP stdio launch and transport config validation
+// Input: MCP server config objects + client.ts source (scar guards)
+// Output: bun:test assertions on config parsing and anti-regression guards
+// Pos: guard MCP stdio launch / transport config; lock out resolveWindowsCommand
 
 import { test, expect, describe } from 'bun:test'
-// import { resolveWindowsCommand } from './client.js'  // Removed - cross-spawn handles automatically
+import { readFile } from 'fs/promises'
 import { McpServerConfigSchema } from './types.js'
 
-// resolveWindowsCommand 已移除：cross-spawn 自动处理 Windows 命令扩展名
-// 手动追加 .cmd/.exe 会破坏 cross-spawn 的自动机制，导致 Windows MCP 全部失败
-// 参考：WINDOWS-MCP-ROOT-CAUSE.md
-/*
-describe.skip('resolveWindowsCommand (deprecated)', () => {
-  test('npx 添加 .cmd 后缀', () => {
-    expect(resolveWindowsCommand('npx')).toBe('npx.cmd')
-  })
-
-  test('npm 添加 .cmd 后缀', () => {
-    expect(resolveWindowsCommand('npm')).toBe('npm.cmd')
-  })
-
-  test('yarn 添加 .cmd 后缀', () => {
-    expect(resolveWindowsCommand('yarn')).toBe('yarn.cmd')
-  })
-
-  test('pnpm 添加 .cmd 后缀', () => {
-    expect(resolveWindowsCommand('pnpm')).toBe('pnpm.cmd')
-  })
-
-  test('node/python/deno/bun/docker/podman 添加 .exe 后缀', () => {
-    for (const command of ['node', 'python', 'python3', 'py', 'deno', 'bun', 'docker', 'podman']) {
-      expect(resolveWindowsCommand(command)).toBe(`${command}.exe`)
-    }
-  })
-
-  test('已有扩展名的命令不修改', () => {
-    expect(resolveWindowsCommand('npx.cmd')).toBe('npx.cmd')
-    expect(resolveWindowsCommand('node.exe')).toBe('node.exe')
-    expect(resolveWindowsCommand('./script.js')).toBe('./script.js')
-  })
-
-  test('绝对路径带扩展名直接返回', () => {
-    const absPath = process.platform === 'win32'
-      ? 'C:\\Program Files\\nodejs\\node.exe'
-      : '/usr/bin/node.exe' // 测试逻辑，非真实路径
-    expect(resolveWindowsCommand(absPath)).toBe(absPath)
-  })
-
-  test('非 cmdScripts 和非 exeCommands 的命令不修改', () => {
-    expect(resolveWindowsCommand('unknown-cmd')).toBe('unknown-cmd')
-    expect(resolveWindowsCommand('custom-tool')).toBe('custom-tool')
-  })
-
-  test('路径中的 npx 命令正确添加后缀', () => {
-    expect(resolveWindowsCommand('./node_modules/.bin/npx')).toMatch(/npx\.cmd$/)
-    expect(resolveWindowsCommand('node_modules/.bin/npx')).toMatch(/npx\.cmd$/)
-  })
-
-  test('路径中的 node 命令正确添加后缀', () => {
-    expect(resolveWindowsCommand('./bin/node')).toMatch(/node\.exe$/)
-    expect(resolveWindowsCommand('tools/node')).toMatch(/node\.exe$/)
-  })
-
-  test('MCP 常见场景：npx 启动 @modelcontextprotocol/server-*', () => {
-    // 典型的 MCP stdio 配置中 command 为 "npx"
-    expect(resolveWindowsCommand('npx')).toBe('npx.cmd')
-  })
-
-  test('MCP 常见场景：使用全局安装的 npm 包', () => {
-    expect(resolveWindowsCommand('npm')).toBe('npm.cmd')
-    expect(resolveWindowsCommand('yarn')).toBe('yarn.cmd')
-  })
-
-  test('边界情况：空字符串和点开头', () => {
-    expect(resolveWindowsCommand('')).toBe('')
-    expect(resolveWindowsCommand('.')).toBe('.')
+describe('resolveWindowsCommand must stay deleted (H-016 / scar)', () => {
+  test('client.ts 不得定义或 export resolveWindowsCommand', async () => {
+    // scar: windows-command-optimization-breaks-cross-spawn
+    // Rewriting commands to .cmd/.exe before StdioClientTransport breaks cross-spawn.
+    const src = await readFile(new URL('./client.ts', import.meta.url), 'utf8')
+    expect(src).not.toMatch(
+      /(?:export\s+)?function\s+resolveWindowsCommand\s*\(/,
+    )
+    expect(src).not.toMatch(
+      /export\s*\{[^}]*\bresolveWindowsCommand\b[^}]*\}/,
+    )
+    // Must not call any resolveWindowsCommand helper on the spawn path
+    expect(src).not.toMatch(/resolveWindowsCommand\s*\(/)
   })
 })
-*/
 
 describe('McpServerConfigSchema', () => {
   test('url 配置缺少 type 时给出明确 transport 提示', () => {

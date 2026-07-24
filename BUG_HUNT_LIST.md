@@ -16,8 +16,8 @@
 | P0   | 1      | 0        | 1    | H-001（有残余） |
 | P1   | 7      | 1        | 8    | H-002/H-008、H-003、H-004、H-005、H-007（第二批 P1 全清） |
 | P2   | 7      | 3        | 10   | H-009（`9b48301d6`） |
-| P3   | 3      | 2        | 5    | — |
-| **合计** | **18** | **6** | **24** | + P-001/P-002/P-003/P-004（隐私节）；H-009 已修复 |
+| P3   | 3      | 2        | 5    | H-016 |
+| **合计** | **18** | **6** | **24** | + P-001/P-002/P-003/P-004（隐私节）；H-009 已修复；H-016 已修复 |
 
 > **首批修复独立验收**（2026-07-24 17:07:55 +08:00）：commits `03ddb4bb9` (H-001)、`c73ce663e` (H-005)、`37d9a1fc8` (P-001/P-002)。详见各条目「修复状态」段。  
 > **第二批修复独立验收（初轮）**（2026-07-24 17:18:22 +08:00）：commits `c7accadcf` (H-004)、`09c3576e9` (H-007)、`033a7c85b` (H-002/H-008)。当时 H-003 无 commit，判定未完成。  
@@ -270,10 +270,17 @@
 
 #### H-016｜resolveWindowsCommand 死代码残留（scar  enticement）
 - **级别**：P3  
-- **状态**：已证实（当前 spawn 路径未调用）  
-- **位置**：`src/services/mcp/client.ts` ~L522+；测试标 deprecated skip  
-- **因果**：函数仍 export；若后续「优化」重新接入会再次破坏 cross-spawn（scar: windows-command-optimization-breaks-cross-spawn）  
-- **建议**：删除或移入 test-only，并加 lint 禁调用  
+- **状态**：已证实 → **已修复**  
+- **修复 commit**：chore(mcp): remove resolveWindowsCommand dead code (H-016)  
+- **验收时间**：2026-07-24  
+- **验收结论**：
+  - 删除 `export function resolveWindowsCommand` 及仅为其服务的 `basename`/`extname` import
+  - 生产 spawn 路径保持 `finalCommand = CLAUDE_CODE_SHELL_PREFIX || stdioRef.command`，注释明确禁止重接
+  - 源码守卫：`client.test.ts` + `stdio-env-inject.test.ts` 断言不得再定义/调用 `resolveWindowsCommand`
+  - 测试：`bun test src/services/mcp/client.test.ts src/services/mcp/__tests__/stdio-env-inject.test.ts` → **19 pass / 0 fail**
+- **位置**（历史）：`src/services/mcp/client.ts` 曾 ~L543+ export；`client.test.ts` deprecated skip 块已清  
+- **因果**（历史）：函数仍 export；若后续「优化」重新接入会再次破坏 cross-spawn（scar: windows-command-optimization-breaks-cross-spawn）  
+- **建议**（已落地）：优先删除 + 源码守卫锁死  
 
 #### H-017｜isTermius 启发式过宽
 - **级别**：P3  
