@@ -222,7 +222,7 @@
 #### H-010｜channelRegistry 冷启动只加载 Map 中「第一个」用户 token
 - **级别**：P2  
 - **状态**：已证实 → **已修复**  
-- **修复 commit**：`4acab2ba25eab35fc5e6123e1dd796a77a8566fa` — fix(channel): restore all persisted user tokens on cold start (H-010)  
+- **修复 commit**：`9c4220d542f5be2e7e6b11922afc00de8bbc20a5` — fix(channel): restore all persisted user tokens on cold start (H-010)  
 - **验收时间**：2026-07-24  
 - **验收结论**：
   - `_contexts` 改为 `Map<channel, Map<user_id, ChannelReplyContext>>`；磁盘冷启动 `_loadPersistedContext` 恢复**全部** entry（不再 `entries[0]`）
