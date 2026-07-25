@@ -12,6 +12,9 @@ coverage
 *.tsbuildinfo
 
 # Non-source artifacts
+# KEEP LOCALLY / 禁止删除：package-v2.1.88/ 为上游 2.1.88 解压参考包（含 cli.js.map、src-extracted）。
+# 仅 gitignore，切勿 rm -rf；勿重新 git add。二次源：/Users/panda/Downloads/资料/claude-code-2.1.88.zip
+# git 恢复：git archive 1a5d1bd package-v2.1.88 | tar -x
 package-v2.1.88
 monitor/
 docs
@@ -41,7 +44,7 @@ monitor/tmp/
 # Stray Electron main bundle dropped to repo root by build:electron in some configs
 /main.js
 package-v2.1.156/
-# Upstream proprietary snapshots (never push) — catch-all for all probed versions
+# Upstream proprietary snapshots (never push; local keep — do not delete working copies)
 package-v2.1.*/
 
 # Build artifacts (tarballs)
