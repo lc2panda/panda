@@ -12,6 +12,13 @@
 
 "use strict";
 
+// Prevent Windows PowerShell stdin hang: PowerShell's $MyInvocation.ExpectingInput
+// can incorrectly report stdin as readable, causing Node.js to wait indefinitely.
+// Explicitly pause stdin to avoid implicit blocking before spawn.
+if (!process.stdin.isTTY) {
+  process.stdin.pause();
+}
+
 const isBun = typeof globalThis.Bun !== "undefined";
 
 if (isBun) {
