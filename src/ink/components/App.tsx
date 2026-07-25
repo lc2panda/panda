@@ -227,7 +227,10 @@ export default class App extends PureComponent<Props, State> {
         // The buffered text is preserved for REPL.tsx via consumeEarlyInput().
         stopCapturingEarlyInput();
         stdin.ref();
-        stdin.setRawMode(true);
+        // Avoid redundant setRawMode(true) if already in raw mode (Windows can hang)
+        if (stdin.isRaw !== true) {
+          stdin.setRawMode(true);
+        }
         stdin.addListener('readable', this.handleReadable);
         // Enable bracketed paste mode
         this.props.stdout.write(EBP);
