@@ -31,7 +31,6 @@ export function startCapturingEarlyInput(): void {
   // be in print mode. Raw mode disables ISIG (terminal Ctrl+C → SIGINT),
   // which would make -p uninterruptible.
   if (
-    process.platform === 'win32' || // Windows: disable early input capture entirely (prevents stdin hang)
     !process.stdin.isTTY ||
     isCapturing ||
     process.argv.includes('-p') ||
@@ -150,13 +149,6 @@ export function stopCapturingEarlyInput(): void {
   if (readableHandler) {
     process.stdin.removeListener('readable', readableHandler)
     readableHandler = null
-  }
-
-  // Pair with the ref() in startCapturingEarlyInput to prevent stdin hang
-  try {
-    process.stdin.unref()
-  } catch {
-    // Windows may throw, ignore silently
   }
 
   // Don't reset stdin state - the REPL's Ink App will manage stdin state.
