@@ -1,3 +1,4 @@
+- `launcher.cjs` — npm 全局安装入口：Node 环境检测并转交 bun 运行；启动前校验必需依赖（Windows 上的 Git）
 - `cli.tsx` — 主入口：CLI启动、运行时polyfill注入、feature flag与全局宏定义
 - `init.ts` — 一次性初始化（遥测、配置、信任对话框）
 - `mcp.ts` — MCP服务端入口

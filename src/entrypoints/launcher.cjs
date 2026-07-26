@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Input: CLI 参数
-// Output: 启动 bun 运行 cli.js，或在 bun 环境下直接加载
+// Output: 校验必需依赖（Windows 上的 Git），启动 bun 运行 cli.js，或在 bun 环境下直接加载
 // Pos: npm 全局安装入口，Node.js 兼容的启动器
 // "一旦我被修改，请更新我的头部注释，以及所属文件夹的md。"
 
@@ -11,6 +11,32 @@
 // with Bun if necessary.
 
 "use strict";
+
+// Git is a required dependency: Panda uses it for repository status and
+// project detection. On Windows, Git is commonly missing from PATH, which
+// previously caused silent hangs. Fail fast with a clear message instead.
+// Mirrors the Bun availability check below (execFileSync + exit(1)).
+function checkGitInstalled() {
+  if (process.platform !== "win32") return;
+  try {
+    require("child_process").execFileSync("git", ["--version"], {
+      stdio: "ignore",
+      timeout: 5000,
+    });
+  } catch {
+    console.error(
+      "\x1b[31mError: Git is required but not found.\x1b[0m\n\n" +
+      "Panda Code requires Git for repository status and project detection.\n\n" +
+      "Install Git for Windows:\n" +
+      "  https://git-scm.com/download/win\n" +
+      "  or run: winget install Git.Git\n" +
+      "\nThen restart your terminal and try again."
+    );
+    process.exit(1);
+  }
+}
+
+checkGitInstalled();
 
 const isBun = typeof globalThis.Bun !== "undefined";
 
