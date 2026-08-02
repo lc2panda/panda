@@ -7,6 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
+import { loadPresetsFromSettings } from '../routing/presets.js'
 
 /**
  * 17 项 Panda 默认 env。任何新增项走此处集中。
@@ -224,6 +225,21 @@ export function initDefaultPandaccSettings(options?: {
       )
     }
     return { newlyAddedKeys: [], newlyAddedTopLevelKeys: [], skipped: true }
+  }
+
+  // Load routing presets from settings (if present)
+  try {
+    const routingPresets = nextSettings.routingPresets as Record<string, unknown> | undefined
+    const activePresetName = nextSettings.activeRoutingPreset as string | undefined
+    if (routingPresets && typeof routingPresets === 'object') {
+      loadPresetsFromSettings(routingPresets, activePresetName)
+    }
+  } catch (e) {
+    // Preset loading is optional — don't fail initialization if it errors
+    if (!silent) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn(`[panda] 加载 routing presets 失败，将使用默认配置: ${msg}`)
+    }
   }
 
   return { newlyAddedKeys, newlyAddedTopLevelKeys, skipped: false }

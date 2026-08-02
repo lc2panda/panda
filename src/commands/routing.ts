@@ -90,10 +90,11 @@ const routing = {
                 name: agentName,
               })
 
+              const { getActivePreset } = require('../routing/presets.js')
               const target = resolveModelTarget(
                 { name: agentName, agentType: agentName },
                 taskProfile,
-                null,
+                getActivePreset(),
                 'claude-sonnet-4-6',
               )
 

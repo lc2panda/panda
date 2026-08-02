@@ -132,6 +132,22 @@ export function setActivePreset(name: string): boolean {
   const preset = getPreset(name)
   if (preset) {
     _activePreset = preset
+
+    // Persist to settings
+    try {
+      const { updateSettingsForSource } = require('../utils/settings/settings.js')
+      const result = updateSettingsForSource('userSettings', {
+        activeRoutingPreset: name,
+      })
+      if (result.error) {
+        console.warn(`[routing] Failed to persist active preset: ${result.error.message}`)
+      }
+    } catch (e) {
+      // Don't fail if persistence errors — in-memory state is still updated
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn(`[routing] Failed to persist active preset: ${msg}`)
+    }
+
     return true
   }
   return false

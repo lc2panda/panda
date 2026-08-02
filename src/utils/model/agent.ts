@@ -73,12 +73,13 @@ export function getAgentModel(
   if (agentDefinition && (agentDefinition.modelPreferences || agentDefinition.modelPreset)) {
     try {
       const { isRoutingEnabled, resolveModelTarget, classifyTask } = require('../../routing/index.js')
+      const { getActivePreset } = require('../../routing/presets.js')
       if (isRoutingEnabled()) {
         const taskProfile = classifyTask(
           agentDefinition.name || agentDefinition.agentType || '',
           agentDefinition,
         )
-        const target = resolveModelTarget(agentDefinition, taskProfile, null, parentModel)
+        const target = resolveModelTarget(agentDefinition, taskProfile, getActivePreset(), parentModel)
         if (target && target.reason !== 'default: inherit from parent') {
           const { logForDebugging } = require('../debug.js')
           logForDebugging(`[routing] getAgentModel: ${agentDefinition.name ?? agentDefinition.agentType} → ${target.modelId} (${target.reason})`)
