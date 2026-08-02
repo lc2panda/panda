@@ -42,6 +42,7 @@ import { sleep } from '../../utils/sleep.js';
 import { buildEffectiveSystemPrompt } from '../../utils/systemPrompt.js';
 import { asSystemPrompt } from '../../utils/systemPromptType.js';
 import { getTaskOutputPath } from '../../utils/task/diskOutput.js';
+import { updateTaskState } from '../../utils/task/framework.js';
 import { getParentSessionId, isTeammate } from '../../utils/teammate.js';
 import { isInProcessTeammate } from '../../utils/teammateContext.js';
 import { teleportToRemote } from '../../utils/teleport.js';
@@ -52,6 +53,7 @@ import { BASH_TOOL_NAME } from '../BashTool/toolName.js';
 import { BackgroundHint } from '../BashTool/UI.js';
 import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js';
 import { spawnTeammate } from '../shared/spawnMultiAgent.js';
+import { type LocalAgentTaskState } from '../../tasks/LocalAgentTask/LocalAgentTask.js';
 import { setAgentColor } from './agentColorManager.js';
 import { agentToolResultSchema, classifyHandoffIfNeeded, emitTaskProgress, extractPartialResult, finalizeAgentTool, findAgentByLooseType, getLastToolUseName, normalizeAgentType, runAsyncAgentLifecycle } from './agentToolUtils.js';
 import { GENERAL_PURPOSE_AGENT } from './built-in/generalPurposeAgent.js';
@@ -92,6 +94,30 @@ function getAutoBackgroundMs(): number {
     return 120_000;
   }
   return 0;
+}
+
+// 辅助函数：实时追加消息到 task.messages（根本修复）
+const SUBAGENT_VERBOSE = process.env.PANDA_SUBAGENT_VERBOSE === '1';
+const SUBAGENT_MAX_MESSAGES = parseInt(process.env.PANDA_SUBAGENT_MAX_MESSAGES || '50', 10);
+
+function appendMessageToAgentTask(
+  agentId: string,
+  message: Message,
+  setAppState: (updater: (prev: AppState) => AppState) => void
+): void {
+  if (!SUBAGENT_VERBOSE) return; // 仅在详细模式下追加
+
+  updateTaskState<LocalAgentTaskState>(agentId, setAppState, task => {
+    const messages = task.messages || [];
+    const updated = [...messages, message];
+
+    // 限制数量，避免内存膨胀
+    const capped = updated.length > SUBAGENT_MAX_MESSAGES
+      ? updated.slice(-SUBAGENT_MAX_MESSAGES)
+      : updated;
+
+    return { ...task, messages: capped };
+  });
 }
 
 // Multi-agent type constants are defined inline inside gated blocks to enable dead code elimination
@@ -1044,6 +1070,9 @@ export const AgentTool = buildTool({
                     })) {
                       agentMessages.push(msg);
 
+                      // 根本修复：实时追加消息到 task.messages
+                      appendMessageToAgentTask(backgroundedTaskId, msg, rootSetAppState);
+
                       // Track progress for backgrounded agents
                       updateProgressFromMessage(tracker, msg, resolveActivity2, toolUseContext.options.tools);
                       updateAsyncAgentProgress(backgroundedTaskId, getProgressUpdate(tracker), rootSetAppState);
@@ -1177,6 +1206,11 @@ export const AgentTool = buildTool({
             if (result.done) break;
             const message = result.value as MessageType;
             agentMessages.push(message);
+
+            // 根本修复：实时追加消息到 task.messages（foreground agent）
+            if (foregroundTaskId) {
+              appendMessageToAgentTask(foregroundTaskId, message, rootSetAppState);
+            }
 
             // Emit task_progress for the VS Code subagent panel
             updateProgressFromMessage(syncTracker, message, syncResolveActivity, toolUseContext.options.tools);

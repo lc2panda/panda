@@ -606,7 +606,7 @@ export function registerAsyncAgent({
     isBackgrounded: true,
     // registerAsyncAgent immediately backgrounds
     pendingMessages: [],
-    retain: false,
+    retain: true, // 修复：立即保留消息，用户点击时可见完整执行过程
     diskLoaded: false
   };
 
@@ -674,7 +674,7 @@ export function registerAgentForeground({
     isBackgrounded: false,
     // Not yet backgrounded - running in foreground
     pendingMessages: [],
-    retain: false,
+    retain: true, // 修复：立即保留消息，用户点击时可见完整执行过程
     diskLoaded: false
   };
 
