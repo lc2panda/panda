@@ -6,13 +6,14 @@
 
 ## 最新更新 (v2.31.0)
 
-### 新增技能：`/advisor` — 智能顾问
+### 新增技能：`/advisor` — 智能顾问 [Panda 扩展]
 - **文件**: `bundled/advisor.ts` (185 行)
-- **功能**: 技术决策分析与多方案对比
+- **功能**: 技术决策分析与多方案对比（Panda 创新功能，非 Claude Code 官方）
 - **配置**: `settings.advisorModel` (支持 claude-opus-4-6, claude-fable-5 等)
 - **双模式设计**:
   - 配置管理: `/advisor status`, `/advisor <model>`, `/advisor off`
   - 决策分析: `/advisor <question>` — 生成 5 Phase 结构化分析
+- **实现**: 基于 LLM prompt-wrapper，非独立决策引擎
 
 ### 新增工具：`utils/advisorHelper.ts`
 - **文件**: `utils/advisorHelper.ts` (203 行) + 测试 (107 行)
