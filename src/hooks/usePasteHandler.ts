@@ -167,6 +167,12 @@ export function usePasteHandler({
     (currentTimeoutId: ReturnType<typeof setTimeout> | null) => {
       if (currentTimeoutId) {
         clearTimeout(currentTimeoutId)
+        // BUGFIX: If we clear a pending timeout that had armed the barrier,
+        // we must disarm it to prevent counter leak on rapid consecutive pastes.
+        if (imagePasteSessionArmedRef.current) {
+          imagePasteSessionArmedRef.current = false
+          onImagePasteEnd?.()
+        }
       }
       return setTimeout(
         (
