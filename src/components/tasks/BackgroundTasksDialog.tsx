@@ -421,7 +421,7 @@ export function BackgroundTasksDialog({
     }
     return <Byline>{actions}</Byline>;
   }
-  return <Box flexDirection="column" tabIndex={0} autoFocus onKeyDown={handleKeyDown}>
+  return <Box flexDirection="column" tabIndex={0} autoFocus onKeyDown={handleKeyDown} key="background-tasks-list">
       <Dialog title="Background tasks" subtitle={<>{subtitle}</>} onCancel={handleCancel} color="background" inputGuide={renderInputGuide}>
         {allSelectableItems.length === 0 ? <Text dimColor>No tasks currently running</Text> : <Box flexDirection="column">
             {teammateTasks.length > 0 && <Box flexDirection="column">
