@@ -463,26 +463,28 @@ cp src/utils/taskPriority.ts scripts/standalone/
 - **代码库扫描**：未发现 omp 集成痕迹
 - **现有 TODO.md**：扁平列表，约 50 项任务，无层次结构
 
-### 6.2 互联网调研（待补充）
-> ⚠️ 由于缺少 omp 截图/文档的明确来源，以下为推测性检索方向
+### 6.2 互联网调研（待后续完善）
+> **注**：以下为推测性检索方向，非阻塞项。由于缺少 omp 截图/文档的明确来源，Phase 1 实施可先基于通用最佳实践（INVEST 原则、敏捷优先级模型）。
 
 **建议检索方向**：
 1. **OpenMP 官方**：https://www.openmp.org/
    - 确认是否有项目管理扩展
-   - 检索时间：待执行
+   - **优先级**：P2（参考性）
    
 2. **GitHub 搜索**：
    ```
    "omp" + "TODO management" + "priority scoring"
    "Open Management Platform" + "task hierarchy"
    ```
-   - 检索时间：待执行
+   - **优先级**：P2（参考性）
    
 3. **项目管理工具对比**：
    - Linear（现代软件团队推荐）
    - Jira（企业级标准）
    - Notion Projects（轻量协作）
-   - 检索时间：待执行
+   - **优先级**：P2（参考性）
+
+**替代方案**：直接采用成熟的任务管理最佳实践（见第 7 章推荐实施方案）
 
 ### 6.3 设计标准参考
 1. **任务分解**：参考 INVEST 原则（Independent, Negotiable, Valuable, Estimable, Small, Testable）
