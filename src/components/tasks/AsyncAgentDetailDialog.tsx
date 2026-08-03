@@ -32,16 +32,27 @@ export function AsyncAgentDetailDialog(t0) {
     onBack
   } = t0;
 
-  // DEBUG FINAL: Runtime diagnostic logging
+  // DEBUG FILE: Write diagnostic info to file
   useEffect(() => {
-    console.error('[DEBUG FINAL] agent.messages:', agent.messages);
-    console.error('[DEBUG FINAL] agent.messages?.length:', agent.messages?.length);
-    if (agent.messages?.[0]) {
-      console.error('[DEBUG FINAL] First message keys:', Object.keys(agent.messages[0]));
-      console.error('[DEBUG FINAL] First message.message:', agent.messages[0].message);
-    } else {
-      console.error('[DEBUG FINAL] No messages or empty array');
-    }
+    const fs = require('fs');
+    const logPath = '/tmp/panda-agent-messages-debug.log';
+
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      agentId: agent.id,
+      messagesLength: agent.messages?.length || 0,
+      messagesExists: !!agent.messages,
+      firstMessage: agent.messages?.[0] ? {
+        keys: Object.keys(agent.messages[0]),
+        type: agent.messages[0].type,
+        hasMessage: !!agent.messages[0].message,
+        messageKeys: agent.messages[0].message ? Object.keys(agent.messages[0].message) : null,
+        messageRole: agent.messages[0].message?.role,
+        messageContentLength: agent.messages[0].message?.content?.length || 0
+      } : null
+    };
+
+    fs.appendFileSync(logPath, JSON.stringify(debugInfo, null, 2) + '\n---\n');
   }, [agent.messages]);
 
   const [theme] = useTheme();
