@@ -17,6 +17,13 @@ import { Message } from '../Message.js';
 import { UserPlanMessage } from '../messages/UserPlanMessage.js';
 import { renderToolActivity } from './renderToolActivity.js';
 import { getTaskStatusColor, getTaskStatusIcon } from './taskStatusUtils.js';
+
+// BOTTOM TRACE: Module load logging
+const fs = require('fs');
+fs.appendFileSync('/tmp/panda-module-load.log',
+  `[${new Date().toISOString()}] AsyncAgentDetailDialog module loaded\n`
+);
+
 type Props = {
   agent: DeepImmutable<LocalAgentTaskState>;
   onDone: () => void;
@@ -31,6 +38,11 @@ export function AsyncAgentDetailDialog(t0) {
     onKillAgent,
     onBack
   } = t0;
+
+  // BOTTOM TRACE: Component render logging
+  fs.appendFileSync('/tmp/panda-component-render.log',
+    `[${new Date().toISOString()}] AsyncAgentDetailDialog rendered, agent.id=${agent?.id}, agent.messages.length=${agent?.messages?.length}\n`
+  );
 
   // DEBUG FILE: Write diagnostic info to file
   useEffect(() => {

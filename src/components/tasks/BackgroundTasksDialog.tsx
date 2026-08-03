@@ -40,6 +40,13 @@ import { DreamDetailDialog } from './DreamDetailDialog.js';
 import { InProcessTeammateDetailDialog } from './InProcessTeammateDetailDialog.js';
 import { RemoteSessionDetailDialog } from './RemoteSessionDetailDialog.js';
 import { ShellDetailDialog } from './ShellDetailDialog.js';
+
+// BOTTOM TRACE: Module load logging
+const fs = require('fs');
+fs.appendFileSync('/tmp/panda-module-load.log',
+  `[${new Date().toISOString()}] BackgroundTasksDialog module loaded\n`
+);
+
 type ViewState = {
   mode: 'list';
 } | {
@@ -129,6 +136,11 @@ export function BackgroundTasksDialog({
   toolUseContext,
   initialDetailTaskId
 }: Props): React.ReactNode {
+  // BOTTOM TRACE: Component render logging
+  fs.appendFileSync('/tmp/panda-component-render.log',
+    `[${new Date().toISOString()}] BackgroundTasksDialog rendered\n`
+  );
+
   const tasks = useAppState(s => s.tasks);
   const foregroundedTaskId = useAppState(s_0 => s_0.foregroundedTaskId);
   const showSpinnerTree = useAppState(s_1 => s_1.expandedView) === 'teammates';
