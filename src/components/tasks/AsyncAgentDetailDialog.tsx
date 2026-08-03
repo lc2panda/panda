@@ -196,6 +196,28 @@ export function AsyncAgentDetailDialog(t0) {
   }
   let t17b;
   if ($[54] !== agent.messages || $[55] !== tools) {
+    // === DEBUG START: 输出 agent.messages 真实结构 ===
+    if (agent.messages) {
+      process.stderr.write('\n[DEBUG AsyncAgentDetailDialog] Messages count: ' + agent.messages.length + '\n');
+
+      // 输出最近3条消息的结构
+      const recentMessages = agent.messages.slice(-3);
+      recentMessages.forEach((msg, idx) => {
+        process.stderr.write(`[DEBUG] Message ${idx}: type=${msg.type}, uuid=${msg.uuid?.substring(0, 8)}, hasMessage=${!!msg.message}, role=${msg.message?.role}, contentLength=${msg.message?.content?.length || 0}\n`);
+      });
+
+      // 输出第一条消息的完整键
+      if (agent.messages.length > 0) {
+        process.stderr.write('[DEBUG] First message keys: ' + Object.keys(agent.messages[0]).join(', ') + '\n');
+        if (agent.messages[0].message) {
+          process.stderr.write('[DEBUG] First message.message keys: ' + Object.keys(agent.messages[0].message).join(', ') + '\n');
+        }
+      }
+    } else {
+      process.stderr.write('[DEBUG AsyncAgentDetailDialog] agent.messages is null/undefined\n');
+    }
+    // === DEBUG END ===
+
     t17b = agent.messages && agent.messages.length > 0 && <Box flexDirection="column" marginTop={1}><Text bold={true} dimColor={true}>Detailed Messages ({agent.messages.length})</Text>{agent.messages.slice(-20).map((msg, i) => <Box key={i} flexDirection="column" marginTop={i > 0 ? 1 : 0}><Text dimColor={true}>{msg.message?.role === 'assistant' ? '🤖 Assistant' : msg.message?.role === 'user' ? '👤 User' : `📋 ${msg.type}`}:</Text>{Array.isArray(msg.message?.content) ? msg.message.content.map((block, j) => <Box key={j} flexDirection="column" marginLeft={2}>{block.type === 'text' ? <Text wrap="wrap">{block.text}</Text> : block.type === 'tool_use' ? <Text dimColor={true}>🔧 {block.name}</Text> : block.type === 'tool_result' ? <Text dimColor={true}>✅ Tool result</Text> : null}</Box>) : <Text wrap="wrap" marginLeft={2}>{typeof msg.message?.content === 'string' ? msg.message.content : msg.message?.content ? JSON.stringify(msg.message.content) : `[${msg.type} message]`}</Text>}</Box>)}</Box>;
     $[54] = agent.messages;
     $[55] = tools;
