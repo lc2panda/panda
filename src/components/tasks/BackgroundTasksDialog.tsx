@@ -371,6 +371,18 @@ export function BackgroundTasksDialog({
       return null;
     }
 
+    // DEBUG: Route logging
+    const fs = require('fs');
+    const logPath = '/tmp/panda-dialog-routing-debug.log';
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      taskId: task_0?.id,
+      taskType: task_0?.type,
+      hasTask: !!task_0,
+      taskKeys: task_0 ? Object.keys(task_0) : null
+    };
+    fs.appendFileSync(logPath, JSON.stringify(debugInfo, null, 2) + '\n---\n');
+
     // Detail mode - show appropriate detail dialog
     switch (task_0.type) {
       case 'local_bash':
