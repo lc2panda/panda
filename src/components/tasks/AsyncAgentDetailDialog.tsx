@@ -1,5 +1,5 @@
 import { c as _c } from "react/compiler-runtime";
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import type { DeepImmutable } from 'src/types/utils.js';
 import { useElapsedTime } from '../../hooks/useElapsedTime.js';
 import type { KeyboardEvent } from '../../ink/events/keyboard-event.js';
@@ -31,6 +31,19 @@ export function AsyncAgentDetailDialog(t0) {
     onKillAgent,
     onBack
   } = t0;
+
+  // DEBUG FINAL: Runtime diagnostic logging
+  useEffect(() => {
+    console.error('[DEBUG FINAL] agent.messages:', agent.messages);
+    console.error('[DEBUG FINAL] agent.messages?.length:', agent.messages?.length);
+    if (agent.messages?.[0]) {
+      console.error('[DEBUG FINAL] First message keys:', Object.keys(agent.messages[0]));
+      console.error('[DEBUG FINAL] First message.message:', agent.messages[0].message);
+    } else {
+      console.error('[DEBUG FINAL] No messages or empty array');
+    }
+  }, [agent.messages]);
+
   const [theme] = useTheme();
   let t1;
   if ($[0] === Symbol.for("react.memo_cache_sentinel")) {
