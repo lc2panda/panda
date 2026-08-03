@@ -14,6 +14,7 @@ import { getQuerySourceForAgent } from 'src/utils/promptCategory.js';
 import { z } from 'zod/v4';
 import { clearInvokedSkillsForAgent, getSdkAgentProgressSummariesEnabled } from '../../bootstrap/state.js';
 import { enhanceSystemPromptWithEnvDetails, getSystemPrompt } from '../../constants/prompts.js';
+import type { AppState } from '../../state/AppState.js';
 import { isCoordinatorMode } from '../../coordinator/coordinatorMode.js';
 import { startAgentSummarization } from '../../services/AgentSummary/agentSummary.js';
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js';
@@ -102,7 +103,7 @@ const SUBAGENT_MAX_MESSAGES = parseInt(process.env.PANDA_SUBAGENT_MAX_MESSAGES |
 
 function appendMessageToAgentTask(
   agentId: string,
-  message: Message,
+  message: MessageType,
   setAppState: (updater: (prev: AppState) => AppState) => void
 ): void {
   if (!SUBAGENT_VERBOSE) return; // 仅在详细模式下追加
