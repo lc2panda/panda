@@ -932,27 +932,31 @@ export const AgentTool = buildTool({
           }
         }
 
-        // Register as foreground task immediately so it can be backgrounded at any time
-        // Skip registration if background tasks are disabled
-        let foregroundTaskId: string | undefined;
-        // Create the background race promise once outside the loop — otherwise
-        // each iteration adds a new .then() reaction to the same pending
-        // promise, accumulating callbacks for the lifetime of the agent.
+        // Register as foreground task immediately — needed for transcript view.
+        // Even in ablation baseline mode (CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1),
+        // we register the task so appendMessageToAgentTask can fill task.messages.
+        // We disable auto-backgrounding in ablation mode by passing undefined for autoBackgroundMs.
+        const registration = registerAgentForeground({
+          agentId: syncAgentId,
+          description,
+          prompt,
+          selectedAgent,
+          setAppState: rootSetAppState,
+          toolUseId: toolUseContext.toolUseId,
+          autoBackgroundMs: !isBackgroundTasksDisabled ? (getAutoBackgroundMs() || undefined) : undefined
+        });
+        const foregroundTaskId: string = registration.taskId;
+
+        // Background-related logic: only enable in non-ablation mode
         let backgroundPromise: Promise<{
           type: 'background';
         }> | undefined;
         let cancelAutoBackground: (() => void) | undefined;
+
         if (!isBackgroundTasksDisabled) {
-          const registration = registerAgentForeground({
-            agentId: syncAgentId,
-            description,
-            prompt,
-            selectedAgent,
-            setAppState: rootSetAppState,
-            toolUseId: toolUseContext.toolUseId,
-            autoBackgroundMs: getAutoBackgroundMs() || undefined
-          });
-          foregroundTaskId = registration.taskId;
+          // Create the background race promise once outside the loop — otherwise
+          // each iteration adds a new .then() reaction to the same pending
+          // promise, accumulating callbacks for the lifetime of the agent.
           backgroundPromise = registration.backgroundSignal.then(() => ({
             type: 'background' as const
           }));
