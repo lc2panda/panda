@@ -9,10 +9,11 @@ import { getEmptyToolPermissionContext } from '../../Tool.js';
 import type { LocalAgentTaskState } from '../../tasks/LocalAgentTask/LocalAgentTask.js';
 import { getTools } from '../../tools.js';
 import { formatNumber } from '../../utils/format.js';
-import { extractTag } from '../../utils/messages.js';
+import { buildMessageLookups, extractTag } from '../../utils/messages.js';
 import { Byline } from '../design-system/Byline.js';
 import { Dialog } from '../design-system/Dialog.js';
 import { KeyboardShortcutHint } from '../design-system/KeyboardShortcutHint.js';
+import { Message } from '../Message.js';
 import { UserPlanMessage } from '../messages/UserPlanMessage.js';
 import { renderToolActivity } from './renderToolActivity.js';
 import { getTaskStatusColor, getTaskStatusIcon } from './taskStatusUtils.js';
@@ -23,7 +24,7 @@ type Props = {
   onBack?: () => void;
 };
 export function AsyncAgentDetailDialog(t0) {
-  const $ = _c(54);
+  const $ = _c(58);
   const {
     agent,
     onDone,
@@ -193,12 +194,22 @@ export function AsyncAgentDetailDialog(t0) {
   } else {
     t17 = $[40];
   }
+  let t17b;
+  if ($[54] !== agent.messages || $[55] !== tools) {
+    t17b = agent.messages && agent.messages.length > 0 && <Box flexDirection="column" marginTop={1}><Text bold={true} dimColor={true}>Detailed Messages ({agent.messages.length})</Text>{agent.messages.slice(-20).map((msg, i) => <Box key={i} flexDirection="column" marginTop={i > 0 ? 1 : 0}><Text dimColor={true}>{msg.role === 'assistant' ? '🤖 Assistant' : '👤 User'}:</Text>{Array.isArray(msg.content) ? msg.content.map((block, j) => <Box key={j} flexDirection="column" marginLeft={2}>{block.type === 'text' ? <Text wrap="wrap">{block.text}</Text> : block.type === 'tool_use' ? <Text dimColor={true}>🔧 {block.name}</Text> : block.type === 'tool_result' ? <Text dimColor={true}>✅ Tool result</Text> : null}</Box>) : <Text wrap="wrap" marginLeft={2}>{typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}</Text>}</Box>)}</Box>;
+    $[54] = agent.messages;
+    $[55] = tools;
+    $[56] = t17b;
+  } else {
+    t17b = $[56];
+  }
   let t18;
-  if ($[41] !== t15 || $[42] !== t16 || $[43] !== t17) {
-    t18 = <Box flexDirection="column">{t15}{t16}{t17}</Box>;
+  if ($[41] !== t15 || $[42] !== t16 || $[43] !== t17 || $[57] !== t17b) {
+    t18 = <Box flexDirection="column">{t15}{t16}{t17b}{t17}</Box>;
     $[41] = t15;
     $[42] = t16;
     $[43] = t17;
+    $[57] = t17b;
     $[44] = t18;
   } else {
     t18 = $[44];

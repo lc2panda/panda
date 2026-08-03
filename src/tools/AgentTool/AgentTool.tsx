@@ -98,15 +98,16 @@ function getAutoBackgroundMs(): number {
 }
 
 // 辅助函数：实时追加消息到 task.messages（根本修复）
-const SUBAGENT_VERBOSE = process.env.PANDA_SUBAGENT_VERBOSE === '1';
-const SUBAGENT_MAX_MESSAGES = parseInt(process.env.PANDA_SUBAGENT_MAX_MESSAGES || '50', 10);
+// 默认启用详细模式，除非显式设置 PANDA_SUBAGENT_VERBOSE=0
+const SUBAGENT_VERBOSE = process.env.PANDA_SUBAGENT_VERBOSE !== '0';
+const SUBAGENT_MAX_MESSAGES = parseInt(process.env.PANDA_SUBAGENT_MAX_MESSAGES || '100', 10);
 
 function appendMessageToAgentTask(
   agentId: string,
   message: MessageType,
   setAppState: (updater: (prev: AppState) => AppState) => void
 ): void {
-  if (!SUBAGENT_VERBOSE) return; // 仅在详细模式下追加
+  if (!SUBAGENT_VERBOSE) return; // 仅在详细模式下追加（默认启用）
 
   updateTaskState<LocalAgentTaskState>(agentId, setAppState, task => {
     const messages = task.messages || [];
