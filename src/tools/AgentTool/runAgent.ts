@@ -355,10 +355,6 @@ export async function* runAgent({
    * during long single-block streams (e.g. thinking) where no assistant
    * message is yielded for >60s. */
   onQueryProgress?: () => void
-  /** Optional callback to append messages to task.messages in real-time.
-   * Called immediately after recording each message to sidechain transcript.
-   * Used to populate LocalAgentTask.messages for the subagent detail window. */
-  onMessageYield?: (message: Message) => void
 }): AsyncGenerator<Message, void> {
   // Track subagent usage for feature discovery
 
@@ -934,9 +930,6 @@ export async function* runAgent({
         if (message.type !== 'progress') {
           lastRecordedUuid = message.uuid
         }
-
-        // 根本修复：实时追加消息到 task.messages（通过回调）
-        onMessageYield?.(message)
         // P0-Fix5 + P3: Track agent output + consecutive same-tool failures
         if ((message as any)?.message?.content) {
           const _p0blocks = (message as any).message.content;

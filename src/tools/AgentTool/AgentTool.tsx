@@ -867,11 +867,7 @@ export const AgentTool = buildTool({
             agentId: asAgentId(agentBackgroundTask.agentId),
             abortController: agentBackgroundTask.abortController!
           },
-          onCacheSafeParams,
-          // 根本修复：runAgent 内部实时追加消息到 task.messages
-          onMessageYield: (message) => {
-            appendMessageToAgentTask(agentBackgroundTask.agentId, message, rootSetAppState);
-          }
+          onCacheSafeParams
         }),
         metadata,
         description,
@@ -985,10 +981,6 @@ export const AgentTool = buildTool({
               stop
             } = startAgentSummarization(summaryTaskId, syncAgentId, params, rootSetAppState);
             stopForegroundSummarization = stop;
-          } : undefined,
-          // 根本修复：runAgent 内部实时追加消息到 task.messages
-          onMessageYield: foregroundTaskId ? (message) => {
-            appendMessageToAgentTask(foregroundTaskId, message, rootSetAppState);
           } : undefined
         })[Symbol.asyncIterator]();
 
